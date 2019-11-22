@@ -178,7 +178,7 @@ def to_relay_type(self, a: AbstractScalar):
     elif issubclass(tp, EnvType):
         return env_type(env_val())
     elif issubclass(tp, UniverseType):
-        return relay.ty.scalar_type('uint64')
+        return relay.ty.TupleType([])
     else:
         return relay.ty.scalar_type(type_to_np_dtype(tp))
 
@@ -215,8 +215,7 @@ def to_relay_type(self, a: AbstractTaggedUnion):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractHandle):
-    return relay.ty.RefType(relay.ty.TupleType(
-        [relay.ty.scalar_type('uint64'), self(a.element)]))
+    return relay.ty.RefType(self(a.element))
 
 
 @overload  # noqa: F811
@@ -240,7 +239,7 @@ def handle_wrapper(fn, handle_cst, handle_params):
         u = res[0]
         res = res[1] if len(res) == 2 else res[1:]
         for h, v in zip(handle_instances, u):
-            h.value = type(h.value)(h.value.fields[0], v)
+            h.value = v
         return (), res
     if len(handle_cst) + len(handle_params) == 0:
         return fn

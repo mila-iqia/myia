@@ -12,7 +12,7 @@ from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
 from ...utils import HandleInstance, TaggedValue, new_universe
-from ...xtype import type_to_np_dtype
+from ...xtype import type_to_np_dtype, UniverseType
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result
 from . import Backend, Converter, HandleBackend
@@ -369,31 +369,16 @@ def relay_split(c, x, sections, dim):
 
 
 def relay_handle(c, v):
-    return relay.expr.RefCreate(
-        relay.Tuple([relay.const(0, 'uint64'), c.ref(v)]))
+    return relay.expr.RefCreate(c.ref(v))
+
+
+# Proper sequencing is handled in convert_func() below
+def relay_universe_setitem(c, u, h, v):
+    return relay.RefWrite(c.ref(h), c.ref(v))
 
 
 def relay_universe_getitem(c, u, h):
-    cv = relay.expr.RefRead(c.ref(h))
-    cu = c.ref(u)
-    return relay.If(relay.greater_equal(cu, relay.TupleGetItem(cv, 0)),
-                    relay.TupleGetItem(cv, 1),
-                    relay.zeros_like(relay.TupleGetItem(cv, 1)))
-
-
-def relay_universe_setitem(c, u, h, v):
-    # Part of this is implemented in the convert_func
-    # because of special flow handling
-    return c.ref(u) + relay.const(1, 'uint64')
-
-
-def relay_universe_setitem_write(c, u, h, v):
-    # This function is not registered in the COMPLEX_MAP
-    # because it is directly used by convert_func instead.
-    u = c.ref(u)
-    h = c.ref(h)
-    v = c.ref(v)
-    return relay.expr.RefWrite(h, relay.expr.Tuple([u, v]))
+    return relay.RefRead(c.ref(h))
 
 
 COMPLEX_MAP = {
@@ -423,8 +408,8 @@ COMPLEX_MAP = {
     P.concat: relay_concat,
     P.split: relay_split,
     P.handle: relay_handle,
-    P.universe_getitem: relay_universe_getitem,
     P.universe_setitem: relay_universe_setitem,
+    P.universe_getitem: relay_universe_getitem,
 }
 
 
@@ -630,17 +615,22 @@ class CompileGraph:
 
     def convert_func(self, graph):
         """Convert a graph."""
+        vname = "handle_seq" + graph.debug.name
+        i = 0
         for p in graph.parameters:
             self.node_map[p] = self.on_parameter(p)
 
         params = [self.ref(p) for p in graph.parameters]
 
-        uset_seq = []
+        useq = []
         for node in toposort(graph.output, NodeVisitor()):
-            if node.is_apply():
+            if any(p.abstract.xtype() is UniverseType
+                   for p in node.inputs[1:]):
+                useq.append(node)
+                self.node_map[node] = relay.var(f"{vname}.{i}")
+                i += 1
+            elif node.is_apply():
                 self.node_map[node] = self.on_apply(node)
-                if node.inputs[0].value is P.universe_setitem:
-                    uset_seq.append(node)
             elif node.is_constant_graph():
                 self.node_map[node] = self.on_graph(node)
             elif node.is_constant():
@@ -648,10 +638,11 @@ class CompileGraph:
 
         out = self.ref(graph.output)
 
-        for uset in reversed(uset_seq):
+        for uop in reversed(useq):
+            assert node.is_apply()
             out = relay.Let(
-                relay.var('_'),
-                relay_universe_setitem_write(self, *uset.inputs[1:]),
+                self.node_map[uop],
+                self.on_apply(uop),
                 out)
 
         res = relay.Function(params, out,
@@ -701,13 +692,11 @@ class RelayInputConverter(Converter):
                                         zip(v, t.elements)])
 
     def convert_universe(self, v, t):
-        return relay_from_scalar(0, 'uint64')
+        return interpreter.TupleValue()
 
     def convert_handle(self, v, t):
         v = self(v.state, t.element)
-        u = relay_from_scalar(0, 'uint64')
-        res = interpreter.RefValue(interpreter.TupleValue(u, v))
-        return res
+        return interpreter.RefValue(v)
 
     def convert_tagged(self, v, t):
         cst = self.cst_conv.convert_tagged(v, t)
@@ -744,7 +733,7 @@ class RelayOutputConverter(Converter):
         return new_universe
 
     def convert_handle(self, v, t):
-        return HandleInstance(self(v.value.fields[1], t.element))
+        return HandleInstance(self(v.value, t.element))
 
     def convert_tagged(self, v, t):
         tag = get_myia_tag(v.constructor)
