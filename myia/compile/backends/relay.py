@@ -11,10 +11,14 @@ from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import TaggedValue, new_universe
+from ...utils import HandleInstance, TaggedValue, new_universe
 from ...xtype import type_to_np_dtype
 from ..channel import handle
-from ..transform import get_prim_graph, wrap_result
+from ..transform import (
+    get_prim_graph,
+    return_handles,
+    wrap_result,
+)
 from . import Backend, Converter, HandleBackend
 from .relay_helpers import (
     TypeHelper,
@@ -25,6 +29,7 @@ from .relay_helpers import (
     get_union_ctr,
     optimize,
     to_relay_type,
+    handle_wrapper,
 )
 
 relay_from_scalar = tvm.get_global_func('relay.from_scalar')
@@ -78,7 +83,6 @@ SIMPLE_MAP = {
 
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
-    P.handle: relay.expr.RefCreate,
 }
 
 
@@ -368,12 +372,32 @@ def relay_split(c, x, sections, dim):
     return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
+def relay_handle(c, v):
+    return relay.expr.RefCreate(
+        relay.Tuple([relay.const(0, 'uint64'), c.ref(v)]))
+
+
 def relay_universe_getitem(c, u, h):
-    return relay.expr.RefRead(c.ref(h))
+    cv = relay.expr.RefRead(c.ref(h))
+    cu = c.ref(u)
+    return relay.If(relay.greater_equal(cu, relay.TupleGetItem(cv, 0)),
+                    relay.TupleGetItem(cv, 1),
+                    relay.zeros_like(relay.TupleGetItem(cv, 1)))
 
 
 def relay_universe_setitem(c, u, h, v):
-    return relay.expr.RefWrite(c.ref(h), c.ref(v))
+    # Part of this is implemented in the convert_func
+    # because of special flow handling
+    return c.ref(u) + relay.const(1, 'uint64')
+
+
+def relay_universe_setitem_write(c, u, h, v):
+    # This function is not registered in the COMPLEX_MAP
+    # because it is directly used by convert_func instead.
+    u = c.ref(u)
+    h = c.ref(h)
+    v = c.ref(v)
+    return relay.expr.RefWrite(h, relay.expr.Tuple([u, v]))
 
 
 COMPLEX_MAP = {
@@ -402,6 +426,7 @@ COMPLEX_MAP = {
     P.conv2d_input_grad: relay_conv2d_input_grad,
     P.concat: relay_concat,
     P.split: relay_split,
+    P.handle: relay_handle,
     P.universe_getitem: relay_universe_getitem,
     P.universe_setitem: relay_universe_setitem,
 }
@@ -456,12 +481,6 @@ class NodeVisitor:
 
     def _visit_unsafe_static_cast(self, node):
         return [node.inputs[1]]
-
-    def _visit_universe_getitem(self, node):
-        return node.inputs[2:]
-
-    def _visit_universe_setitem(self, node):
-        return node.inputs[2:]
 
     def __call__(self, node):
         """Don't visit called primitives."""
@@ -536,10 +555,13 @@ class CompileGraph:
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
+        graph, handles_cst, handles_params = return_handles(graph)
+
         self.module = relay.Module({})
         self.types = TypeHelper()
         self.types.initialize(self.module, mng)
         self.make_const = RelayConstantConverter(context)
+        self.universe_helper = None
 
         # Analyze and create a global union type of all the possible types
         # and then use it for all union values.
@@ -557,7 +579,8 @@ class CompileGraph:
 
         for g in mng.graphs:
             if g.parent is None:
-                function_map[self.graph_map[g]] = self.convert_func(g)
+                function_map[self.graph_map[g]] = \
+                    self.convert_func(g)
 
         self.types.finalize(self.module)
         add_functions(self.module, function_map)
@@ -567,6 +590,8 @@ class CompileGraph:
         exec = relay.create_executor(mod=self.module, ctx=context,
                                      target=target)
         res = exec.evaluate(self.module["main"])
+
+        res = handle_wrapper(res, handles_cst, handles_params)
 
         def f(*args):
             return wrap_result(res(*args))
@@ -614,16 +639,29 @@ class CompileGraph:
 
         params = [self.ref(p) for p in graph.parameters]
 
+        uset_seq = []
         for node in toposort(graph.output, NodeVisitor()):
             if node.is_apply():
                 self.node_map[node] = self.on_apply(node)
+                if node.inputs[0].value is P.universe_setitem:
+                    uset_seq.append(node)
             elif node.is_constant_graph():
                 self.node_map[node] = self.on_graph(node)
             elif node.is_constant():
                 self.node_map[node] = self.on_constant(node)
 
-        return relay.Function(params, self.ref(graph.output),
-                              ret_type=to_relay_type(graph.output.abstract))
+        out = self.ref(graph.output)
+
+        for uset in reversed(uset_seq):
+            out = relay.Let(
+                relay.var('_'),
+                relay_universe_setitem_write(self, *uset.inputs[1:]),
+                out)
+
+        res = relay.Function(params, out,
+                             ret_type=to_relay_type(graph.output.abstract))
+
+        return res
 
 
 compiler = CompileGraph()
@@ -657,7 +695,13 @@ class RelayInputConverter(Converter):
                                         zip(v, t.elements)])
 
     def convert_universe(self, v, t):
-        return interpreter.TupleValue()
+        return relay_from_scalar(0, 'uint64')
+
+    def convert_handle(self, v, t):
+        v = self(v.state, t.element)
+        u = relay_from_scalar(0, 'uint64')
+        res = interpreter.RefValue(interpreter.TupleValue(u, v))
+        return res
 
     def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
@@ -693,8 +737,10 @@ class RelayOutputConverter(Converter):
 
     def convert_universe(self, v, t):
         """Convert a universe value"""
-        assert len(v) == 0
         return new_universe
+
+    def convert_handle(self, v, t):
+        return HandleInstance(self(v.value.fields[1], t.element))
 
     def convert_tagged(self, v, t):
         tag = get_myia_tag(v.constructor)
