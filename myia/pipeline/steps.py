@@ -369,7 +369,7 @@ step_opt2 = Optimizer.partial(
 ############
 
 
-def step_validate(resources, graph, argspec=None, outspec=None):
+def step_validate(resources, graph):
     """Pipeline step to validate a graph prior to compilation.
 
     Inputs:
@@ -378,9 +378,7 @@ def step_validate(resources, graph, argspec=None, outspec=None):
     Outputs:
         None.
     """
-    validate(graph,
-             whitelist=resources.operation_whitelist,
-             validate_abstract=resources.validate_abstract)
+    validate(graph)
     return {'graph': graph}
 
 

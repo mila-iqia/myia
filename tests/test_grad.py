@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pytest import mark
 
-from myia.abstract import AbstractJTagged, from_value, ndarray_aliasable
+from myia.abstract import from_value, ndarray_aliasable
 from myia.api import myia
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.operations import (
@@ -38,7 +38,6 @@ from myia.pipeline import (
     steps,
 )
 from myia.utils import InferenceError, MyiaInputTypeError
-from myia.validate import validate_abstract, whitelist
 
 from .common import AA, MA, MB, Point3D, U, f64, to_abstract_test, u64
 from .multitest import backend_all, mt, myia_function_test
@@ -51,14 +50,6 @@ class Point:
 
     def abs(self):
         return (self.x ** 2 + self.y ** 2) ** 0.5
-
-
-grad_whitelist = whitelist | {P.J, P.Jinv}
-
-
-@validate_abstract.variant
-def grad_validate_abstract(self, t: AbstractJTagged):
-    pass
 
 
 def grad_wrap(graph, argspec):
@@ -80,10 +71,7 @@ grad_pipeline = PipelineDefinition(
     opt=steps.step_debug_opt,
     validate=steps.step_validate,
     export=steps.step_debug_export,
-).configure({
-    'resources.operation_whitelist': grad_whitelist,
-    'resources.validate_abstract': grad_validate_abstract
-})
+)
 
 
 def test_GradTester():

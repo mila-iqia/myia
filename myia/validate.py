@@ -12,7 +12,8 @@ from .abstract import (
     abstract_check,
 )
 from .ir import manage
-from .operations import Primitive, primitives as P
+from .operations import Primitive
+from .operations.primitives import BackendPrimitive
 from .utils import ErrorPool, overload
 
 
@@ -54,149 +55,95 @@ def validate_abstract(self, a: (type(None), AbstractExternal), uses):
     raise ValidationError(f'Illegal type in the graph: {a}')
 
 
-# All the legal operations are listed here.
-# Illegal ones are commented out.
-whitelist = frozenset({
-    P.scalar_abs,
-    P.scalar_add,
-    P.scalar_sub,
-    P.scalar_mul,
-    P.scalar_div,
-    P.scalar_mod,
-    P.scalar_pow,
-    P.scalar_uadd,
-    P.scalar_usub,
-    P.scalar_exp,
-    P.scalar_log,
-    P.scalar_sin,
-    P.scalar_cos,
-    P.scalar_tan,
-    P.scalar_tanh,
-    P.scalar_eq,
-    P.scalar_lt,
-    P.scalar_gt,
-    P.scalar_ne,
-    P.scalar_le,
-    P.scalar_ge,
-    P.scalar_floor,
-    P.scalar_max,
-    P.scalar_sign,
-    P.bool_not,
-    P.scalar_bit_and,
-    P.scalar_bit_or,
-    P.scalar_bit_xor,
-    P.scalar_bit_lshift,
-    P.scalar_bit_rshift,
-    P.bool_and,
-    P.bool_or,
-    P.bool_eq,
-    P.make_tuple,
-    P.tuple_getitem,
-    P.array_getitem,
-    P.tuple_setitem,
-    P.array_setitem,
-    # P.record_getitem,
-    # P.record_setitem,
-    P.scalar_to_array,
-    P.array_to_scalar,
-    P.broadcast_shape,
-    P.invert_permutation,
-    P.shape,
-    P.array_map,
-    P.array_scan,
-    P.array_reduce,
-    P.distribute,
-    P.reshape,
-    P.transpose,
-    P.dot,
-    P.switch,
-    P.return_,
-    P.identity,
-    P.partial,
-    # P.make_record,
-    P.env_getitem,
-    P.env_setitem,
-    P.env_add,
-    # P.J,
-    # P.Jinv,
-    P.scalar_cast,
-    P.array_cast,
-    P.hastag,
-    P.casttag,
-    P.tagged,
-    P.unsafe_static_cast,
-    P.gather,
-    P.scatter,
-    P.scatter_add,
-    P.argmax,
-    P.array_max,
-    P.concat,
-    P.conv2d,
-    P.conv2d_input_grad,
-    P.conv2d_weight_grad,
-    P.max_pool2d,
-    P.max_pool2d_grad,
-    P.split,
-})
+class NodeValidator:
+    """Validate each node in a graph."""
 
-
-class Validator:
-    """Verify that g is properly type-specialized.
-
-    Every node of each graph must have a concrete type in its type attribute,
-    every application must be compatible with its argument types, and every
-    primitive must belong to the whitelist.
-    """
-
-    def __init__(self, root, whitelist, _validate_abstract=validate_abstract):
-        """Initialize and run the Validator."""
-        self.errors = ErrorPool(exc_class=ValidationError)
-        self.whitelist = frozenset(whitelist)
-        self._validate_abstract_fn = _validate_abstract
-        self._run(root)
-
-    def _test(self, node, fn):
+    def _test(self, node):
         try:
-            fn(node)
+            self.test_node(node)
         except ValidationError as err:
             err.node = node
             node.debug.errors.add(err)
             self.errors.add(err)
 
-    def _validate_oper(self, node):
-        if node.is_constant(Primitive):
-            if node.value not in self.whitelist:
-                raise ValidationError(f'Illegal primitive: {node.value}')
+    def setup(self, root, errors=None, manager=None):
+        """Set the error pool and the manager."""
+        self.errors = errors or ErrorPool(exc_class=ValidationError)
+        self.manager = manager or manage(root)
 
-    def _validate_abstract(self, node):
-        return self._validate_abstract_fn(node.abstract,
-                                          self.manager.uses[node])
-
-    def _run(self, root):
-        self.manager = manage(root)
+    def run(self, root):
+        """Run on the root graph."""
+        self.setup(root)
         for node in list(self.manager.all_nodes):
-            self._test(node, self._validate_abstract)
-            self._test(node, self._validate_oper)
+            self._test(node)
 
         def stringify(err):
             return f'* {err.node} -- {err.args[0]}'
 
         self.errors.trigger(stringify=stringify)
 
+    def test_node(self, node):
+        """Test whether the node is valid or not."""
+        raise NotImplementedError('Override in subclass')
 
-def validate(root, whitelist=whitelist, validate_abstract=validate_abstract):
+
+class AbstractValidator(NodeValidator):
+    """Test that every node's abstract type is valid."""
+
+    def test_node(self, node):
+        """Test that the node's abstract type is valid."""
+        return validate_abstract(node.abstract, self.manager.uses[node])
+
+
+class OperatorValidator(NodeValidator):
+    """Test that every node's operator is valid."""
+
+    def test_node(self, node):
+        """Test that the node's operator is valid."""
+        if node.is_constant(Primitive):
+            if not node.is_constant(BackendPrimitive):
+                raise ValidationError(f'Illegal primitive: {node.value}')
+
+
+class MultiValidator(NodeValidator):
+    """Combine multiple validators."""
+
+    def __init__(self, *validators):
+        """Initialize the MultiValidator."""
+        self.validators = [v for v in validators if v]
+
+    def setup(self, root):
+        """Set up all validators."""
+        super().setup(root)
+        for v in self.validators:
+            v.setup(root, errors=self.errors, manager=self.manager)
+
+    def test_node(self, node):
+        """Test the node through every validator."""
+        for v in self.validators:
+            v.test_node(node)
+
+
+def validate(root):
     """Verify that g is properly type-specialized.
 
     Every node of each graph must have a concrete type in its type attribute,
     every application must be compatible with its argument types, and every
-    primitive must belong to the whitelist.
+    primitive must be a BackendPrimitive.
     """
-    Validator(root, whitelist, validate_abstract)
+    mv = MultiValidator(
+        OperatorValidator(),
+        AbstractValidator(),
+    )
+    mv.run(root)
 
 
 __all__ = [
+    'AbstractValidator',
+    'MultiValidator',
+    'NodeValidator',
+    'OperatorValidator',
     'ValidationError',
-    'Validator',
     'validate',
     'validate_abstract',
 ]

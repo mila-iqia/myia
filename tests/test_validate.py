@@ -3,44 +3,20 @@ import pytest
 
 from myia.operations import partial, primitives as P
 from myia.pipeline import scalar_parse, scalar_pipeline
-from myia.validate import ValidationError, validate as _validate
+from myia.validate import ValidationError, validate
 
 from .common import Point, i64, to_abstract_test
 
 Point_a = Point(i64, i64)
 
 
-test_whitelist = frozenset({
-    P.scalar_add,
-    P.scalar_sub,
-    P.scalar_mul,
-    P.scalar_div,
-    P.make_tuple,
-    P.tuple_getitem,
-    P.bool_and,
-    P.scalar_lt,
-    P.partial,
-    P.switch,
-    P.return_,
-    P.tagged,
-    P.hastag,
-    P.casttag,
-})
-
-
-def validate(g):
-    return _validate(g, whitelist=test_whitelist)
-
-
 pip = scalar_pipeline \
-    .select('resources', 'parse', 'infer', 'specialize', 'validate') \
-    .configure({'resources.operation_whitelist': test_whitelist})
+    .select('resources', 'parse', 'infer', 'specialize', 'validate')
 
 
 pip_ec = scalar_pipeline \
     .select('resources', 'parse', 'infer', 'specialize',
-            'simplify_types', 'validate') \
-    .configure({'resources.operation_whitelist': test_whitelist})
+            'simplify_types', 'validate')
 
 
 def run(pip, fn, types):
@@ -74,10 +50,10 @@ def test_validate():
     def f1(x, y):
         return x + y
 
-    # ** is not in the whitelist
+    # make_record is not in the whitelist
     @invalid(i64, i64)
     def f2(x, y):
-        return x ** y
+        return Point(x, y)
 
     # make_record is not in the whitelist
     # simplify_types should remove it
