@@ -19,6 +19,7 @@ import operator
 from functools import reduce
 
 import torch
+import torch.nn.functional
 
 from .. import operations
 from ..abstract import myia_static
@@ -266,6 +267,14 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
     if bias is not None:
         ret = ret + bias.reshape((1, bias.shape[0], 1, 1))
     return ret
+
+
+@core
+def cross_entropy(input, target):
+    """Map of method torch.nn.functional.cross_entropy."""
+    a = torch.nn.functional.log_softmax(input, 1)
+    b = torch.nn.functional.nll_loss(a, target)
+    return b
 
 
 @core
@@ -646,6 +655,7 @@ def zeros(*shp, dtype=None):
 
 __all__ = [
     'conv2d',
+    'cross_entropy',
     'item',
     'linear',
     'relu',
