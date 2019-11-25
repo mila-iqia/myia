@@ -86,3 +86,10 @@ Publications
 ~~~~~~~~~~~~
 
 * `Automatic differentiation in ML: Where we are and where we should be going (NeurIPS 2018) <https://papers.nips.cc/paper/8092-automatic-differentiation-in-ml-where-we-are-and-where-we-should-be-going>`_
+
+Citation
+~~~~~~~~
+
+If you use Myia for a scientific paper, please cite the above paper or
+mention Myia in the acknowledgements. It would be great if you could
+also let us know about it.
