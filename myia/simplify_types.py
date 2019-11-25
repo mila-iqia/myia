@@ -73,12 +73,14 @@ def _reabs(self, a: AbstractClassBase):
 
 @overload  # noqa: F811
 def _reabs(self, a: AbstractScalar):
+    new_values = self(a.values)
     if a.xtype() == String:
         v = a.xvalue()
         if v is not ANYTHING:
             v = str_to_tag(v)
-        a = AbstractScalar({**a.values, VALUE: v, TYPE: Int[64]})
-    return a
+        return AbstractScalar({**new_values, VALUE: v, TYPE: Int[64]})
+    else:
+        return AbstractScalar(new_values)
 
 
 @overload  # noqa: F811
@@ -88,7 +90,8 @@ def _reabs(self, a: AbstractDict):
 
 @overload  # noqa: F811
 def _reabs(self, a: AbstractArray):
-    return (yield AbstractArray)(self(a.element), {**a.values, TYPE: NDArray})
+    return (yield AbstractArray)(self(a.element),
+                                 {**self(a.values), TYPE: NDArray})
 
 
 @overload  # noqa: F811
@@ -105,7 +108,7 @@ def _reabs(self, a: AbstractKeywordArgument):
 
 @overload  # noqa: F811
 def _reabs(self, a: AbstractType):
-    return a
+    return (yield AbstractType)(self(a.values[VALUE]))
 
 
 ##################
