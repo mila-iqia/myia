@@ -182,11 +182,9 @@ def _pytorch_array_reduce_mul(tshp):
 
         if len(tshp) in (0, len(ashp)):
             res = torch.prod(array)
-        elif len(tshp) == 1:
-            res = torch.prod(array, tshp[0], keepdim=True)
         else:
             raise NotImplementedError(
-                'Pytorch product reduction only accepts 1 dim nor no dim.')
+                'We currently only support full product on an array.')
         return (res,)
 
     return _impl

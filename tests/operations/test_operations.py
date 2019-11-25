@@ -56,6 +56,14 @@ def test_bitwise_rshift(a, b):
     return a >> b
 
 
+@mt(
+    run(np.arange(10), result=np.prod(np.arange(10))),
+    run(np.asarray([-2, -1, 2, 11], dtype='float32'), result=np.float32(44)),
+)
+def test_prod(arr):
+    return np.prod(arr)
+
+
 def test_op_full():
     @myia
     def run_full(value):

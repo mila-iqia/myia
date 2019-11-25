@@ -144,6 +144,14 @@ def relay_array_reduce(c, fn, array, shape):
             if rtshp == ():
                 res = relay.op.take(res, relay.const(0))
         return res
+    elif fn == P.scalar_mul:
+        ashp = ashape(array)
+        if len(tshp) in (0, len(ashp)):
+            res = relay.op.prod(ary)
+        else:
+            raise NotImplementedError(
+                'We currently support only full product on an array.')
+        return res
     else:
         raise NotImplementedError(f"reduce with {fn}")
 
