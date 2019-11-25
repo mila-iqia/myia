@@ -20,7 +20,7 @@ from ..lib import (
     Constant,
     macro,
 )
-from ..xtype import Nil, Number, String, pytype_to_myiatype
+from ..xtype import Number, String, pytype_to_myiatype
 
 
 def convert_to_scalar_type(sync_data):
