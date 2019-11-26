@@ -314,28 +314,20 @@ def test_torch_conv2d__group3(inp, w, b):
 @mt(
     fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(3, 5))),
                          nn.Parameter(torch.randint(5, (3,)),
-                                      requires_grad=False)),
-)
-def test_torch_cross_entropy_mean(inp, target):
-    return F.cross_entropy(inp, target, reduction='mean')
-
-
-@mt(
+                                      requires_grad=False),
+                         'mean'),
     fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(3, 5))),
                          nn.Parameter(torch.randint(5, (3,)),
-                                      requires_grad=False)),
-)
-def test_torch_cross_entropy_none(inp, target):
-    return F.cross_entropy(inp, target, reduction='none')
-
-
-@mt(
+                                      requires_grad=False),
+                         'none'),
     fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(3, 5))),
                          nn.Parameter(torch.randint(5, (3,)),
-                                      requires_grad=False)),
+                                      requires_grad=False),
+                         'sum'),
+    broad_specs=(True, True, False)
 )
-def test_torch_cross_entropy_sum(inp, target):
-    return F.cross_entropy(inp, target, reduction='sum')
+def test_torch_cross_entropy(inp, target, reduction):
+    return F.cross_entropy(inp, target, reduction=reduction)
 
 
 @fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
