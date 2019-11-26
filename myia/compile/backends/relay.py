@@ -12,7 +12,7 @@ from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
 from ...utils import HandleInstance, TaggedValue, new_universe
-from ...xtype import type_to_np_dtype, UniverseType
+from ...xtype import UniverseType, type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result
 from . import Backend, Converter, HandleBackend
@@ -615,7 +615,7 @@ class CompileGraph:
 
     def convert_func(self, graph):
         """Convert a graph."""
-        vname = "handle_seq" + graph.debug.name
+        vname = "handle_seq" + graph.debug.debug_name
         i = 0
         for p in graph.parameters:
             self.node_map[p] = self.on_parameter(p)
@@ -669,7 +669,10 @@ class RelayInputConverter(Converter):
         th = TypeHelper()
         th.initialize(mod, DummyManager())
         th.finalize(mod)
-        self.intrp = relay.create_executor(mod=mod, ctx=context)
+        target = context.MASK2STR[context.device_type]
+        if target == 'cpu':
+            target = 'llvm'
+        self.intrp = relay.create_executor(mod=mod, ctx=context, target=target)
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
