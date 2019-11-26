@@ -19,7 +19,6 @@ import operator
 from functools import reduce
 
 import torch
-import torch.nn.functional
 
 from .. import operations
 from ..abstract import myia_static
@@ -270,10 +269,10 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
 
 
 @core
-def cross_entropy(input, target):
+def cross_entropy(input, target, reduction='mean'):
     """Map of method torch.nn.functional.cross_entropy."""
     a = torch.nn.functional.log_softmax(input, 1)
-    b = torch.nn.functional.nll_loss(a, target)
+    b = torch.nn.functional.nll_loss(a, target, reduction=reduction)
     return b
 
 

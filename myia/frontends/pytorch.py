@@ -5,7 +5,6 @@ import types
 from collections import OrderedDict
 
 import torch
-import torch.nn.functional
 
 from .. import operations
 from ..abstract.data import (
