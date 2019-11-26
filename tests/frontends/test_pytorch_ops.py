@@ -317,7 +317,7 @@ def test_torch_conv2d__group3(inp, w, b):
                                       requires_grad=False)),
 )
 def test_torch_cross_entropy_mean(inp, target):
-    return F.cross_entropy(inp, target, reduction='none')
+    return F.cross_entropy(inp, target, reduction='mean')
 
 
 @mt(
