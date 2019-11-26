@@ -300,7 +300,7 @@ class Monomorphizer:
                 res = self.engine.run_coroutine(
                     inf.run(self.engine, None, argrefs)
                 )
-            except InferenceError:
+            except InferenceError:  # pragma: no cover
                 return None, None
             self.infcaches[inf] = {choice: res}
             return choice, res

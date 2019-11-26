@@ -111,10 +111,6 @@ class Reference(ReferenceBase):
         raw = self.engine.get_inferred(self)
         return await force_pending(await raw)
 
-    def get_sync(self):
-        """Get the value (synchronous)."""
-        return self.engine.run_coroutine(self.get())
-
     def get_resolved(self):
         """Get the value if resolved. Error out if not."""
         c = self.engine.cache.cache
@@ -153,10 +149,6 @@ class VirtualReference(ReferenceBase):
 
     async def get(self):
         """Get the value (asynchronous)."""
-        return self.abstract
-
-    def get_sync(self):  # pragma: no cover
-        """Get the value (synchronous)."""
         return self.abstract
 
 
