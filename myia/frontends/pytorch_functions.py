@@ -269,6 +269,14 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
 
 
 @core
+def cross_entropy(input, target, reduction='mean'):
+    """Map of method torch.nn.functional.cross_entropy."""
+    a = torch.nn.functional.log_softmax(input, 1)
+    b = torch.nn.functional.nll_loss(a, target, reduction=reduction)
+    return b
+
+
+@core
 def gather(self, dim, index):
     """Map of 'gather' pytorch method."""
     return P.gather(self, dim, index)
@@ -646,6 +654,7 @@ def zeros(*shp, dtype=None):
 
 __all__ = [
     'conv2d',
+    'cross_entropy',
     'item',
     'linear',
     'relu',

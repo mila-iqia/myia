@@ -311,6 +311,25 @@ def test_torch_conv2d__group3(inp, w, b):
     return torch.sum(value)
 
 
+@mt(
+    fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(3, 5))),
+                         nn.Parameter(torch.randint(5, (3,)),
+                                      requires_grad=False),
+                         'mean'),
+    fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(3, 5))),
+                         nn.Parameter(torch.randint(5, (3,)),
+                                      requires_grad=False),
+                         'none'),
+    fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(3, 5))),
+                         nn.Parameter(torch.randint(5, (3,)),
+                                      requires_grad=False),
+                         'sum'),
+    broad_specs=(True, True, False)
+)
+def test_torch_cross_entropy(inp, target, reduction):
+    return F.cross_entropy(inp, target, reduction=reduction)
+
+
 @fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
                       torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]))
 def test_torch_gather(x, index):
