@@ -1,6 +1,5 @@
 import numpy as np
 
-from myia import myia
 from myia.xtype import i32, i64, u32
 
 from ..multitest import infer, mt, run, run_no_relay
@@ -64,23 +63,12 @@ def test_prod(arr):
     return np.prod(arr)
 
 
-def test_op_full():
-    @myia
-    def run_full(value):
-        return np.full((2, 7), value, 'float16')
-
-    expected = np.ones((2, 7), 'float16') * 4
-    output = run_full(4)
-    assert output.dtype == np.float16
-    assert np.allclose(expected, output)
-
-
-def test_op_prod():
-    @myia
-    def run_prod(val):
-        return np.prod(val)
-
-    values = np.arange(1, 6)
-    expected = np.prod(values)
-    output = run_prod(values)
-    assert expected == output == 120
+@mt(
+    run((2, 3), 0, None, result=np.zeros((2, 3), 'float32')),
+    run((8,), 1, 'float16', result=np.ones((8,), 'float16')),
+    run((1, 4), -2.5, None, result=(-2.5 * np.ones((1, 4), 'float32'))),
+    run((1, 4), -2.5, 'float64', result=(-2.5 * np.ones((1, 4), 'float64'))),
+    broad_specs=(False, False, False),
+)
+def test_full(shape, value, dtype):
+    return np.full(shape, value, dtype)
