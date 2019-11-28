@@ -84,7 +84,9 @@ SIMPLE_MAP = {
 def relay_distribute(c, array, shape):
     """Implementation of distribute for Relay."""
     assert shape.is_constant(tuple)
-    return relay.op.broadcast_to(c.ref(array), shape.value)
+    # Make sure shape is a tuple of builtin Python integers.
+    relay_shape = tuple(int(dim) for dim in shape.value)
+    return relay.op.broadcast_to(c.ref(array), relay_shape)
 
 
 def relay_transpose(c, a, ax):

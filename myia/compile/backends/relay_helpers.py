@@ -188,7 +188,9 @@ def to_relay_type(self, a: AbstractTuple):
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractArray):
     tp = a.element.xtype()
-    return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
+    # Make sure shape is a tuple of builtin Python integers.
+    relay_shape = tuple(int(dim) for dim in a.xshape())
+    return relay.ty.TensorType(relay_shape, type_to_np_dtype(tp))
 
 
 @overload  # noqa: F811

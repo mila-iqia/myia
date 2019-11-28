@@ -23,14 +23,16 @@ from ..lib import (
 from ..xtype import Number, String, pytype_to_myiatype
 
 
-def convert_to_scalar_type(sync_data):
+@macro
+async def to_scalar_type(info, data):
     """
-    Main code to convert given data to abstract scalar.
+    Convert given data to abstract scalar.
 
-    :param sync_data: arbitrary data to convert
+    :param data: arbitrary data to convert
     :return: an abstract scalar object if data can be converted,
         otherwise raise an exception.
     """
+    sync_data = await data.get()
     if isinstance(sync_data, AbstractType):
         return Constant(sync_data.xvalue())
     elif isinstance(sync_data, AbstractScalar):
@@ -41,13 +43,6 @@ def convert_to_scalar_type(sync_data):
             myia_type = pytype_to_myiatype(np.dtype(sync_data.xvalue()).type)
             return Constant(AbstractScalar({VALUE: ANYTHING, TYPE: myia_type}))
     raise Exception('Unable to convert data to scalar type: %s' % sync_data)
-
-
-@macro
-async def to_scalar_type(info, data):
-    """Return a constant with the result of `data.xvalue()`."""
-    sync_data = await data.get()
-    return convert_to_scalar_type(sync_data)
 
 
 __operation_defaults__ = {

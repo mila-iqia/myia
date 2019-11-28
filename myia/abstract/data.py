@@ -860,17 +860,6 @@ def listof(t):
 def u64tup_typecheck(engine, tup):
     """Verify that tup is a tuple of uint64."""
     tup_t = engine.check(AbstractTuple, tup)
-    # If tup is a constant tuple of positive integers,
-    # then consider it as a tuple of uint64.
-    try:
-        if all(isinstance(el, AbstractScalar)
-               and issubclass(el.xtype(), xtype.Integral)
-               and el.xvalue() >= 0
-               for el in tup_t.elements):
-            return tup_t
-    except TypeError:
-        pass
-    # Otherwise, check merged type.
     for elem_t in tup_t.elements:
         engine.abstract_merge(xtype.UInt[64], elem_t.xtype())
     return tup_t
