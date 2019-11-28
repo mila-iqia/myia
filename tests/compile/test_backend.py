@@ -6,10 +6,16 @@ from myia.compile.backends import (
     load_backend,
     parse_default,
 )
-from myia.operations import array_reduce, reshape, scalar_add, scalar_to_array
+from myia.operations import (
+    array_reduce,
+    array_to_scalar,
+    reshape,
+    scalar_add,
+    scalar_to_array,
+)
 
 from ..common import AN, MA
-from ..multitest import mt, run
+from ..multitest import mt, run, run_gpu
 
 
 def test_default_backend():
@@ -75,6 +81,11 @@ def test_array_reduce2(x):
     return array_reduce(scalar_add, x, (3,))
 
 
+@run_gpu(MA(1, 1))
+def test_array_to_scalar(x):
+    return array_to_scalar(reshape(x, ()))
+
+
 @mt(
     run(2, 3),
     run(2.0, 3.0),
@@ -83,7 +94,7 @@ def test_truediv(x, y):
     return x / y
 
 
-@run(2)
+@run_gpu(2)
 def test_to_array(x):
     return scalar_to_array(x, AN)
 
