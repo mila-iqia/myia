@@ -672,6 +672,8 @@ class RelayInputConverter(Converter):
         target = context.MASK2STR[context.device_type]
         if target == 'cpu':
             target = 'llvm'
+        elif target == 'gpu':
+            target = 'cuda'
         self.intrp = relay.create_executor(mod=mod, ctx=context, target=target)
 
     def convert_array(self, v, t):
