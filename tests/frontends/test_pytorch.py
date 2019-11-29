@@ -713,7 +713,8 @@ def test_optim_setitem():
         return _cost, update(model, dmodel, update_sgd)
     loss, model_new = step(model, inp, target)
 
-    assert loss.item() == 161.05856323242188
+    expected_loss = torch.Tensor([161.05856323242188])
+    assert torch.allclose(loss, expected_loss)
 
     expected_param = torch.Tensor([[-0.21953332, -0.31154382, -0.29184943],
                                    [-0.47497076, -0.39380032, -0.32451797],
