@@ -1,7 +1,16 @@
 import numpy as np
 
-from myia.xtype import i32, i64, u32
+from myia.xtype import f16, f32, f64, i16, i32, i64, u32
 
+from ..common import (
+    af16_of,
+    af32_of,
+    af64_of,
+    ai16_of,
+    ai32_of,
+    ai64_of,
+    au64_of,
+)
 from ..multitest import infer, mt, run, run_no_relay
 
 
@@ -61,6 +70,9 @@ def test_bitwise_rshift(a, b):
 
 
 @mt(
+    infer(af16_of(2, 3), result=af16_of()),
+    infer(ai32_of(2, 3), result=ai32_of()),
+    infer(au64_of(2, 3), result=au64_of()),
     run(np.arange(1, 11), result=3628800),
     run(np.asarray([-2, -1, 2, 11], dtype='float32'), result=np.float32(44)),
 )
@@ -69,11 +81,29 @@ def test_prod(arr):
 
 
 @mt(
-    run(Shp(2, 3), 0, None, result=np.zeros((2, 3), 'float32')),
+    run(Shp(2, 3), 0, None, result=np.zeros((2, 3))),
     run(Shp(8,), 1, 'float16', result=np.ones((8,), 'float16')),
-    run(Shp(1, 4), -2.5, None, result=(-2.5 * np.ones((1, 4), 'float32'))),
+    run(Shp(1, 4), -2.5, None, result=(-2.5 * np.ones((1, 4)))),
     run(Shp(1, 4), -2.5, 'double', result=(-2.5 * np.ones((1, 4), 'double'))),
     broad_specs=(False, False, False),
 )
 def test_full(shape, value, dtype):
+    return np.full(shape, value, dtype)
+
+
+@mt(
+    # If d-type is not specified, output type should be type of fill value.
+    infer(Shp(2, 3), i16, None, result=ai16_of(2, 3)),
+    infer(Shp(2, 3), i64, None, result=ai64_of(2, 3)),
+    infer(Shp(2, 3), f16, None, result=af16_of(2, 3)),
+    infer(Shp(2, 3), f32, None, result=af32_of(2, 3)),
+    # Otherwise, output type should be specified d-type.
+    infer(Shp(2, 3), i64, 'int16', result=ai16_of(2, 3)),
+    infer(Shp(2, 3), i64, 'float16', result=af16_of(2, 3)),
+    infer(Shp(2, 3), i64, 'float64', result=af64_of(2, 3)),
+    infer(Shp(2, 3), f64, 'int16', result=ai16_of(2, 3)),
+    infer(Shp(2, 3), f64, 'int32', result=ai32_of(2, 3)),
+    infer(Shp(2, 3), f64, 'uint64', result=au64_of(2, 3)),
+)
+def test_infer_full(shape, value, dtype):
     return np.full(shape, value, dtype)

@@ -64,6 +64,10 @@ def ai16_of(*shp, value=ANYTHING):
     return arr_of(i16, shp, value)
 
 
+def au64_of(*shp, value=ANYTHING):
+    return arr_of(u64, shp, value)
+
+
 def af64_of(*shp, value=ANYTHING):
     return arr_of(f64, shp, value)
 
