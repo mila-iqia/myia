@@ -92,14 +92,6 @@ def wrap_primitives(graph):
     return graph
 
 
-def gather_handles_cst(node):
-    """Return a list of constant handles."""
-    lst = []
-    if node.is_constant(HandleInstance):
-        lst.append((node.value, node))
-    return lst
-
-
 @overload(bootstrap=True)
 def _gather_handles_param(self, t: AbstractHandle, curnode, idx, curget, lst):
     lst.append((idx, curget, curnode))
@@ -143,14 +135,8 @@ def return_handles(graph):
     mng = graph.manager
 
     handles_params = gather_handles_params(graph.parameters)
-
-    cts = {ct for cts in mng.constants.values() for ct in cts}
-    for ct in cts:
-        handles_cst = gather_handles_cst(ct)
-
-    handle_nodes = [h for _, h in handles_cst]
-    handle_nodes.extend(sexp_to_node(n, graph, typed=True)
-                        for _, _, n in handles_params)
+    handle_nodes = [sexp_to_node(n, graph, typed=True)
+                    for _, _, n in handles_params]
 
     if len(handle_nodes) != 0:
         with mng.transact() as tr:
@@ -167,25 +153,7 @@ def return_handles(graph):
         graph.output.abstract = AbstractTuple([out_node.abstract] +
                                               old_a.elements[1:])
 
-    return (graph, [i for i, _ in handles_cst],
-            [(i, get) for i, get, _ in handles_params])
-
-
-def handle_wrapper(fn, handle_cst, handle_params):
-    """Wraps a model function to perform handle updates."""
-    def wrapper(*args):
-        handle_instances = handle_cst
-        handle_instances.extend(get(args[i]) for i, get in handle_params)
-        res = fn(*args)
-        u = res[0]
-        res = res[1] if len(res) == 2 else res[1:]
-        for h, v in zip(handle_instances, u):
-            h.state = v
-        return res
-    if len(handle_cst) + len(handle_params) == 0:
-        return fn
-    else:
-        return wrapper
+    return graph, [(i, get) for i, get, _ in handles_params]
 
 
 @overload

@@ -536,7 +536,7 @@ class CompileGraph:
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
-        graph, handles_cst, handles_params = return_handles(graph)
+        graph, handles_params = return_handles(graph)
 
         self.module = relay.Module({})
         self.types = TypeHelper()
@@ -572,7 +572,7 @@ class CompileGraph:
                                      target=target)
         res = exec.evaluate(self.module["main"])
 
-        res = handle_wrapper(res, handles_cst, handles_params)
+        res = handle_wrapper(res, handles_params)
 
         def f(*args):
             return wrap_result(res(*args))
@@ -732,10 +732,6 @@ class RelayOutputConverter(Converter):
         """Convert the value to a tuple."""
         return tuple(self(v, t)
                      for v, t in zip(v, t.elements))
-
-    def convert_universe(self, v, t):
-        """Convert a universe value."""
-        return new_universe
 
     def convert_handle(self, v, t):
         return HandleInstance(self(v.value, t.element))

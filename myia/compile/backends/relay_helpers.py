@@ -230,18 +230,17 @@ def dead_value(t):
     return _placeholder_body(to_relay_type(t))
 
 
-def handle_wrapper(fn, handle_cst, handle_params):
+def handle_wrapper(fn, handle_params):
     """Wraps a model function to perform handle updates."""
     def wrapper(*args):
-        handle_instances = list(handle_cst)
-        handle_instances.extend(get(args[i]) for i, get in handle_params)
+        handle_instances = list(get(args[i]) for i, get in handle_params)
         res = fn(*args)
         u = res[0]
         res = res[1] if len(res) == 2 else res[1:]
         for h, v in zip(handle_instances, u):
             h.value = v
         return (), res
-    if len(handle_cst) + len(handle_params) == 0:
+    if len(handle_params) == 0:
         return fn
     else:
         return wrapper

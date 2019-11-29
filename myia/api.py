@@ -41,7 +41,7 @@ class MyiaFunction:
         """Initialize a MyiaFunction."""
         # Change this once relay becomes the default backend.
         if use_universe and backend != 'relay':
-            raise RuntimeError(
+            raise RuntimeError(  # pragma: no cover
                 "Universe is only supported for the relay backend.")
         self.fn = fn
         self.alias_tracker = alias_tracker
