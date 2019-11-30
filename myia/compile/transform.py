@@ -92,51 +92,24 @@ def wrap_primitives(graph):
     return graph
 
 
-@overload(bootstrap=True)
-def _gather_handles_param(self, t: AbstractHandle, curnode, idx, curget, lst):
-    lst.append((idx, curget, curnode))
-
-
-def _make_typed_cst(v, t):
-    node = Constant(v)
-    node.abstract = AbstractScalar({TYPE: t, VALUE: v})
-    return node
-
-
-@overload  # noqa: F811
-def _gather_handles_param(self, t: AbstractTuple, curnode, idx, curget, lst):
-    for i, tt in enumerate(t.elements):
-        self(tt, (tt, (P.tuple_getitem, curnode, _make_typed_cst(i, i64))),
-             idx, lambda v, i=i: v[i], lst)
-
-
-@overload  # noqa: F811
-def _gather_handles_param(self,
-                          t: (AbstractArray, AbstractScalar,
-                              AbstractType, AbstractTaggedUnion),
-                          *args):
-    return
-
-
 def gather_handles_params(params):
     """Return list of all handles in params.
 
     This list also has graph nodes that correspond to the handle value
     and functions to extract the value from the arguments.
     """
-    lst = []
-    for i, p in enumerate(params):
-        _gather_handles_param(p.abstract, p, i, lambda v: v, lst)
-    return lst
 
 
 def return_handles(graph):
     """Change the Universe output to return all the new values of handles."""
     mng = graph.manager
 
-    handles_params = gather_handles_params(graph.parameters)
-    handle_nodes = [sexp_to_node(n, graph, typed=True)
-                    for _, _, n in handles_params]
+    handle_nodes = []
+    handle_idx = []
+    for i, p in enumerate(graph.parameters):
+        if isinstance(p.abstract, AbstractHandle):
+            handle_nodes.append(p)
+            handle_idx.append(i)
 
     if len(handle_nodes) != 0:
         with mng.transact() as tr:
@@ -153,7 +126,7 @@ def return_handles(graph):
         graph.output.abstract = AbstractTuple([out_node.abstract] +
                                               old_a.elements[1:])
 
-    return graph, [(i, get) for i, get, _ in handles_params]
+    return graph, handle_idx
 
 
 @overload

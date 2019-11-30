@@ -233,7 +233,7 @@ def dead_value(t):
 def handle_wrapper(fn, handle_params):
     """Wraps a model function to perform handle updates."""
     def wrapper(*args):
-        handle_instances = list(get(args[i]) for i, get in handle_params)
+        handle_instances = list(args[i] for i in handle_params)
         res = fn(*args)
         u = res[0]
         res = res[1] if len(res) == 2 else res[1:]
