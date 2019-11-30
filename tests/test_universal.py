@@ -1,5 +1,7 @@
 import pytest
 
+from dataclasses import dataclass
+
 from myia import myia
 from myia.compile.backends import load_backend
 from myia.lib import Empty, HandleInstance, core
@@ -117,3 +119,22 @@ def test_return_handle():
     # to return the handle for now.
     h2 = plus2(hb)
     assert h2.state == 2
+
+
+def test_handle_struct():
+
+    @myia(use_universe=True, backend='relay')
+    def counter(s):
+        increment(s.pos)
+        return handle_get(s.pos)
+
+    @dataclass
+    class CounterState:
+        pos: HandleInstance
+
+    st = CounterState(HandleInstance(0))
+
+    stb = counter.to_device(st)
+    assert counter(stb) == 1
+    breakpoint()
+    assert counter(stb) == 2
