@@ -30,6 +30,7 @@ from myia.operations import (
     env_add,
     env_getitem,
     env_setitem,
+    full,
     identity,
     partial as myia_partial,
     reshape,
@@ -399,6 +400,13 @@ def test_prim_dot():
     res = dot(a, b)
 
     assert (res == ref).all()
+
+
+def test_op_full():
+    ref = np.full((4, 9), -4, 'float16')
+    res = full((4, 9), -4, np.float16)
+    assert res.dtype == 'float16'
+    assert np.allclose(ref, res, rtol=0, atol=0)
 
 
 def test_prim_scalar_bit_lshift():

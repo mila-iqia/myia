@@ -104,6 +104,10 @@ def test_full(shape, value, dtype):
     infer(Shp(2, 3), f64, 'int16', result=ai16_of(2, 3)),
     infer(Shp(2, 3), f64, 'int32', result=ai32_of(2, 3)),
     infer(Shp(2, 3), f64, 'uint64', result=au64_of(2, 3)),
+    # Numpy d-types should also be accepted as d-types.
+    infer(Shp(2, 3), i64, np.int16, result=ai16_of(2, 3)),
+    infer(Shp(2, 3), i64, np.float16, result=af16_of(2, 3)),
+    infer(Shp(2, 3), f64, np.uint64, result=au64_of(2, 3)),
 )
 def test_infer_full(shape, value, dtype):
     return np.full(shape, value, dtype)

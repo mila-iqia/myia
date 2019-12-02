@@ -1,4 +1,4 @@
-
+import inspect
 import typing
 from dataclasses import dataclass, is_dataclass
 
@@ -139,7 +139,7 @@ def to_abstract_test(self, x: (bool, int, float, str,
                                EnvInstance)):
     return AbstractScalar({
         VALUE: x,
-        TYPE: xtype.pytype_to_myiatype(type(x)),
+        TYPE: xtype.pytype_to_myiatype(x if inspect.isclass(x) else type(x)),
     })
 
 

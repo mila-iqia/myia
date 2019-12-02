@@ -34,15 +34,17 @@ async def to_scalar_type(info, data):
     """
     sync_data = await data.get()
     if isinstance(sync_data, AbstractType):
-        return Constant(sync_data.xvalue())
-    elif isinstance(sync_data, AbstractScalar):
+        sync_data = sync_data.xvalue()
+    if isinstance(sync_data, AbstractScalar):
         xtype = sync_data.xtype()
         if issubclass(xtype, Number):
             return Constant(sync_data)
         elif xtype is String:
             myia_type = pytype_to_myiatype(np.dtype(sync_data.xvalue()).type)
             return Constant(AbstractScalar({VALUE: ANYTHING, TYPE: myia_type}))
-    raise Exception('Unable to convert data to scalar type: %s' % sync_data)
+    else:
+        raise Exception(
+            'Unable to convert data to scalar type: %s' % sync_data)
 
 
 __operation_defaults__ = {
