@@ -43,7 +43,7 @@ async def to_scalar_type(info, data):
             myia_type = pytype_to_myiatype(np.dtype(sync_data.xvalue()).type)
             return Constant(AbstractScalar({VALUE: ANYTHING, TYPE: myia_type}))
     else:
-        raise Exception(
+        raise TypeError(
             'Unable to convert data to scalar type: %s' % sync_data)
 
 
