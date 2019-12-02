@@ -1,10 +1,10 @@
 import numpy as np
-import pytest
 
-from myia import myia
+from myia.utils.errors import MyiaTypeError
 from myia.xtype import f16, f32, f64, i16, i32, i64, u32
 
 from ..common import (
+    Ty,
     af16_of,
     af32_of,
     af64_of,
@@ -94,6 +94,10 @@ def test_full(shape, value, dtype):
 
 
 @mt(
+    # An error should be raised if wrong values are given as types.
+    infer(Shp(2, 3), i32, 'bad string', result=MyiaTypeError),
+    infer(Shp(2, 3), i32, 10, result=MyiaTypeError),
+    infer(Shp(2, 3), i32, (), result=MyiaTypeError),
     # If d-type is not specified, output type should be type of fill value.
     infer(Shp(2, 3), i16, None, result=ai16_of(2, 3)),
     infer(Shp(2, 3), i64, None, result=ai64_of(2, 3)),
@@ -107,33 +111,9 @@ def test_full(shape, value, dtype):
     infer(Shp(2, 3), f64, 'int32', result=ai32_of(2, 3)),
     infer(Shp(2, 3), f64, 'uint64', result=au64_of(2, 3)),
     # Numpy d-types should also be accepted as d-types.
-    infer(Shp(2, 3), i64, np.int16, result=ai16_of(2, 3)),
-    infer(Shp(2, 3), i64, np.float16, result=af16_of(2, 3)),
-    infer(Shp(2, 3), f64, np.uint64, result=au64_of(2, 3)),
+    infer(Shp(2, 3), i64, Ty(np.int16), result=ai16_of(2, 3)),
+    infer(Shp(2, 3), i64, Ty(np.float16), result=af16_of(2, 3)),
+    infer(Shp(2, 3), f64, Ty(np.uint64), result=au64_of(2, 3)),
 )
 def test_infer_full(shape, value, dtype):
     return np.full(shape, value, dtype)
-
-
-def test_full_bad_dtype():
-    """Test op full with wrong given d-types."""
-    for dtype, should_raise in (
-            ('float16', False),
-            (int, False),
-            (np.float16, False),
-            ('bad string', True),
-            # Bad value (integer, neither type not string)
-            (10, True),
-            # Bad value (a tuple)
-            ((), True),
-    ):
-        @myia
-        def test():
-            return np.full((2, 3), 0, dtype)
-
-        if should_raise:
-            with pytest.raises(TypeError):
-                test()
-        else:
-            result = test()
-            assert np.dtype(result.dtype).type is np.dtype(dtype).type
