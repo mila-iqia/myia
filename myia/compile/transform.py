@@ -1,20 +1,10 @@
 """Transforms a graph into lower-level code."""
 
 from .. import xtype
-from ..abstract import (
-    TYPE,
-    VALUE,
-    AbstractArray,
-    AbstractHandle,
-    AbstractScalar,
-    AbstractTaggedUnion,
-    AbstractTuple,
-    AbstractType,
-    to_abstract,
-)
-from ..ir import Apply, Constant, Graph, sexp_to_node, toposort
+from ..abstract import AbstractHandle, AbstractTuple, to_abstract
+from ..ir import Apply, Constant, Graph, toposort
 from ..operations import Primitive, primitives as P
-from ..utils import HandleInstance, SymbolicKeyInstance, overload
+from ..utils import SymbolicKeyInstance, overload
 from .channel import handle
 from .vm import FinalVM
 
@@ -438,6 +428,5 @@ __all__ = [
     'convert_grad',
     'wrap_primitives',
     'wrap_result',
-    'handle_wrapper',
     'return_handles',
 ]

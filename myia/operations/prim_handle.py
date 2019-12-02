@@ -1,6 +1,6 @@
 """Definitions for the primitive `handle`."""
 
-from ..lib import AbstractHandle, HandleInstance, standard_prim
+from ..lib import AbstractHandle, standard_prim
 from . import primitives as P
 
 

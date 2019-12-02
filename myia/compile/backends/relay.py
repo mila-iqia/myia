@@ -11,7 +11,7 @@ from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import HandleInstance, TaggedValue, new_universe
+from ...utils import HandleInstance, TaggedValue
 from ...xtype import UniverseType, type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result

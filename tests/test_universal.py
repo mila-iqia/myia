@@ -1,7 +1,5 @@
 import pytest
 
-from dataclasses import dataclass
-
 from myia import myia
 from myia.compile.backends import load_backend
 from myia.lib import Empty, HandleInstance, core
