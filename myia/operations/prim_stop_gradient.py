@@ -37,7 +37,7 @@ __operation_defaults__ = {
 __primitive_defaults__ = {
     'name': 'stop_gradient',
     'registered_name': 'stop_gradient',
-    'type': 'backend',
+    'type': 'placeholder',
     'python_implementation': pyimpl_stop_gradient,
     'inferrer_constructor': infer_stop_gradient,
     'grad_transform': bprop_stop_gradient,

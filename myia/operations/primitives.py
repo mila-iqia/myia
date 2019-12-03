@@ -434,7 +434,7 @@ split = BackendPrimitive(
     defaults='myia.operations.prim_split'
 )
 
-stop_gradient = BackendPrimitive(
+stop_gradient = PlaceholderPrimitive(
     name='stop_gradient',
     defaults='myia.operations.prim_stop_gradient'
 )
