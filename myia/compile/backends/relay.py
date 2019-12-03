@@ -84,7 +84,9 @@ SIMPLE_MAP = {
 def relay_distribute(c, array, shape):
     """Implementation of distribute for Relay."""
     assert shape.is_constant(tuple)
-    return relay.op.broadcast_to(c.ref(array), shape.value)
+    # Make sure shape is a tuple of builtin Python integers.
+    relay_shape = tuple(int(dim) for dim in shape.value)
+    return relay.op.broadcast_to(c.ref(array), relay_shape)
 
 
 def relay_transpose(c, a, ax):
@@ -143,6 +145,14 @@ def relay_array_reduce(c, fn, array, shape):
             res = relay.op.reshape(res, newshape=tshp)
             if rtshp == ():
                 res = relay.op.take(res, relay.const(0))
+        return res
+    elif fn == P.scalar_mul:
+        ashp = ashape(array)
+        if len(tshp) in (0, len(ashp)):
+            res = relay.op.prod(ary)
+        else:
+            raise NotImplementedError(
+                'We currently support only full product on an array.')
         return res
     else:
         raise NotImplementedError(f"reduce with {fn}")

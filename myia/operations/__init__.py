@@ -18,6 +18,11 @@ Jinv = Operation(
     defaults='myia.operations.prim_Jinv'
 )
 
+abstract_array = Operation(
+    name='abstract_array',
+    defaults='myia.operations.macro_abstract_array'
+)
+
 add = Operation(
     name='add',
     defaults='myia.operations.ops_dunder.add'
@@ -368,6 +373,11 @@ floordiv = Operation(
     defaults='myia.operations.ops_dunder.floordiv'
 )
 
+full = Operation(
+    name='full',
+    defaults='myia.operations.op_full'
+)
+
 gadd = Operation(
     name='gadd',
     defaults='myia.operations.op_gadd'
@@ -628,6 +638,11 @@ pow = Operation(
     defaults='myia.operations.ops_dunder.pow'
 )
 
+prod = Operation(
+    name='prod',
+    defaults='myia.operations.ops_array.prod'
+)
+
 raise_ = Operation(
     name='raise',
     defaults='myia.operations.prim_raise_'
@@ -886,6 +901,11 @@ t = Operation(
 tagged = Operation(
     name='tagged',
     defaults='myia.operations.prim_tagged'
+)
+
+to_scalar_type = Operation(
+    name='to_scalar_type',
+    defaults='myia.operations.macro_to_scalar_type'
 )
 
 transpose = Operation(

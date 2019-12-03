@@ -1,4 +1,4 @@
-
+import inspect
 import typing
 from dataclasses import dataclass, is_dataclass
 
@@ -62,6 +62,10 @@ def ai32_of(*shp, value=ANYTHING):
 
 def ai16_of(*shp, value=ANYTHING):
     return arr_of(i16, shp, value)
+
+
+def au64_of(*shp, value=ANYTHING):
+    return arr_of(u64, shp, value)
 
 
 def af64_of(*shp, value=ANYTHING):
@@ -135,7 +139,7 @@ def to_abstract_test(self, x: (bool, int, float, str,
                                EnvInstance)):
     return AbstractScalar({
         VALUE: x,
-        TYPE: xtype.pytype_to_myiatype(type(x)),
+        TYPE: xtype.pytype_to_myiatype(x if inspect.isclass(x) else type(x)),
     })
 
 

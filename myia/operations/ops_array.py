@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from .. import lib, operations
 from ..hypermap import HyperMap
 from ..lib import core, myia_static
-from ..operations import array_reduce, primitives as P, scalar_add, shape
+from ..operations import (
+    array_reduce,
+    primitives as P,
+    scalar_add,
+    scalar_mul,
+    shape,
+)
 from .utils import OperationDefinition, to_opdef
 
 
@@ -54,6 +60,13 @@ array_ge = elemwise('array_ge', operations.ge, infer_value=True)
 def sum(x):
     """Implementation of `sum`."""
     return array_reduce(scalar_add, x, ())
+
+
+@to_opdef
+@core
+def prod(x):
+    """Implementation of `np.prod`. Parameter `axis` is not yet supported."""
+    return array_reduce(scalar_mul, x, ())
 
 
 @to_opdef

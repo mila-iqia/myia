@@ -224,7 +224,7 @@ def dead_value(t):
 
 def _placeholder_body(type):
     if isinstance(type, relay.TensorType):
-        sh = [int(sh) for sh in type.shape]
+        sh = [sh.value for sh in type.shape]
         return relay.const(np.array(np.random.rand(*sh)).astype(type.dtype),
                            dtype=type.dtype)
     elif isinstance(type, relay.TupleType):
