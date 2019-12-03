@@ -277,6 +277,12 @@ def cross_entropy(input, target, reduction='mean'):
 
 
 @core
+def detach(self):
+    """Map of method torch.Tensor.detach."""
+    return P.detach(self)
+
+
+@core
 def gather(self, dim, index):
     """Map of 'gather' pytorch method."""
     return P.gather(self, dim, index)
