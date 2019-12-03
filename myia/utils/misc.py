@@ -15,6 +15,26 @@ T1 = TypeVar('T1')
 T2 = TypeVar('T2')
 
 
+@serializable('RandomStateWrapper')
+class RandomStateWrapper:
+    """Represents a wrapper around a backend random state object."""
+
+    __slots__ = 'state',
+
+    def __init__(self, backend_state):
+        """Initialize wrapper with given backend random state object."""
+        self.state = backend_state
+
+    def _serialize(self):
+        return {'state': self.state}
+
+    @classmethod
+    def _construct(cls):
+        res = cls(None)
+        data = yield res
+        res.state = data['state']
+
+
 @serializable('TaggedValue')
 class TaggedValue:
     """Represents a tagged value for a TaggedUnion."""
@@ -455,6 +475,7 @@ __all__ = [
     'Event',
     'Events',
     'HasDefaults',
+    'RandomStateWrapper',
     'MISSING',
     'ModuleNamespace',
     'NS',
