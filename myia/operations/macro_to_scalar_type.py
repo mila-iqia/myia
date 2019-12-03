@@ -58,7 +58,7 @@ async def to_scalar_type(info, data):
     sync_data = await data.get()
 
     # We expect either:
-    # - an abstract string containing an abstract scalar with scalar type
+    # - an abstract type containing an abstract scalar with scalar type
     # - an abstract scalar containing a string to be parsed to a scalar type
 
     if isinstance(sync_data, AbstractType):
