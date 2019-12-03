@@ -205,8 +205,7 @@ class JTransformedFunction(Function):
 
 
 @serializable('VirtualFunction')
-@dataclass(frozen=True)
-class VirtualFunction(Function):
+class VirtualFunction(Function, Interned, PossiblyRecursive):
     """Represents some function with an explicitly given type signature.
 
     Attributes:
@@ -215,8 +214,28 @@ class VirtualFunction(Function):
 
     """
 
-    args: Tuple['AbstractValue']
+    args: List['AbstractValue']
     output: 'AbstractValue'
+
+    def __init__(self, args, output):
+        """Initialize a VirtualFunction."""
+        self.args = list(args)
+        self.output = output
+        self._incomplete = False
+
+    def __eqkey__(self):
+        return AttrEK(self, ['args', 'output'])
+
+    def _serialize(self):
+        return {'args': self.args, 'output': self.output}
+
+    @classmethod
+    def _construct(cls):
+        obj = cls.empty()
+        data = yield obj
+        obj.args = data['args']
+        obj.output = data['output']
+        obj._incomplete = False
 
 
 @serializable('TypedPrimitive')

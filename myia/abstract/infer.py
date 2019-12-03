@@ -34,6 +34,7 @@ from .data import (
     AbstractType,
     AbstractValue,
     DummyFunction,
+    Function,
     GraphFunction,
     JTransformedFunction,
     MacroFunction,
@@ -92,6 +93,21 @@ class InferenceEngine:
         self.reference_map = {}
         self.constructors = {}
 
+    async def infer_function(self, fn, argspec, outspec=None):
+        """Infer a function call on the given argspec/outspec."""
+        if not isinstance(fn, Function):
+            fn = to_abstract(fn).get_unique()
+        vfn = VirtualFunction(argspec, outspec)
+        out = await execute_inferrers(
+            self,
+            [self.get_inferrer_for(fn)],
+            VirtualReference(vfn.output),
+            [VirtualReference(arg) for arg in vfn.args]
+        )
+        if outspec is not None:
+            self.abstract_merge(out, vfn.output)
+        return out
+
     def run(self, graph, *, argspec, outspec=None):
         """Run the inferrer on a graph given initial values.
 
@@ -101,30 +117,14 @@ class InferenceEngine:
             outspec (optional): Expected inference result. If provided,
                 inference result will be checked against it.
         """
-        assert not isinstance(outspec, dict)
-        argrefs = [VirtualReference(arg) for arg in argspec]
-
         self.mng.add_graph(graph)
         empty_context = self.context_class.empty()
         root_context = empty_context.add(graph, argspec)
-        output_ref = self.ref(graph.return_, root_context)
-
-        async def _run():
-            inf = GraphInferrer(graph, empty_context)
-            self.loop.schedule(
-                execute_inferrers(self, [inf], None, argrefs)
-            )
-
-        async def _check():
-            amerge(concretize_abstract(await output_ref.get()),
-                   outspec,
-                   forced=False)
-
-        self.run_coroutine(_run())
-        if outspec is not None:
-            self.run_coroutine(_check())
-
-        return concretize_abstract(output_ref.get_sync()), root_context
+        out = self.run_coroutine(
+            self.infer_function(graph, argspec, outspec)
+        )
+        out = concretize_abstract(out)
+        return out, root_context
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""

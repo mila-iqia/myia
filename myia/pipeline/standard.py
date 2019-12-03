@@ -12,10 +12,6 @@ from ..ir import GraphManager
 from ..operations import primitives as P
 from ..operations.gen import lop, reverse_binop, rop
 from ..utils import Registry
-from ..validate import (
-    validate_abstract as default_validate_abstract,
-    whitelist as default_whitelist,
-)
 from . import steps
 from .pipeline import PipelineDefinition
 from .resources import (
@@ -272,8 +268,6 @@ standard_resources = Resources.partial(
     debug_vm=DebugVMResource.partial(
         implementations=vm_registry,
     ),
-    operation_whitelist=default_whitelist,
-    validate_abstract=default_validate_abstract,
     return_backend=False,
     universal=False,
 )

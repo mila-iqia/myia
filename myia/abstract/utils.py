@@ -31,6 +31,7 @@ from .data import (
     Possibilities,
     TaggedPossibilities,
     TrackDict,
+    VirtualFunction,
 )
 from .loop import Pending
 
@@ -187,6 +188,11 @@ def abstract_check(self, x: TaggedPossibilities, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, t: VirtualFunction, *args):
+    return all(self(t, *args) for v in t.args) and self(t.output, *args)
+
+
+@overload  # noqa: F811
 def abstract_check(self, t: PartialApplication, *args):
     return self(t.fn, *args) and all(self(v, *args) for v in t.args)
 
@@ -234,7 +240,7 @@ def _make_constructor(inst):
 def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
     def proceed():
-        if isinstance(x, AbstractValue) and x in cache:
+        if isinstance(x, (AbstractValue, VirtualFunction)) and x in cache:
             return cache[x]
         result = __call__(self, x, *args)
         if not isinstance(result, GeneratorType):
@@ -362,6 +368,14 @@ def abstract_clone(self, x: PartialApplication, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: JTransformedFunction, *args):
     return JTransformedFunction(self(x.fn, *args))
+
+
+@overload  # noqa: F811
+def abstract_clone(self, x: VirtualFunction, *args):
+    return (yield VirtualFunction)(
+        [self(arg, *args) for arg in x.args],
+        self(x.output, *args)
+    )
 
 
 @overload  # noqa: F811

@@ -21,6 +21,8 @@ def skip_node(node):
 
 def _get_call(ref):
     ctx = ref.context
+    if not hasattr(ctx, 'graph'):
+        return '<unknown>', ()
     g = ctx.graph or ref.node.graph
     while g and g.has_flags('auxiliary') \
             and ctx.parent and ctx.parent.graph:

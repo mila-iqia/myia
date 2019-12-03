@@ -93,9 +93,11 @@ class Graph:
         """Return the graph's type based on parameter/output types."""
         from ..abstract import VirtualFunction, AbstractFunction
         if any(p.abstract is None for p in self.parameters):
-            return None  # pragma: no cover
+            return None
+        if self.return_.abstract is None:
+            return None
         vf = VirtualFunction(tuple(p.abstract for p in self.parameters),
-                             self.output.abstract)
+                             self.return_.abstract)
         return AbstractFunction(vf)
 
     @property

@@ -59,20 +59,22 @@ class Unspecializable(Exception):
 
 @abstract_clone.variant
 def _fix_type(self, a: GraphFunction, spc):
-    if a.graph in spc.ctcache:
-        ctx = spc.ctcache[a.graph]
-        return GraphFunction(spc.results[ctx], Context.empty(), None)
-    else:
+    ctx = spc.ctcache.get(a.tracking_id, None)
+    if ctx is None:
+        ctx = spc.ctcache.get(a.graph, None)
+    if ctx is None:
         assert a.graph not in spc.results
         return DummyFunction()
+    else:
+        return GraphFunction(spc.results[ctx], Context.empty(), None)
 
 
 @overload  # noqa: F811
 def _fix_type(self, a: PrimitiveFunction, spc):
     try:
-        return spc.analyze_function(None, a, None)[0].abstract.get_unique()
+        return self(spc.analyze_function(None, a, None)[0], spc)
     except Unspecializable:
-        return a
+        return DummyFunction()
 
 
 @overload  # noqa: F811
@@ -232,6 +234,7 @@ class Monomorphizer:
         self.fill_placeholders()
         result = self.results[context]
         self.manager.keep_roots(result)
+        self.fix_types()
         return result
 
     #########
@@ -261,8 +264,9 @@ class Monomorphizer:
             inf = self.engine.get_inferrer_for(fn)
 
         if isinstance(fn, PrimitiveFunction):
-            a = AbstractFunction(TypedPrimitive(fn.prim, argvals, outval))
-            return _const(fn.prim, a), None
+            tfn = TypedPrimitive(fn.prim, argvals, outval)
+            a = AbstractFunction(tfn)
+            return tfn, _const(fn.prim, a), None
 
         assert isinstance(inf, GraphInferrer)
         concretize_cache(inf.graph_cache)
@@ -272,7 +276,7 @@ class Monomorphizer:
         if norm_ctx not in self.specializations:
             self.specializations[norm_ctx] = ctx
         new_ct = _const(_Placeholder(norm_ctx), None)
-        return new_ct, norm_ctx
+        return None, new_ct, norm_ctx
 
     def _find_choices(self, inf):
         if inf not in self.infcaches:
@@ -296,7 +300,7 @@ class Monomorphizer:
                 res = self.engine.run_coroutine(
                     inf.run(self.engine, None, argrefs)
                 )
-            except InferenceError:
+            except InferenceError:  # pragma: no cover
                 return None, None
             self.infcaches[inf] = {choice: res}
             return choice, res
@@ -450,15 +454,16 @@ class Monomorphizer:
                 fn = a.get_unique()
                 with About(ref.node.debug, 'equiv'):
                     try:
-                        new_node, norm_ctx = self.analyze_function(
+                        _, new_node, norm_ctx = self.analyze_function(
                             a, fn, entry.argvals)
                     except Unspecializable as e:
                         aerr = AbstractError(e.problem, e.data)
                         new_node = _const(e.problem, aerr)
                     else:
-                        if (isinstance(fn, GraphFunction)
-                                and entry.argvals is None):
-                            self.ctcache[ref.node.value] = norm_ctx
+                        if isinstance(fn, GraphFunction):
+                            self.ctcache[ref.node] = norm_ctx
+                            if fn.tracking_id:
+                                self.ctcache[fn.tracking_id] = norm_ctx
 
                         if norm_ctx is not None:
                             retref = self.engine.ref(norm_ctx.graph.return_,
@@ -529,6 +534,7 @@ class Monomorphizer:
                 newgraph = ctx.graph.make_new(relation=next(_count))
                 newgraph.set_flags(reference=False)
             self.results[ctx] = newgraph
+            self.ctcache[newgraph] = ctx
             entry.append(newgraph)
 
     ################
@@ -562,11 +568,9 @@ class Monomorphizer:
                 else:
                     ref = self.engine.ref(node, orig_ctx)
                     if ref in self.engine.cache.cache:
-                        res = ref.get_resolved()
-                        new_node.abstract = concretize_abstract(res)
+                        new_node.abstract = ref.get_resolved()
                     else:
                         new_node.abstract = AbstractError(DEAD)
-                new_node.abstract = _fix_type(new_node.abstract, self)
 
             def fv_function(fv, ctx=ctx):
                 fv_ctx = ctx.filter(fv.graph)
@@ -637,6 +641,15 @@ class Monomorphizer:
                     node.abstract = AbstractFunction(
                         GraphFunction(node.value, Context.empty())
                     )
+
+    #############
+    # Fix types #
+    #############
+
+    def fix_types(self):
+        """Fix all node types."""
+        for node in self.manager.all_nodes:
+            node.abstract = _fix_type(node.abstract, self)
 
 
 class _MonoRemapper(CloneRemapper):

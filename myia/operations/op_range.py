@@ -13,12 +13,15 @@ class Range:  # pragma: no cover
     stop: object
     step: object
 
+    @core
     def __myia_iter__(self):
         return self
 
+    @core
     def __myia_next__(self):
         return self.start, Range(self.start + self.step, self.stop, self.step)
 
+    @core
     def __myia_hasnext__(self):
         return self.start < self.stop
 

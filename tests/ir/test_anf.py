@@ -1,6 +1,7 @@
 
 import pytest
 
+from myia.abstract import AbstractFunction, VirtualFunction
 from myia.ir.anf import PARAMETER, Apply, Constant, Graph, Parameter
 from myia.operations import primitives as primops
 
@@ -28,6 +29,14 @@ def test_graph():
     return_ = Apply([return_, value], g)
     g.return_ = return_
     g.parameters.append(x)
+    assert g.abstract is None
+    g.parameters[0].abstract = 123
+    assert g.abstract is None
+    g.parameters[0].abstract = None
+    g.return_.abstract = 456
+    assert g.abstract is None
+    g.parameters[0].abstract = 123
+    assert g.abstract == AbstractFunction(VirtualFunction([123], 456))
 
 
 def test_graph_helpers():
