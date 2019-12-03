@@ -331,9 +331,9 @@ def test_torch_cross_entropy(inp, target, reduction):
 
 
 @mt(
-    fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(7, 3)))),
-    fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(5, 8)))),
-    fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(torch.randn(10)))),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(7, 3)))),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(5, 8)))),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(10)))),
 )
 def test_torch_detach(x):
     # Example copied from here (2019/12/03):
