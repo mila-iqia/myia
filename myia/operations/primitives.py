@@ -179,7 +179,7 @@ hastype = InferencePrimitive(
     defaults='myia.operations.prim_hastype'
 )
 
-identity = BackendPrimitive(
+identity = PlaceholderPrimitive(
     name='identity',
     defaults='myia.operations.prim_identity'
 )
