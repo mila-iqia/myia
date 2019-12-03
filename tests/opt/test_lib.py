@@ -15,6 +15,7 @@ from myia.operations import (
     scalar_to_array,
     scalar_usub,
     shape,
+    stop_gradient,
     switch,
     transpose,
     tuple_setitem,
@@ -272,6 +273,17 @@ def test_elim_identity():
         return x + y
 
     _check_opt(before, after, lib.elim_identity)
+
+
+def test_elim_stop_gradient():
+
+    def before(x, y):
+        return stop_gradient(x) + stop_gradient(y)
+
+    def after(x, y):
+        return x + y
+
+    _check_opt(before, after, lib.elim_stop_gradient)
 
 
 #######################

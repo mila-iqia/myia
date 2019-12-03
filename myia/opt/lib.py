@@ -313,6 +313,12 @@ elim_identity = psub(
     name='elim_identity'
 )
 
+elim_stop_gradient = psub(
+    pattern=(P.stop_gradient, X),
+    replacement=X,
+    name='elim_stop_gradient'
+)
+
 not_eq = psub(
     pattern=(P.bool_not, (P.scalar_eq, X, Y)),
     replacement=(P.scalar_ne, X, Y),
