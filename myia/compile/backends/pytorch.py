@@ -73,7 +73,7 @@ simple_mapping = {
     P.distribute: lambda a, shp: a.expand(*shp) if shp != () else a,
     P.transpose: lambda a, perm: a.permute(*perm),
     P.reshape: lambda a, shp: a.reshape(shp),
-    P.detach: lambda a: a.detach(),
+    P.stop_gradient: lambda a: a.detach(),
     P.dot: torch.mm,
 
     P.array_to_scalar: pytorch_array_to_scalar,

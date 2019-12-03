@@ -119,11 +119,6 @@ conv2d_weight_grad = BackendPrimitive(
     defaults='myia.operations.prim_conv2d_weight_grad'
 )
 
-detach = BackendPrimitive(
-    name='detach',
-    defaults='myia.operations.prim_detach'
-)
-
 dict_getitem = InferencePrimitive(
     name='dict_getitem',
     defaults='myia.operations.prim_dict_getitem'
@@ -437,6 +432,11 @@ shape = BackendPrimitive(
 split = BackendPrimitive(
     name='split',
     defaults='myia.operations.prim_split'
+)
+
+stop_gradient = BackendPrimitive(
+    name='stop_gradient',
+    defaults='myia.operations.prim_stop_gradient'
 )
 
 string_eq = InferencePrimitive(

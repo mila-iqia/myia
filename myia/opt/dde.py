@@ -380,7 +380,7 @@ def _vprop_cast_operation(vprop, need, inputs, out):
     P.conv2d,
     P.conv2d_input_grad,
     P.conv2d_weight_grad,
-    P.detach,
+    P.stop_gradient,
     P.distribute,
     P.dot,
     P.env_add,

@@ -288,11 +288,6 @@ conv2d_weight_grad = Operation(
     defaults='myia.operations.prim_conv2d_weight_grad'
 )
 
-detach = Operation(
-    name='detach',
-    defaults='myia.operations.prim_detach'
-)
-
 dict_getitem = Operation(
     name='dict_getitem',
     defaults='myia.operations.prim_dict_getitem'
@@ -871,6 +866,11 @@ slice = Operation(
 split = Operation(
     name='split',
     defaults='myia.operations.prim_split'
+)
+
+stop_gradient = Operation(
+    name='stop_gradient',
+    defaults='myia.operations.prim_stop_gradient'
 )
 
 string_eq = Operation(
