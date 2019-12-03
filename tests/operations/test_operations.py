@@ -1,7 +1,7 @@
 import numpy as np
 
 from myia.utils.errors import MyiaTypeError
-from myia.xtype import f16, f32, f64, i16, i32, i64, u32
+from myia.xtype import f16, f32, f64, i16, i32, i64, u32, i8, u64
 
 from ..common import (
     Ty,
@@ -117,3 +117,21 @@ def test_full(shape, value, dtype):
 )
 def test_infer_full(shape, value, dtype):
     return np.full(shape, value, dtype)
+
+
+@mt(
+    # we could create an int8 from any floating.
+    infer(Ty(np.int8), f16, result=i8),
+    infer(Ty(np.int8), f32, result=i8),
+    infer(Ty(np.int8), f64, result=i8),
+    # we could cast an int64 to any lower precision integer.
+    infer(Ty(np.int8), i64, result=i8),
+    infer(Ty(np.int16), i64, result=i16),
+    infer(Ty(np.int32), i64, result=i32),
+    infer(Ty(np.int64), i64, result=i64),
+    # we could instantiate an uint from an int, and vice versa
+    infer(Ty(np.int64), u64, result=i64),
+    infer(Ty(np.uint64), i64, result=u64),
+)
+def test_scalar_instantiation(dtype, value):
+    return dtype(value)
