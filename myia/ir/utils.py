@@ -220,10 +220,10 @@ def sexp_to_node(sexp, graph, multigraph=False, sub=None):
     """
     if isinstance(sexp, tuple):
         if multigraph and isinstance(graph, Var):
-            node = Apply([sexp_to_node(x, Var('G'), True, sub)
+            return Apply([sexp_to_node(x, Var('G'), True, sub)
                           for x in sexp], graph)
         else:
-            node = Apply([sexp_to_node(x, graph, multigraph, sub)
+            return Apply([sexp_to_node(x, graph, multigraph, sub)
                           for x in sexp], graph)
     elif sub and sexp in sub:
         return sub[sexp]
@@ -232,8 +232,7 @@ def sexp_to_node(sexp, graph, multigraph=False, sub=None):
     elif isinstance(sexp, ANFNode):
         return sexp
     else:
-        node = Constant(sexp)
-    return node
+        return Constant(sexp)
 
 
 def sexp_to_graph(sexp):

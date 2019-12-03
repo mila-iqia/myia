@@ -63,10 +63,11 @@ class TypeHelper:
     def initialize(self, mod, mng):
         """Add stub types to the module."""
         mod[env_type] = adt.TypeData(env_type, [a], [empty_env, cons_env])
-        for node in mng.all_nodes:
-            if isinstance(node.abstract, AbstractTaggedUnion):
-                for opt in node.abstract.options:
-                    get_union_ctr(*opt)
+        if mng is not None:
+            for node in mng.all_nodes:
+                if isinstance(node.abstract, AbstractTaggedUnion):
+                    for opt in node.abstract.options:
+                        get_union_ctr(*opt)
         mod[union_type] = adt.TypeData(
             union_type, [], list(tag_map.values()))
 

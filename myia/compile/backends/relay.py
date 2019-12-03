@@ -556,7 +556,11 @@ class CompileGraph:
                 if g is graph:
                     self.graph_map[g] = relay.GlobalVar("main")
                 else:
-                    self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
+                    # Mangle a "main" from the user
+                    name = g.debug.debug_name
+                    if name == "main":
+                        name = "!main"
+                    self.graph_map[g] = relay.GlobalVar(name)
 
         for g in mng.graphs:
             if g.parent is None:
@@ -654,10 +658,6 @@ class CompileGraph:
 compiler = CompileGraph()
 
 
-class DummyManager:
-    all_nodes = []
-
-
 class RelayInputConverter(Converter):
     """Convert values to Relay."""
 
@@ -667,7 +667,7 @@ class RelayInputConverter(Converter):
         self.cst_conv = RelayConstantConverter(self.context)
         mod = relay.Module({})
         th = TypeHelper()
-        th.initialize(mod, DummyManager())
+        th.initialize(mod, None)
         th.finalize(mod)
         target = context.MASK2STR[context.device_type]
         if target == 'cpu':
