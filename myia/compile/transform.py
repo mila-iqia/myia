@@ -82,14 +82,6 @@ def wrap_primitives(graph):
     return graph
 
 
-def gather_handles_params(params):
-    """Return list of all handles in params.
-
-    This list also has graph nodes that correspond to the handle value
-    and functions to extract the value from the arguments.
-    """
-
-
 def return_handles(graph):
     """Change the Universe output to return all the new values of handles."""
     mng = graph.manager
