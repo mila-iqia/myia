@@ -21,11 +21,16 @@ from .utils import ErrorPool, overload
 class ValidationError(Exception):
     """Error validating a Graph."""
 
+    def __init__(self, msg, **data):
+        """Initialize a ValidationError."""
+        super().__init__(msg)
+        self.data = data
+
 
 @abstract_check.variant
 def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
     """Validate a type."""
-    raise ValidationError(f'Illegal type in the graph: {a}')
+    raise ValidationError(f'Illegal type in the graph: {a}', type=a)
 
 
 @overload  # noqa: F811
@@ -38,7 +43,7 @@ def validate_abstract(self, a: AbstractError, uses):
     else:  # pragma: no cover
         # As it turns out, the inferrer now catches this error before we get to
         # validation.
-        raise ValidationError(f'Illegal type in the graph: {a}')
+        raise ValidationError(f'Illegal type in the graph: {a}', type=a)
 
 
 @overload  # noqa: F811
@@ -48,14 +53,15 @@ def validate_abstract(self, a: AbstractScalar, uses):
                        xtype.EnvType, xtype.SymbolicKeyType,
                        xtype.UniverseType)):
         raise ValidationError(
-            f'Illegal type in the graph: {a}'
+            f'Illegal type in the graph: {a}',
+            type=a
         )   # pragma: no cover
     return True
 
 
 @overload  # noqa: F811
 def validate_abstract(self, a: (type(None), AbstractExternal), uses):
-    raise ValidationError(f'Illegal type in the graph: {a}')
+    raise ValidationError(f'Illegal type in the graph: {a}', type=a)
 
 
 @overload  # noqa: F811
