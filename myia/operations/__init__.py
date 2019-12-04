@@ -868,6 +868,11 @@ split = Operation(
     defaults='myia.operations.prim_split'
 )
 
+stop_gradient = Operation(
+    name='stop_gradient',
+    defaults='myia.operations.prim_stop_gradient'
+)
+
 string_eq = Operation(
     name='string_eq',
     defaults='myia.operations.prim_string_eq'

@@ -47,6 +47,7 @@ from myia.operations import (
     scalar_to_array,
     shape,
     split,
+    stop_gradient,
     switch,
     transpose,
     tuple_getitem,
@@ -464,6 +465,11 @@ def test_prim_identity():
     for x in (1, 1.7, True, False, [1, 2, 3], (4, 5)):
         assert identity(x) is x
         assert return_(x) is x
+
+
+def test_prim_stop_gradient():
+    for x in (1, 1.7, True, False, [1, 2, 3], (4, 5)):
+        assert stop_gradient(x) is x
 
 
 def test_prim_switch():

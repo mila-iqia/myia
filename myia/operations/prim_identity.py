@@ -32,7 +32,7 @@ __operation_defaults__ = {
 __primitive_defaults__ = {
     'name': 'identity',
     'registered_name': 'identity',
-    'type': 'backend',
+    'type': 'placeholder',
     'python_implementation': pyimpl_identity,
     'inferrer_constructor': infer_identity,
     'grad_transform': None,

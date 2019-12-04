@@ -358,6 +358,7 @@ step_opt2 = Optimizer.partial(
             optlib.gadd_zero_r,
             optlib.gadd_switch,
             optlib.setitem_dead,
+            optlib.elim_stop_gradient,
         ],
         cse=CSE.partial(report_changes=False),
     )

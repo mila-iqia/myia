@@ -330,6 +330,20 @@ def test_torch_cross_entropy(inp, target, reduction):
     return F.cross_entropy(inp, target, reduction=reduction)
 
 
+@mt(
+    fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(7, 3)))),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(5, 8)))),
+    fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(10)))),
+)
+def test_torch_detach(x):
+    # Example copied from here (2019/12/03):
+    # http://www.bnikolic.co.uk/blog/pytorch-detach.html
+    y = x ** 2
+    z = x.detach() ** 3
+    r = (y + z).sum()
+    return r
+
+
 @fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
                       torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]))
 def test_torch_gather(x, index):

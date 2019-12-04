@@ -179,7 +179,7 @@ hastype = InferencePrimitive(
     defaults='myia.operations.prim_hastype'
 )
 
-identity = BackendPrimitive(
+identity = PlaceholderPrimitive(
     name='identity',
     defaults='myia.operations.prim_identity'
 )
@@ -432,6 +432,11 @@ shape = BackendPrimitive(
 split = BackendPrimitive(
     name='split',
     defaults='myia.operations.prim_split'
+)
+
+stop_gradient = PlaceholderPrimitive(
+    name='stop_gradient',
+    defaults='myia.operations.prim_stop_gradient'
 )
 
 string_eq = InferencePrimitive(
