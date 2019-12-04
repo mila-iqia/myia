@@ -50,6 +50,7 @@ def validate_abstract(self, a: AbstractScalar, uses):
         raise ValidationError(
             f'Illegal type in the graph: {a}'
         )   # pragma: no cover
+    return True
 
 
 @overload  # noqa: F811
