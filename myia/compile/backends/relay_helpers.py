@@ -187,8 +187,11 @@ def to_relay_type(self, a: AbstractScalar):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractType):
-    # Let's just replace abstract type object by type wrapped inside it.
-    return to_relay_type(a.xvalue())
+    # Abstract types are not currently used in the graph,
+    # they are replaced with other calls,
+    #  and appear here just as unused graph parameters.
+    # So, let's just replace them with an integer type as placeholder.
+    return relay.ty.scalar_type('int32')
 
 
 @overload  # noqa: F811

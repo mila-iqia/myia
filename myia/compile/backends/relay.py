@@ -709,12 +709,10 @@ class RelayInputConverter(Converter):
         return self.intrp.evaluate(cst)
 
     def convert_type(self, v, t):
-        # v is already a scalar type
-        # (ie. numpy type or Python builtin numeric type)
-        # and relay does not want anything but scalar or ndarray in his graph,
-        # so let's just send a nil scalar value casted to given scalar type
-        # inside a numpy array.
-        return np.asarray(0, dtype=v)
+        # abstract type will be replaced with an integer type as placeholder
+        # (see to_relay_type(AbstractType), so we must return an integer
+        # of same type here.
+        return np.int32(0)
 
 
 class RelayOutputConverter(Converter):

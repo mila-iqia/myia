@@ -303,7 +303,13 @@ class InferenceEngine:
             cls = type_to_abstract(val)
             g = ref.node.graph
             if isinstance(cls, AbstractScalar):
-                newcall = g.apply(P.scalar_cast, *n_args, cls)
+                typ = cls.xtype()
+                if issubclass(typ, xtype.Number):
+                    newcall = g.apply(P.scalar_cast, *n_args, cls)
+                elif typ is xtype.Bool:
+                    newcall = g.apply(P.scalar_ne, *n_args, 0)
+                else:
+                    raise MyiaTypeError(f'Cannot compile typecast to {typ}')
             else:
                 newfn = g.apply(P.partial, P.make_record, val)
                 newcall = g.apply(newfn, *n_args)
@@ -366,7 +372,7 @@ class InferenceEngine:
         """
         if isinstance(predicate, tuple):
             return any(self.check_predicate(pred, x) for pred in predicate)
-        if isinstance(predicate, xtype.TypeMeta):
+        elif isinstance(predicate, xtype.TypeMeta):
             if isinstance(x, AbstractValue):
                 x = x.xtype()
                 if x is None:

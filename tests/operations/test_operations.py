@@ -1,7 +1,7 @@
 import numpy as np
 
 from myia.utils.errors import MyiaTypeError
-from myia.xtype import f16, f32, f64, i8, i16, i32, i64, u32, u64
+from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
 
 from ..common import (
     Ty,
@@ -120,6 +120,10 @@ def test_infer_full(shape, value, dtype):
 
 
 @mt(
+    # we could not cast to a Nil,
+    infer(Ty(Nil), i64, result=MyiaTypeError),
+    # We could cast to a Bool,
+    infer(Ty(Bool), i64, result=Bool),
     # we could create an int8 from any floating.
     infer(Ty(np.int8), f16, result=i8),
     infer(Ty(np.int8), f32, result=i8),
