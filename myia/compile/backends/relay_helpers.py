@@ -15,6 +15,7 @@ from ...abstract import (
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
+    AbstractType,
     TypedPrimitive,
     VirtualFunction,
     broaden,
@@ -182,6 +183,12 @@ def to_relay_type(self, a: AbstractScalar):
         return relay.ty.TupleType([])
     else:
         return relay.ty.scalar_type(type_to_np_dtype(tp))
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: AbstractType):
+    # Let's just replace abstract type object by type wrapped inside it.
+    return to_relay_type(a.xvalue())
 
 
 @overload  # noqa: F811

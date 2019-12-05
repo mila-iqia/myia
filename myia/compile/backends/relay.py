@@ -2,6 +2,7 @@
 
 from itertools import accumulate
 
+import numpy as np
 import tvm
 from tvm import relay
 from tvm.relay import adt
@@ -706,6 +707,14 @@ class RelayInputConverter(Converter):
     def convert_tagged(self, v, t):
         cst = self.cst_conv.convert_tagged(v, t)
         return self.intrp.evaluate(cst)
+
+    def convert_type(self, v, t):
+        # v is already a scalar type
+        # (ie. numpy type or Python builtin numeric type)
+        # and relay does not want anything but scalar or ndarray in his graph,
+        # so let's just send a nil scalar value casted to given scalar type
+        # inside a numpy array.
+        return np.asarray(0, dtype=v)
 
 
 class RelayOutputConverter(Converter):
