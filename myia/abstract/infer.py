@@ -21,17 +21,13 @@ from ..utils import (
 from .amerge import amerge, bind
 from .data import (
     ANYTHING,
-    DATA,
     TYPE,
     VALUE,
-    AbstractClassBase,
-    AbstractError,
     AbstractFunction,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTuple,
-    AbstractType,
     AbstractValue,
     DummyFunction,
     Function,
@@ -47,7 +43,7 @@ from .data import (
 from .loop import InferenceLoop, Pending, force_pending
 from .macro import AnnotationBasedChecker
 from .ref import Context, EvaluationCache, Reference, VirtualReference
-from .to_abstract import to_abstract, type_to_abstract
+from .to_abstract import to_abstract
 from .utils import (
     broaden as _broaden,
     concretize_abstract,
@@ -295,40 +291,10 @@ class InferenceEngine:
         fn = await fn_ref.get()
         argrefs = [self.ref(node, ctx) for node in n_args]
 
-        if isinstance(fn, AbstractType):
-            # Replace abstract type instantiation with
-            # either a cast for abstract scalars, or
-            # a make_record for all other cases.
-            val = fn.xvalue()
-            cls = type_to_abstract(val)
+        if not isinstance(fn, AbstractFunction):
             g = ref.node.graph
-            if isinstance(cls, AbstractScalar):
-                typ = cls.xtype()
-                if issubclass(typ, xtype.Number):
-                    newcall = g.apply(P.scalar_cast, *n_args, cls)
-                elif typ is xtype.Bool:
-                    newcall = g.apply(P.scalar_ne, *n_args, 0)
-                else:
-                    raise MyiaTypeError(f'Cannot compile typecast to {typ}')
-            else:
-                newfn = g.apply(P.partial, P.make_record, val)
-                newcall = g.apply(newfn, *n_args)
+            newcall = g.apply(operations.call_object, n_fn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
-
-        elif isinstance(fn, AbstractError):
-            raise MyiaTypeError(
-                f'Trying to call a function with type '
-                f'{fn.xvalue()} {fn.values[DATA] or ""}.'
-            )
-
-        elif isinstance(fn, AbstractClassBase):
-            g = ref.node.graph
-            newfn = g.apply(operations.getattr, fn_ref.node, '__call__')
-            newcall = g.apply(newfn, *n_args)
-            return await self.reroute(ref, self.ref(newcall, ctx))
-
-        elif not isinstance(fn, AbstractFunction):
-            raise MyiaTypeError(f'Myia does not know how to call {fn}')
 
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]

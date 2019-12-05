@@ -263,6 +263,11 @@ broadcast_shape = Operation(
     defaults='myia.operations.prim_broadcast_shape'
 )
 
+call_object = Operation(
+    name='call_object',
+    defaults='myia.operations.macro_call_object'
+)
+
 casttag = Operation(
     name='casttag',
     defaults='myia.operations.prim_casttag'
