@@ -361,6 +361,8 @@ class InferenceEngine:
             * A Myia type (xtype.Int[64] etc.)
             * A Python class
             * A callable that returns a boolean
+            * A tuple of values listed above. In such case, we just need
+              one of given predicates to apply to x.
         """
         if isinstance(predicate, tuple):
             return any(self.check_predicate(pred, x) for pred in predicate)

@@ -1,7 +1,7 @@
 import numpy as np
 
 from myia.utils.errors import MyiaTypeError
-from myia.xtype import f16, f32, f64, i16, i32, i64, u32, i8, u64
+from myia.xtype import f16, f32, f64, i8, i16, i32, i64, u32, u64
 
 from ..common import (
     Ty,
@@ -158,6 +158,8 @@ def test_infer_scalar_cast(dtype, value):
     run(int, 0, result=0),
     run(float, 0, result=0),
     # test bool
+    run(np.bool, 0.0, result=False),
+    run(np.bool, 1, result=True),
     run(np.bool, 1, result=1),
     run(np.bool, -1, result=1),
     run(np.bool, -1.23456, result=1),
