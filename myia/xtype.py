@@ -248,6 +248,20 @@ register_serialize(f32, 'f32')
 register_serialize(f64, 'f64')
 register_serialize(UniverseType, 'universe_type')
 
+register_serialize(numpy.bool, 'numpy_bool')
+register_serialize(numpy.int, 'numpy_int')
+register_serialize(numpy.float, 'numpy_float')
+register_serialize(numpy.int8, 'numpy_int8')
+register_serialize(numpy.int16, 'numpy_int16')
+register_serialize(numpy.int32, 'numpy_int32')
+register_serialize(numpy.int64, 'numpy_int64')
+register_serialize(numpy.uint8, 'numpy_uint8')
+register_serialize(numpy.uint16, 'numpy_uint16')
+register_serialize(numpy.uint32, 'numpy_uint32')
+register_serialize(numpy.uint64, 'numpy_uint64')
+register_serialize(numpy.float16, 'numpy_float16')
+register_serialize(numpy.float32, 'numpy_float32')
+register_serialize(numpy.float64, 'numpy_float64')
 
 DTYPE_TO_MTYPE = dict(
     int8=Int[8],

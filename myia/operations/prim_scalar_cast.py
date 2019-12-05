@@ -34,7 +34,7 @@ async def infer_scalar_cast(self, engine,
     if not isinstance(a, AbstractScalar):
         raise MyiaTypeError('scalar_cast must cast to a scalar type')
     t = a.xtype()
-    engine.check(xtype.Number, t)
+    engine.check((xtype.Number, xtype.Bool), t)
     values = {**scalar.values, TYPE: t}
     return lib.AbstractScalar(values)
 

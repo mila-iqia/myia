@@ -362,6 +362,8 @@ class InferenceEngine:
             * A Python class
             * A callable that returns a boolean
         """
+        if isinstance(predicate, tuple):
+            return any(self.check_predicate(pred, x) for pred in predicate)
         if isinstance(predicate, xtype.TypeMeta):
             if isinstance(x, AbstractValue):
                 x = x.xtype()

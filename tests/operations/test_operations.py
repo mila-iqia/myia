@@ -133,5 +133,51 @@ def test_infer_full(shape, value, dtype):
     infer(Ty(np.int64), u64, result=i64),
     infer(Ty(np.uint64), i64, result=u64),
 )
-def test_scalar_instantiation(dtype, value):
+def test_infer_scalar_cast(dtype, value):
+    return dtype(value)
+
+
+@mt(
+    # test each scalar type
+    run(np.uint8, 0, result=0),
+    run_no_relay(np.uint16, 0, result=0),
+    run_no_relay(np.uint32, 0, result=0),
+    run_no_relay(np.uint64, 0, result=0),
+    run_no_relay(np.int8, 0, result=0),
+    run_no_relay(np.int16, 0, result=0),
+    run_no_relay(np.int32, 0, result=0),
+    run_no_relay(np.int64, 0, result=0),
+    run_no_relay(np.float16, 0, result=0),
+    run_no_relay(np.float32, 0, result=0),
+    run_no_relay(np.float64, 0, result=0),
+    run_no_relay(np.bool, 0, result=0),
+    run_no_relay(np.int, 0, result=0),
+    run_no_relay(np.float, 0, result=0),
+    run_no_relay(np.double, 0, result=0),
+    run_no_relay(bool, 0, result=0),
+    run_no_relay(int, 0, result=0),
+    run_no_relay(float, 0, result=0),
+    # test bool
+    run_no_relay(np.bool, 1, result=1),
+    run_no_relay(np.bool, -1, result=1),
+    run_no_relay(np.bool, -1.23456, result=1),
+    run_no_relay(np.bool, -1.23456, result=1),
+    # test uint8
+    run_no_relay(np.uint8, 0, result=0),
+    run_no_relay(np.uint8, 255, result=255),
+    run_no_relay(np.uint8, 256, result=0),
+    run_no_relay(np.uint8, 257, result=1),
+    run_no_relay(np.uint8, -1, result=255),
+    run_no_relay(np.uint8, -1.5, result=255),  # -1.5 => -1 => forced to 255
+    run_no_relay(np.uint8, 255.123456789, result=255),
+    # test int8
+    run_no_relay(np.int8, -128, result=-128),
+    run_no_relay(np.int8, 127, result=127),
+    run_no_relay(np.int8, 128, result=-128),
+    run_no_relay(np.int8, 129, result=-127),
+    run_no_relay(np.int8, -129, result=127),
+    # test float16
+    run_no_relay(np.float16, -1.23456789, result=-1.234375),
+)
+def test_scalar_cast(dtype, value):
     return dtype(value)
