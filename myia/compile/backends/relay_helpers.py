@@ -11,6 +11,7 @@ from ...abstract import (
     AbstractArray,
     AbstractError,
     AbstractFunction,
+    AbstractHandle,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
@@ -19,7 +20,7 @@ from ...abstract import (
     broaden,
 )
 from ...utils import overload
-from ...xtype import Bool, EnvType, Nil, type_to_np_dtype
+from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 empty_union = adt.Constructor("empty", [], union_type)
@@ -62,10 +63,11 @@ class TypeHelper:
     def initialize(self, mod, mng):
         """Add stub types to the module."""
         mod[env_type] = adt.TypeData(env_type, [a], [empty_env, cons_env])
-        for node in mng.all_nodes:
-            if isinstance(node.abstract, AbstractTaggedUnion):
-                for opt in node.abstract.options:
-                    get_union_ctr(*opt)
+        if mng is not None:
+            for node in mng.all_nodes:
+                if isinstance(node.abstract, AbstractTaggedUnion):
+                    for opt in node.abstract.options:
+                        get_union_ctr(*opt)
         mod[union_type] = adt.TypeData(
             union_type, [], list(tag_map.values()))
 
@@ -176,6 +178,8 @@ def to_relay_type(self, a: AbstractScalar):
         return relay.ty.TupleType([])
     elif issubclass(tp, EnvType):
         return env_type(env_val())
+    elif issubclass(tp, UniverseType):
+        return relay.ty.TupleType([])
     else:
         return relay.ty.scalar_type(type_to_np_dtype(tp))
 
@@ -211,6 +215,11 @@ def to_relay_type(self, a: AbstractTaggedUnion):
 
 
 @overload  # noqa: F811
+def to_relay_type(self, a: AbstractHandle):
+    return relay.ty.RefType(self(a.element))
+
+
+@overload  # noqa: F811
 def to_relay_type(self, a: AbstractError):
     return relay.ty.scalar_type('uint16')
 
@@ -220,6 +229,22 @@ def dead_value(t):
     if isinstance(t, AbstractError):
         return relay.const(0xDEAD, 'uint16')
     return _placeholder_body(to_relay_type(t))
+
+
+def handle_wrapper(fn, handle_params):
+    """Wraps a model function to perform handle updates."""
+    def wrapper(*args):
+        handle_instances = list(args[i] for i in handle_params)
+        res = fn(*args)
+        u = res[0]
+        res = res[1] if len(res) == 2 else res[1:]
+        for h, v in zip(handle_instances, u):
+            h.value = v
+        return (), res
+    if len(handle_params) == 0:
+        return fn
+    else:
+        return wrapper
 
 
 def _placeholder_body(type):
@@ -245,6 +270,8 @@ def _placeholder_body(type):
             return empty_env()
         else:  # pragma: no cover
             raise ValueError(f"Can't build value for adt: {type.func}")
+    elif isinstance(type, relay.RefType):
+        return relay.RefCreate(_placeholder_body(type.value))
     else:  # pragma: no cover
         raise ValueError(f"Can't build value of type {type}")
 

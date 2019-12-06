@@ -39,21 +39,19 @@ class MyiaFunction:
                  backend=None, backend_options=None, alias_tracker=None,
                  use_universe=False, tracer=ABSENT):
         """Initialize a MyiaFunction."""
+        # Change this once relay becomes the default backend.
+        if use_universe and backend != 'relay':
+            raise RuntimeError(  # pragma: no cover
+                "Universe is only supported for the relay backend.")
         self.fn = fn
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
-        if use_universe:
-            from .pipeline import standard_debug_pipeline
-            self.pip = standard_debug_pipeline.configure({
-                'validate': False,
-                'resources.universal': True,
-            })
-        else:
-            self.pip = standard_pipeline.configure({
-                'resources.backend.name': backend,
-                'resources.backend.options': backend_options,
-                'resources.return_backend': return_backend,
-            })
+        self.pip = standard_pipeline.configure({
+            'resources.universal': use_universe,
+            'resources.backend.name': backend,
+            'resources.backend.options': backend_options,
+            'resources.return_backend': return_backend,
+        })
         self._cache = {}
         self.latest = None
         if tracer is ABSENT:
@@ -114,6 +112,12 @@ class MyiaFunction:
             except MyiaInputTypeError:
                 pass
         return self.compile(args)(*args)
+
+    def to_device(self, v, *, broaden=True, vm_t=None, orig_t=None):
+        """Move value to the function's accelerator hardware."""
+        backr = self.pip.steps['resources'].keywords['backend'].keywords
+        return to_device(v, backr['name'], backr['options'],
+                         broaden=broaden, vm_t=vm_t, orig_t=orig_t)
 
 
 @keyword_decorator

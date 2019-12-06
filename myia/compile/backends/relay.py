@@ -11,10 +11,10 @@ from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import TaggedValue
-from ...xtype import type_to_np_dtype
+from ...utils import HandleInstance, TaggedValue
+from ...xtype import UniverseType, type_to_np_dtype
 from ..channel import handle
-from ..transform import get_prim_graph, wrap_result
+from ..transform import get_prim_graph, return_handles, wrap_result
 from . import Backend, Converter, HandleBackend
 from .relay_helpers import (
     TypeHelper,
@@ -23,6 +23,7 @@ from .relay_helpers import (
     empty_env,
     get_myia_tag,
     get_union_ctr,
+    handle_wrapper,
     optimize,
     to_relay_type,
 )
@@ -367,6 +368,19 @@ def relay_split(c, x, sections, dim):
     return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
+def relay_handle(c, v):
+    return relay.expr.RefCreate(c.ref(v))
+
+
+# Proper sequencing is handled in convert_func() below
+def relay_universe_setitem(c, u, h, v):
+    return relay.RefWrite(c.ref(h), c.ref(v))
+
+
+def relay_universe_getitem(c, u, h):
+    return relay.RefRead(c.ref(h))
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -393,6 +407,9 @@ COMPLEX_MAP = {
     P.conv2d_input_grad: relay_conv2d_input_grad,
     P.concat: relay_concat,
     P.split: relay_split,
+    P.handle: relay_handle,
+    P.universe_setitem: relay_universe_setitem,
+    P.universe_getitem: relay_universe_getitem,
 }
 
 
@@ -519,10 +536,13 @@ class CompileGraph:
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
+        graph, handles_params = return_handles(graph)
+
         self.module = relay.Module({})
         self.types = TypeHelper()
         self.types.initialize(self.module, mng)
         self.make_const = RelayConstantConverter(context)
+        self.universe_helper = None
 
         # Analyze and create a global union type of all the possible types
         # and then use it for all union values.
@@ -533,23 +553,30 @@ class CompileGraph:
 
         for g in mng.graphs:
             if g.parent is None:
-                self.graph_map[g] = relay.GlobalVar(g.debug.debug_name)
+                if g is graph:
+                    self.graph_map[g] = relay.GlobalVar("main")
+                else:
+                    # Mangle a "main" from the user
+                    name = g.debug.debug_name
+                    if name == "main":  # pragma: no cover
+                        name = "!main"
+                    self.graph_map[g] = relay.GlobalVar(name)
 
         for g in mng.graphs:
             if g.parent is None:
-                function_map[self.graph_map[g]] = self.convert_func(g)
+                function_map[self.graph_map[g]] = \
+                    self.convert_func(g)
 
         self.types.finalize(self.module)
         add_functions(self.module, function_map)
-
-        # Maybe make a function that calls the right graph instead?
-        self.module["main"] = self.module[self.graph_map[graph]]
 
         self.module = optimize(self.module)
 
         exec = relay.create_executor(mod=self.module, ctx=context,
                                      target=target)
         res = exec.evaluate(self.module["main"])
+
+        res = handle_wrapper(res, handles_params)
 
         def f(*args):
             return wrap_result(res(*args))
@@ -592,21 +619,40 @@ class CompileGraph:
 
     def convert_func(self, graph):
         """Convert a graph."""
+        vname = "handle_seq" + graph.debug.debug_name
+        i = 0
         for p in graph.parameters:
             self.node_map[p] = self.on_parameter(p)
 
         params = [self.ref(p) for p in graph.parameters]
 
+        useq = []
         for node in toposort(graph.output, NodeVisitor()):
-            if node.is_apply():
+            if any(p.abstract.xtype() is UniverseType
+                   for p in node.inputs[1:]):
+                useq.append(node)
+                self.node_map[node] = relay.var(f"{vname}.{i}")
+                i += 1
+            elif node.is_apply():
                 self.node_map[node] = self.on_apply(node)
             elif node.is_constant_graph():
                 self.node_map[node] = self.on_graph(node)
             elif node.is_constant():
                 self.node_map[node] = self.on_constant(node)
 
-        return relay.Function(params, self.ref(graph.output),
-                              ret_type=to_relay_type(graph.output.abstract))
+        out = self.ref(graph.output)
+
+        for uop in reversed(useq):
+            assert node.is_apply()
+            out = relay.Let(
+                self.node_map[uop],
+                self.on_apply(uop),
+                out)
+
+        res = relay.Function(params, out,
+                             ret_type=to_relay_type(graph.output.abstract))
+
+        return res
 
 
 compiler = CompileGraph()
@@ -618,6 +664,17 @@ class RelayInputConverter(Converter):
     def __init__(self, context):
         """Set the context."""
         self.context = context
+        self.cst_conv = RelayConstantConverter(self.context)
+        mod = relay.Module({})
+        th = TypeHelper()
+        th.initialize(mod, None)
+        th.finalize(mod)
+        target = context.MASK2STR[context.device_type]
+        if target == 'cpu':
+            target = 'llvm'
+        elif target == 'gpu':
+            target = 'cuda'
+        self.intrp = relay.create_executor(mod=mod, ctx=context, target=target)
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
@@ -639,11 +696,16 @@ class RelayInputConverter(Converter):
         return interpreter.TupleValue(*[self(e, et) for e, et in
                                         zip(v, t.elements)])
 
+    def convert_universe(self, v, t):
+        return interpreter.TupleValue()
+
+    def convert_handle(self, v, t):
+        v = self(v.state, t.element)
+        return interpreter.RefValue(v)
+
     def convert_tagged(self, v, t):
-        real_t = t.options.get(v.tag)
-        ctr = get_union_ctr(v.tag, real_t)
-        conv_val = self(v.value, real_t)
-        return interpreter.ConstructorValue(ctr.tag, [conv_val], None)
+        cst = self.cst_conv.convert_tagged(v, t)
+        return self.intrp.evaluate(cst)
 
 
 class RelayOutputConverter(Converter):
@@ -670,6 +732,9 @@ class RelayOutputConverter(Converter):
         """Convert the value to a tuple."""
         return tuple(self(v, t)
                      for v, t in zip(v, t.elements))
+
+    def convert_handle(self, v, t):
+        return HandleInstance(self(v.value, t.element))
 
     def convert_tagged(self, v, t):
         tag = get_myia_tag(v.constructor)

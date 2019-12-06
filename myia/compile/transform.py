@@ -1,11 +1,14 @@
 """Transforms a graph into lower-level code."""
 
-from ..abstract import to_abstract
+from .. import xtype
+from ..abstract import AbstractHandle, AbstractTuple, to_abstract
 from ..ir import Apply, Constant, Graph, toposort
 from ..operations import Primitive, primitives as P
 from ..utils import SymbolicKeyInstance, overload
 from .channel import handle
 from .vm import FinalVM
+
+i64 = xtype.Int[64]
 
 
 def convert_grad(graph):
@@ -77,6 +80,35 @@ def wrap_primitives(graph):
                         tr.set_edge(node, key, Constant(g))
 
     return graph
+
+
+def return_handles(graph):
+    """Change the Universe output to return all the new values of handles."""
+    mng = graph.manager
+
+    handle_nodes = []
+    handle_idx = []
+    for i, p in enumerate(graph.parameters):
+        if isinstance(p.abstract, AbstractHandle):
+            handle_nodes.append(p)
+            handle_idx.append(i)
+
+    if len(handle_nodes) != 0:
+        with mng.transact() as tr:
+            universe_out = graph.output.inputs[1]
+            vals = [graph.apply(P.universe_getitem, universe_out, n)
+                    for n in handle_nodes]
+            types = [n.abstract.element for n in handle_nodes]
+            for v, a in zip(vals, types):
+                v.abstract = a
+            out_node = graph.apply(P.make_tuple, *vals)
+            out_node.abstract = AbstractTuple(types)
+            tr.set_edge(graph.output, 1, out_node)
+        old_a = graph.output.abstract
+        graph.output.abstract = AbstractTuple([out_node.abstract] +
+                                              old_a.elements[1:])
+
+    return graph, handle_idx
 
 
 @overload
@@ -388,4 +420,5 @@ __all__ = [
     'convert_grad',
     'wrap_primitives',
     'wrap_result',
+    'return_handles',
 ]
