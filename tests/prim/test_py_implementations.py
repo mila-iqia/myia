@@ -27,10 +27,12 @@ from myia.operations import (
     distribute,
     dot,
     embed,
+    embedding,
     env_add,
     env_getitem,
     env_setitem,
     full,
+    grad_embedding_weights,
     identity,
     partial as myia_partial,
     reshape,
@@ -407,6 +409,28 @@ def test_op_full():
     ref = np.full((4, 9), -4, 'float16')
     res = full((4, 9), -4, np.float16)
     assert res.dtype == 'float16'
+    assert np.allclose(ref, res, rtol=0, atol=0)
+
+
+def test_prim_embedding():
+    inp = np.random.randint(0, 9, (2, 7))
+    wgh = np.random.randn(10, 3)
+    ref = np.take(wgh, inp, axis=0)
+    res = embedding(inp, wgh)
+    assert np.allclose(ref, res, rtol=0, atol=0)
+
+
+def test_prim_grad_embedding_weights():
+    indices = np.random.randint(0, 9, (2, 7))
+    weights = np.random.randn(10, 3)
+    dout = embedding(indices, weights)
+    broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
+    ref = np.zeros(weights.shape, dtype=dout.dtype)
+    for i in range(weights.shape[0]):
+        ref[i] = (((broadcastable_indices == i) * dout)
+                  .reshape((-1, weights.shape[1]))
+                  .sum(axis=0))
+    res = grad_embedding_weights(indices, weights, dout)
     assert np.allclose(ref, res, rtol=0, atol=0)
 
 

@@ -35,6 +35,16 @@ def pytorch_array_to_scalar(v):
     return v.detach().numpy()
 
 
+def pytorch_grad_embedding_weights(indices, weights, dout):
+    broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
+    output = torch.zeros(weights.shape, dtype=dout.dtype)
+    for i in range(weights.shape[0]):
+        output[i] = (((broadcastable_indices == i) * dout)
+                     .reshape((-1, weights.shape[1]))
+                     .sum(axis=0))
+    return output
+
+
 simple_mapping = {
     P.scalar_abs: np.absolute,
     P.scalar_add: lambda a, b: a + b,
@@ -74,6 +84,8 @@ simple_mapping = {
     P.transpose: lambda a, perm: a.permute(*perm),
     P.reshape: lambda a, shp: a.reshape(shp),
     P.dot: torch.mm,
+    P.embedding: lambda i, w: torch.nn.functional.embedding(i, w),
+    P.grad_embedding_weights: pytorch_grad_embedding_weights,
 
     P.array_to_scalar: pytorch_array_to_scalar,
 }

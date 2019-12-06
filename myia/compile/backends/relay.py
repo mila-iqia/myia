@@ -80,6 +80,7 @@ SIMPLE_MAP = {
 
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
+    P.embedding: lambda i, w: relay.take(w, i, 0),
 }
 
 
@@ -382,6 +383,24 @@ def relay_universe_getitem(c, u, h):
     return relay.RefRead(c.ref(h))
 
 
+def relay_grad_embedding_weights(c, _indices, _weights, _dout):
+    dout = c.ref(_dout)
+    r_indices = relay.reshape(c.ref(_indices),
+                              tuple(_indices.abstract.xshape()) + (1,))
+    n_rows, n_cols = _weights.abstract.xshape()
+    outputs = []
+    indices_dtype = type_to_np_dtype(_indices.abstract.element.xtype())
+    out_dtype = type_to_np_dtype(_dout.abstract.element.xtype())
+    for i in range(n_rows):
+        select_entries = relay.equal(r_indices, relay.const(i, indices_dtype))
+        casted_select = relay.cast(select_entries, out_dtype)
+        select_dout = relay.multiply(casted_select, dout)
+        reshape_out = relay.reshape(select_dout, (-1, n_cols))
+        vector = relay.sum(reshape_out, 0)
+        outputs.append(relay.reshape(vector, (1, n_cols)))
+    return relay.concatenate(outputs, 0)
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -411,6 +430,7 @@ COMPLEX_MAP = {
     P.handle: relay_handle,
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
+    P.grad_embedding_weights: relay_grad_embedding_weights,
 }
 
 

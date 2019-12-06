@@ -277,6 +277,12 @@ def cross_entropy(input, target, reduction='mean'):
 
 
 @core
+def embedding(input, weight):
+    """Map of method torch.nn.functional.embedding."""
+    return P.embedding(input, weight)
+
+
+@core
 def gather(self, dim, index):
     """Map of 'gather' pytorch method."""
     return P.gather(self, dim, index)

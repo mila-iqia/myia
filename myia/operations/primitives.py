@@ -139,6 +139,11 @@ dot = BackendPrimitive(
     defaults='myia.operations.prim_dot'
 )
 
+embedding = BackendPrimitive(
+    name='embedding',
+    defaults='myia.operations.prim_embedding'
+)
+
 env_add = BackendPrimitive(
     name='env_add',
     defaults='myia.operations.prim_env_add'
@@ -162,6 +167,11 @@ extract_kwarg = InferencePrimitive(
 gather = BackendPrimitive(
     name='gather',
     defaults='myia.operations.prim_gather'
+)
+
+grad_embedding_weights = BackendPrimitive(
+    name='grad_embedding_weights',
+    defaults='myia.operations.prim_grad_embedding_weights'
 )
 
 handle = BackendPrimitive(

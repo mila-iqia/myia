@@ -328,6 +328,11 @@ embed = Operation(
     defaults='myia.operations.macro_embed'
 )
 
+embedding = Operation(
+    name='embedding',
+    defaults='myia.operations.prim_embedding'
+)
+
 enumerate = Operation(
     name='enumerate',
     defaults='myia.operations.op_enumerate'
@@ -411,6 +416,11 @@ getitem = Operation(
 grad = Operation(
     name='grad',
     defaults='myia.operations.macro_grad'
+)
+
+grad_embedding_weights = Operation(
+    name='grad_embedding_weights',
+    defaults='myia.operations.prim_grad_embedding_weights'
 )
 
 gt = Operation(
