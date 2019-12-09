@@ -39,7 +39,7 @@ def pytorch_grad_embedding_weights(indices, weights, dout):
     broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
     output = torch.zeros(weights.shape, dtype=dout.dtype)
     for i in range(weights.shape[0]):
-        output[i] = (((broadcastable_indices == i) * dout)
+        output[i] = (((broadcastable_indices == i).to(dout.dtype) * dout)
                      .reshape((-1, weights.shape[1]))
                      .sum(axis=0))
     return output
