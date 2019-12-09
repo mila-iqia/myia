@@ -412,17 +412,17 @@ def test_op_full():
     assert np.allclose(ref, res, rtol=0, atol=0)
 
 
-def test_prim_embedding():
-    inp = np.random.randint(0, 9, (2, 7))
-    wgh = np.random.randn(10, 3)
+def test_prim_take():
+    inp = np.random.randint(0, 3, (2, 7))
+    wgh = np.random.randn(3, 2)
     ref = np.take(wgh, inp, axis=0)
     res = take(wgh, inp)
     assert np.allclose(ref, res, rtol=0, atol=0)
 
 
-def test_prim_grad_embedding_weights():
-    indices = np.random.randint(0, 9, (2, 7))
-    weights = np.random.randn(10, 3)
+def test_prim_take_grad_weights():
+    indices = np.random.randint(0, 3, (2, 7))
+    weights = np.random.randn(3, 2)
     dout = take(weights, indices)
     broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
     ref = np.zeros(weights.shape, dtype=dout.dtype)
