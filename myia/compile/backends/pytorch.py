@@ -41,7 +41,7 @@ def pytorch_grad_embedding_weights(indices, weights, dout):
     for i in range(weights.shape[0]):
         output[i] = (((broadcastable_indices == i).to(dout.dtype) * dout)
                      .reshape((-1, weights.shape[1]))
-                     .sum(axis=0))
+                     .sum(dim=(0,)))
     return output
 
 
