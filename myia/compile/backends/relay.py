@@ -80,7 +80,7 @@ SIMPLE_MAP = {
 
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
-    P.embedding: lambda i, w: relay.take(w, i, 0),
+    P.take: lambda w, i: relay.take(w, i, 0),
 }
 
 
@@ -383,7 +383,7 @@ def relay_universe_getitem(c, u, h):
     return relay.RefRead(c.ref(h))
 
 
-def relay_grad_embedding_weights(c, _indices, _weights, _dout):
+def relay_take_grad_weights(c, _weights, _indices, _dout):
     dout = c.ref(_dout)
     r_indices = relay.reshape(c.ref(_indices),
                               tuple(_indices.abstract.xshape()) + (1,))
@@ -430,7 +430,7 @@ COMPLEX_MAP = {
     P.handle: relay_handle,
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
-    P.grad_embedding_weights: relay_grad_embedding_weights,
+    P.take_grad_weights: relay_take_grad_weights,
 }
 
 

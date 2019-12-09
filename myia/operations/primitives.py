@@ -139,11 +139,6 @@ dot = BackendPrimitive(
     defaults='myia.operations.prim_dot'
 )
 
-embedding = BackendPrimitive(
-    name='embedding',
-    defaults='myia.operations.prim_embedding'
-)
-
 env_add = BackendPrimitive(
     name='env_add',
     defaults='myia.operations.prim_env_add'
@@ -167,11 +162,6 @@ extract_kwarg = InferencePrimitive(
 gather = BackendPrimitive(
     name='gather',
     defaults='myia.operations.prim_gather'
-)
-
-grad_embedding_weights = BackendPrimitive(
-    name='grad_embedding_weights',
-    defaults='myia.operations.prim_grad_embedding_weights'
 )
 
 handle = BackendPrimitive(
@@ -462,6 +452,16 @@ switch = BackendPrimitive(
 tagged = BackendPrimitive(
     name='tagged',
     defaults='myia.operations.prim_tagged'
+)
+
+take = BackendPrimitive(
+    name='take',
+    defaults='myia.operations.prim_take'
+)
+
+take_grad_weights = BackendPrimitive(
+    name='take_grad_weights',
+    defaults='myia.operations.prim_take_grad_weights'
 )
 
 transpose = BackendPrimitive(
