@@ -2,6 +2,7 @@
 
 from itertools import accumulate
 
+import numpy as np
 import tvm
 from tvm import relay
 from tvm.relay import adt
@@ -706,6 +707,12 @@ class RelayInputConverter(Converter):
     def convert_tagged(self, v, t):
         cst = self.cst_conv.convert_tagged(v, t)
         return self.intrp.evaluate(cst)
+
+    def convert_type(self, v, t):
+        # abstract type will be replaced with an integer type as placeholder
+        # (see to_relay_type(AbstractType), so we must return an integer
+        # of same type here.
+        return np.int32(0)
 
 
 class RelayOutputConverter(Converter):

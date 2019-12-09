@@ -15,6 +15,7 @@ from ...abstract import (
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
+    AbstractType,
     TypedPrimitive,
     VirtualFunction,
     broaden,
@@ -182,6 +183,15 @@ def to_relay_type(self, a: AbstractScalar):
         return relay.ty.TupleType([])
     else:
         return relay.ty.scalar_type(type_to_np_dtype(tp))
+
+
+@overload  # noqa: F811
+def to_relay_type(self, a: AbstractType):
+    # Abstract types are not currently used in the graph,
+    # they are replaced with other calls,
+    #  and appear here just as unused graph parameters.
+    # So, let's just replace them with an integer type as placeholder.
+    return relay.ty.scalar_type('int32')
 
 
 @overload  # noqa: F811

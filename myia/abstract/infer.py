@@ -21,17 +21,13 @@ from ..utils import (
 from .amerge import amerge, bind
 from .data import (
     ANYTHING,
-    DATA,
     TYPE,
     VALUE,
-    AbstractClassBase,
-    AbstractError,
     AbstractFunction,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTuple,
-    AbstractType,
     AbstractValue,
     DummyFunction,
     Function,
@@ -295,26 +291,10 @@ class InferenceEngine:
         fn = await fn_ref.get()
         argrefs = [self.ref(node, ctx) for node in n_args]
 
-        if isinstance(fn, AbstractType):
+        if not isinstance(fn, AbstractFunction):
             g = ref.node.graph
-            newfn = g.apply(P.partial, P.make_record, fn.xvalue())
-            newcall = g.apply(newfn, *n_args)
+            newcall = g.apply(operations.call_object, n_fn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
-
-        elif isinstance(fn, AbstractError):
-            raise MyiaTypeError(
-                f'Trying to call a function with type '
-                f'{fn.xvalue()} {fn.values[DATA] or ""}.'
-            )
-
-        elif isinstance(fn, AbstractClassBase):
-            g = ref.node.graph
-            newfn = g.apply(operations.getattr, fn_ref.node, '__call__')
-            newcall = g.apply(newfn, *n_args)
-            return await self.reroute(ref, self.ref(newcall, ctx))
-
-        elif not isinstance(fn, AbstractFunction):
-            raise MyiaTypeError(f'Myia does not know how to call {fn}')
 
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]

@@ -1,7 +1,7 @@
 import numpy as np
 
 from myia.utils.errors import MyiaTypeError
-from myia.xtype import f16, f32, f64, i16, i32, i64, u32
+from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
 
 from ..common import (
     Ty,
@@ -117,3 +117,76 @@ def test_full(shape, value, dtype):
 )
 def test_infer_full(shape, value, dtype):
     return np.full(shape, value, dtype)
+
+
+@mt(
+    # we could not cast to a Nil,
+    infer(Ty(Nil), i64, result=MyiaTypeError),
+    # We could cast to a Bool,
+    infer(Ty(Bool), i64, result=Bool),
+    # we could create an int8 from any floating.
+    infer(Ty(np.int8), f16, result=i8),
+    infer(Ty(np.int8), f32, result=i8),
+    infer(Ty(np.int8), f64, result=i8),
+    # we could cast an int64 to any lower precision integer.
+    infer(Ty(np.int8), i64, result=i8),
+    infer(Ty(np.int16), i64, result=i16),
+    infer(Ty(np.int32), i64, result=i32),
+    infer(Ty(np.int64), i64, result=i64),
+    # we could instantiate an uint from an int, and vice versa
+    infer(Ty(np.int64), u64, result=i64),
+    infer(Ty(np.uint64), i64, result=u64),
+)
+def test_infer_scalar_cast(dtype, value):
+    return dtype(value)
+
+
+@mt(
+    # test each scalar type
+    run(np.uint8, 0, result=0),
+    run(np.uint16, 0, result=0),
+    run(np.uint32, 0, result=0),
+    run(np.uint64, 0, result=0),
+    run(np.int8, 0, result=0),
+    run(np.int16, 0, result=0),
+    run(np.int32, 0, result=0),
+    run(np.int64, 0, result=0),
+    run(np.float16, 0, result=0),
+    run(np.float32, 0, result=0),
+    run(np.float64, 0, result=0),
+    run(np.bool, 0, result=0),
+    run(np.int, 0, result=0),
+    run(np.float, 0, result=0),
+    run(np.double, 0, result=0),
+    run(bool, 0, result=0),
+    run(int, 0, result=0),
+    run(float, 0, result=0),
+    # test bool
+    run(np.bool, 0.0, result=False),
+    run(np.bool, 1, result=True),
+    run(np.bool, 1, result=1),
+    run(np.bool, -1, result=1),
+    run(np.bool, -1.23456, result=1),
+    run(np.bool, -1.23456, result=1),
+    # test uint8
+    run(np.uint8, 0, result=0),
+    run(np.uint8, 255, result=255),
+    run(np.uint8, 256, result=0),
+    run(np.uint8, 257, result=1),
+    run(np.uint8, -1, result=255),
+    run(np.uint8, -1.5, result=255),  # -1.5 => -1 => forced to 255
+    run(np.uint8, 255.123456789, result=255),
+    # test int8
+    run(np.int8, -128, result=-128),
+    run(np.int8, 127, result=127),
+    run(np.int8, 128, result=-128),
+    run(np.int8, 129, result=-127),
+    run(np.int8, -129, result=127),
+    # test float16
+    run(np.float16, 1, result=1),
+    run(np.float16, -1.1, result=np.float16(-1.1)),
+    run(np.float16, -1.23456789, result=-1.234375),
+    broad_specs=(False, False)
+)
+def test_scalar_cast(dtype, value):
+    return dtype(value)
