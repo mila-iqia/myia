@@ -49,7 +49,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Myia'
-copyright = '2017, MILA'
+copyright = '2019, MILA'
 author = 'MILA'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -91,7 +91,14 @@ html_theme = 'alabaster'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+    'github_user': 'mila-iqia',
+    'github_repo': 'myia',
+    'fixed_sidebar': True,
+    'github_button': True,
+    'codecov_button': True,
+    'sidebar_collapse': True,
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -109,7 +116,6 @@ html_sidebars = {
         'navigation.html',
         'relations.html',  # needs 'show_related': True theme option to display
         'searchbox.html',
-        'donate.html',
     ]
 }
 
