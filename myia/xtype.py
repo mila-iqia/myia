@@ -325,6 +325,7 @@ def pytype_to_myiatype(pytype):
 
     Arguments:
         pytype: The Python type to convert.
+
     """
     return _simple_types[pytype]
 

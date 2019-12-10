@@ -210,6 +210,7 @@ class Monomorphizer:
     Arguments:
         engine: The InferenceEngine containing the type information.
         reuse_existing: Whether to reuse existing graphs when possible.
+
     """
 
     def __init__(self, engine, reuse_existing=True):

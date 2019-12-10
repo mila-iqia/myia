@@ -32,6 +32,7 @@ def dfs(root: T,
             * Return 'follow' to include the node and follow its edges.
             * Return 'nofollow' to include the node but not follow its edges.
             * Return 'exclude' to not include the node, nor follow its edges.
+
     """
     seen: Set[T] = set()
     to_visit = [root]
@@ -66,6 +67,7 @@ def toposort(root: T,
             * Return 'follow' to include the node and follow its edges.
             * Return 'nofollow' to include the node but not follow its edges.
             * Return 'exclude' to not include the node, nor follow its edges.
+
     """
     done: Set[T] = set()
     todo: List[T] = [root]

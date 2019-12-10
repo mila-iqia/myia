@@ -674,12 +674,13 @@ def resolve_globals(resources, node, equiv):
 def make_inliner(inline_criterion, check_recursive, name):
     """Create an inliner.
 
-    Args:
+    Arguments:
         inline_criterion: A function that takes (graph, node, args) and
             returns whether the graph should be inlined or not.
         check_recursive: Check whether a function is possibly recursive
             before inlining it. If it is, don't inline.
         name: The name of the optimization.
+
     """
     @pattern_replacer(G, Xs, interest=Graph)
     def inline(resources, node, equiv):

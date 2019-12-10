@@ -25,7 +25,7 @@ class PipelineDefinition:
     def index(self, step, upper_bound=False):
         """Return the index corresponding to the given step.
 
-        Args:
+        Arguments:
             step: The name of the step, or an int (returned without
                 modification).
             upper_bound: Whether this is meant to be used as an
@@ -34,6 +34,7 @@ class PipelineDefinition:
                   string, so that it becomes inclusive,
                 * unless it starts with !
                 * Integers are still returned without modification.
+
         """
         if isinstance(step, str):
             if step.startswith('!'):
@@ -148,6 +149,7 @@ class PipelineDefinition:
             in_key: The name of the pipeline input to use for the
                 callable's argument.
             out_key: The name of the pipeline output to return.
+
         """
         def run(arg):
             res = self.run(**{in_key: arg})

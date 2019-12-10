@@ -876,6 +876,7 @@ class Block:
         Arguments:
             parser: The Parser object.
             flags: Flags to give to that Block's graph.
+
         """
         self.parser = parser
         self.use_universe = use_universe

@@ -56,7 +56,7 @@ class Named:
     def __init__(self, name):
         """Construct a named object.
 
-        Args:
+        Arguments:
             name: The name of this object.
 
         """
@@ -138,7 +138,7 @@ def repr_(obj: Any, **kwargs: Any):
     function returns `<module.Class(key=value) object at address>` instead, to
     make objects easier to identify by their attributes.
 
-    Args:
+    Arguments:
         **kwargs: The attributes and their values that will be printed as part
             of the string representation.
 
@@ -194,6 +194,7 @@ class Event:
                 be the event.
             run_history: Whether to call the handler for all previous events
                 or not.
+
         """
         self._handlers.append(handler)
         if run_history and self.history:
@@ -241,11 +242,12 @@ class Events:
     >>> events.yawn(20)
     aaaaaaaaaaaaaaaaaaaa
 
-    Args:
+    Arguments:
         owner: The object that owns all the events. It will be passed
             as the first argument on each event.
         events: Keyword arguments mapping an event name to a history,
             or None if there is no history.
+
     """
 
     def __init__(self, owner=None, **events):
@@ -286,10 +288,11 @@ class Namespace:
     def __init__(self, label, *dicts):
         """Initialize a namespace.
 
-        Args:
+        Arguments:
             label: The namespace's name.
             dicts: A list of dictionaries containing the namespace's data,
                 which are consulted sequentially.
+
         """
         self.label = label
         self.dicts = dicts
@@ -318,9 +321,10 @@ class ModuleNamespace(Namespace):
     def __init__(self, name):
         """Initialize a ModuleNamespace.
 
-        Args:
+        Arguments:
             name: Qualified name for the module. Must be possible
                 to `__import__` it.
+
         """
         mod = vars(__import__(name, fromlist=['_']))
         super().__init__(name, mod, builtins_d)
@@ -332,7 +336,7 @@ class ClosureNamespace(Namespace):
     def __init__(self, fn):
         """Initialize a ClosureNamespace.
 
-        Args:
+        Arguments:
             fn: The function.
 
         """
@@ -366,6 +370,7 @@ class ErrorPool:
 
     Arguments:
         exc_class: The exception to raise if any error occurred.
+
     """
 
     def __init__(self, *, exc_class=Exception):

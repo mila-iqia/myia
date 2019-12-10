@@ -67,6 +67,7 @@ def tentative(self, p: Possibilities, loop):
     Arguments:
         d: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
+
     """
     return loop.create_pending_tentative(tentative=p)
 
@@ -123,6 +124,7 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
         bind_pending: Whether we bind two Pending, unresolved values.
         accept_pending: Works the same as bind_pending, but only for the
             top level call.
+
     """
     if x1 is x2:
         return x1
@@ -404,6 +406,7 @@ def bind(loop, committed, resolved, pending):
             committed to, which will force the merge to return that value.
         resolved: A set of Pendings that have already been resolved.
         pending: A set of unresolved Pendings.
+
     """
     def amergeall():
         if committed is None:

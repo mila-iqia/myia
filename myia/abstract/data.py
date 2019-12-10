@@ -406,6 +406,7 @@ class AbstractFunction(AbstractAtom):
         Arguments:
             poss: Possible Functions that could be called here.
             value: Either Possibilities or Pending.
+
         """
         assert (len(poss) > 0) ^ (value is not None)
         v = Possibilities(poss) if value is None else value

@@ -61,6 +61,7 @@ class Overload:
             after recursive calls.
         mixins: A list of Overload instances that contribute functions to this
             Overload.
+
     """
 
     def __init__(self,
@@ -281,6 +282,7 @@ def overload(fn, *, bootstrap=False, initial_state=None, postprocess=None):
             if there is no initial state.
         postprocess: A function to transform the result. Not called on the
             results of recursive calls.
+
     """
     dispatch = _find_overload(fn, bootstrap, initial_state, postprocess)
     return dispatch.register(fn)
@@ -303,6 +305,7 @@ def overload_wrapper(wrapper, *, bootstrap=False, initial_state=None,
             if there is no initial state.
         postprocess: A function to transform the result. Not called on the
             results of recursive calls.
+
     """
     dispatch = _find_overload(wrapper, bootstrap, initial_state, postprocess)
     return dispatch.wrapper(wrapper)

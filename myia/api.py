@@ -143,6 +143,7 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
         backend: the backend to use for compilation
         backend_options: backend-specific options.
         return_backend: return backend values (avoids copies to CPU).
+
     """
     return MyiaFunction(fn, specialize_values, backend=backend,
                         backend_options=backend_options,

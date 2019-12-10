@@ -42,6 +42,7 @@ class GraphRemapper(Partializable):
         manager: The manager to use, or None to fetch it automatically.
         graph_relation (Optional): The relation between the original graph
             and the new graph (defaults to relation).
+
     """
 
     def __init__(self,
@@ -113,6 +114,7 @@ class GraphRemapper(Partializable):
             new_node: What to remap node to.
             link: Whether to link that node or not using link_apply. By default
                 it is True if the node is an Apply node.
+
         """
         if key in self.repl:
             return self.repl[key]
@@ -383,6 +385,7 @@ class GraphCloner:
         graph_relation: The relation the cloned graphs present with
             respect to the originals, for debugging purposes. Default
             is the value of the `relation` argument.
+
     """
 
     def __init__(self,

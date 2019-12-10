@@ -70,6 +70,7 @@ def freevars_boundary(graph, include_boundary=True):
     Arguments:
         graph: The main graph from which we want to include nodes.
         include_boundary: Whether to yield the free variables or not.
+
     """
     def include(node):
         g = node.graph

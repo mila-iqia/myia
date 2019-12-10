@@ -150,6 +150,7 @@ class TraceListener:
 
     Arguments:
         focus: A glob prepended to this listener's patterns.
+
     """
 
     def __init__(self, focus=None):
@@ -218,6 +219,7 @@ class DoTrace(TraceListener):
             are. This argument will not work if any pattern is a regex.
         post: A function to call at the end of processing. Defaults to
             None, which means no function is called.
+
     """
 
     def __init__(self, patterns={}, *, focus=None, post=None):

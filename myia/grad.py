@@ -98,6 +98,7 @@ class SlaveRemapper(GradRemapper):
             to refer to nodes in other remappers.
         graph_relation (Optional): The relation between the original graph
             and the new graph (defaults to relation).
+
     """
 
     def __init__(self,

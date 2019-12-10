@@ -18,10 +18,11 @@ def manage(*graphs, weak=False):
     * If two graphs have different managers, an error will be raised.
     * If no graph has a manager, one will be created.
 
-    Args:
+    Arguments:
         graphs: The graphs to manage.
         weak: If True, when creating a new manager, graphs will not
             be forcefully associated with it. (Defaults to False.)
+
     """
     manager = None
     for graph in graphs:
@@ -673,10 +674,11 @@ class GraphManager(Partializable):
     def _process_edge(self, node, key, inp, direction):
         """Add/remove an edge between two nodes.
 
-        Args:
+        Arguments:
             direction:
                 * 1 if the edge is added.
                 * -1 if the edge is removed.
+
         """
         if direction == -1:
             if (node, key) not in self.uses[inp]:
@@ -696,10 +698,11 @@ class GraphManager(Partializable):
     def _process_inputs(self, node, direction):
         """Process the inputs of a newly [dis]connected node.
 
-        Args:
+        Arguments:
             direction:
                 * 1 if the node was connected.
                 * -1 if the node was disconnected.
+
         """
         for key, inp in enumerate(node.inputs):
             self._process_edge(node, key, inp, direction)
