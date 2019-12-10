@@ -57,7 +57,7 @@ def _is_tentative(self, x: (Possibilities, TaggedPossibilities), loop):
 @broaden.variant(
     initial_state=lambda: CloneState({}, None, _is_tentative)
 )
-def tentative(self, p: Possibilities, loop):
+def tentative(self, p: Possibilities, loop):  # noqa: D417
     """Broaden an abstract value and make it tentative.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
@@ -65,7 +65,7 @@ def tentative(self, p: Possibilities, loop):
       us to avoid resolving them earlier than we would like.
 
     Arguments:
-        d: The abstract data to clone.
+        p: The abstract data to clone.
         loop: The InferenceLoop, used to broaden Possibilities.
 
     """

@@ -139,6 +139,7 @@ def repr_(obj: Any, **kwargs: Any):
     make objects easier to identify by their attributes.
 
     Arguments:
+        obj: object to represent
         **kwargs: The attributes and their values that will be printed as part
             of the string representation.
 

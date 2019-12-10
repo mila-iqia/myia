@@ -1,3 +1,4 @@
 [pydocstyle]
 ignore-decorators = overload
-add-ignore = D105, D401
+add-ignore = D105
+convention = google

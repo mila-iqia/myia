@@ -1,5 +1,4 @@
-"""
-Implementation of the 'abstract_array' operation.
+"""Implementation of the 'abstract_array' operation.
 
 Create an AbstractArray using given shape and AbstractScalar.
 Used in myia/operations/op_full.py

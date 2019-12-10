@@ -108,9 +108,9 @@ class GraphRemapper(Partializable):
             key: Either (g, node) or just a node. The latter case corresponds
                 to remapping all uses of node from all graphs to the same
                 node.
-            g: The graph to which node belongs.
+            graph: The graph to which node belongs.
             node: The node to remap.
-            ng: Equivalent to self.get_graph(g).
+            new_graph: Equivalent to self.get_graph(g).
             new_node: What to remap node to.
             link: Whether to link that node or not using link_apply. By default
                 it is True if the node is an Apply node.

@@ -706,6 +706,7 @@ class StandardInferrer(Inferrer):
         If a is not a constant, raises a MyiaTypeError.
 
         Arguments:
+            a: Value to check for constantness
             argnum (int): Which argument we are checking.
             range (optional): A range or collection in which the argument
                 must lie.

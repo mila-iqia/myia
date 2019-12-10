@@ -284,8 +284,9 @@ def gather(self, dim, index):
 
 @core
 def linear(input, weight, bias=None):
-    r"""
-    Applies a linear transformation to the incoming data: :math:`y = xA^T + b`.
+    r"""Applies a linear transformation to the incoming data.
+
+    :math:`y = xA^T + b`
 
     Shape:
         - Input: :math:`(N, *, in\_features)` where `*` means any number of
@@ -293,6 +294,7 @@ def linear(input, weight, bias=None):
         - Weight: :math:`(out\_features, in\_features)`
         - Bias: :math:`(out\_features)`
         - Output: :math:`(N, *, out\_features)`
+
     """
     if input.dim() == 2 and bias is not None:
         # fused op is marginally faster

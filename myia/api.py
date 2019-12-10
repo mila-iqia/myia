@@ -143,6 +143,9 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
         backend: the backend to use for compilation
         backend_options: backend-specific options.
         return_backend: return backend values (avoids copies to CPU).
+        alias_tracker: function to indicate aliases
+            (see :func:`myia.abstract.find_aliases`)
+        use_universe: Enable use of sequential code (experimental)
 
     """
     return MyiaFunction(fn, specialize_values, backend=backend,

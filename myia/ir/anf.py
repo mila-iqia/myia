@@ -102,8 +102,7 @@ class Graph:
 
     @property
     def output(self) -> 'ANFNode':
-        """
-        Return the graph's output.
+        """Return the graph's output.
 
         Equal to `self.return_.inputs[1]`, if it exists. Unlike `return_`,
         `output' may be a constant or belong to a different graph.

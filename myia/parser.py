@@ -875,6 +875,8 @@ class Block:
 
         Arguments:
             parser: The Parser object.
+            use_universe: Make all operations in the graph serialized
+                with universe
             flags: Flags to give to that Block's graph.
 
         """
@@ -971,6 +973,8 @@ class Block:
 
         Args:
             varnum: The name of the variable to read.
+            resolve_globals: If the name is not resolvable,
+                assume it is a global
 
         """
         if varnum in self.variables:

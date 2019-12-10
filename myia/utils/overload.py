@@ -114,7 +114,9 @@ class Overload:
             params = list(sign.parameters.values())
             if wrapper:
                 params = params[1:]
-            if self.__self__ is not None:
+            if (self.__self__ is not None or
+                self.initial_state or
+                    self.postprocess):
                 params = params[1:]
             params = [p.replace(annotation=inspect.Parameter.empty)
                       for p in params]
@@ -275,6 +277,7 @@ def overload(fn, *, bootstrap=False, initial_state=None, postprocess=None):
     use.
 
     Arguments:
+        fn: The function to register.
         bootstrap: Whether to bootstrap this function so that it receives
             itself as its first argument. Useful for recursive functions.
         initial_state: A function with no arguments that returns the initial
@@ -298,6 +301,7 @@ def overload_wrapper(wrapper, *, bootstrap=False, initial_state=None,
     give to that method.
 
     Arguments:
+        wrapper: Function to wrap the dispatch with.
         bootstrap: Whether to bootstrap this function so that it receives
             itself as its first argument. Useful for recursive functions.
         initial_state: A function with no arguments that returns the initial

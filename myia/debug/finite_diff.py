@@ -145,8 +145,7 @@ def gen_variants(self, obj: numpy.ndarray, gen, path):
 
 
 class GradTester:
-    """
-    Test computed gradient against finite differences estimate.
+    """Test computed gradient against finite differences estimate.
 
     Arguments:
         fn: The function to test against.
@@ -200,8 +199,7 @@ class GradTester:
         results[f'd{outname}/d{argname}'] = value
 
     def compute_exact(self) -> Dict[str, float]:
-        """
-        Compute the exact gradient.
+        """Compute the exact gradient.
 
         Returns:
             A dictionary that maps d<outname>/d<argname> to the
@@ -228,8 +226,7 @@ class GradTester:
             return x - self.epsilon, x + self.epsilon
 
     def compute_finite_diff(self) -> Dict[str, float]:
-        """
-        Compute the finite differences gradient.
+        """Compute the finite differences gradient.
 
         Returns:
             A dictionary that maps d<outname>/d<argname> to the
@@ -259,8 +256,7 @@ class GradTester:
         return results
 
     def compare(self) -> Dict[str, Dict]:
-        """
-        Compare the exact gradients to the estimated ones.
+        """Compare the exact gradients to the estimated ones.
 
         Returns:
             A dictionary that maps d<outname>/d<argname> to a dictionary
