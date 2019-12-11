@@ -29,6 +29,7 @@ from ..multitest import (
     mt,
     myia_function_test,
     run,
+    run_no_relay
 )
 from ..test_grad import grad_wrap
 
@@ -370,6 +371,32 @@ def test_torch_gather(x, index):
 )
 def test_torch_item(x):
     return x.item()
+
+
+
+@mt(
+    run_no_relay(nn.Parameter(torch.randn(2, 3, 4)), 'fro', None),
+    run(nn.Parameter(torch.randn(2, 3, 4)), float('inf'), None),
+    run(nn.Parameter(torch.randn(2, 3, 4)), float('-inf'), None),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', None),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 1, None),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 2, None),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 2.5, None),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', 0),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', 1),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', 2),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', (0,)),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', (1,)),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', (2,)),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', (0, 1)),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 'fro', (2, 1)),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 2.5, 2),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 2.5, (1, 2)),
+    run(nn.Parameter(torch.randn(2, 3, 4)), 2.5, (1, 0, 2)),
+    broad_specs=(True, False, False)
+)
+def test_torch_norm(inp, p, dim):
+    return torch.norm(inp, p, dim)
 
 
 @fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
