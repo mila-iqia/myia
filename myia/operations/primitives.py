@@ -164,6 +164,11 @@ gather = BackendPrimitive(
     defaults='myia.operations.prim_gather'
 )
 
+get_rows = BackendPrimitive(
+    name='get_rows',
+    defaults='myia.operations.prim_get_rows'
+)
+
 handle = BackendPrimitive(
     name='handle',
     defaults='myia.operations.prim_handle'
@@ -457,11 +462,6 @@ tagged = BackendPrimitive(
 take = BackendPrimitive(
     name='take',
     defaults='myia.operations.prim_take'
-)
-
-take_grad_weights = BackendPrimitive(
-    name='take_grad_weights',
-    defaults='myia.operations.prim_take_grad_weights'
 )
 
 transpose = BackendPrimitive(

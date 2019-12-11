@@ -37,7 +37,7 @@ async def infer_take(self, engine,
 @bprop_to_grad_transform(P.take)
 def bprop_take(weights, indices, out, dout):
     """Backpropagator for primitive `take`."""
-    return (P.take_grad_weights(weights, indices, dout),
+    return (P.get_rows(P.shape(weights)[0], indices, dout),
             zeros_like(indices))
 
 

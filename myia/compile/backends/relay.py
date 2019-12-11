@@ -383,18 +383,20 @@ def relay_universe_getitem(c, u, h):
     return relay.RefRead(c.ref(h))
 
 
-def relay_take_grad_weights(c, _weights, _indices, _dout):
-    dout = c.ref(_dout)
+def relay_get_rows(c, _nb_indices, _indices, _values):
+    assert _nb_indices.is_constant(int)
+    values = c.ref(_values)
     r_indices = relay.reshape(c.ref(_indices),
                               tuple(_indices.abstract.xshape()) + (1,))
-    n_rows, n_cols = _weights.abstract.xshape()
+    n_rows = _nb_indices.value
+    n_cols = _values.abstract.xshape()[-1]
     outputs = []
     indices_dtype = type_to_np_dtype(_indices.abstract.element.xtype())
-    out_dtype = type_to_np_dtype(_dout.abstract.element.xtype())
+    out_dtype = type_to_np_dtype(_values.abstract.element.xtype())
     for i in range(n_rows):
         select_entries = relay.equal(r_indices, relay.const(i, indices_dtype))
         casted_select = relay.cast(select_entries, out_dtype)
-        select_dout = relay.multiply(casted_select, dout)
+        select_dout = relay.multiply(casted_select, values)
         reshape_out = relay.reshape(select_dout, (-1, n_cols))
         vector = relay.sum(reshape_out, 0)
         outputs.append(relay.reshape(vector, (1, n_cols)))
@@ -430,7 +432,7 @@ COMPLEX_MAP = {
     P.handle: relay_handle,
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
-    P.take_grad_weights: relay_take_grad_weights,
+    P.get_rows: relay_get_rows,
 }
 
 

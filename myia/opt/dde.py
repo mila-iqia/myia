@@ -385,7 +385,7 @@ def _vprop_cast_operation(vprop, need, inputs, out):
     P.distribute,
     P.dot,
     P.take,
-    P.take_grad_weights,
+    P.get_rows,
     P.env_add,
     P.gather,
     P.handle,

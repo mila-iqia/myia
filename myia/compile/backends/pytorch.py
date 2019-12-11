@@ -35,12 +35,13 @@ def pytorch_array_to_scalar(v):
     return v.detach().numpy()
 
 
-def pytorch_take_grad_weights(weights, indices, dout):
+def pytorch_get_rows(nb_indices, indices, values):
+    row_size = values.shape[-1]
     broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
-    output = torch.zeros(weights.shape, dtype=dout.dtype)
-    for i in range(weights.shape[0]):
-        output[i] = (((broadcastable_indices == i).to(dout.dtype) * dout)
-                     .reshape((-1, weights.shape[1]))
+    output = torch.zeros((nb_indices, row_size), dtype=values.dtype)
+    for i in range(nb_indices):
+        output[i] = (((broadcastable_indices == i).to(values.dtype) * values)
+                     .reshape((-1, row_size))
                      .sum(dim=(0,)))
     return output
 
@@ -85,7 +86,7 @@ simple_mapping = {
     P.reshape: lambda a, shp: a.reshape(shp),
     P.dot: torch.mm,
     P.take: lambda w, i: torch.nn.functional.embedding(i, w),
-    P.take_grad_weights: pytorch_take_grad_weights,
+    P.get_rows: pytorch_get_rows,
 
     P.array_to_scalar: pytorch_array_to_scalar,
 }
