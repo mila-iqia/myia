@@ -26,7 +26,7 @@ APPLY = Named('APPLY')
 
 @serializable('Graph')
 class Graph:
-    """A function graph.
+    r"""A function graph.
 
     Attributes:
         parameters: The parameters of this function as a list of `Parameter`
@@ -37,10 +37,10 @@ class Graph:
             has no output node (because it won't be known e.g. until the
             function has completed parsing), but it must be set afterwards for
             the graph instance to be valid.
-        vararg (bool): Whether there is an *args argument. This will be the
+        vararg (bool): Whether there is an \*args argument. This will be the
             last parameter unless there is a kwarg, in which case it will be
             the second-to-last.
-        kwarg (bool): Whether there is a *kwargs argument. This will always be
+        kwarg (bool): Whether there is a \*kwargs argument. This will always be
             the last parameter.
         defaults: List of parameter names that have default values.
         kwonly: The number of keyword-only arguments, which are all at the end
@@ -105,7 +105,7 @@ class Graph:
         """Return the graph's output.
 
         Equal to `self.return_.inputs[1]`, if it exists. Unlike `return_`,
-        `output' may be a constant or belong to a different graph.
+        `output` may be a constant or belong to a different graph.
         """
         if not self.return_ or len(self.return_.inputs) < 2:
             raise Exception('Graph has no output.')

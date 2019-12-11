@@ -277,7 +277,7 @@ class InferenceEngine:
         return self.constructors[m]
 
     async def execute(self, fn, *args):
-        """Infer the result of fn(*args)."""
+        r"""Infer the result of fn(\*args)."""
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
         argrefs = [VirtualReference(a) for a in args]

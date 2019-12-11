@@ -55,24 +55,23 @@ async def make_trials(engine, ref, repl):
 
     The subtree for ref.node is explored, and for every Union encountered we
     create a subtree for each combination of options. For example, if
-    `x :: Union(i64, None)`, `y :: Union(i64, None)`, `z :: i64` and
-    `ref.node = x * y * z`, make_trials returns the following:
+    :code:`x :: Union(i64, None)`, :code:`y :: Union(i64, None)`,
+    :code:`z :: i64` and :code:`ref.node = x * y * z`, make_trials
+    returns the following::
 
-    ```
-    {
-        {(x, i64),  (y, i64)}:  cast(x, i64) * cast(y, i64) * z
-        {(x, None), (y, i64)}:  cast(x, None) * cast(y, i64) * z
-        {(x, i64),  (y, None)}: cast(x, i64) * cast(y, None) * z
-        {(x, None), (y, None)}: cast(x, None) * cast(y, None) * z
-    }
-    ```
+        {
+          {(x, i64),  (y, i64)}:  cast(x, i64) * cast(y, i64) * z
+          {(x, None), (y, i64)}:  cast(x, None) * cast(y, i64) * z
+          {(x, i64),  (y, None)}: cast(x, i64) * cast(y, None) * z
+          {(x, None), (y, None)}: cast(x, None) * cast(y, None) * z
+        }
 
     This is not cheap, and exponential in the number of distinct unions
     encountered, but in practice, conditions of if statements should not
     contain a whole lot of these and it should probably be fine.
 
     Returns:
-        A `{{(node, type), ...}: replacement_node}` dictionary, where
+        A :code:`{{(node, type), ...}: replacement_node}` dictionary, where
         replacement_node is a node that corresponds to ref.node, but uses
         `unsafe_static_cast(node, type)` for each `(node, type)` pair in the
         set, for each occurrence of `node` in the subtree.

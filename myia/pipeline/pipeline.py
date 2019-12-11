@@ -30,6 +30,7 @@ class PipelineDefinition:
                 modification).
             upper_bound: Whether this is meant to be used as an
                 upper bound or not. If it is True, then:
+
                 * 1 will be added to the result if the step is a
                   string, so that it becomes inclusive,
                 * unless it starts with !

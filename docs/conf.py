@@ -73,12 +73,17 @@ language = None
 # This patterns also effect to html_static_path and html_extra_path
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+highlight_language = 'python3'
+
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+autodoc_default_options = {
+    'exclude-members': '@SERIAL_TAG',
+}
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -94,7 +99,6 @@ html_theme = 'alabaster'
 html_theme_options = {
     'github_user': 'mila-iqia',
     'github_repo': 'myia',
-    'fixed_sidebar': True,
     'github_button': True,
     'codecov_button': True,
     'sidebar_collapse': True,

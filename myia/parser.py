@@ -768,19 +768,17 @@ class Parser:
     def process_For(self, block: 'Block', node: ast.For) -> 'Block':
         """Process a for loop.
 
-        ```
-        for x in xs:
-            body
-        ```
+        ::
 
-        Is essentially compiled as:
+            for x in xs:
+                body
 
-        ```
-        it = iter(xs)
-        while hasnext(it):
-            x, it = next(it)
-            body
-        ```
+        Is essentially compiled as::
+
+            it = iter(xs)
+            while hasnext(it):
+                x, it = next(it)
+                body
 
         A for loop will generate 3 functions: The test, the body, and the
         continuation.

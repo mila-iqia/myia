@@ -368,11 +368,13 @@ class GraphCloner:
         graphs: A set of graphs to clone.
         inline: A list of graphs to inline. Each entry must be a triple
             of (graph, target_graph, new_params):
-            graph: The original graph, which we want to clone. Graphs
+
+            :graph: The original graph, which we want to clone. Graphs
                 nested in the original graph will be automatically cloned.
-            target_graph: The graph in which to inline.
-            new_params: A list of nodes to replace the graph's parameters,
+            :target_graph: The graph in which to inline.
+            :new_params: A list of nodes to replace the graph's parameters,
                 which usually belong to target_graph or its parents.
+
         total: Whether to clone every graph encountered when walking
             through the graphs to clone, even if these graphs are
             not nested.

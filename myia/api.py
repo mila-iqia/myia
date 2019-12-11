@@ -126,7 +126,7 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
-    they can be provided as keyword arguments:
+    they can be provided as keyword arguments::
 
         @myia
         def myfun(x, y):

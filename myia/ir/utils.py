@@ -172,12 +172,12 @@ def _same_subgraph(root1, root2, equiv):
 
 
 def isomorphic(g1, g2, equiv=None):
-    """Return whether g1 and g2 are structurally equivalent.
+    r"""Return whether g1 and g2 are structurally equivalent.
 
     Constants are isomorphic iff they contain the same value or are isomorphic
     graphs.
 
-    g1.return_ and g2.return_ must represent the same node under the
+    g1.return\_ and g2.return\_ must represent the same node under the
     isomorphism. Parameters must match in the same order.
     """
     if equiv is None:

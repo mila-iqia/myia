@@ -61,7 +61,9 @@ class Tracer:
 
         * `**` in a pattern matches any character sequence including
           the / delimiter
+
             * `/**/` can also match `/`
+
         * `*` matches any character sequence except /
         * A pattern that does not start with `/` is equivalent to the same
           pattern prepended with `/**/`, e.g. `apple` is equivalent to
