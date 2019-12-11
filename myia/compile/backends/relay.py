@@ -753,8 +753,10 @@ class RelayBackend(Backend):
     """Backend based on Relay.
 
     Backend options:
-        target: the target device class ('cpu', 'cuda')
-        device_id: the target device identifier (an int)
+
+        :target: the target device class ('cpu', 'cuda')
+        :device_id: the target device identifier (an int)
+
     """
 
     def __init__(self, target, device_id):
