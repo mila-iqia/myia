@@ -383,7 +383,7 @@ def relay_universe_getitem(c, u, h):
     return relay.RefRead(c.ref(h))
 
 
-def relay_get_rows(c, _nb_indices, _indices, _values):
+def relay_take_grad_inp(c, _nb_indices, _indices, _values):
     assert _nb_indices.is_constant(int)
     values = c.ref(_values)
     r_indices = relay.reshape(c.ref(_indices),
@@ -432,7 +432,7 @@ COMPLEX_MAP = {
     P.handle: relay_handle,
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
-    P.get_rows: relay_get_rows,
+    P.take_grad_inp: relay_take_grad_inp,
 }
 
 

@@ -35,7 +35,7 @@ def pytorch_array_to_scalar(v):
     return v.detach().numpy()
 
 
-def pytorch_get_rows(nb_indices, indices, values):
+def pytorch_take_grad_inp(nb_indices, indices, values):
     row_size = values.shape[-1]
     broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
     output = torch.zeros((nb_indices, row_size), dtype=values.dtype)
@@ -86,7 +86,7 @@ simple_mapping = {
     P.reshape: lambda a, shp: a.reshape(shp),
     P.dot: torch.mm,
     P.take: lambda w, i: torch.nn.functional.embedding(i, w),
-    P.get_rows: pytorch_get_rows,
+    P.take_grad_inp: pytorch_take_grad_inp,
 
     P.array_to_scalar: pytorch_array_to_scalar,
 }

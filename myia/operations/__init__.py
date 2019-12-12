@@ -398,11 +398,6 @@ ge = Operation(
     defaults='myia.operations.ops_dunder.ge'
 )
 
-get_rows = Operation(
-    name='get_rows',
-    defaults='myia.operations.prim_get_rows'
-)
-
 getattr = Operation(
     name='getattr',
     defaults='myia.operations.macro_getattr'
@@ -921,6 +916,11 @@ tagged = Operation(
 take = Operation(
     name='take',
     defaults='myia.operations.prim_take'
+)
+
+take_grad_inp = Operation(
+    name='take_grad_inp',
+    defaults='myia.operations.prim_take_grad_inp'
 )
 
 to_scalar_type = Operation(

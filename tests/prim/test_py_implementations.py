@@ -31,7 +31,6 @@ from myia.operations import (
     env_getitem,
     env_setitem,
     full,
-    get_rows,
     identity,
     partial as myia_partial,
     reshape,
@@ -51,6 +50,7 @@ from myia.operations import (
     stop_gradient,
     switch,
     take,
+    take_grad_inp,
     transpose,
     tuple_getitem,
     tuple_setitem,
@@ -420,7 +420,7 @@ def test_prim_take():
     assert np.allclose(ref, res, rtol=0, atol=0)
 
 
-def test_prim_get_rows():
+def test_prim_take_grad_inp():
     indices = np.random.randint(0, 3, (2, 7))
     weights = np.random.randn(3, 2)
     dout = take(weights, indices)
@@ -430,7 +430,7 @@ def test_prim_get_rows():
         ref[i] = (((broadcastable_indices == i) * dout)
                   .reshape((-1, weights.shape[1]))
                   .sum(axis=0))
-    res = get_rows(weights.shape[0], indices, dout)
+    res = take_grad_inp(weights.shape[0], indices, dout)
     assert np.allclose(ref, res, rtol=0, atol=0)
 
 

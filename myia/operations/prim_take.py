@@ -14,30 +14,30 @@ from ..operations import zeros_like
 from . import primitives as P
 
 
-def pyimpl_take(weights, indices):
+def pyimpl_take(inp, indices):
     """Implement `take`."""
-    return np.take(weights, indices, axis=0)
+    return np.take(inp, indices, axis=0)
 
 
 @standard_prim(P.take)
 async def infer_take(self, engine,
-                     weights: AbstractArray,
+                     inp: AbstractArray,
                      indices: AbstractArray):
     """Infer the return type of primitive `take`."""
     indices_shape = tuple(await force_pending(indices.xshape()))
-    weights_shape = tuple(await force_pending(weights.xshape()))
-    assert len(weights_shape) == 2
-    output_shape = indices_shape + (weights_shape[1],)
+    inp_shape = tuple(await force_pending(inp.xshape()))
+    assert len(inp_shape) == 2
+    output_shape = indices_shape + (inp_shape[1],)
     return AbstractArray(
-        weights.element,
-        {SHAPE: output_shape, TYPE: await force_pending(weights.xtype())}
+        inp.element,
+        {SHAPE: output_shape, TYPE: await force_pending(inp.xtype())}
     )
 
 
 @bprop_to_grad_transform(P.take)
-def bprop_take(weights, indices, out, dout):
+def bprop_take(inp, indices, out, dout):
     """Backpropagator for primitive `take`."""
-    return (P.get_rows(P.shape(weights)[0], indices, dout),
+    return (P.take_grad_inp(P.shape(inp)[0], indices, dout),
             zeros_like(indices))
 
 

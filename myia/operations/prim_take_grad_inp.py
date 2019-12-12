@@ -1,5 +1,8 @@
 """
-Definition for primitive get_rows.
+Definition for primitive take_grad_inp.
+
+Internal primitive used to compute
+gradient of primitive take wrt/ matrix input.
 
 Inputs:
 - the maximum number of indices n.
@@ -27,8 +30,8 @@ from ..lib import (
 from . import primitives as P
 
 
-def pyimpl_get_rows(nb_indices, indices, values):
-    """Implement `get_rows`."""
+def pyimpl_take_grad_inp(nb_indices, indices, values):
+    """Implement `take_grad_inp`."""
     row_size = values.shape[-1]
     broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
     output = np.zeros((nb_indices, row_size), dtype=values.dtype)
@@ -39,12 +42,12 @@ def pyimpl_get_rows(nb_indices, indices, values):
     return output
 
 
-@standard_prim(P.get_rows)
-async def infer_get_rows(self, engine,
-                         nb_indices: AbstractScalar,
-                         indices: AbstractArray,
-                         values: AbstractArray):
-    """Infer the return type of primitive `get_rows`."""
+@standard_prim(P.take_grad_inp)
+async def infer_take_grad_inp(self, engine,
+                              nb_indices: AbstractScalar,
+                              indices: AbstractArray,
+                              values: AbstractArray):
+    """Infer the return type of primitive `take_grad_inp`."""
     output_shape = (nb_indices.xvalue(),
                     (await force_pending(values.xshape()))[-1])
     return AbstractArray(values.element, {
@@ -54,17 +57,17 @@ async def infer_get_rows(self, engine,
 
 
 __operation_defaults__ = {
-    'name': 'get_rows',
-    'registered_name': 'get_rows',
-    'mapping': P.get_rows,
-    'python_implementation': pyimpl_get_rows,
+    'name': 'take_grad_inp',
+    'registered_name': 'take_grad_inp',
+    'mapping': P.take_grad_inp,
+    'python_implementation': pyimpl_take_grad_inp,
 }
 
 __primitive_defaults__ = {
-    'name': 'get_rows',
-    'registered_name': 'get_rows',
+    'name': 'take_grad_inp',
+    'registered_name': 'take_grad_inp',
     'type': 'backend',
-    'python_implementation': pyimpl_get_rows,
-    'inferrer_constructor': infer_get_rows,
+    'python_implementation': pyimpl_take_grad_inp,
+    'inferrer_constructor': infer_take_grad_inp,
     'grad_transform': None,
 }
