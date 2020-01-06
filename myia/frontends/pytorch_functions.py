@@ -99,23 +99,6 @@ def _ensure_u64(x):
     return P.scalar_cast(x, u64)
 
 
-@myia_static
-def _lead_reshape(shape, dims):
-    """
-    Generate tuple to reshape a tensor with given original shape.
-
-    dims will select the leading dimensions, and a latest dimension
-    (set with size -1) will be added.
-    """
-    return _lead_shape(shape, dims) + (-1,)
-
-
-@myia_static
-def _lead_shape(shape, dims):
-    """Extract shape tuple from given shape for given dimensions."""
-    return tuple(shape[dim] for dim in dims)
-
-
 @core
 def _pair(x):
     if not P.hastype(x, TupleT):
@@ -126,16 +109,31 @@ def _pair(x):
 
 
 @myia_static
-def _partition_dimensions(nb_dims, selected_dims):
-    """Partition dimensions into remaining dimensions and selected ones."""
-    remaining_dims = ()
-    filtered_dims = ()
-    for i in range(nb_dims):
-        if i in selected_dims:
-            filtered_dims = filtered_dims + (i,)
+def _prepare_dims_to_norm(shape, dim):
+    # Make sure dim is a tuple.
+    if not isinstance(dim, tuple):
+        dim = (dim,)
+    # If no dim, norm all dimensions.
+    if len(dim) == 0:
+        dim = shape
+
+    leading_dims = ()
+    dims_to_norm = ()
+    for i in range(len(shape)):
+        if i in dim:
+            dims_to_norm = dims_to_norm + (i,)
         else:
-            remaining_dims = remaining_dims + (i,)
-    return remaining_dims, filtered_dims
+            leading_dims = leading_dims + (i,)
+    permutation = ()
+    leading_shape = ()
+    reshaping_tuple = ()
+    if leading_dims:
+        permutation = leading_dims + dims_to_norm
+        leading_shape = tuple(shape[d] for d in leading_dims)
+        reshaping_tuple = leading_shape + (-1,)
+    else:
+        leading_dims = None
+    return leading_dims, permutation, leading_shape, reshaping_tuple
 
 
 def prod(x):
@@ -487,69 +485,64 @@ def nll_loss(logs, targets, reduction='mean'):
 @core
 def norm(inp, p=None, dim=None):
     """Map of torch.norm method."""
-
-    # Check p and put numeric value in p_value.
     if p is None:
         p = 2
 
+    # Convert p to input type.
     p = torch.zeros(1, dtype=inp.dtype) + inp.dtype(p)
+    # Create a value 1 with input type.
     one = torch.zeros(1, dtype=inp.dtype) + inp.dtype(1)
 
     # Reshape inp based on dims, making sure that dimensions to norm
     # are all assembled in latest inp dimension.
     leading_dims = None
+    leading_shape = None
+
     if dim is None:
         # We must norm the entire tensor.
         new_inp = inp.reshape(1, -1)
     else:
-        # Check dim and put dimensions in tuple dims_to_norm.
-        if isinstance(dim, int):
-            dims_to_norm = (dim,)
-        elif not isinstance(dim, tuple):
-            raise TypeError('Invalid type for dim arg in norm.')
-        elif len(dim) == 0:
-            dims_to_norm = inp.shape
-        else:
-            dims_to_norm = dim
-
-        # Partition tensor dimensions.
-        # normed_dims contains the (unique) dimensions to norm.
-        # leading_dims contains the remaining dimensions.
-        leading_dims, normed_dims = _partition_dimensions(len(inp.shape),
-                                                          dims_to_norm)
+        # Check input shape and given dimensions to retrieve
+        # leading dimensions (not to norm),
+        # permutation to apply to input if necessary,
+        # leading shape,
+        # and reshaping tuple (leading shape + (-1,)), to apply to
+        # permuted input if necessary.
+        leading_dims, permutation, leading_shape, reshaping_tuple = \
+            _prepare_dims_to_norm(inp.shape, dim)
 
         # Now we can reshape inp.
-        if not leading_dims:
+        if leading_dims is None:
             # We must norm the entire tensor.
             new_inp = inp.reshape(1, -1)
         else:
             # We must norm only dimensions in normed_dims.
             # 1) Move dimensions to norm to the end of tensor dimension.
             # 2) Reshape to pack trailing dimensions to norm into 1 dimension.
-            permutation = leading_dims + normed_dims
-            new_inp = inp.permute(*permutation)
-            new_inp = new_inp.reshape(*_lead_reshape(inp.shape, leading_dims))
+            new_inp = inp.permute(permutation)
+            new_inp = new_inp.reshape(*reshaping_tuple)
 
     # Then we can compute norm.
     if p.item() == np.inf:
+        # Maximum of absolute values
         res = new_inp.abs().max(-1)[0]
     elif p.item() == -np.inf:
+        # Minimum of absolute values.
+        # res = new_inp.abs().min(-1)[0]
         u = new_inp.abs()
         v = -u
         w = v.max(-1)[0]
         res = -w
-        # res = new_inp.abs().min(-1)[0]
     else:
+        # Classical p-norm.
+        # res = (new_inp.abs() ** p_value).sum(-1) ** (1 / p_value)
         a = new_inp.abs() ** p
         b = a.sum(-1)
         c = one / p
         res = b ** c
-        # res = (new_inp.abs() ** p_value).sum(-1) ** (1 / p_value)
     if leading_dims is not None:
-        out = res.reshape(_lead_shape(inp.shape, leading_dims))
-    else:
-        out = res.item()
-    return out
+        res = res.reshape(leading_shape)
+    return res
 
 
 @core
