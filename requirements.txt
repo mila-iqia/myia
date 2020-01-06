@@ -3,3 +3,4 @@ codecov
 prettyprinter
 ruamel.yaml
 ruamel.yaml.clib>=0.2
+pydocstyle==5.0.1

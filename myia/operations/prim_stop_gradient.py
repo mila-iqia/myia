@@ -1,5 +1,4 @@
-"""
-Definition of primitive `stop_gradient`.
+"""Definition of primitive `stop_gradient`.
 
 Used to stop gradient propagation through given input.
 """

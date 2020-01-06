@@ -1,8 +1,9 @@
 .. include:: ../README.rst
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   :hidden:
+
+   API docs <source/modules>
 
 
 Indices and tables

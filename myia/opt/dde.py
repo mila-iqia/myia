@@ -18,17 +18,17 @@ MAX_NEED_DEPTH = 5
 
 
 class ValuePropagator:
-    """Perform value propagation.
+    r"""Perform value propagation.
 
     Each need for each node is associated to a set of possible values. A "need"
     is either ANYTHING or a path. For example, the need (0, 7) on a node means
     that we need element 7 of element 0 of the tuple returned at this node.
 
-    * Primitives of the form *_getitem or *_setitem should manipulate the needs
-      accordingly, e.g. if we need (0, 7) on getitem(tup, 3), then we need
-      (3, 0, 7) on tup.
+    * Primitives of the form \*_getitem or \*_setitem should
+      manipulate the needs accordingly, e.g. if we need (0, 7) on
+      getitem(tup, 3), then we need (3, 0, 7) on tup.
 
-    We start with the ANYTHING need on root.return_, ANYTHING on
+    We start with the ANYTHING need on root.return\_, ANYTHING on
     root.parameters, and the appropriate values on constants, and propagate
     until equilibrium. The set of possible needs and values is appropriately
     limited to ensure that the process terminates.
@@ -36,6 +36,7 @@ class ValuePropagator:
     Some nodes may end up not being needed at all, e.g. if the only need on
     a tuple is (1,), then the node for element 0, if it is used nowhere else,
     is not needed, and it can be removed later.
+
     """
 
     def __init__(self, resources, root):
@@ -184,10 +185,10 @@ class ValuePropagator:
             self.add_value(out, need, value)
 
     def getitem(self, coll, key, out, need):
-        """Implement a standard getitem operation.
+        r"""Implement a standard getitem operation.
 
         * We need key:ANYTHING
-        * For all possible values of key, we need coll:(key, *need),
+        * For all possible values of key, we need coll:(key, \*need),
           and the values are propagated to out:need.
 
         Arguments:

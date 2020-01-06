@@ -18,6 +18,7 @@ def require_same(fns, objs):
             may be `[type, len]`.
         objs: Objects that must be invariant with respect to the given
             functions.
+
     """
     o, *rest = objs
     for fn in fns:

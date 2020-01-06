@@ -42,6 +42,7 @@ class GraphRemapper(Partializable):
         manager: The manager to use, or None to fetch it automatically.
         graph_relation (Optional): The relation between the original graph
             and the new graph (defaults to relation).
+
     """
 
     def __init__(self,
@@ -107,12 +108,13 @@ class GraphRemapper(Partializable):
             key: Either (g, node) or just a node. The latter case corresponds
                 to remapping all uses of node from all graphs to the same
                 node.
-            g: The graph to which node belongs.
+            graph: The graph to which node belongs.
             node: The node to remap.
-            ng: Equivalent to self.get_graph(g).
+            new_graph: Equivalent to self.get_graph(g).
             new_node: What to remap node to.
             link: Whether to link that node or not using link_apply. By default
                 it is True if the node is an Apply node.
+
         """
         if key in self.repl:
             return self.repl[key]
@@ -366,11 +368,13 @@ class GraphCloner:
         graphs: A set of graphs to clone.
         inline: A list of graphs to inline. Each entry must be a triple
             of (graph, target_graph, new_params):
-            graph: The original graph, which we want to clone. Graphs
+
+            :graph: The original graph, which we want to clone. Graphs
                 nested in the original graph will be automatically cloned.
-            target_graph: The graph in which to inline.
-            new_params: A list of nodes to replace the graph's parameters,
+            :target_graph: The graph in which to inline.
+            :new_params: A list of nodes to replace the graph's parameters,
                 which usually belong to target_graph or its parents.
+
         total: Whether to clone every graph encountered when walking
             through the graphs to clone, even if these graphs are
             not nested.
@@ -383,6 +387,7 @@ class GraphCloner:
         graph_relation: The relation the cloned graphs present with
             respect to the originals, for debugging purposes. Default
             is the value of the `relation` argument.
+
     """
 
     def __init__(self,

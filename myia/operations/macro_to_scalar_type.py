@@ -1,5 +1,4 @@
-"""
-Implementation of 'to_scalar_type' operation.
+"""Implementation of 'to_scalar_type' operation.
 
 Convert given data into an appropriate abstract scalar.
 If data is already an abstract type, return the result of method xvalue().
@@ -48,12 +47,15 @@ def string_to_np_dtype(string):
 
 @macro
 async def to_scalar_type(info, data):
-    """
-    Convert given data to abstract scalar.
+    """Convert given data to abstract scalar.
 
-    :param data: arbitrary data to convert
-    :return: an abstract scalar object if data can be converted,
+    Arguments:
+        data: arbitrary data to convert
+
+    Returns:
+        an abstract scalar object if data can be converted,
         otherwise raise an exception.
+
     """
     sync_data = await data.get()
 

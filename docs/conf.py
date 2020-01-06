@@ -49,7 +49,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Myia'
-copyright = '2017, MILA'
+copyright = '2019, MILA'
 author = 'MILA'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -73,12 +73,17 @@ language = None
 # This patterns also effect to html_static_path and html_extra_path
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
+highlight_language = 'python3'
+
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = 'sphinx'
 
 # If true, `todo` and `todoList` produce output, else they produce nothing.
 todo_include_todos = False
 
+autodoc_default_options = {
+    'exclude-members': '@SERIAL_TAG',
+}
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -91,7 +96,13 @@ html_theme = 'alabaster'
 # further.  For a list of options available for each theme, see the
 # documentation.
 #
-# html_theme_options = {}
+html_theme_options = {
+    'github_user': 'mila-iqia',
+    'github_repo': 'myia',
+    'github_button': True,
+    'codecov_button': True,
+    'sidebar_collapse': True,
+}
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -109,7 +120,6 @@ html_sidebars = {
         'navigation.html',
         'relations.html',  # needs 'show_related': True theme option to display
         'searchbox.html',
-        'donate.html',
     ]
 }
 

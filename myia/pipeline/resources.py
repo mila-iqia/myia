@@ -184,8 +184,9 @@ class BackendResource(Partializable):
         """Initialize a BackendResource.
 
         Arguments:
-            name: (str) the name of the backend to use
-            options: (dict) options for the backend
+            resources: The resources object of the pipeline
+            name (str): the name of the backend to use
+            options (dict): options for the backend
 
         """
         self.resources = resources

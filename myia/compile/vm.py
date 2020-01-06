@@ -229,6 +229,7 @@ class FinalVM:
         Arguments:
            t: tuple
            idx: index
+
         """
         a = self._ref(t)
         idx = self.backend.to_scalar(self._ref(idx))
@@ -241,6 +242,7 @@ class FinalVM:
            t: tuple
            idx: index
            v: value to set
+
         """
         t = self._ref(t)
         idx = self.backend.to_scalar(self._ref(idx))
@@ -253,6 +255,7 @@ class FinalVM:
         Arguments:
            x: some object
            tag: the tag
+
         """
         x = self._ref(x)
         tag = self.backend.to_scalar(self._ref(tag))
@@ -264,6 +267,7 @@ class FinalVM:
         Arguments:
            x: TaggedValue
            tag: the tag
+
         """
         x = self._ref(x)
         tag = self.backend.to_scalar(self._ref(tag))
@@ -276,6 +280,7 @@ class FinalVM:
         Arguments:
            x: TaggedValue
            tag: the expected tag
+
         """
         x = self._ref(x)
         tag = self.backend.to_scalar(self._ref(tag))
@@ -287,6 +292,7 @@ class FinalVM:
         Arguments:
            x: Value
            type: the type to static cast to (ignored)
+
         """
         self._push(self._ref(x))
 

@@ -121,8 +121,7 @@ def conv1d_weight(input, weight_size, grad_output, stride, padding, dilation,
 
 def conv2d_input(input_size, weight, grad_output, stride, padding, dilation,
                  groups):
-    r"""
-    Computes gradient of conv2d with respect to input of convolution.
+    r"""Computes gradient of conv2d with respect to input of convolution.
 
     This is same as the 2D transposed convolution operator under the hood but
     requires shape of the gradient w.r.t. input to be specified explicitly.
@@ -164,14 +163,13 @@ def conv2d_input(input_size, weight, grad_output, stride, padding, dilation,
 
 def conv2d_weight(input, weight_size, grad_output, stride, padding, dilation,
                   groups):
-    r"""
-    Computes gradient of conv2d with respect to the weight of the convolution.
+    r"""Computes gradient of conv2d with respect to the weight.
 
     Args:
         input: input tensor of shape (minibatch x in_channels x iH x iW)
-        weight_size : Shape of the weight gradient tensor
-        grad_output : output gradient tensor
-                      (minibatch x out_channels x oH x oW)
+        weight_size: Shape of the weight gradient tensor
+        grad_output: output gradient tensor
+            (minibatch x out_channels x oH x oW)
         stride (int or tuple, optional): Stride of the convolution. Default: 1
         padding (int or tuple, optional): Zero-padding added to both sides of
                                           the input. Default: 0

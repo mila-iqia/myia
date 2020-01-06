@@ -28,10 +28,12 @@ def dfs(root: T,
         root: The node to start from.
         succ: A function that returns a node's successors.
         include: A function that returns whether to include a node
-                 in the search.
+            in the search.
+
             * Return 'follow' to include the node and follow its edges.
             * Return 'nofollow' to include the node but not follow its edges.
             * Return 'exclude' to not include the node, nor follow its edges.
+
     """
     seen: Set[T] = set()
     to_visit = [root]
@@ -62,10 +64,12 @@ def toposort(root: T,
         root: The node to start from.
         succ: A function that returns a node's successors.
         include: A function that returns whether to include a node
-                 in the search.
+            in the search.
+
             * Return 'follow' to include the node and follow its edges.
             * Return 'nofollow' to include the node but not follow its edges.
             * Return 'exclude' to not include the node, nor follow its edges.
+
     """
     done: Set[T] = set()
     todo: List[T] = [root]

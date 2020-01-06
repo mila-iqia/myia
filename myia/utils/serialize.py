@@ -166,9 +166,9 @@ def serializable(tag, *, dc=None, sequence=False, scalar=False,
                  construct=True):
     """Class decorator to make the wrapped class serializable.
 
-    Parameters:
-        tag: string, serialization tag, must be unique
-        dc: bool, class is a dataclass (autodetected, but can override)
+    Arguments:
+        tag (string): serialization tag, must be unique
+        dc (bool): class is a dataclass (autodetected, but can override)
         sequence: _serialize returns a sequence (tuple or list)
         scalar: _serialize returns a single item.
         construct: register the deserialization function or not

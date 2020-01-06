@@ -70,6 +70,7 @@ def from_value(v, broaden=False, **kwargs):
         v: The value to convert.
         broaden: If True, concrete values will be made more abstract, so e.g.
             the value 1234 would become ANYTHING.
+
     """
     a = to_abstract(v, **kwargs)
     if broaden:
@@ -95,6 +96,7 @@ def to_abstract(fn, self, v, **kwargs):
         loop: The InferenceLoop, or None. If not None, scalars ints or floats
             will be given a Pending type so that it can adapt to the types of
             the variables they interact with.
+
     """
     if fn is not None:
         rval = fn(self, v, **kwargs)

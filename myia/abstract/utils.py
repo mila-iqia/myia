@@ -51,6 +51,7 @@ def build_value(a, default=ABSENT):
         a: The abstract value.
         default: A default value to return if the value cannot be built.
             If not provided, a ValueError will be raised in those cases.
+
     """
     def return_default(err):
         if default is ABSENT:
@@ -433,13 +434,14 @@ def is_broad(self, x: (AbstractScalar, AbstractFunction), *args):
 @abstract_clone.variant(
     initial_state=lambda: CloneState({}, '_broad', is_broad)
 )
-def broaden(self, d: TrackDict, *args):
+def broaden(self, d: TrackDict, *args):  # noqa: D417
     """Broaden an abstract value.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
 
     Arguments:
         d: The abstract data to clone.
+
     """
     return {k: k.broaden(v, self, *args) for k, v in d.items()}
 

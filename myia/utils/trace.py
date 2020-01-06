@@ -61,7 +61,9 @@ class Tracer:
 
         * `**` in a pattern matches any character sequence including
           the / delimiter
+
             * `/**/` can also match `/`
+
         * `*` matches any character sequence except /
         * A pattern that does not start with `/` is equivalent to the same
           pattern prepended with `/**/`, e.g. `apple` is equivalent to
@@ -150,6 +152,7 @@ class TraceListener:
 
     Arguments:
         focus: A glob prepended to this listener's patterns.
+
     """
 
     def __init__(self, focus=None):
@@ -218,6 +221,7 @@ class DoTrace(TraceListener):
             are. This argument will not work if any pattern is a regex.
         post: A function to call at the end of processing. Defaults to
             None, which means no function is called.
+
     """
 
     def __init__(self, patterns={}, *, focus=None, post=None):

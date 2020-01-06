@@ -63,6 +63,7 @@ def dunder_protocol_binary(name, lattr, rattr,
     """Define a function that calls a certain method (binary).
 
     This typically works as follows:
+
     * Try method lattr on the left operand.
     * If it doesn't exist or returns NotImplemented, try method rattr
       on the right operand.

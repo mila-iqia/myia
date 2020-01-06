@@ -117,24 +117,27 @@ def _reabs(self, a: AbstractType):
 
 
 def simplify_types(root, manager):
-    """Simplify the set of types that can be found in the graph.
+    r"""Simplify the set of types that can be found in the graph.
 
     * Replace AbstractClass by AbstractTuple:
+
       * Class[x: t, ...] => Tuple[t, ...]
       * record_getitem(data, attr) => tuple_getitem(data, idx)
       * record_setitem(data, attr, value) => tuple_setitem(data, idx, value)
-      * make_record(cls, *args) => make_tuple(*args)
+      * make_record(cls, \*args) => make_tuple(\*args)
 
     * Replace AbstractDict by AbstractTuple:
+
       * Dict[x: t, ...] => Tuple[t, ...]
       * dict_getitem(data, item) => tuple_getitem(data, idx)
       * dict_setitem(data, item, value) => tuple_setitem(data, idx, value)
-      * make_dict(cls, *args) => make_tuple(*args)
+      * make_dict(cls, \*args) => make_tuple(\*args)
 
     * Replace AbstractUnion by AbstractTaggedUnion:
+
       * Union[a, b, c, ...] => TaggedUnion[1 => a, 2 => b, 3 => c, ...]
       * hastype(x, type) => hastag(x, tag)
-      *                  => bool_or(hastag(x, tag1), hastag(x, tag2), ...)
+                         => bool_or(hastag(x, tag1), hastag(x, tag2), ...)
       * unsafe_static_cast(x, type) => casttag(x, tag)
     """
     manager.add_graph(root)

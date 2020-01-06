@@ -61,17 +61,20 @@ def find_aliases(obj, aliasable=ndarray_aliasable):
     """Find aliased data in obj.
 
     Arguments:
-        ndarray_aliasable: A function with signature
-                ((v, vseq, path) -> True/False/"X")
-            Arguments:
-                v: The potentially aliasable value
-                vseq: The sequence of objects containing v
-                path: The sequence of indexes on the path to v
-            Returns:
-                True: v is aliasable
-                False: v is not aliasable
-                "X": v is aliasable, but it is located in a place where the
-                    aliasing data cannot be used
+        obj: Object to look into for aliasing
+
+        aliasable: A function with three arguments or :code:`None`
+
+            :v: The potentially aliasable value
+            :vseq: The sequence of objects containing `v`
+            :path: The sequence of indexes on the path to `v`
+
+            The possible return values are:
+
+            * :code:`True`: `v` is aliasable
+            * :code:`False`: `v` is not aliasable
+            * :code:`"X"`: `v` is aliasable, but it is located in a
+                    place where the aliasing data cannot be used
 
     """
     if aliasable is None:

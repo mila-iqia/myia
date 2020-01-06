@@ -418,7 +418,8 @@ class PyTorchBackend(Backend):
     """Backend to run using pytorch.
 
     Backend options:
-        device: the target device for data storage ('cpu', 'cuda', 'cuda:X')
+
+        :device: the target device for data storage ('cpu', 'cuda', 'cuda:X')
 
     """
 

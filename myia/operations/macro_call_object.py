@@ -1,5 +1,4 @@
-"""
-Implementation of macro `call_object(obj, *args)`.
+"""Implementation of macro `call_object(obj, *args)`.
 
 Receive and call syntax `obj(*args)` and replace it with
 relevant myia operations.

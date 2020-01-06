@@ -140,6 +140,7 @@ def register_backend(name, load_fn, defaults_fn):
     preregistered.
 
     Arguments:
+        name (str): Name of the backend, must be unique
         load_fn: function that will load the backend.  This must
                  return a callable that will take keyword arguemnts
                  for options.

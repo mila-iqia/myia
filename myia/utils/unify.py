@@ -239,6 +239,7 @@ def var(filter: FilterT = None) -> Var:
             same filter and identifier will return the same object.
         filter: A predicate, or a set of values the variable is
             allowed to take.
+
     """
     if callable(filter):
         return FilterVar(filter)

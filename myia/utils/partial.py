@@ -12,6 +12,7 @@ def partition_keywords(f, kw):
     Return:
         good: key/value pairs that the function f recognizes.
         bad: key/value pairs that the function f does not recognize.
+
     """
     spec = inspect.getfullargspec(f)
     if spec.varkw:

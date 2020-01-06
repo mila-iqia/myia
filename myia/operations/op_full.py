@@ -20,14 +20,17 @@ def pyimpl_full(shape, fill_value, dtype):
 
 @core
 def full(shape, fill_value, dtype=None):
-    """
-    Main code for operation full.
+    """Main code for operation full.
 
-    :param shape: a tuple of integers
-    :param fill_value: a scalar value
-    :param dtype: either a string (e.g. 'int32')
-        or a numpy dtype (e.g. np.int32)
-    :return: an array
+    Arguments:
+        shape: a tuple of integers
+        fill_value: a scalar value
+        dtype: either a string (e.g. 'int32')
+            or a numpy dtype (e.g. np.int32)
+
+    Returns:
+        an array
+
     """
     if dtype is None:
         dtype = typeof(fill_value)

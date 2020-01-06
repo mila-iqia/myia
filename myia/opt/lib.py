@@ -674,12 +674,13 @@ def resolve_globals(resources, node, equiv):
 def make_inliner(inline_criterion, check_recursive, name):
     """Create an inliner.
 
-    Args:
+    Arguments:
         inline_criterion: A function that takes (graph, node, args) and
             returns whether the graph should be inlined or not.
         check_recursive: Check whether a function is possibly recursive
             before inlining it. If it is, don't inline.
         name: The name of the optimization.
+
     """
     @pattern_replacer(G, Xs, interest=Graph)
     def inline(resources, node, equiv):
@@ -859,12 +860,12 @@ def incorporate_getitem_through_switch(resources, node, equiv):
     """Incorporate a getitem into both branches.
 
     Example:
-
         switch(x, f, g)(y)[i]
         => switch(x, f2, g2)(y)
 
-    Where f2 and g2 are modified versions of f and g that return their
-    ith element.
+        Where f2 and g2 are modified versions of f and g that return their
+        ith element.
+
     """
     g1 = equiv[G1].value
     g2 = equiv[G2].value
@@ -939,10 +940,10 @@ def incorporate_call(resources, node, equiv):
     """Incorporate a call into the graph that returns the function.
 
     Example:
-
         g(x)(y) => g2(x, y)
 
-    Where g2 is a modified copy of g that incorporates the call on y.
+        Where g2 is a modified copy of g that incorporates the call on y.
+
     """
     g = equiv[G].value
     xs = equiv[Xs]
@@ -957,12 +958,12 @@ def incorporate_call_through_switch(resources, node, equiv):
     """Incorporate a call to both branches.
 
     Example:
-
         switch(x, f, g)(y)(z)
         => switch(x, f2, g2)(y, z)
 
-    Where f2 and g2 are modified copies of f and g that incorporate the
-    call on both y and z.
+        Where f2 and g2 are modified copies of f and g that incorporate the
+        call on both y and z.
+
     """
     g1 = equiv[G1].value
     g2 = equiv[G2].value

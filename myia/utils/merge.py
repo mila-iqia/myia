@@ -89,12 +89,14 @@ def merge(__call__, a, b, mode=MergeMode.mode):
     Arguments:
         a: The original data.
         b: The data to merge.
-        mode:
-            'merge': (default) Sequences will be concatenated, sets merged,
+        mode ({'merge', 'override', 'reset'}):
+
+            :'merge': (default) Sequences will be concatenated, sets merged,
                 and dictionaries merged according to their keys.
-            'override': Dictionaries are merged, but sequences are not
+            :'override': Dictionaries are merged, but sequences are not
                 concatenated.
-            'reset': b is returned, or takes primacy over the data in a.
+            :'reset': b is returned, or takes primacy over the data in a.
+
     """
     if isinstance(b, MergeMode):
         mode = b.mode

@@ -112,6 +112,7 @@ class InferenceEngine:
             argspec: The arguments. Must be a tuple of AbstractValue.
             outspec (optional): Expected inference result. If provided,
                 inference result will be checked against it.
+
         """
         self.mng.add_graph(graph)
         empty_context = self.context_class.empty()
@@ -276,7 +277,7 @@ class InferenceEngine:
         return self.constructors[m]
 
     async def execute(self, fn, *args):
-        """Infer the result of fn(*args)."""
+        r"""Infer the result of fn(\*args)."""
         infs = [self.get_inferrer_for(poss)
                 for poss in await fn.get()]
         argrefs = [VirtualReference(a) for a in args]
@@ -426,6 +427,7 @@ class Inferrer(Partializable):
             engine: The InferenceEngine
             outref: A Reference to the output (could be None)
             argrefs: A tuple of References to the arguments
+
         """
         unnorm_args = tuple([await ref.get() for ref in argrefs])
         args = await self.normalize_args(unnorm_args)
@@ -682,6 +684,7 @@ class StandardInferrer(Inferrer):
     Arguments:
         infer: The inference function. Its arguments and type annotations
             will be inspected and checked automatically.
+
     """
 
     def __init__(self, prim, infer):
@@ -703,9 +706,11 @@ class StandardInferrer(Inferrer):
         If a is not a constant, raises a MyiaTypeError.
 
         Arguments:
+            a: Value to check for constantness
             argnum (int): Which argument we are checking.
             range (optional): A range or collection in which the argument
                 must lie.
+
         """
         v = a.xvalue()
         if v is ANYTHING:
@@ -740,6 +745,7 @@ class UniformPrimitiveInferrer(Inferrer):
         impl: The implementation.
         infer_value: Whether to do constant propagation through this
             implementation.
+
     """
 
     def __init__(self, prim, impl, infer_value=False):
@@ -773,6 +779,7 @@ class UniformPrimitiveInferrer(Inferrer):
 
         Arguments: engine: The InferenceEngine args: The abstract arguments
             outtype: The output type to give to the result
+
         """
         if not self.infer_value:
             outval = ANYTHING
