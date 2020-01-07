@@ -331,6 +331,20 @@ def test_torch_cross_entropy(inp, target, reduction):
 
 
 @mt(
+    fwd_and_bwd(
+        nn.Parameter(torch.randint(0, 4, (2, 7)), requires_grad=False),
+        nn.Parameter(torch.Tensor(torch.randn(4, 3)))
+    ),
+    fwd_and_bwd(
+        nn.Parameter(torch.randint(0, 4, (3, 2, 2)), requires_grad=False),
+        nn.Parameter(torch.Tensor(torch.randn(4, 4)))
+    ),
+)
+def test_torch_embedding(inp, weights):
+    return F.embedding(inp, weights)
+
+
+@mt(
     fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(7, 3)))),
     fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(5, 8)))),
     fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(10)))),

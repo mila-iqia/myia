@@ -454,6 +454,16 @@ tagged = BackendPrimitive(
     defaults='myia.operations.prim_tagged'
 )
 
+take = BackendPrimitive(
+    name='take',
+    defaults='myia.operations.prim_take'
+)
+
+take_grad_inp = BackendPrimitive(
+    name='take_grad_inp',
+    defaults='myia.operations.prim_take_grad_inp'
+)
+
 transpose = BackendPrimitive(
     name='transpose',
     defaults='myia.operations.prim_transpose'

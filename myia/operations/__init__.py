@@ -913,6 +913,16 @@ tagged = Operation(
     defaults='myia.operations.prim_tagged'
 )
 
+take = Operation(
+    name='take',
+    defaults='myia.operations.prim_take'
+)
+
+take_grad_inp = Operation(
+    name='take_grad_inp',
+    defaults='myia.operations.prim_take_grad_inp'
+)
+
 to_scalar_type = Operation(
     name='to_scalar_type',
     defaults='myia.operations.macro_to_scalar_type'

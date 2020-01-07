@@ -80,6 +80,7 @@ SIMPLE_MAP = {
 
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
+    P.take: lambda w, i: relay.take(w, i, 0),
 }
 
 
@@ -382,6 +383,26 @@ def relay_universe_getitem(c, u, h):
     return relay.RefRead(c.ref(h))
 
 
+def relay_take_grad_inp(c, _nb_indices, _indices, _values):
+    assert _nb_indices.is_constant(int)
+    values = c.ref(_values)
+    r_indices = relay.reshape(c.ref(_indices),
+                              tuple(_indices.abstract.xshape()) + (1,))
+    n_rows = _nb_indices.value
+    n_cols = _values.abstract.xshape()[-1]
+    outputs = []
+    indices_dtype = type_to_np_dtype(_indices.abstract.element.xtype())
+    out_dtype = type_to_np_dtype(_values.abstract.element.xtype())
+    for i in range(n_rows):
+        select_entries = relay.equal(r_indices, relay.const(i, indices_dtype))
+        casted_select = relay.cast(select_entries, out_dtype)
+        select_dout = relay.multiply(casted_select, values)
+        reshape_out = relay.reshape(select_dout, (-1, n_cols))
+        vector = relay.sum(reshape_out, 0)
+        outputs.append(relay.reshape(vector, (1, n_cols)))
+    return relay.concatenate(outputs, 0)
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -411,6 +432,7 @@ COMPLEX_MAP = {
     P.handle: relay_handle,
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
+    P.take_grad_inp: relay_take_grad_inp,
 }
 
 

@@ -37,6 +37,7 @@ from .pytorch_functions import (
     chunk,
     conv2d,
     cross_entropy,
+    embedding,
     gather,
     item,
     linear,
@@ -101,6 +102,7 @@ standard_object_map.update({
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
     torch.nn.functional.conv2d: conv2d,
     torch.nn.functional.cross_entropy: cross_entropy,
+    torch.nn.functional.embedding: embedding,
     torch.nn.functional.linear: linear,
     torch.nn.functional.max_pool2d: max_pool2d,
     torch.nn.functional.mse_loss: mse_loss,

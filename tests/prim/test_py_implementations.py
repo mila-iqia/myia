@@ -49,6 +49,8 @@ from myia.operations import (
     split,
     stop_gradient,
     switch,
+    take,
+    take_grad_inp,
     transpose,
     tuple_getitem,
     tuple_setitem,
@@ -407,6 +409,28 @@ def test_op_full():
     ref = np.full((4, 9), -4, 'float16')
     res = full((4, 9), -4, np.float16)
     assert res.dtype == 'float16'
+    assert np.allclose(ref, res, rtol=0, atol=0)
+
+
+def test_prim_take():
+    inp = np.random.randint(0, 3, (2, 7))
+    wgh = np.random.randn(3, 2)
+    ref = np.take(wgh, inp, axis=0)
+    res = take(wgh, inp)
+    assert np.allclose(ref, res, rtol=0, atol=0)
+
+
+def test_prim_take_grad_inp():
+    indices = np.random.randint(0, 3, (2, 7))
+    weights = np.random.randn(3, 2)
+    dout = take(weights, indices)
+    broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
+    ref = np.zeros(weights.shape, dtype=dout.dtype)
+    for i in range(weights.shape[0]):
+        ref[i] = (((broadcastable_indices == i) * dout)
+                  .reshape((-1, weights.shape[1]))
+                  .sum(axis=0))
+    res = take_grad_inp(weights.shape[0], indices, dout)
     assert np.allclose(ref, res, rtol=0, atol=0)
 
 
