@@ -1,19 +1,16 @@
-"""
-Definition for primitive take_grad_inp.
+"""Definition for primitive take_grad_inp.
 
 Internal primitive used to compute
 gradient of primitive take wrt/ matrix input.
 
-Inputs:
-- the maximum number of indices n.
-- a tensor of indices I with shape S.
-- a tensor of values V with shape (*S, r)
-Output:
-- a matrix with shape (n, r), where each row i contains
-  the sum of rows in last dimension of V corresponding to
-  occurrences of i in last dimension of I. All other output
-  matrix rows that do not appear in indices are filled with
-  zero (0).
+Inputs - the maximum number of indices n, a tensor of indices I with shape S,
+and a tensor of values V with shape `(*S, r)`
+
+Output - a matrix with shape (n, r), where each row i contains
+the sum of rows in last dimension of V corresponding to
+occurrences of i in last dimension of I. All other output
+matrix rows that do not appear in indices are filled with
+zero (0).
 """
 
 import numpy as np
