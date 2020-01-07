@@ -353,6 +353,29 @@ def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
                                      channels=in_channels)
 
 
+def relay_conv_transpose2d(c, input, weight, stride, padding,
+                           output_padding, groups, dilation):
+    assert stride.is_constant(tuple)
+    assert padding.is_constant(tuple)
+    assert output_padding.is_constant(tuple)
+    assert dilation.is_constant(tuple)
+    assert groups.is_constant(int)
+    data_shape = input.abstract.xshape()
+    weight_shape = weight.abstract.xshape()
+    _, in_channels, _, _ = data_shape
+    _, _, filter_h, filter_w = weight_shape
+    _i = c.ref(input)
+    _w = c.ref(weight)
+    return relay.nn.conv2d_transpose(_i, _w,
+                                     strides=stride.value,
+                                     padding=padding.value,
+                                     dilation=dilation.value,
+                                     groups=groups.value,
+                                     output_padding=output_padding.value,
+                                     kernel_size=(filter_h, filter_w),
+                                     channels=in_channels)
+
+
 def relay_concat(c, x, dim):
     assert dim.is_constant(int)
 
@@ -427,6 +450,7 @@ COMPLEX_MAP = {
     P.conv2d: relay_conv2d,
     P.conv2d_weight_grad: relay_conv2d_weight_grad,
     P.conv2d_input_grad: relay_conv2d_input_grad,
+    P.conv_transpose2d: relay_conv_transpose2d,
     P.concat: relay_concat,
     P.split: relay_split,
     P.handle: relay_handle,

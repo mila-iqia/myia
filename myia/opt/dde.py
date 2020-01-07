@@ -378,6 +378,7 @@ def _vprop_cast_operation(vprop, need, inputs, out):
     P.bool_or,
     P.broadcast_shape,
     P.concat,
+    P.conv_transpose2d,
     P.conv2d,
     P.conv2d_input_grad,
     P.conv2d_weight_grad,

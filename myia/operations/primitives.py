@@ -119,6 +119,11 @@ conv2d_weight_grad = BackendPrimitive(
     defaults='myia.operations.prim_conv2d_weight_grad'
 )
 
+conv_transpose2d = BackendPrimitive(
+    name='conv_transpose2d',
+    defaults='myia.operations.prim_conv_transpose2d'
+)
+
 dict_getitem = InferencePrimitive(
     name='dict_getitem',
     defaults='myia.operations.prim_dict_getitem'

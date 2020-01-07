@@ -1,4 +1,5 @@
 
+import numpy as np
 from copy import copy
 from types import FunctionType
 
@@ -29,6 +30,7 @@ from ..multitest import (
     mt,
     myia_function_test,
     run,
+    run_no_relay
 )
 from ..test_grad import grad_wrap
 
@@ -256,6 +258,19 @@ http://forum.opennmt.net/t/runtimeerror-subtraction-the-operator-with-a-bool
 def test_torch_eq(x, y):
     return torch.eq(x, y)
 # """
+
+
+def _shp(*values):
+    return tuple(np.uint64(value) for value in values)
+
+
+@mt(
+    run_no_relay(torch.randn(1, 1, 4, 4), torch.randn(1, 3, 2, 2), None, _shp(1, 1), _shp(1, 1), _shp(0, 0), 1, _shp(1, 1)),
+    run_no_relay(torch.randn(2, 2, 4, 4), torch.randn(2, 3, 2, 2), torch.randn(6), _shp(2, 3), _shp(1, 1), _shp(1, 1), 2, _shp(1, 1)),
+    broad_specs=(True, True, True, False, False, False, False, False)
+)
+def test_conv_transpose2d(i, w, b, s, p, o_p, g, d):
+    return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)
 
 
 @fwd_and_bwd(torch.randn(1, 1, 3, 3, dtype=torch.float32, requires_grad=True),

@@ -247,6 +247,15 @@ def chunk(self, chunks, dim=0):
 
 
 @core
+def conv_transpose2d(input, weight, bias=None, stride=1, padding=0,
+                     output_padding=0, groups=1, dilation=1):
+    ret = P.conv_transpose2d(input, weight, stride, padding,
+                             output_padding, groups, dilation)
+    if bias is not None:
+        ret = ret + bias.reshape((1, bias.shape[0], 1, 1))
+    return ret
+
+@core
 def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
            groups=1):
     r"""Applies a Conv2d."""
