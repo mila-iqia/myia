@@ -489,9 +489,9 @@ def norm(inp, p=None, dim=None):
         p = 2
 
     # Convert p to input type.
-    p = torch.zeros(1, dtype=inp.dtype) + inp.dtype(p)
+    p = P.scalar_to_array(P.scalar_cast(p, inp.dtype), APT)
     # Create a value 1 with input type.
-    one = torch.zeros(1, dtype=inp.dtype) + inp.dtype(1)
+    one = P.scalar_to_array(P.scalar_cast(1, inp.dtype), APT)
 
     # Reshape inp based on dims, making sure that dimensions to norm
     # are all assembled in latest inp dimension.
