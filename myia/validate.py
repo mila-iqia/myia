@@ -9,6 +9,7 @@ from .abstract import (
     AbstractExternal,
     AbstractJTagged,
     AbstractScalar,
+    AbstractType,
     abstract_check,
 )
 from .ir import manage
@@ -54,6 +55,11 @@ def validate_abstract(self, a: AbstractScalar, uses):
 @overload  # noqa: F811
 def validate_abstract(self, a: (type(None), AbstractExternal), uses):
     raise ValidationError(f'Illegal type in the graph: {a}')
+
+
+@overload  # noqa: F811
+def validate_abstract(self, a: AbstractType, uses):
+    return True
 
 
 class NodeValidator:

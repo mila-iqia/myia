@@ -13,7 +13,7 @@ def pyimpl_unsafe_static_cast(x, t):
 @standard_prim(P.unsafe_static_cast)
 async def infer_unsafe_static_cast(self, engine, x, typ: lib.AbstractType):
     """Infer the return type of primitive `unsafe_static_cast`."""
-    return typ.xvalue()
+    return typ.element
 
 
 __operation_defaults__ = {

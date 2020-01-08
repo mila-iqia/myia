@@ -30,7 +30,7 @@ async def infer_scalar_cast(self, engine,
                             scalar: xtype.Number,
                             typ: lib.AbstractType):
     """Infer the return type of primitive `scalar_cast`."""
-    a = self.require_constant(typ, argnum=1)
+    a = typ.element
     if not isinstance(a, AbstractScalar):
         raise MyiaTypeError('scalar_cast must cast to a scalar type')
     t = a.xtype()

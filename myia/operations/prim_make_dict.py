@@ -8,7 +8,7 @@ from . import primitives as P
 @standard_prim(P.make_dict)
 async def infer_make_dict(self, engine, _dct: lib.AbstractType, *values):
     """Infer the return type of primitive `make_dict`."""
-    dct = _dct.xvalue()
+    dct = _dct.element
     assert len(dct.entries) == len(values)
     for t, elem in zip(dct.entries.values(), values):
         assert typecheck(t, elem)

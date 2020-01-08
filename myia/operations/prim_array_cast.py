@@ -26,7 +26,7 @@ async def infer_array_cast(self, engine,
                            a: lib.AbstractArray,
                            typ: lib.AbstractType):
     """Infer the return type of primitive `array_cast`."""
-    scal = self.require_constant(typ, argnum=1)
+    scal = typ.element
     if not isinstance(scal, lib.AbstractScalar):
         raise MyiaTypeError('array_cast must cast to a scalar dtype')
     t = scal.xtype()

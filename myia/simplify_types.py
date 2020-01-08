@@ -107,11 +107,6 @@ def _reabs(self, a: AbstractKeywordArgument):
     return self(a.argument)
 
 
-@overload  # noqa: F811
-def _reabs(self, a: AbstractType):
-    return (yield AbstractType)(self(a.values[VALUE]))
-
-
 ##################
 # Simplify types #
 ##################

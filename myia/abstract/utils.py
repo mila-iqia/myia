@@ -22,6 +22,7 @@ from .data import (
     AbstractScalar,
     AbstractStructure,
     AbstractTaggedUnion,
+    AbstractType,
     AbstractTuple,
     AbstractUnion,
     AbstractValue,
@@ -58,6 +59,9 @@ def build_value(a, default=ABSENT):
             raise err
         else:
             return default
+
+    if isinstance(a, AbstractType):
+        return a.element
 
     v = a.values.get(VALUE, ABSENT)
 
@@ -155,7 +159,11 @@ def abstract_check(self, x: AbstractScalar, *args):
 
 @overload  # noqa: F811
 def abstract_check(self, xs: AbstractStructure, *args):
-    return all(self(x, *args) for x in xs.children())
+    ch = xs.children()
+    if ch is ANYTHING:
+        return self(ch)
+    else:
+        return all(self(x, *args) for x in ch)
 
 
 @overload  # noqa: F811

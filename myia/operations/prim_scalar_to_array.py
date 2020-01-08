@@ -7,6 +7,7 @@ from ..lib import (
     TYPE,
     AbstractArray,
     AbstractScalar,
+    AbstractType,
     bprop_to_grad_transform,
     standard_prim,
 )
@@ -20,9 +21,10 @@ def pyimpl_scalar_to_array(x, t):
 
 
 @standard_prim(P.scalar_to_array)
-async def infer_scalar_to_array(self, engine, a: AbstractScalar, t):
+async def infer_scalar_to_array(self, engine,
+                                a: AbstractScalar, t: AbstractType):
     """Infer the return type of primitive `scalar_to_array`."""
-    tp = t.xvalue()
+    tp = t.element
     assert isinstance(tp, AbstractArray)
     return AbstractArray(a, {SHAPE: (), TYPE: tp.xtype()})
 

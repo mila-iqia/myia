@@ -30,7 +30,7 @@ async def call_object(info, fn, *n_args):
         # Replace abstract type instantiation with
         # either a cast for abstract scalars, or
         # a make_record for all other cases.
-        val = fn.xvalue()
+        val = fn.element
         cls = type_to_abstract(val)
         if isinstance(cls, AbstractScalar):
             typ = cls.xtype()
