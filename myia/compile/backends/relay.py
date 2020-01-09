@@ -360,10 +360,14 @@ def relay_conv_transpose2d(c, input, weight, stride, padding,
     assert output_padding.is_constant(tuple)
     assert dilation.is_constant(tuple)
     assert groups.is_constant(int)
+    if stride.value != (1, 1):
+        raise ValueError("non unit stride is not supported "
+                         "for relay conv_transpose2d "
+                         "for now, it gives bad values")
     data_shape = input.abstract.xshape()
     weight_shape = weight.abstract.xshape()
     _, in_channels, _, _ = data_shape
-    _, _, filter_h, filter_w = weight_shape
+    _, w_c, filter_h, filter_w = weight_shape
     _i = c.ref(input)
     _w = c.ref(weight)
     return relay.nn.conv2d_transpose(_i, _w,
