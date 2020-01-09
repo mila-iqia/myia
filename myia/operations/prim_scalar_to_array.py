@@ -30,7 +30,7 @@ async def infer_scalar_to_array(self, engine, a: AbstractScalar, t):
 @bprop_to_grad_transform(P.scalar_to_array)
 def bprop_scalar_to_array(x, t, out, dout):
     """Backpropagator for primitive `scalar_to_array`."""
-    return (array_to_scalar(dout),)
+    return (array_to_scalar(dout), t)
 
 
 __operation_defaults__ = {
