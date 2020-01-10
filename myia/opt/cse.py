@@ -6,7 +6,7 @@ from collections import defaultdict
 from ..abstract import AbstractFunction, TypedPrimitive
 from ..graph_utils import toposort
 from ..ir import succ_incoming
-from ..utils import Partializable
+from ..utils import Partializable, tracer
 
 
 def _absof(node):
@@ -94,11 +94,21 @@ class CSE(Partializable):
         """Initialize CSE."""
         self.resources = resources
         self.report_changes = report_changes
+        self.name = 'cse'
 
     def __call__(self, root):
         """Apply CSE on root."""
-        chg = cse(root, self.resources.manager)
-        return chg and self.report_changes
+        args = dict(
+            opt=self,
+            node=None,
+            manager=self.resources.manager,
+        )
+        with tracer('opt', **args) as tr:
+            tr.set_results(success=False, **args)
+            chg = cse(root, self.resources.manager)
+            if chg:
+                tracer().emit_success(**args, new_node=None)
+            return chg and self.report_changes
 
 
 __all__ = [
