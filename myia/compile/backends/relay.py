@@ -1,6 +1,9 @@
 """Transforms a graph into lower-level code."""
 
 from itertools import accumulate
+import os
+
+import numpy as np
 
 import numpy as np
 import tvm
@@ -28,8 +31,6 @@ from .relay_helpers import (
     optimize,
     to_relay_type,
 )
-
-relay_from_scalar = tvm.get_global_func('relay.from_scalar')
 
 
 @wrap_result.register
@@ -585,19 +586,17 @@ class CompileGraph:
                         name = "!main"
                     self.graph_map[g] = relay.GlobalVar(name)
 
-        for g in mng.graphs:
-            if g.parent is None:
-                function_map[self.graph_map[g]] = \
-                    self.convert_func(g)
+        for g in self.graph_map.keys():
+            function_map[self.graph_map[g]] = self.convert_func(g)
 
         self.types.finalize(self.module)
         add_functions(self.module, function_map)
 
         self.module = optimize(self.module)
 
-        exec = relay.create_executor(mod=self.module, ctx=context,
-                                     target=target)
-        res = exec.evaluate(self.module["main"])
+        vm = relay.create_executor(mod=self.module, ctx=context,
+                                   target=target, kind='vm')
+        res = vm.evaluate(self.module["main"])
 
         res = handle_wrapper(res, handles_params)
 
@@ -697,30 +696,30 @@ class RelayInputConverter(Converter):
             target = 'llvm'
         elif target == 'gpu':
             target = 'cuda'
-        self.intrp = relay.create_executor(mod=mod, ctx=context, target=target)
+        #self.intrp = relay.create_executor(mod=mod, ctx=context, target=target,
+        #kind='vm')
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
-        return interpreter.TensorValue(tvm.ndarray.array(v, self.context))
+        return tvm.ndarray.array(v, self.context)
 
     def convert_scalar(self, v, t):
         """Convert the scalar to a TVM array."""
-        return relay_from_scalar(v, type_to_np_dtype(t))
+        return getattr(np, type_to_np_dtype(t))(v)
 
     def convert_bool(self, v, t):
         """Convert the scalar to a TVM array."""
-        return relay_from_scalar(v, type_to_np_dtype(t))
+        return np.bool_(v)
 
     def convert_nil(self, v, t):
         """Convert Nil to Relay."""
-        return interpreter.TupleValue()
+        return ()
 
     def convert_tuple(self, v, t):
-        return interpreter.TupleValue(*[self(e, et) for e, et in
-                                        zip(v, t.elements)])
+        return tuple(self(e, et) for e, et in zip(v, t.elements))
 
     def convert_universe(self, v, t):
-        return interpreter.TupleValue()
+        return ()
 
     def convert_handle(self, v, t):
         v = self(v.state, t.element)
