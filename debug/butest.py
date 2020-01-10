@@ -237,10 +237,10 @@ def pytest_runtest_setup(item):
 
     class Db(BucheDb):
 
-        def __init__(self):
-            super().__init__(None)
+        def __init__(self, skip=None):
+            super().__init__(None, skip=skip)
 
-        def set_trace(self, frame=None):
+        def set_trace(self, frame=None, skip=None):
             interactor.show(synchronous=True)
             self.repl = interactor.repl
             super().set_trace(frame)

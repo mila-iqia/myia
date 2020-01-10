@@ -40,15 +40,23 @@ def bucheg(graph, **kwargs):
     buche(graph, **kw)
 
 
+def buchegx(graph, **kwargs):
+    return bucheg(graph,
+                  function_in_node=False,
+                  graph_beautify=False, **kwargs)
+
+
 suite = {
     'buche': buche,
     'bucheg': bucheg,
+    'buchegx': buchegx,
     'ibuche': ibuche,
     'Subgraph': gprint.Subgraph,
     'logword': breakword.log,
     'getword': breakword.word,
     'afterword': breakword.after,
-    'breakword': breakword.brk,
+    'breakword': breakword.logbrk,
+    'bw': breakword,
 }
 
 
