@@ -1,7 +1,8 @@
-import torch
-from ..lib import (
-    AbstractTuple, AbstractScalar, AbstractArray, Constant, macro
-)
+"""Implementation of gradient of conv2d wrt/ input, as a macro.
+
+Use primitive conv_transpose2d.
+"""
+from ..lib import AbstractArray, AbstractTuple, Constant, macro
 from . import primitives as P
 
 
@@ -19,7 +20,7 @@ async def conv2d_grad_input(
         r_padding,
         r_dilation,
         r_groups):
-
+    """Return a new Apply calling conv_transpose2d with right arguments."""
     _input_size = await r_input_size.get()  # type: AbstractTuple
     _weight = await r_weight.get()  # type: AbstractArray
     _grad_output = await r_grad_output.get()  # type: AbstractArray

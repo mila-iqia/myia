@@ -1,5 +1,4 @@
 
-import numpy as np
 from copy import copy
 from types import FunctionType
 
@@ -30,7 +29,7 @@ from ..multitest import (
     mt,
     myia_function_test,
     run,
-    run_no_relay
+    run_no_relay,
 )
 from ..test_grad import grad_wrap
 
@@ -260,22 +259,6 @@ def test_torch_eq(x, y):
 # """
 
 
-def _shp(*values):
-    return tuple(values)
-    # return tuple(np.uint64(value) for value in values)
-
-
-@mt(
-    run_no_relay(torch.randn(1, 2, 4, 4), torch.randn(2, 3, 2, 2), torch.randn(6), _shp(1, 1), _shp(1, 1), _shp(0, 0), 2, _shp(1, 1)),
-    run_no_relay(torch.randn(1, 2, 5, 4), torch.randn(2, 4, 1, 3), None, _shp(2, 3), _shp(4, 5), _shp(3, 2), 2, _shp(5, 4)),
-    run_no_relay(torch.randn(5, 2, 5, 6), torch.randn(2, 2, 4, 4), None, _shp(1, 1), _shp(0, 0), _shp(0, 0), 1, _shp(1, 1)),
-    run_no_relay(torch.randn(1, 1, 4, 4), torch.randn(1, 3, 2, 2), None, _shp(1, 1), _shp(1, 1), _shp(0, 0), 1, _shp(1, 1)),
-    broad_specs=(True, True, False, False, False, False, False, False)
-)
-def test_conv_transpose2d(i, w, b, s, p, o_p, g, d):
-    return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)
-
-
 @fwd_and_bwd(torch.randn(1, 1, 3, 3, dtype=torch.float32, requires_grad=True),
              torch.randn(1, 1, 2, 2, dtype=torch.float32, requires_grad=True))
 def test_conv2d_no_dil(inp, w):
@@ -327,6 +310,29 @@ def test_torch_conv2d__non_tuple_args(inp, w, b):
 def test_torch_conv2d__group3(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 1)
     return torch.sum(value)
+
+
+@mt(
+    run_no_relay(torch.randn(1, 2, 4, 4),
+                 torch.randn(2, 3, 2, 2),
+                 torch.randn(6), (1, 1),
+                 (1, 1), (0, 0), 2, (1, 1)),
+    run_no_relay(torch.randn(1, 2, 5, 4),
+                 torch.randn(2, 4, 1, 3),
+                 None,
+                 (2, 3), (4, 5), (3, 2), 2, (5, 4)),
+    run_no_relay(torch.randn(5, 2, 5, 6),
+                 torch.randn(2, 2, 4, 4),
+                 None,
+                 (1, 1), (0, 0), (0, 0), 1, (1, 1)),
+    run_no_relay(torch.randn(1, 1, 4, 4),
+                 torch.randn(1, 3, 2, 2),
+                 None,
+                 (1, 1), (1, 1), (0, 0), 1, (1, 1)),
+    broad_specs=(True, True, False, False, False, False, False, False)
+)
+def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
+    return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)
 
 
 @mt(

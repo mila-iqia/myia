@@ -11,7 +11,7 @@ from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..cconv import closure_convert
 from ..transform import CompileGraphs, nonlinear_ops
 from . import Backend, HandleBackend
-from .pytorch_conv_grad import conv2d_input, conv2d_weight
+from .pytorch_conv_grad import conv2d_weight
 
 _type_map = {
     Int[8]: torch.int8,
@@ -330,7 +330,7 @@ def pytorch_conv2d(op):
 
 
 def pytorch_conv_transpose2d(op):
-    """Implementation of conv_transpose2d"""
+    """Implementation of conv_transpose2d."""
     def _impl(input, weight, bias,
               stride, padding, output_padding, groups, dilation):
         stride = tuple(_x.item() for _x in stride)

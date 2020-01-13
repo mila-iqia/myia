@@ -11,10 +11,10 @@ from ..lib import (
     u64pair_typecheck,
 )
 from ..operations import (
+    conv2d_grad_input,
     conv2d_weight_grad,
     shape,
     zeros_like,
-    conv2d_grad_input
 )
 from . import primitives as P
 

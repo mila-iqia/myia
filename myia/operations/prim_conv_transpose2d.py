@@ -1,8 +1,15 @@
 """Primitive for conv_transpose2d."""
 
+from ..lib import (
+    SHAPE,
+    TYPE,
+    AbstractArray,
+    AbstractScalar,
+    AbstractTuple,
+    force_pending,
+    standard_prim,
+)
 from . import primitives as P
-from ..lib import (AbstractArray, AbstractScalar, AbstractTuple, force_pending,
-                   SHAPE, standard_prim, TYPE)
 
 
 @standard_prim(P.conv_transpose2d)
@@ -18,6 +25,7 @@ async def infer_conv_transpose2d(
         groups: AbstractScalar,
         dilation: AbstractTuple
 ):
+    """Infer output array type and shape."""
     n, c_in, h_in, w_in = await force_pending(input.xshape())
     stride = tuple(
         self.require_constant(e, argnum=f'"2:stride[{edx}]"')
