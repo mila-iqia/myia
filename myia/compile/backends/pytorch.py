@@ -329,21 +329,6 @@ def pytorch_conv2d(op):
     return _impl, op.inputs[1:]
 
 
-def pytorch_conv2d_input_grad(op):
-    """Implementation of conv2d_input_grad for pytorch."""
-    def _impl(input_size, weight, grad_output, stride, padding,
-              dilation, groups):
-        input_size = tuple(i.item() for i in input_size)
-        stride = tuple(_x.item() for _x in stride)
-        padding = tuple(_x.item() for _x in padding)
-        dilation = tuple(_x.item() for _x in dilation)
-        groups = groups.item()
-        return (conv2d_input(
-            input_size, weight, grad_output, stride,
-            padding, dilation, groups),)
-    return _impl, op.inputs[1:]
-
-
 def pytorch_conv_transpose2d(op):
     """Implementation of conv_transpose2d"""
     def _impl(input, weight, bias,
@@ -404,7 +389,6 @@ _mapping = {
     P.array_setitem: pytorch_array_setitem,
     P.concat: pytorch_concat,
     P.conv2d: pytorch_conv2d,
-    P.conv2d_input_grad: pytorch_conv2d_input_grad,
     P.conv_transpose2d: pytorch_conv_transpose2d,
     P.conv2d_weight_grad: pytorch_conv2d_weight_grad,
     P.scalar_cast: pytorch_scalar_cast,

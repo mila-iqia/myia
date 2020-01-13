@@ -319,40 +319,6 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
     return d
 
 
-def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
-    assert isize.is_constant(tuple)
-    assert stride.is_constant(tuple)
-    assert pad.is_constant(tuple)
-    assert dil.is_constant(tuple)
-    assert groups.is_constant(int)
-    if stride.value != (1, 1):
-        raise ValueError("non unit stride is not supported for input grad "
-                         "for now, it gives bad values")
-
-    weight = c.ref(w)
-    grad = c.ref(dout)
-
-    data_shape = isize.value
-    weight_shape = w.abstract.xshape()
-    _, _, grad_h, grad_w = dout.abstract.xshape()
-    bactch, in_channels, in_h, in_w = data_shape
-    out_channels, _, filter_h, filter_w = weight_shape
-
-    out_h = ((grad_h - 1) * stride.value[0] - pad.value[0] * 2 +
-             (filter_h - 1) * dil.value[0] + 1)
-    out_w = ((grad_w - 1) * stride.value[1] - pad.value[1] * 2 +
-             (filter_w - 1) * dil.value[1] + 1)
-    output_padding = (isize.value[2] - out_h, isize.value[3] - out_w)
-
-    return relay.nn.conv2d_transpose(grad, weight,
-                                     strides=stride.value,
-                                     padding=pad.value, dilation=dil.value,
-                                     groups=groups.value,
-                                     output_padding=output_padding,
-                                     kernel_size=(filter_h, filter_w),
-                                     channels=in_channels)
-
-
 def relay_conv_transpose2d(c, input, weight, stride, padding,
                            output_padding, groups, dilation):
     assert stride.is_constant(tuple)
@@ -453,7 +419,6 @@ COMPLEX_MAP = {
     P.array_max: relay_array_max,
     P.conv2d: relay_conv2d,
     P.conv2d_weight_grad: relay_conv2d_weight_grad,
-    P.conv2d_input_grad: relay_conv2d_input_grad,
     P.conv_transpose2d: relay_conv_transpose2d,
     P.concat: relay_concat,
     P.split: relay_split,

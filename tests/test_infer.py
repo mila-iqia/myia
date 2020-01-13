@@ -25,6 +25,7 @@ from myia.operations import (
     bool_or,
     broadcast_shape,
     casttag,
+    conv2d_grad_input,
     distribute,
     dot,
     embed,
@@ -2321,8 +2322,8 @@ def test_conv2d(i, w, s, p, d, g):
                  Shp(2, 3), Shp(3, 2), Shp(3, 4), S(1, u64),
                  result=af32_of(2, 1, 4, 5)),
 )
-def test_conv2d_input_grad(i_s, w, g_o, s, p, d, g):
-    return P.conv2d_input_grad(i_s, w, g_o, s, p, d, g)
+def test_conv2d_grad_input(i_s, w, g_o, s, p, d, g):
+    return conv2d_grad_input(i_s, w, g_o, s, p, d, g)
 
 
 @mt(

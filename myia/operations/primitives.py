@@ -109,11 +109,6 @@ conv2d = BackendPrimitive(
     defaults='myia.operations.prim_conv2d'
 )
 
-conv2d_input_grad = BackendPrimitive(
-    name='conv2d_input_grad',
-    defaults='myia.operations.prim_conv2d_input_grad'
-)
-
 conv2d_weight_grad = BackendPrimitive(
     name='conv2d_weight_grad',
     defaults='myia.operations.prim_conv2d_weight_grad'
