@@ -346,13 +346,14 @@ def pytorch_conv2d_input_grad(op):
 
 def pytorch_conv_transpose2d(op):
     """Implementation of conv_transpose2d"""
-    def _impl(input, weight, stride, padding, output_padding, groups, dilation):
+    def _impl(input, weight, bias,
+              stride, padding, output_padding, groups, dilation):
         stride = tuple(_x.item() for _x in stride)
         padding = tuple(_x.item() for _x in padding)
         output_padding = tuple(_x.item() for _x in output_padding)
         dilation = tuple(_x.item() for _x in dilation)
         groups = groups.item()
-        return torch.conv_transpose2d(input, weight, None, stride, padding,
+        return torch.conv_transpose2d(input, weight, bias, stride, padding,
                                       output_padding, groups, dilation)
     return _impl, op.inputs[1:]
 

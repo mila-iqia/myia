@@ -246,13 +246,10 @@ def chunk(self, chunks, dim=0):
     return P.split(self, sections, dim)
 
 
-# TODO: `bias` not yet supported.
 @core
 def conv_transpose2d(input, weight, bias, stride=1, padding=0,
                      output_padding=0, groups=1, dilation=1):
-    if bias is not None:
-        raise Exception('Bias not yet supported.')
-    return P.conv_transpose2d(input, weight, stride, padding,
+    return P.conv_transpose2d(input, weight, bias, stride, padding,
                               output_padding, groups, dilation)
 
 @core

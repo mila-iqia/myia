@@ -266,6 +266,7 @@ def _shp(*values):
 
 
 @mt(
+    run_no_relay(torch.randn(1, 2, 4, 4), torch.randn(2, 3, 2, 2), torch.randn(6), _shp(1, 1), _shp(1, 1), _shp(0, 0), 2, _shp(1, 1)),
     run_no_relay(torch.randn(1, 2, 5, 4), torch.randn(2, 4, 1, 3), None, _shp(2, 3), _shp(4, 5), _shp(3, 2), 2, _shp(5, 4)),
     run_no_relay(torch.randn(5, 2, 5, 6), torch.randn(2, 2, 4, 4), None, _shp(1, 1), _shp(0, 0), _shp(0, 0), 1, _shp(1, 1)),
     run_no_relay(torch.randn(1, 1, 4, 4), torch.randn(1, 3, 2, 2), None, _shp(1, 1), _shp(1, 1), _shp(0, 0), 1, _shp(1, 1)),
