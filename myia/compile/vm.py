@@ -34,7 +34,6 @@ class FinalVM:
 
     def _push(self, v):
         """Push a value to the stack."""
-
         self.stack[self.sp] = v
         self.sp += 1
 
