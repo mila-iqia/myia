@@ -36,19 +36,15 @@ async def conv2d_grad_input(
     weight_shape = _weight.xshape()
     grad_output_shape = _grad_output.xshape()
 
-    if input_size is None:
-        raise ValueError("grad.conv2d_input requires specifying an input_size")
-
     kernel_size = (weight_shape[2], weight_shape[3])
 
     # Compute grad input padding.
-    k = len(grad_output_shape) - 2
 
-    if len(input_size) == k + 2:
-        input_size = input_size[-k:]
-    if len(input_size) != k:
-        raise ValueError("input_size must have {} elements (got {})"
-                         .format(k + 2, len(input_size)))
+    # For a 2D convolution, tensors should have 4 dimensions.
+    assert len(grad_output_shape) == 4
+    assert len(input_size) == 4
+    k = len(grad_output_shape) - 2
+    input_size = input_size[-k:]
 
     min_sizes = []
     for d in range(k):
@@ -56,15 +52,8 @@ async def conv2d_grad_input(
             (grad_output_shape[d + 2] - 1) * stride[d] - 2 * padding[d] +
             (kernel_size[d] - 1) * dilation[d] + 1)
 
-    max_sizes = [min_sizes[d] + stride[d] - 1 for d in range(k)]
-
-    for size, min_size, max_size in zip(input_size, min_sizes, max_sizes):
-        if size < min_size or size > max_size:
-            raise ValueError(
-                ("requested an input grad size of {}, but valid sizes range "
-                 "from {} to {} (for a grad_output of {})").format(
-                    input_size, min_sizes, max_sizes,
-                    grad_output_shape[2:]))
+    # Let's avoid checking minimum and maximum size here.
+    # Backends should check it when relevant.
 
     grad_input_padding = tuple(input_size[d] - min_sizes[d] for d in range(k))
     # End computing.
