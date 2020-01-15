@@ -18,6 +18,7 @@
 import operator
 from functools import reduce
 
+import numpy as np
 import torch
 
 from .. import operations
@@ -105,6 +106,34 @@ def _pair(x):
     x = (_ensure_u64(x[0]), x[1])
     x = (x[0], _ensure_u64(x[1]))
     return x
+
+
+@myia_static
+def _prepare_dims_to_norm(shape, dim):
+    # Make sure dim is a tuple.
+    if not isinstance(dim, tuple):
+        dim = (dim,)
+    # If no dim, norm all dimensions.
+    if len(dim) == 0:
+        dim = shape
+
+    leading_dims = ()
+    dims_to_norm = ()
+    for i in range(len(shape)):
+        if i in dim:
+            dims_to_norm = dims_to_norm + (i,)
+        else:
+            leading_dims = leading_dims + (i,)
+    permutation = ()
+    leading_shape = ()
+    reshaping_tuple = ()
+    if leading_dims:
+        permutation = leading_dims + dims_to_norm
+        leading_shape = tuple(shape[d] for d in leading_dims)
+        reshaping_tuple = leading_shape + (-1,)
+    else:
+        leading_dims = None
+    return leading_dims, permutation, leading_shape, reshaping_tuple
 
 
 def prod(x):
@@ -446,6 +475,74 @@ def nll_loss(logs, targets, reduction='mean'):
     elif reduction == 'sum':
         out = torch.sum(out)
     return out
+
+
+# TODO
+# Parameter p does not currently support string values ('fro' and 'nuc')
+# (issues: p expected either number and not string, or string and not number)
+# Frobenius norm (p = 'fro') can be computed with p = 2.
+# Nuclear norm (p = 'nuc') is not yet supported.
+@core
+def norm(inp, p=None, dim=None):
+    """Map of torch.norm method."""
+    if p is None:
+        p = 2
+
+    # Convert p to input type.
+    p = P.scalar_to_array(P.scalar_cast(p, inp.dtype), APT)
+    # Create a value 1 with input type.
+    one = P.scalar_to_array(P.scalar_cast(1, inp.dtype), APT)
+
+    # Reshape inp based on dims, making sure that dimensions to norm
+    # are all assembled in latest inp dimension.
+    leading_dims = None
+    leading_shape = None
+
+    if dim is None:
+        # We must norm the entire tensor.
+        new_inp = inp.reshape(1, -1)
+    else:
+        # Check input shape and given dimensions to retrieve
+        # leading dimensions (not to norm),
+        # permutation to apply to input if necessary,
+        # leading shape,
+        # and reshaping tuple (leading shape + (-1,)), to apply to
+        # permuted input if necessary.
+        leading_dims, permutation, leading_shape, reshaping_tuple = \
+            _prepare_dims_to_norm(inp.shape, dim)
+
+        # Now we can reshape inp.
+        if leading_dims is None:
+            # We must norm the entire tensor.
+            new_inp = inp.reshape(1, -1)
+        else:
+            # We must norm only dimensions in normed_dims.
+            # 1) Move dimensions to norm to the end of tensor dimension.
+            # 2) Reshape to pack trailing dimensions to norm into 1 dimension.
+            new_inp = inp.permute(permutation)
+            new_inp = new_inp.reshape(*reshaping_tuple)
+
+    # Then we can compute norm.
+    if p.item() == np.inf:
+        # Maximum of absolute values
+        res = new_inp.abs().max(-1)[0]
+    elif p.item() == -np.inf:
+        # Minimum of absolute values.
+        # res = new_inp.abs().min(-1)[0]
+        u = new_inp.abs()
+        v = -u
+        w = v.max(-1)[0]
+        res = -w
+    else:
+        # Classical p-norm.
+        # res = (new_inp.abs() ** p_value).sum(-1) ** (1 / p_value)
+        a = new_inp.abs() ** p
+        b = a.sum(-1)
+        c = one / p
+        res = b ** c
+    if leading_dims is not None:
+        res = res.reshape(leading_shape)
+    return res
 
 
 @core

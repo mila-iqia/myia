@@ -372,6 +372,22 @@ def test_torch_item(x):
     return x.item()
 
 
+@mt(
+    run(nn.Parameter(torch.randn(1, 2, 2)), float('inf'), None),
+    run(nn.Parameter(torch.randn(1, 2, 2)), float('-inf'), None),
+    run(nn.Parameter(torch.randn(1, 2, 2)), 2, None),
+    run(nn.Parameter(torch.randn(1, 2, 2)), 3.5, None),
+    run(nn.Parameter(torch.randn(1, 2, 2)), 2, 0),
+    run(nn.Parameter(torch.randn(1, 2, 2)), 2, ()),
+    run(nn.Parameter(torch.randn(1, 2, 2)), 2, (1,)),
+    run(nn.Parameter(torch.randn(1, 2, 2)), 2, (2, 1)),
+    run(nn.Parameter(torch.randn(1, 2, 2)), 2.5, (1, 0, 2)),
+    broad_specs=(True, False, False)
+)
+def test_torch_norm(inp, p, dim):
+    return torch.norm(inp, p, dim)
+
+
 @fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_get(x):
     return x[:, -3:-1:2, -2]
