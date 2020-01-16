@@ -686,18 +686,6 @@ class RelayInputConverter(Converter):
     def __init__(self, context):
         """Set the context."""
         self.context = context
-        self.cst_conv = RelayConstantConverter(self.context)
-        mod = relay.Module({})
-        th = TypeHelper()
-        th.initialize(mod, None)
-        th.finalize(mod)
-        target = context.MASK2STR[context.device_type]
-        if target == 'cpu':
-            target = 'llvm'
-        elif target == 'gpu':
-            target = 'cuda'
-        #self.intrp = relay.create_executor(mod=mod, ctx=context, target=target,
-        #kind='vm')
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
@@ -705,11 +693,12 @@ class RelayInputConverter(Converter):
 
     def convert_scalar(self, v, t):
         """Convert the scalar to a TVM array."""
-        return getattr(np, type_to_np_dtype(t))(v)
+        return tvm.ndarray.array(getattr(np, type_to_np_dtype(t))(v),
+                                 self.context)
 
     def convert_bool(self, v, t):
         """Convert the scalar to a TVM array."""
-        return np.bool_(v)
+        return tvm.ndarray.array(np.bool_(v), self.context)
 
     def convert_nil(self, v, t):
         """Convert Nil to Relay."""
@@ -726,8 +715,12 @@ class RelayInputConverter(Converter):
         return interpreter.RefValue(v)
 
     def convert_tagged(self, v, t):
-        cst = self.cst_conv.convert_tagged(v, t)
-        return self.intrp.evaluate(cst)
+        real_t = t.options.get(v.tag)
+        ctr = get_union_ctr(v.tag, real_t)
+        conv_val = self(v.value, real_t)
+        if not isinstance(conv_val, tuple):
+            conv_val = (conv_val,)
+        return relay.vm.ADT(ctr.tag, conv_val)
 
     def convert_type(self, v, t):
         # abstract type will be replaced with an integer type as placeholder
