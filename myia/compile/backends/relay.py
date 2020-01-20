@@ -536,7 +536,7 @@ class RelayConstantConverter(Converter):
         return relay.Tuple([self(e, et) for e, et in
                             zip(v, t.elements)])
 
-    def convert_tagged(self, v, t):  # pragma: no cover
+    def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
         ctr = get_union_ctr(v.tag, real_t)
         conv_val = self(v.value, real_t)
@@ -686,6 +686,8 @@ class RelayInputConverter(Converter):
     def __init__(self, context):
         """Set the context."""
         self.context = context
+        self.th = TypeHelper()
+        self.cst_conv = RelayConstantConverter(self.context)
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
@@ -715,12 +717,13 @@ class RelayInputConverter(Converter):
         return interpreter.RefValue(v)
 
     def convert_tagged(self, v, t):
-        real_t = t.options.get(v.tag)
-        ctr = get_union_ctr(v.tag, real_t)
-        conv_val = self(v.value, real_t)
-        if not isinstance(conv_val, tuple):
-            conv_val = (conv_val,)
-        return relay.vm.ADT(ctr.tag, conv_val)
+        mod = relay.Module({})
+        self.th.initialize(mod, None)
+        cst = self.cst_conv.convert_tagged(v, t)
+        mod["main"] = relay.Function([], cst)
+        self.th.finalize(mod)
+        vm = relay.create_executor(ctx=self.context, mod=mod, kind='vm')
+        return vm.evaluate()()
 
     def convert_type(self, v, t):
         # abstract type will be replaced with an integer type as placeholder
@@ -758,7 +761,7 @@ class RelayOutputConverter(Converter):
         return HandleInstance(self(v.value, t.element))
 
     def convert_tagged(self, v, t):
-        tag = get_myia_tag(v.constructor)
+        tag = get_myia_tag(v.tag)
         conv_val = self(v.fields[0], t.options.get(tag))
         return TaggedValue(tag, conv_val)
 
