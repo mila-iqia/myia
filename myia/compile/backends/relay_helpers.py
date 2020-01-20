@@ -36,13 +36,26 @@ def get_union_ctr(tag, t):
         rt = to_relay_type(t)
         ctr = adt.Constructor(f"c{tag}", [rt], union_type)
         tag_map[tag] = ctr
-        rev_tag_map[ctr] = tag
     return tag_map[tag]
 
 
-def get_myia_tag(ctr):
-    """Return the myia tag for a constructor."""
-    return rev_tag_map[ctr]
+def fill_reverse_tag_map():
+    """Fill the back-conversion map.
+
+    Do this after a compilation step involving the constructors you
+    need since the tags are not set otherwise.
+    """
+    for tag, ctr in tag_map.items():
+        if ctr.tag != -1:
+            rev_tag_map[ctr.tag] = tag
+
+
+def get_myia_tag(rtag):
+    """Return the myia tag for a constructor.
+
+    This will fail if you haven't properly called fill_reverse_tag_map().
+    """
+    return rev_tag_map[rtag]
 
 
 env_val = relay.GlobalTypeVar('$_env_val')
@@ -326,6 +339,7 @@ __all__ = [
     'add_functions',
     'dead_value',
     'empty_env',
+    'fill_reverse_tag_map',
     'get_myia_tag',
     'get_union_ctr',
     'optimize',

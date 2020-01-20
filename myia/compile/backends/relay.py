@@ -1,9 +1,7 @@
 """Transforms a graph into lower-level code."""
 
-from itertools import accumulate
 import os
-
-import numpy as np
+from itertools import accumulate
 
 import numpy as np
 import tvm
@@ -25,6 +23,7 @@ from .relay_helpers import (
     add_functions,
     dead_value,
     empty_env,
+    fill_reverse_tag_map,
     get_myia_tag,
     get_union_ctr,
     handle_wrapper,
@@ -598,6 +597,8 @@ class CompileGraph:
                                    target=target, kind='vm')
         res = vm.evaluate(self.module["main"])
 
+        fill_reverse_tag_map()
+
         res = handle_wrapper(res, handles_params)
 
         def f(*args):
@@ -762,7 +763,7 @@ class RelayOutputConverter(Converter):
 
     def convert_tagged(self, v, t):
         tag = get_myia_tag(v.tag)
-        conv_val = self(v.fields[0], t.options.get(tag))
+        conv_val = self(v[0], t.options.get(tag))
         return TaggedValue(tag, conv_val)
 
 
