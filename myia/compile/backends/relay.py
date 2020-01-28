@@ -27,7 +27,6 @@ from .relay_helpers import (
     get_myia_tag,
     get_union_ctr,
     handle_wrapper,
-    optimize,
     to_relay_type,
 )
 
@@ -590,8 +589,6 @@ class CompileGraph:
 
         self.types.finalize(self.module)
         add_functions(self.module, function_map)
-
-        self.module = optimize(self.module)
 
         vm = relay.create_executor(mod=self.module, ctx=context,
                                    target=target, kind='vm')

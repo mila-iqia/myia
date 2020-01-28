@@ -310,30 +310,6 @@ def add_functions(mod, funcs):
         mod[gv] = funcs[gv]
 
 
-pass_set = transform.Sequential(
-    passes=[
-        transform.SimplifyInference(),
-        transform.CanonicalizeOps(),
-        transform.CanonicalizeCast(),
-        transform.FuseOps(3),
-        # transform.CombineParallelConv2d(),
-        transform.AlterOpLayout(),
-        # transform.RewriteAnnotatedOps(???),
-    ],
-    opt_level=0
-)
-
-
-def optimize(mod):
-    """Optimize all the functions in a module.
-
-    Modules are the only mutable piece of Relay.  We write an
-    optimization pass over the module which destructively updates each
-    function while optimizing.
-    """
-    return pass_set(mod)
-
-
 __all__ = [
     'TypeHelper',
     'add_functions',
@@ -342,6 +318,5 @@ __all__ = [
     'fill_reverse_tag_map',
     'get_myia_tag',
     'get_union_ctr',
-    'optimize',
     'to_relay_type',
 ]
