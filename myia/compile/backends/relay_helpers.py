@@ -25,7 +25,7 @@ from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 empty_union = adt.Constructor("empty", [], union_type)
-tag_map = {}
+tag_map = {None: empty_union}
 rev_tag_map = {}
 
 
