@@ -32,9 +32,12 @@ from .relay_helpers import (
 
 
 @wrap_result.register
-def wrap_result(data: interpreter.TupleValue):
+def wrap_result(data: tvm.container.ADT):
     """Wrap tuples from relay."""
-    return tuple(handle(d) for d in data)
+    if data.tag == 0:
+        return tuple(handle(d) for d in data)
+    else:
+        return handle(data)
 
 
 def ashape(node):
