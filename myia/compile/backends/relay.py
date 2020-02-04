@@ -31,6 +31,9 @@ from .relay_helpers import (
 )
 
 
+EXEC_KIND = 'vm'
+
+
 @wrap_result.register
 def wrap_result(data: tvm.container.ADT):
     """Wrap tuples from relay."""
@@ -594,8 +597,8 @@ class CompileGraph:
         add_functions(self.module, function_map)
 
         vm = relay.create_executor(mod=self.module, ctx=context,
-                                   target=target, kind='vm')
-        res = vm.evaluate(self.module["main"])
+                                   target=target, kind=EXEC_KIND)
+        res = vm.evaluate()
 
         fill_reverse_tag_map()
 
@@ -723,7 +726,7 @@ class RelayInputConverter(Converter):
         cst = self.cst_conv.convert_tagged(v, t)
         mod["main"] = relay.Function([], cst)
         self.th.finalize(mod)
-        vm = relay.create_executor(ctx=self.context, mod=mod, kind='vm')
+        vm = relay.create_executor(ctx=self.context, mod=mod, kind=EXEC_KIND)
         return vm.evaluate()()
 
     def convert_type(self, v, t):
@@ -763,7 +766,10 @@ class RelayOutputConverter(Converter):
 
     def convert_tagged(self, v, t):
         tag = get_myia_tag(v.tag)
-        conv_val = self(v[0], t.options.get(tag))
+        try:
+            conv_val = self(v[0], t.options.get(tag))
+        except TypeError:
+            conv_val = self(v.fields[0], t.options.get(tag))
         return TaggedValue(tag, conv_val)
 
 
