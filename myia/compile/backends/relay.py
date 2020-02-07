@@ -514,7 +514,7 @@ class RelayConstantConverter(Converter):
 
     def convert_array(self, v, t):  # pragma: no cover
         """Make a TVM array from a numpy array."""
-        return relay.const(tvm.ndarray.array(v, self.context))
+        return relay.const(tvm.runtime.ndarray.array(v, self.context))
 
     def convert_scalar(self, v, t):
         """Convert the scalar to a TVM array."""
@@ -695,16 +695,16 @@ class RelayInputConverter(Converter):
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
-        return tvm.ndarray.array(v, self.context)
+        return tvm.runtime.ndarray.array(v, self.context)
 
     def convert_scalar(self, v, t):
         """Convert the scalar to a TVM array."""
-        return tvm.ndarray.array(getattr(np, type_to_np_dtype(t))(v),
-                                 self.context)
+        return tvm.runtime.ndarray.array(getattr(np, type_to_np_dtype(t))(v),
+                                         self.context)
 
     def convert_bool(self, v, t):
         """Convert the scalar to a TVM array."""
-        return tvm.ndarray.array(np.bool_(v), self.context)
+        return tvm.runtime.ndarray.array(np.bool_(v), self.context)
 
     def convert_nil(self, v, t):
         """Convert Nil to Relay."""
@@ -786,7 +786,7 @@ class RelayBackend(Backend):
     def __init__(self, target, device_id):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
-        self.context = tvm.ndarray.context(target, device_id)
+        self.context = tvm.runtime.ndarray.context(target, device_id)
         if target == 'cpu':
             target = 'llvm'
         self.target = target
