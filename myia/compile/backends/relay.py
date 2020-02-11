@@ -31,7 +31,7 @@ from .relay_helpers import (
 )
 
 
-EXEC_KIND = 'vm'
+EXEC_KIND = 'debug'
 
 
 @wrap_result.register
