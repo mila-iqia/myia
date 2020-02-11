@@ -35,7 +35,7 @@ EXEC_KIND = 'debug'
 
 
 @wrap_result.register
-def wrap_result(data: tvm.container.ADT):
+def wrap_result(data: tvm.runtime.container.ADT):
     """Wrap tuples from relay."""
     if data.tag == 0:
         return tuple(handle(d) for d in data)
