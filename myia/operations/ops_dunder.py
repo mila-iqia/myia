@@ -121,6 +121,7 @@ pos = dunder_protocol_unary('pos')
 neg = dunder_protocol_unary('neg')
 floor = dunder_protocol_unary('floor')
 trunc = dunder_protocol_unary('trunc')
+invert = dunder_protocol_unary('invert')
 
 bool = dunder_protocol_unary('bool')
 eq = dunder_protocol_binary(

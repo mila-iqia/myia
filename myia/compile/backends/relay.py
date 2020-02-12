@@ -29,11 +29,19 @@ from .relay_helpers import (
     to_relay_type,
 )
 
-relay_from_scalar = tvm.get_global_func('relay.from_scalar')
+try:
+    # These symbols seems to not exist in TVM recent git master branch.
+    relay_from_scalar = tvm.get_global_func('relay.from_scalar')
+    TupleValue = interpreter.Tuple
+except ValueError:
+    TupleValue = relay.expr.Tuple
+
+    def relay_from_scalar(value, dtype):
+        return relay.const(value, dtype).data
 
 
 @wrap_result.register
-def wrap_result(data: interpreter.TupleValue):
+def wrap_result(data: TupleValue):
     """Wrap tuples from relay."""
     return tuple(handle(d) for d in data)
 
@@ -69,6 +77,10 @@ SIMPLE_MAP = {
     P.scalar_le: relay.op.less_equal,
     P.scalar_ge: relay.op.greater_equal,
     P.bool_and: relay.op.logical_and,
+    P.scalar_bit_and: relay.op.bitwise_and,
+    P.scalar_bit_or: relay.op.bitwise_or,
+    P.scalar_bit_xor: relay.op.bitwise_xor,
+    P.scalar_bit_not: relay.op.bitwise_not,
     P.scalar_bit_lshift: relay.op.left_shift,
     P.scalar_bit_rshift: relay.op.right_shift,
     P.bool_or: relay.op.logical_or,

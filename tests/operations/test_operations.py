@@ -25,7 +25,7 @@ def Shp(*values):
     infer(u32, u32, result=u32),
     infer(i32, i32, result=i32),
     infer(i64, i64, result=i64),
-    run_no_relay(5, 7, result=5)
+    run(5, 7, result=5)
 )
 def test_bitwise_and(a, b):
     return a & b
@@ -35,7 +35,7 @@ def test_bitwise_and(a, b):
     infer(u32, u32, result=u32),
     infer(i32, i32, result=i32),
     infer(i64, i64, result=i64),
-    run_no_relay(5, 2, result=7)
+    run(5, 2, result=7)
 )
 def test_bitwise_or(a, b):
     return a | b
@@ -45,7 +45,7 @@ def test_bitwise_or(a, b):
     infer(u32, u32, result=u32),
     infer(i32, i32, result=i32),
     infer(i64, i64, result=i64),
-    run_no_relay(10, 8, result=2)
+    run(10, 8, result=2)
 )
 def test_bitwise_xor(a, b):
     return a ^ b
@@ -69,6 +69,18 @@ def test_bitwise_lshift(a, b):
 )
 def test_bitwise_rshift(a, b):
     return a >> b
+
+
+@mt(
+    infer(u32, result=u32),
+    infer(i32, result=i32),
+    infer(i64, result=i64),
+    run(0, result=~0),
+    run(-37, result=~(-37)),
+    run(np.uint16(0b0000110101001101), result=np.uint16(0b1111001010110010)),
+)
+def test_bitwise_not(a):
+    return ~a
 
 
 @mt(
