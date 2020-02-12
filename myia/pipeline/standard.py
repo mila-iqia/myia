@@ -163,6 +163,7 @@ standard_method_map = {
             operations.scalar_bit_lshift, xtype.Integral, '__lshift__'),
         '__rshift__': lop(
             operations.scalar_bit_rshift, xtype.Integral, '__rshift__'),
+        '__invert__': operations.scalar_bit_not,
         '__floordiv__': lop(operations.int_floordiv, xtype.Integral,
                             '__floordiv__'),
         '__truediv__': lop(operations.int_truediv, xtype.Integral,

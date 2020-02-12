@@ -38,6 +38,7 @@ from myia.operations import (
     scalar_abs,
     scalar_bit_and,
     scalar_bit_lshift,
+    scalar_bit_not,
     scalar_bit_or,
     scalar_bit_rshift,
     scalar_bit_xor,
@@ -462,6 +463,14 @@ def test_prim_scalar_bit_xor():
     ref = 10 ^ 8
     res = scalar_bit_xor(10, 8)
     assert ref == res == 2
+
+
+def test_prim_scalar_bit_not():
+    a = np.uint16(0b0000110101001101)
+    ref = np.uint16(0b1111001010110010)
+    assert ref == ~a
+    res = scalar_bit_not(a)
+    assert res == ref
 
 
 @run_lang(40)

@@ -402,6 +402,7 @@ def _vprop_cast_operation(vprop, need, inputs, out):
     P.scalar_bit_or,
     P.scalar_bit_rshift,
     P.scalar_bit_xor,
+    P.scalar_bit_not,
     P.scalar_cast,
     P.scalar_cos,
     P.scalar_div,
