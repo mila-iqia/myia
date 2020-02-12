@@ -1,6 +1,5 @@
 """Transforms a graph into lower-level code."""
 
-import os
 from itertools import accumulate
 
 import numpy as np
@@ -29,7 +28,6 @@ from .relay_helpers import (
     handle_wrapper,
     to_relay_type,
 )
-
 
 EXEC_KIND = 'debug'
 

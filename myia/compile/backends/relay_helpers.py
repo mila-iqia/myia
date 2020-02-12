@@ -5,7 +5,7 @@ Most of those should go away as Relay main development progresses.
 
 import numpy as np
 from tvm import relay
-from tvm.relay import adt, transform
+from tvm.relay import adt
 
 from ...abstract import (
     AbstractArray,
