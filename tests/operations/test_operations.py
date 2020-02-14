@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 from myia.utils.errors import MyiaTypeError
@@ -69,6 +70,26 @@ def test_bitwise_lshift(a, b):
 )
 def test_bitwise_rshift(a, b):
     return a >> b
+
+
+@mt(
+    infer(i32, result=i32),
+    infer(f64, result=f64),
+    run(0, result=0),
+    run(math.pi / 2, result=1),
+)
+def test_sin(a):
+    return math.sin(a)
+
+
+@mt(
+    infer(i32, result=i32),
+    infer(f64, result=f64),
+    run(0, result=1),
+    run(math.pi / 2, result=0),
+)
+def test_cos(a):
+    return math.cos(a)
 
 
 @mt(

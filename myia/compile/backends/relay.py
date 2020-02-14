@@ -59,6 +59,8 @@ SIMPLE_MAP = {
     P.scalar_log: relay.log,
     P.scalar_max: relay.maximum,
     P.scalar_tanh: relay.op.tanh,
+    P.scalar_sin: relay.op.sin,
+    P.scalar_cos: relay.op.cos,
     P.scalar_sign: relay.sign,
     P.scalar_abs: relay.abs,
 

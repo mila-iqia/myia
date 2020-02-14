@@ -61,6 +61,8 @@ simple_mapping = {
     P.scalar_log: np.log,
     P.scalar_tan: np.tan,
     P.scalar_tanh: np.tanh,
+    P.scalar_sin: np.sin,
+    P.scalar_cos: np.cos,
 
     P.scalar_eq: lambda a, b: a == b,
     P.scalar_lt: lambda a, b: a < b,
@@ -108,6 +110,8 @@ scalar_mapping = {
     P.scalar_log: torch.log,
     P.scalar_tan: torch.tan,
     P.scalar_tanh: torch.tanh,
+    P.scalar_sin: torch.sin,
+    P.scalar_cos: torch.cos,
 
     P.scalar_eq: torch.eq,
     P.scalar_lt: torch.lt,
