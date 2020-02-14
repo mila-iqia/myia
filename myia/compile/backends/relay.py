@@ -29,19 +29,11 @@ from .relay_helpers import (
     to_relay_type,
 )
 
-try:
-    # These symbols seems to not exist in TVM recent git master branch.
-    relay_from_scalar = tvm.get_global_func('relay.from_scalar')
-    TupleValue = interpreter.Tuple
-except ValueError:
-    TupleValue = relay.expr.Tuple
-
-    def relay_from_scalar(value, dtype):
-        return relay.const(value, dtype).data
+relay_from_scalar = tvm.get_global_func('relay.from_scalar')
 
 
 @wrap_result.register
-def wrap_result(data: TupleValue):
+def wrap_result(data: interpreter.TupleValue):
     """Wrap tuples from relay."""
     return tuple(handle(d) for d in data)
 
