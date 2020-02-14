@@ -617,7 +617,7 @@ class CompileGraph:
 
         graph, handles_params = return_handles(graph)
 
-        self.module = relay.Module({})
+        self.module = tvm.IRModule({})
         self.types = TypeHelper()
         self.types.initialize(self.module, mng)
         self.make_const = RelayConstantConverter(context)
@@ -775,7 +775,7 @@ class RelayInputConverter(Converter):
         return interpreter.RefValue(v)
 
     def convert_tagged(self, v, t):
-        mod = relay.Module({})
+        mod = tvm.IRModule({})
         self.th.initialize(mod, None)
         cst = self.cst_conv.convert_tagged(v, t)
         mod["main"] = relay.Function([], cst)

@@ -6,6 +6,7 @@ Most of those should go away as Relay main development progresses.
 import numpy as np
 from tvm import relay
 from tvm.relay import adt
+from tvm.runtime.object import Object
 
 from ...abstract import (
     AbstractArray,
@@ -297,7 +298,7 @@ def _placeholder_body(type):
             params,
             _placeholder_body(type.ret_type),
             ret_type=type.ret_type)
-    elif isinstance(type, relay.TypeCall):
+    elif isinstance(type, Object):
         if type.func == union_type:
             return empty_union()
         elif type.func == env_type:
