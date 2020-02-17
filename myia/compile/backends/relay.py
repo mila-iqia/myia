@@ -38,7 +38,8 @@ def wrap_result(data: tvm.runtime.container.ADT):
     if data.tag == 0:
         return tuple(handle(d) for d in data)
     else:
-        return handle(data)
+        raise ValueError(  # pragma: no cover
+            "Returning non-tuple from top-level function.")
 
 
 def ashape(node):
