@@ -5,7 +5,7 @@ Most of those should go away as Relay main development progresses.
 
 import numpy as np
 from tvm import relay
-from tvm.relay import adt, transform
+from tvm.relay import adt
 
 from ...abstract import (
     AbstractArray,
@@ -25,7 +25,7 @@ from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 empty_union = adt.Constructor("empty", [], union_type)
-tag_map = {}
+tag_map = {None: empty_union}
 rev_tag_map = {}
 
 
@@ -36,13 +36,26 @@ def get_union_ctr(tag, t):
         rt = to_relay_type(t)
         ctr = adt.Constructor(f"c{tag}", [rt], union_type)
         tag_map[tag] = ctr
-        rev_tag_map[ctr] = tag
     return tag_map[tag]
 
 
-def get_myia_tag(ctr):
-    """Return the myia tag for a constructor."""
-    return rev_tag_map[ctr]
+def fill_reverse_tag_map():
+    """Fill the back-conversion map.
+
+    Do this after a compilation step involving the constructors you
+    need since the tags are not set otherwise.
+    """
+    for tag, ctr in tag_map.items():
+        if ctr.tag != -1:
+            rev_tag_map[ctr.tag] = tag
+
+
+def get_myia_tag(rtag):
+    """Return the myia tag for a constructor.
+
+    This will fail if you haven't properly called fill_reverse_tag_map().
+    """
+    return rev_tag_map[rtag]
 
 
 env_val = relay.GlobalTypeVar('$_env_val')
@@ -297,37 +310,13 @@ def add_functions(mod, funcs):
         mod[gv] = funcs[gv]
 
 
-pass_set = transform.Sequential(
-    passes=[
-        transform.SimplifyInference(),
-        transform.CanonicalizeOps(),
-        transform.CanonicalizeCast(),
-        transform.FuseOps(3),
-        # transform.CombineParallelConv2d(),
-        transform.AlterOpLayout(),
-        # transform.RewriteAnnotatedOps(???),
-    ],
-    opt_level=0
-)
-
-
-def optimize(mod):
-    """Optimize all the functions in a module.
-
-    Modules are the only mutable piece of Relay.  We write an
-    optimization pass over the module which destructively updates each
-    function while optimizing.
-    """
-    return pass_set(mod)
-
-
 __all__ = [
     'TypeHelper',
     'add_functions',
     'dead_value',
     'empty_env',
+    'fill_reverse_tag_map',
     'get_myia_tag',
     'get_union_ctr',
-    'optimize',
     'to_relay_type',
 ]

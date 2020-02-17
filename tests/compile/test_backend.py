@@ -108,6 +108,11 @@ def test_bool_and_nil_args(x):
     return x
 
 
+@run(3)
+def test_return_tuple(x):
+    return (1, 2, x)
+
+
 @pytest.mark.xfail  # MyiaTypeError: AbstractTuple vs AbstractTaggedUnion
 @run(())
 def test_return_list():

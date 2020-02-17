@@ -22,20 +22,24 @@ from .relay_helpers import (
     add_functions,
     dead_value,
     empty_env,
+    fill_reverse_tag_map,
     get_myia_tag,
     get_union_ctr,
     handle_wrapper,
-    optimize,
     to_relay_type,
 )
 
-relay_from_scalar = tvm.get_global_func('relay.from_scalar')
+EXEC_KIND = 'debug'
 
 
 @wrap_result.register
-def wrap_result(data: interpreter.TupleValue):
+def wrap_result(data: tvm.runtime.container.ADT):
     """Wrap tuples from relay."""
-    return tuple(handle(d) for d in data)
+    if data.tag == 0:
+        return tuple(handle(d) for d in data)
+    else:
+        raise ValueError(  # pragma: no cover
+            "Returning non-tuple from top-level function.")
 
 
 def ashape(node):
@@ -509,7 +513,7 @@ class RelayConstantConverter(Converter):
 
     def convert_array(self, v, t):  # pragma: no cover
         """Make a TVM array from a numpy array."""
-        return relay.const(tvm.ndarray.array(v, self.context))
+        return relay.const(tvm.runtime.ndarray.array(v, self.context))
 
     def convert_scalar(self, v, t):
         """Convert the scalar to a TVM array."""
@@ -535,7 +539,7 @@ class RelayConstantConverter(Converter):
         return relay.Tuple([self(e, et) for e, et in
                             zip(v, t.elements)])
 
-    def convert_tagged(self, v, t):  # pragma: no cover
+    def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
         ctr = get_union_ctr(v.tag, real_t)
         conv_val = self(v.value, real_t)
@@ -585,19 +589,17 @@ class CompileGraph:
                         name = "!main"
                     self.graph_map[g] = relay.GlobalVar(name)
 
-        for g in mng.graphs:
-            if g.parent is None:
-                function_map[self.graph_map[g]] = \
-                    self.convert_func(g)
+        for g in self.graph_map.keys():
+            function_map[self.graph_map[g]] = self.convert_func(g)
 
         self.types.finalize(self.module)
         add_functions(self.module, function_map)
 
-        self.module = optimize(self.module)
+        vm = relay.create_executor(mod=self.module, ctx=context,
+                                   target=target, kind=EXEC_KIND)
+        res = vm.evaluate()
 
-        exec = relay.create_executor(mod=self.module, ctx=context,
-                                     target=target)
-        res = exec.evaluate(self.module["main"])
+        fill_reverse_tag_map()
 
         res = handle_wrapper(res, handles_params)
 
@@ -687,48 +689,44 @@ class RelayInputConverter(Converter):
     def __init__(self, context):
         """Set the context."""
         self.context = context
+        self.th = TypeHelper()
         self.cst_conv = RelayConstantConverter(self.context)
-        mod = relay.Module({})
-        th = TypeHelper()
-        th.initialize(mod, None)
-        th.finalize(mod)
-        target = context.MASK2STR[context.device_type]
-        if target == 'cpu':
-            target = 'llvm'
-        elif target == 'gpu':
-            target = 'cuda'
-        self.intrp = relay.create_executor(mod=mod, ctx=context, target=target)
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
-        return interpreter.TensorValue(tvm.ndarray.array(v, self.context))
+        return tvm.runtime.ndarray.array(v, self.context)
 
     def convert_scalar(self, v, t):
         """Convert the scalar to a TVM array."""
-        return relay_from_scalar(v, type_to_np_dtype(t))
+        return tvm.runtime.ndarray.array(getattr(np, type_to_np_dtype(t))(v),
+                                         self.context)
 
     def convert_bool(self, v, t):
         """Convert the scalar to a TVM array."""
-        return relay_from_scalar(v, type_to_np_dtype(t))
+        return tvm.runtime.ndarray.array(np.bool_(v), self.context)
 
     def convert_nil(self, v, t):
         """Convert Nil to Relay."""
-        return interpreter.TupleValue()
+        return ()
 
     def convert_tuple(self, v, t):
-        return interpreter.TupleValue(*[self(e, et) for e, et in
-                                        zip(v, t.elements)])
+        return tuple(self(e, et) for e, et in zip(v, t.elements))
 
     def convert_universe(self, v, t):
-        return interpreter.TupleValue()
+        return ()
 
     def convert_handle(self, v, t):
         v = self(v.state, t.element)
         return interpreter.RefValue(v)
 
     def convert_tagged(self, v, t):
+        mod = relay.Module({})
+        self.th.initialize(mod, None)
         cst = self.cst_conv.convert_tagged(v, t)
-        return self.intrp.evaluate(cst)
+        mod["main"] = relay.Function([], cst)
+        self.th.finalize(mod)
+        vm = relay.create_executor(ctx=self.context, mod=mod, kind=EXEC_KIND)
+        return vm.evaluate()()
 
     def convert_type(self, v, t):
         # abstract type will be replaced with an integer type as placeholder
@@ -766,8 +764,11 @@ class RelayOutputConverter(Converter):
         return HandleInstance(self(v.value, t.element))
 
     def convert_tagged(self, v, t):
-        tag = get_myia_tag(v.constructor)
-        conv_val = self(v.fields[0], t.options.get(tag))
+        tag = get_myia_tag(v.tag)
+        try:
+            conv_val = self(v[0], t.options.get(tag))
+        except TypeError:
+            conv_val = self(v.fields[0], t.options.get(tag))
         return TaggedValue(tag, conv_val)
 
 
@@ -784,7 +785,7 @@ class RelayBackend(Backend):
     def __init__(self, target, device_id):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
-        self.context = tvm.ndarray.context(target, device_id)
+        self.context = tvm.runtime.ndarray.context(target, device_id)
         if target == 'cpu':
             target = 'llvm'
         self.target = target
