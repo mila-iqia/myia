@@ -328,6 +328,11 @@ dtype = Operation(
     defaults='myia.operations.macro_dtype'
 )
 
+einsum = Operation(
+    name='einsum',
+    defaults='myia.operations.macro_einsum'
+)
+
 embed = Operation(
     name='embed',
     defaults='myia.operations.macro_embed'
