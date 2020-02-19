@@ -478,6 +478,11 @@ int_truediv = Operation(
     defaults='myia.operations.ops_scalar.int_truediv'
 )
 
+invert = Operation(
+    name='invert',
+    defaults='myia.operations.ops_dunder.invert'
+)
+
 invert_permutation = Operation(
     name='invert_permutation',
     defaults='myia.operations.prim_invert_permutation'
@@ -711,6 +716,11 @@ scalar_bit_and = Operation(
 scalar_bit_lshift = Operation(
     name='scalar_bit_lshift',
     defaults='myia.operations.prim_scalar_bit_lshift'
+)
+
+scalar_bit_not = Operation(
+    name='scalar_bit_not',
+    defaults='myia.operations.prim_scalar_bit_not'
 )
 
 scalar_bit_or = Operation(

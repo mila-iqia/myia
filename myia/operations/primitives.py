@@ -274,6 +274,11 @@ scalar_bit_lshift = BackendPrimitive(
     defaults='myia.operations.prim_scalar_bit_lshift'
 )
 
+scalar_bit_not = BackendPrimitive(
+    name='scalar_bit_not',
+    defaults='myia.operations.prim_scalar_bit_not'
+)
+
 scalar_bit_or = BackendPrimitive(
     name='scalar_bit_or',
     defaults='myia.operations.prim_scalar_bit_or'

@@ -1,9 +1,12 @@
+import math
+
 import numpy as np
 
 from myia.utils.errors import MyiaTypeError
 from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
 
 from ..common import (
+    MA,
     Ty,
     af16_of,
     af32_of,
@@ -13,7 +16,7 @@ from ..common import (
     ai64_of,
     au64_of,
 )
-from ..multitest import infer, mt, run, run_no_relay
+from ..multitest import infer, mt, run
 
 
 def Shp(*values):
@@ -25,7 +28,7 @@ def Shp(*values):
     infer(u32, u32, result=u32),
     infer(i32, i32, result=i32),
     infer(i64, i64, result=i64),
-    run_no_relay(5, 7, result=5)
+    run(5, 7, result=5)
 )
 def test_bitwise_and(a, b):
     return a & b
@@ -35,7 +38,7 @@ def test_bitwise_and(a, b):
     infer(u32, u32, result=u32),
     infer(i32, i32, result=i32),
     infer(i64, i64, result=i64),
-    run_no_relay(5, 2, result=7)
+    run(5, 2, result=7)
 )
 def test_bitwise_or(a, b):
     return a | b
@@ -45,7 +48,7 @@ def test_bitwise_or(a, b):
     infer(u32, u32, result=u32),
     infer(i32, i32, result=i32),
     infer(i64, i64, result=i64),
-    run_no_relay(10, 8, result=2)
+    run(10, 8, result=2)
 )
 def test_bitwise_xor(a, b):
     return a ^ b
@@ -69,6 +72,81 @@ def test_bitwise_lshift(a, b):
 )
 def test_bitwise_rshift(a, b):
     return a >> b
+
+
+@mt(
+    infer(u32, result=u32),
+    infer(i32, result=i32),
+    infer(i64, result=i64),
+    run(0, result=~0),
+    run(-37, result=~(-37)),
+    run(np.uint16(0b0000110101001101), result=np.uint16(0b1111001010110010)),
+)
+def test_bitwise_not(a):
+    return ~a
+
+
+@mt(
+    # seems to not accept integers
+    run(0., result=0),
+    run(np.float16(0), result=0),
+    run(np.float32(0), result=0),
+    run(np.float64(0), result=0),
+    run(math.pi / 2, result=1),
+    run(2 * math.pi / 3, result=math.sin(2 * math.pi / 3)),
+)
+def test_sin(a):
+    return math.sin(a)
+
+
+@mt(
+    # seems to not accept integers
+    run(0., result=1),
+    run(np.float16(0), result=1),
+    run(np.float32(0), result=1),
+    run(np.float64(0), result=1),
+    run(math.pi / 2, result=0),
+    run(2 * math.pi / 3, result=math.cos(2 * math.pi / 3))
+)
+def test_cos(a):
+    return math.cos(a)
+
+
+@mt(
+    run(-2.7, result=-2),
+    run(7.8, result=7),
+    run(np.float16(7.8), result=7),
+    run(np.float32(7.8), result=7),
+    run(np.float64(7.8), result=7),
+)
+def test_trunc(a):
+    return math.trunc(a)
+
+
+@mt(
+    # sin seems not supported for pytorch/CPU/float16
+    run(MA(3, 3, dtype='float32'), result=np.sin(MA(3, 3, dtype='float32'))),
+    run(MA(3, 3, dtype='float64'), result=np.sin(MA(3, 3, dtype='float64'))),
+)
+def test_elemwise_sin(a):
+    return np.sin(a)
+
+
+@mt(
+    # cos seems not supported for pytorch/CPU/float16
+    run(MA(3, 3, dtype='float32'), result=np.cos(MA(3, 3, dtype='float32'))),
+    run(MA(3, 3, dtype='float64'), result=np.cos(MA(3, 3, dtype='float64'))),
+)
+def test_elemwise_cos(a):
+    return np.cos(a)
+
+
+@mt(
+    run(MA(3, 3, dtype='float32'), result=np.trunc(MA(3, 3, dtype='float32'))),
+    run(MA(3, 3, dtype='float64'), result=np.trunc(MA(3, 3, dtype='float64'))),
+)
+def test_elemwise_trunc(a):
+    return np.trunc(a)
 
 
 @mt(
