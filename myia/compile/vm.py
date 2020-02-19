@@ -90,7 +90,7 @@ class FinalVM:
         return wrap_result(self.eval(args))
 
     def eval(self, args):
-        """Evalute the code for this vm with the passed-in arguments."""
+        """Evaluate the code for this vm with the passed-in arguments."""
         # reset the runtime to initial values
         self.stack = [None] * len(args)  # The value stack
         self.retp = [-1]  # The call stack
@@ -358,6 +358,11 @@ class FinalVM:
 
         """
         outs = fn(*(self._ref(a) for a in args))
+        # outs may be a simple tensor (not a tuple),
+        # so following "for o in outs" might try to
+        # iterate over tensor first dimension.
+        if not isinstance(outs, tuple):
+            outs = (outs,)
         for o in outs:
             self._push(o)
 

@@ -11,7 +11,7 @@ from ..lib import (
     u64pair_typecheck,
 )
 from ..operations import (
-    conv2d_input_grad,
+    conv2d_grad_input,
     conv2d_weight_grad,
     shape,
     zeros_like,
@@ -64,7 +64,7 @@ async def infer_conv2d(self, engine,
 @bprop_to_grad_transform(P.conv2d)
 def bprop_conv2d(input, weight, stride, padding, dilation, groups, out, dout):
     """Backpropagator for `conv2d`."""
-    gI = conv2d_input_grad(shape(input), weight, dout, stride, padding,
+    gI = conv2d_grad_input(shape(input), weight, dout, stride, padding,
                            dilation, groups)
     gW = conv2d_weight_grad(input, shape(weight), dout, stride, padding,
                             dilation, groups)

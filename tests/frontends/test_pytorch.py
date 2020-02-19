@@ -574,25 +574,6 @@ def test_nn_max_pool2d_update():
 
 # TODO: Should this eventually be in a different test file?
 #       It's currently here because it needs to have 'torch' imported.
-def test_conv_grad_errors():
-    from myia.compile.backends.pytorch_conv_grad import conv2d_input
-
-    torch.manual_seed(123)
-    input_size = (2, 6, 4, 5)
-    weight = torch.randn(3, 2, 3, 3)
-    grad_output = torch.ones(2, 3, 2, 1)
-    with pytest.raises(ValueError):
-        conv2d_input(None, weight, grad_output, (2, 3), (3, 2), (3, 4), 3)
-    with pytest.raises(ValueError):
-        conv2d_input((2, 2, 6, 4, 5), weight, grad_output,
-                     (2, 3), (3, 2), (3, 4), 3)
-    with pytest.raises(ValueError):
-        conv2d_input(input_size, weight, torch.ones(9, 9, 9, 9),
-                     (2, 3), (3, 2), (3, 4), 3)
-
-
-# TODO: Should this eventually be in a different test file?
-#       It's currently here because it needs to have 'torch' imported.
 def test_shp_explicit_errors():
     backend = 'pytorch'
     backend_options = get_backend_options(args, backend)

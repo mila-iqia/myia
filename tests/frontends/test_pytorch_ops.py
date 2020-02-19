@@ -29,6 +29,7 @@ from ..multitest import (
     mt,
     myia_function_test,
     run,
+    run_no_relay,
 )
 from ..test_grad import grad_wrap
 
@@ -309,6 +310,29 @@ def test_torch_conv2d__non_tuple_args(inp, w, b):
 def test_torch_conv2d__group3(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 1)
     return torch.sum(value)
+
+
+@mt(
+    run_no_relay(torch.randn(1, 2, 4, 4),
+                 torch.randn(2, 3, 2, 2),
+                 torch.randn(6), (1, 1),
+                 (1, 1), (0, 0), 2, (1, 1)),
+    run_no_relay(torch.randn(1, 2, 5, 4),
+                 torch.randn(2, 4, 1, 3),
+                 None,
+                 (2, 3), (4, 5), (3, 2), 2, (5, 4)),
+    run_no_relay(torch.randn(5, 2, 5, 6),
+                 torch.randn(2, 2, 4, 4),
+                 None,
+                 (1, 1), (0, 0), (0, 0), 1, (1, 1)),
+    run_no_relay(torch.randn(1, 1, 4, 4),
+                 torch.randn(1, 3, 2, 2),
+                 None,
+                 (1, 1), (1, 1), (0, 0), 1, (1, 1)),
+    broad_specs=(True, True, False, False, False, False, False, False)
+)
+def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
+    return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)
 
 
 @mt(

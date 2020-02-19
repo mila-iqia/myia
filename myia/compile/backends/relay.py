@@ -323,36 +323,35 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
     return d
 
 
-def relay_conv2d_input_grad(c, isize, w, dout, stride, pad, dil, groups):
-    assert isize.is_constant(tuple)
+def relay_conv_transpose2d(c, input, weight, bias, stride, padding,
+                           output_padding, groups, dilation):
+
+    if not bias.is_constant(type(None)):
+        raise NotImplementedError('conv_transpose2d: bias not yet supported '
+                                  'in relay backend.')
+
     assert stride.is_constant(tuple)
-    assert pad.is_constant(tuple)
-    assert dil.is_constant(tuple)
+    assert padding.is_constant(tuple)
+    assert output_padding.is_constant(tuple)
+    assert dilation.is_constant(tuple)
     assert groups.is_constant(int)
+
     if stride.value != (1, 1):
-        raise ValueError("non unit stride is not supported for input grad "
+        raise ValueError("non unit stride is not supported "
+                         "for relay conv_transpose2d "
                          "for now, it gives bad values")
-
-    weight = c.ref(w)
-    grad = c.ref(dout)
-
-    data_shape = isize.value
-    weight_shape = w.abstract.xshape()
-    _, _, grad_h, grad_w = dout.abstract.xshape()
-    bactch, in_channels, in_h, in_w = data_shape
-    out_channels, _, filter_h, filter_w = weight_shape
-
-    out_h = ((grad_h - 1) * stride.value[0] - pad.value[0] * 2 +
-             (filter_h - 1) * dil.value[0] + 1)
-    out_w = ((grad_w - 1) * stride.value[1] - pad.value[1] * 2 +
-             (filter_w - 1) * dil.value[1] + 1)
-    output_padding = (isize.value[2] - out_h, isize.value[3] - out_w)
-
-    return relay.nn.conv2d_transpose(grad, weight,
+    data_shape = input.abstract.xshape()
+    weight_shape = weight.abstract.xshape()
+    _, in_channels, _, _ = data_shape
+    _, w_c, filter_h, filter_w = weight_shape
+    _i = c.ref(input)
+    _w = c.ref(weight)
+    return relay.nn.conv2d_transpose(_i, _w,
                                      strides=stride.value,
-                                     padding=pad.value, dilation=dil.value,
+                                     padding=padding.value,
+                                     dilation=dilation.value,
                                      groups=groups.value,
-                                     output_padding=output_padding,
+                                     output_padding=output_padding.value,
                                      kernel_size=(filter_h, filter_w),
                                      channels=in_channels)
 
@@ -430,7 +429,7 @@ COMPLEX_MAP = {
     P.array_max: relay_array_max,
     P.conv2d: relay_conv2d,
     P.conv2d_weight_grad: relay_conv2d_weight_grad,
-    P.conv2d_input_grad: relay_conv2d_input_grad,
+    P.conv_transpose2d: relay_conv_transpose2d,
     P.concat: relay_concat,
     P.split: relay_split,
     P.handle: relay_handle,

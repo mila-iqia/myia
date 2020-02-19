@@ -283,14 +283,19 @@ conv2d = Operation(
     defaults='myia.operations.prim_conv2d'
 )
 
-conv2d_input_grad = Operation(
-    name='conv2d_input_grad',
-    defaults='myia.operations.prim_conv2d_input_grad'
+conv2d_grad_input = Operation(
+    name='conv2d_grad_input',
+    defaults='myia.operations.macro_conv2d_grad_input'
 )
 
 conv2d_weight_grad = Operation(
     name='conv2d_weight_grad',
     defaults='myia.operations.prim_conv2d_weight_grad'
+)
+
+conv_transpose2d = Operation(
+    name='conv_transpose2d',
+    defaults='myia.operations.prim_conv_transpose2d'
 )
 
 dict_getitem = Operation(

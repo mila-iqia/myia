@@ -298,6 +298,14 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
 
 
 @core
+def conv_transpose2d(input, weight, bias, stride=1, padding=0,
+                     output_padding=0, groups=1, dilation=1):
+    """Map of Pytorch method torch.nn.functional.conv_transpose2d."""
+    return P.conv_transpose2d(input, weight, bias, stride, padding,
+                              output_padding, groups, dilation)
+
+
+@core
 def cross_entropy(input, target, reduction='mean'):
     """Map of method torch.nn.functional.cross_entropy."""
     a = torch.nn.functional.log_softmax(input, 1)

@@ -36,6 +36,7 @@ from .pytorch_functions import (
     cat,
     chunk,
     conv2d,
+    conv_transpose2d,
     cross_entropy,
     embedding,
     gather,
@@ -103,6 +104,7 @@ standard_object_map.update({
     torch.var: var,
     # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
     torch.nn.functional.conv2d: conv2d,
+    torch.nn.functional.conv_transpose2d: conv_transpose2d,
     torch.nn.functional.cross_entropy: cross_entropy,
     torch.nn.functional.embedding: embedding,
     torch.nn.functional.linear: linear,
