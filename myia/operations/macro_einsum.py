@@ -50,7 +50,7 @@ def _simple_einsum(g, spec, *args):
     out_idx = set(output_spec)
 
     if len(input_spec) == len(set(input_spec)):
-        # Pure reduce
+        # Pure reduce/transpose
         assert len(args) == 1
         arg = args[0]
         reduce_axes = [i for i, c in enumerate(input_spec) if c not in out_idx]
@@ -58,13 +58,18 @@ def _simple_einsum(g, spec, *args):
 
         target_shape = [s if i not in reduce_axes else 1
                         for i, s in enumerate(shp)]
-
         res = g.apply(P.array_reduce, P.scalar_add, arg[0],
                       tuple(target_shape))
+
         for i in reversed(reduce_axes):
             del target_shape[i]
-        final_shape = tuple(target_shape)
-        res = g.apply(P.reshape, res, final_shape)
+        res = g.apply(P.reshape, res, tuple(target_shape))
+
+        mid_spec = [c for c in input_spec if c in out_idx]
+        transpose_pattern = tuple(mid_spec.index(c) for c in output_spec)
+        res = g.apply(P.transpose, res, transpose_pattern)
+
+        final_shape = tuple(target_shape[i] for i in transpose_pattern)
         return (res, final_shape)
 
     else:

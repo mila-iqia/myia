@@ -11,6 +11,16 @@ def test_einsum_inner(a, b):
     return einsum('j,j', a, b)
 
 
+@run_debug(MA(3, 3)[0], MA(3, 3)[1])
+def test_einsum_outer(a, b):
+    return einsum('i,k->ik', a, b)
+
+
+@run_debug(MA(2, 4))
+def test_einsum_transpose(a):
+    return einsum('ij->ji', a)
+
+
 @mt(
     run_debug(MA(2, 3), MB(3, 4)),
     infer(MA(2, 3), MB(4, 3), result=InferenceError),
