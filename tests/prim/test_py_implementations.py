@@ -33,6 +33,8 @@ from myia.operations import (
     full,
     identity,
     partial as myia_partial,
+    random_initialize,
+    random_uint32,
     reshape,
     return_,
     scalar_abs,
@@ -638,3 +640,19 @@ def test_call_operation():
     bad_op = Operation('bad_op')
     with pytest.raises(RuntimeError):
         bad_op(123)
+
+
+def test_random():
+    rstate = random_initialize(1234)
+    r0, v0 = random_uint32(rstate, (2, 3))
+    r1, v1 = random_uint32(rstate, (2, 3))
+    assert isinstance(rstate, np.random.RandomState)
+    assert isinstance(r0, np.random.RandomState)
+    assert isinstance(r1, np.random.RandomState)
+    assert isinstance(v0, np.ndarray)
+    assert isinstance(v1, np.ndarray)
+    assert v0.dtype == 'uint32'
+    assert v1.dtype == 'uint32'
+    assert v0.shape == (2, 3)
+    assert v1.shape == (2, 3)
+    assert not np.allclose(v0, v1)

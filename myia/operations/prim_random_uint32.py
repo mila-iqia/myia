@@ -37,8 +37,6 @@ async def infer_random_uint32(self, engine,
     output_shape = tuple(
         self.require_constant(e, argnum=f'"3:size[{edx}]"')
         for edx, e in enumerate(shape.elements))
-    if not output_shape:
-        output_shape = (1,)
     value_type = AbstractArray(output_scalar_type,
                                {SHAPE: output_shape, TYPE: xtype.NDArray})
     return AbstractTuple((AbstractRandomState(), value_type))

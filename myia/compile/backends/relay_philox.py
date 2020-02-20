@@ -74,17 +74,6 @@ class Philox2x32:
         """
         return (output_size + (output_size % 2)) // 2
 
-    def generate_numpy_counter_array(self, counter):
-        """Generate numpy uint64 counter array for Philox2x32 RNG.
-
-        Generate a numpy vector of 64-bits integers
-        which encodes couples (counter, i) for i in range(n).
-
-        counter must be an integer.
-        """
-        return ((np.full((self.n,), counter, np.uint64) << 32)
-                | np.arange(self.n, dtype='uint64'))
-
     def generate_relay_counter_array(self, counter):
         """Generate relay symbolic uint64 counter array for Philox2x32 RNG.
 
@@ -146,15 +135,6 @@ class Philox2x32:
         tensor = relay.concatenate([vector_hi_32, vector_lo_32], 1)
         return relay.reshape(tensor, (2 * self.n))
 
-    def __uint32_to_float32(self, tensor):
-        """Convert uint32 to float32 in interval [0, 1).
-
-        Apply (i >> 8) * R123_0x1p_24f to each uint32 i.
-        """
-        a = relay.right_shift(tensor, RELAY_UINT32_8)
-        b = relay.cast(a, 'float32')
-        return relay.multiply(b, RELAY_R123_0x1p_24f)
-
     def philox_2x_bump_key(self, key):
         """Bump key."""
         return relay.add(key, RELAY_PHILOX_W32_0)
@@ -170,68 +150,21 @@ class Philox2x32:
         assert 0 <= r <= 16
         if r > 0:
             ctr = self.philox_2x_round(ctr, key)
-        if r > 1:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 2:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 3:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 4:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 5:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 6:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 7:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 8:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 9:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 10:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 11:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 12:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 13:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 14:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
-        if r > 15:
-            key = self.philox_2x_bump_key(key)
-            ctr = self.philox_2x_round(ctr, key)
+            for _ in range(1, r):
+                key = self.philox_2x_bump_key(key)
+                ctr = self.philox_2x_round(ctr, key)
         return ctr
 
-    def philox_2x(self, ctr, key, to_float=False):
+    def philox_2x(self, ctr, key):
         """Generate random values, with 10 as default number of rounds.
 
         :param ctr: counter array: uint64 vector
         :param key: key: uint32 scalar
-        :param to_float: if False, return uint32 generated values as is.
-            If true, convert them to float32 and return float32 values.
-        :return: random values in uint32 or float32 vector with expected
-            output size.
+        :return: random values in uint32 vector with expected output size.
         """
         output_64 = self.impl_philox_2x_r(PHILOX2x32_DEFAULT_ROUNDS, ctr, key)
         output = self.__uint64_to_2xuint32_vector(output_64)
         if self.output_size % 2 == 1:
             output = relay.op.transform.strided_slice(
                 output, [0], [2 * self.n - 1])
-        if to_float:
-            return self.__uint32_to_float32(output)
         return output

@@ -10,7 +10,9 @@ def run_generator():
     rstate = random_initialize(12345678)
     r0, v0 = random_uint32(rstate, (2, 2))
     r1, v1 = random_uint32(r0, (2, 2))
-    return r1, v0, v1
+    r2, v2 = random_uint32(r1, (1,))
+    r3, v3 = random_uint32(r2, ())
+    return r3, v0, v1, v2, v3
 
 
 @myia(backend='pytorch')
@@ -24,9 +26,9 @@ def run_relay():
 
 
 def run_random_generator(fn, expected_values):
-    r, v0, v1 = fn()
+    r, v0, v1, v2, v3 = fn()
     two_exp_32 = np.uint64(np.iinfo(np.uint32).max) + np.uint64(1)
-    for v, expected in zip((v0, v1), expected_values):
+    for v, expected in zip((v0, v1, v2, v3), expected_values):
         assert v.dtype == 'uint32'
         assert np.all(0 <= v)
         assert np.all(v < two_exp_32)
@@ -41,7 +43,9 @@ def test_pytorch():
             dtype='uint32'),
         np.asarray(
             [[1514647480, 548814914], [3847607334, 2603396401]],
-            dtype='uint32')
+            dtype='uint32'),
+        np.asarray([1379542846], dtype='uint32'),
+        1617509384,
     )
     run_random_generator(run_pytorch, expected)
 
@@ -53,9 +57,11 @@ def test_relay():
             dtype='uint32'),
         np.asarray(
             [[3733719701, 3996474388], [316852167, 779101904]],
-            dtype='uint32')
+            dtype='uint32'),
+        np.asarray([3997522715], dtype='uint32'),
+        2591148269,
     )
     rstate = run_random_generator(run_relay, expected)
     key, counter = rstate
     assert key == 12345678
-    assert counter == 2
+    assert counter == 4

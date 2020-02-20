@@ -479,9 +479,6 @@ class AbstractRandomState(AbstractAtom):
         """Initialize an AbstractRandomState."""
         super().__init__({})
 
-    def __pretty__(self, ctx):
-        return 'AbstractRandomState()'
-
 
 class AbstractWrapper(AbstractStructure):
     """Base class for abstract values that wrap a single element type."""

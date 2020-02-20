@@ -442,10 +442,14 @@ def relay_random_uint32(c, ref_rstate, ref_shape):
     counter = relay.TupleGetItem(relay_state, 1)
     impl = relay_philox.Philox2x32(output_size)
     ctr = impl.generate_relay_counter_array(counter)
-    random = impl.philox_2x(ctr, key, to_float=False)
+    random = impl.philox_2x(ctr, key)
     # Reshape vector to expected shape.
     if shape:
+        # Reshape vector to output shape.
         random = relay.op.reshape(random, shape)
+    else:
+        # Convert 1-element vector to scalar
+        random = relay.op.take(random, relay.const(0), mode='fast')
     # Generate next state: same key, counter + 1
     next_rstate = relay.Tuple((
         key, relay.add(counter, relay.const(1, 'uint32'))))

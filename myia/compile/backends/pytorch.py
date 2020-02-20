@@ -56,8 +56,6 @@ def pytorch_random_initialize(seed):
 def pytorch_random_uint32(rstate, shape):
     """Implementation of random_uint32 for pytorch."""
     shape = tuple(dim.item() for dim in shape)
-    if not shape:
-        shape = (1,)
     rng = torch.Generator()
     rng.set_state(rstate)
     output = torch.zeros(shape, dtype=torch.int64)
@@ -551,8 +549,6 @@ class PyTorchBackend(Backend):
         elif isinstance(t, abstract.AbstractTaggedUnion):
             real_t = t.options.get(v.tag)
             return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
-        elif isinstance(t, abstract.AbstractRandomState):
-            return v.state
         else:
             raise NotImplementedError(f'to_backend_value for {t}')
 
