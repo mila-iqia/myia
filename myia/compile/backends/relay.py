@@ -12,11 +12,11 @@ from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import HandleInstance, TaggedValue
+from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
 from ...xtype import UniverseType, type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result
-from . import Backend, Converter, HandleBackend
+from . import Backend, Converter, HandleBackend, relay_philox
 from .relay_helpers import (
     TypeHelper,
     add_functions,
@@ -413,6 +413,50 @@ def relay_take_grad_inp(c, _nb_indices, _indices, _values):
     return relay.concatenate(outputs, 0)
 
 
+def relay_random_initialize(c, ref_seed):
+    """Create a random state for Philox2x32 RNG.
+
+    State is a couple (key, counter).
+    key is given seed, or a default value if seed is None.
+    counter starts with 0 and is incremented after each generation batch.
+    """
+    assert ref_seed.is_constant(type(None)) or ref_seed.is_constant(int)
+    seed = ref_seed.value
+    key = relay.const(seed, 'uint32')
+    counter = relay.const(0, 'uint32')
+    rstate = relay.Tuple((key, counter))
+    return rstate
+
+
+def relay_random_uint32(c, ref_rstate, ref_shape):
+    """Generate a random tensor using Philox2x32 RNG."""
+    assert ref_shape.is_constant(tuple)
+    shape = ref_shape.value
+    relay_state = c.ref(ref_rstate)
+    # Compute output size.
+    output_size = 1
+    for dim in shape:
+        output_size *= dim
+    # Generate random uint32 values.
+    key = relay.TupleGetItem(relay_state, 0)
+    counter = relay.TupleGetItem(relay_state, 1)
+    impl = relay_philox.Philox2x32(output_size)
+    ctr = impl.generate_relay_counter_array(counter)
+    random = impl.philox_2x(ctr, key)
+    # Reshape vector to expected shape.
+    if shape:
+        # Reshape vector to output shape.
+        random = relay.op.reshape(random, shape)
+    else:
+        # Convert 1-element vector to scalar
+        random = relay.op.take(random, relay.const(0), mode='fast')
+    # Generate next state: same key, counter + 1
+    next_rstate = relay.Tuple((
+        key, relay.add(counter, relay.const(1, 'uint32'))))
+    # Return next state and random tensor.
+    return relay.Tuple((next_rstate, random))
+
+
 COMPLEX_MAP = {
     P.distribute: relay_distribute,
     P.transpose: relay_transpose,
@@ -443,6 +487,8 @@ COMPLEX_MAP = {
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
     P.take_grad_inp: relay_take_grad_inp,
+    P.random_initialize: relay_random_initialize,
+    P.random_uint32: relay_random_uint32,
 }
 
 
@@ -776,6 +822,9 @@ class RelayOutputConverter(Converter):
         except TypeError:
             conv_val = self(v.fields[0], t.options.get(tag))
         return TaggedValue(tag, conv_val)
+
+    def convert_random_state(self, v, t):
+        return RandomStateWrapper(tuple(el.asnumpy().item() for el in v))
 
 
 class RelayBackend(Backend):

@@ -471,6 +471,15 @@ class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
 
 
+@serializable('AbstractRandomState')
+class AbstractRandomState(AbstractAtom):
+    """Abstract class to represent a backend random state object."""
+
+    def __init__(self):
+        """Initialize an AbstractRandomState."""
+        super().__init__({})
+
+
 class AbstractWrapper(AbstractStructure):
     """Base class for abstract values that wrap a single element type."""
 
@@ -999,6 +1008,7 @@ __all__ = [
     'AbstractHandle',
     'AbstractJTagged',
     'AbstractKeywordArgument',
+    'AbstractRandomState',
     'AbstractScalar',
     'AbstractStructure',
     'AbstractTaggedUnion',

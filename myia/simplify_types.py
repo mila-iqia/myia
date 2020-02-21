@@ -13,6 +13,7 @@ from .abstract import (
     AbstractDict,
     AbstractHandle,
     AbstractKeywordArgument,
+    AbstractRandomState,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
@@ -424,6 +425,11 @@ def from_canonical(self, res, orig_t: AbstractDict):
 @overload  # noqa: F811
 def from_canonical(self, res, orig_t: AbstractTuple):
     return tuple(self(x, o) for x, o in zip(res, orig_t.elements))
+
+
+@overload  # noqa: F811
+def from_canonical(self, res, orig_t: AbstractRandomState):
+    return res.state
 
 
 @overload  # noqa: F811

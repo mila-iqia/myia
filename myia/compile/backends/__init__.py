@@ -221,12 +221,18 @@ class Converter:
         """Convert a type value."""
         raise NotImplementedError("convert_type")
 
+    def convert_random_state(self, v, t):
+        """Convert a random state value."""
+        raise NotImplementedError("convert_type")
+
     def __call__(self, v, t):
         """Convert a value."""
         if v is abstract.DEAD:
             return self.convert_dead(v, t)
         elif isinstance(t, abstract.AbstractArray):
             return self.convert_array(v, t)
+        elif isinstance(t, abstract.AbstractRandomState):
+            return self.convert_random_state(v, t)
         elif isinstance(t, abstract.AbstractScalar):
             if issubclass(t.xtype(), xtype.Number):
                 return self.convert_scalar(v, t.xtype())

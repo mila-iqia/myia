@@ -6,7 +6,7 @@ import torch
 from ... import abstract, xtype
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import TaggedValue
+from ...utils import RandomStateWrapper, TaggedValue
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..cconv import closure_convert
 from ..transform import CompileGraphs, nonlinear_ops
@@ -44,6 +44,23 @@ def pytorch_take_grad_inp(nb_indices, indices, values):
                      .reshape((-1, row_size))
                      .sum(dim=(0,)))
     return output
+
+
+def pytorch_random_initialize(seed):
+    """Implementation of random_initialize for pytorch."""
+    rng = torch.Generator()
+    rng.manual_seed(seed.item())
+    return rng.get_state()
+
+
+def pytorch_random_uint32(rstate, shape):
+    """Implementation of random_uint32 for pytorch."""
+    shape = tuple(dim.item() for dim in shape)
+    rng = torch.Generator()
+    rng.set_state(rstate)
+    output = torch.zeros(shape, dtype=torch.int64)
+    output.random_(0, 2**32, generator=rng)
+    return rng.get_state(), output
 
 
 simple_mapping = {
@@ -93,6 +110,8 @@ simple_mapping = {
     P.take_grad_inp: pytorch_take_grad_inp,
 
     P.array_to_scalar: pytorch_array_to_scalar,
+    P.random_initialize: pytorch_random_initialize,
+    P.random_uint32: pytorch_random_uint32,
 }
 
 
@@ -484,13 +503,22 @@ class PyTorchBackend(Backend):
         if isinstance(t, abstract.AbstractScalar):
             return self.to_scalar(v)
         elif isinstance(t, abstract.AbstractArray):
-            return self.to_numpy(v)
+            # Convert torch tensor to numpy tensor.
+            output = self.to_numpy(v)
+            # If possible and necessary, cast numpy tensor to expected tensor.
+            array_type = t.element.xtype()
+            if array_type and array_type not in _type_map:
+                # Probably u16, u32 or u64. Let's cast.
+                output = output.astype(type_to_np_dtype(array_type))
+            return output
         elif isinstance(t, abstract.AbstractTuple):
             return tuple(self.from_backend_value(ve, te)
                          for ve, te in zip(v, t.elements))
         elif isinstance(t, abstract.AbstractTaggedUnion):
             return TaggedValue(v.tag, self.from_backend_value(
                 v.value, t.options.get(v.tag)))
+        elif isinstance(t, abstract.AbstractRandomState):
+            return RandomStateWrapper(self.to_numpy(v))
         else:
             raise NotImplementedError(f"Don't know what to do for {t}")
 

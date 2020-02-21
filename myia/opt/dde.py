@@ -382,6 +382,8 @@ def _vprop_cast_operation(vprop, need, inputs, out):
     P.conv2d_weight_grad,
     P.conv_transpose2d,
     P.stop_gradient,
+    P.random_initialize,
+    P.random_uint32,
     P.distribute,
     P.dot,
     P.take,

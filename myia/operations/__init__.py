@@ -663,6 +663,16 @@ raise_ = Operation(
     defaults='myia.operations.prim_raise_'
 )
 
+random_initialize = Operation(
+    name='random_initialize',
+    defaults='myia.operations.prim_random_initialize'
+)
+
+random_uint32 = Operation(
+    name='random_uint32',
+    defaults='myia.operations.prim_random_uint32'
+)
+
 range = Operation(
     name='range',
     defaults='myia.operations.op_range'

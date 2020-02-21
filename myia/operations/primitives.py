@@ -234,6 +234,16 @@ raise_ = BackendPrimitive(
     defaults='myia.operations.prim_raise_'
 )
 
+random_initialize = BackendPrimitive(
+    name='random_initialize',
+    defaults='myia.operations.prim_random_initialize'
+)
+
+random_uint32 = BackendPrimitive(
+    name='random_uint32',
+    defaults='myia.operations.prim_random_uint32'
+)
+
 record_getitem = InferencePrimitive(
     name='record_getitem',
     defaults='myia.operations.prim_record_getitem'
