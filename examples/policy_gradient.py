@@ -1,41 +1,7 @@
+"""Example of Policy Gradient in Myia.
+
+Myia is still a work in progress, and this example may change in the future.
 """
-from __future__ import print_function
-import argparse
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-from torchvision import datasets, transforms
-
-from myia import myia, value_and_grad
-from myia.ir import sexp_to_node
-from myia.lib import setter_from_getter
-from myia.abstract import Macro, build_value, macro, myia_static
-from myia.frontends import activate_frontend
-
-from myia.debug import traceback
-
-activate_frontend('pytorch')
-
-from myia.operations import primitives as P
-from dataclasses import dataclass
-import numpy as np
-
-import gym
-
-
-import time
-from dataclasses import dataclass
-
-import numpy
-from numpy.random import RandomState
-
-from myia import ArithmeticData, myia, value_and_grad
-from myia.api import to_device
-# The following import installs custom tracebacks for inference errors
-from myia.debug import traceback  # noqa
-"""
-# """
 from __future__ import print_function
 import torch
 
@@ -46,8 +12,6 @@ from myia.debug import traceback
 
 from dataclasses import dataclass
 
-# import time
-
 import gym
 import numpy as np
 from numpy.random import RandomState
@@ -55,7 +19,6 @@ from numpy.random import RandomState
 from myia.api import to_device
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
-# """
 
 from myia.public_api import softmax, _sum, mean, std
 
