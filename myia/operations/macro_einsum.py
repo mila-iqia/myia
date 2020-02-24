@@ -69,11 +69,7 @@ def _reduce_transpose(g, input_spec, output_spec, arg):
     return (res, final_shape)
 
 
-def _elemwise(g, a_spec, b_spec, a, b):
-    pass
-
-
-def _simple_einsum(g, spec, *args):
+def _simple_einsum(g, spec, idx_rm, remaining, args):
     input_spec, output_spec = spec.split('->')
 
     if len(input_spec) == len(set(input_spec)):
@@ -85,19 +81,44 @@ def _simple_einsum(g, spec, *args):
     elif ',' in input_spec:
         input_list = input_spec.split(',')
         assert len(input_list) == 2
-        if set(input_list[0]) == set(input_list[1]):
-            # elemwise
-            a, b = args
-            av = a[0]
-            bv = b[0]
-            tmp_spec = input_list[0]
-            if input_list[1] != tmp_spec:
-                tt = tuple(tmp_spec.find(c) for c in input_list[1])
-                bv = g.apply(P.transpose, bv, tt)
-            res = (g.apply(P.array_map, P.scalar_mul, av, bv), a[1])
-            return _reduce_transpose(g, input_list[0], output_spec, res)
-        else:
-            raise InferenceError(f"Can't support this pattern in einsum: {spec}")
+        a_spec = input_list[0]
+        b_spec = input_list[1]
+        a, b = args
+        av, as_ = a
+        bv, bs = b
+        idx_rm = list(idx_rm)
+
+        out_shape = []
+        out_spec = ''.join(remaining + idx_rm)
+
+        for c in out_spec:
+            p = a_spec.find(c)
+            if p != -1:
+                out_shape.append(as_[p])
+            else:
+                out_shape.append(bs[b_spec.find(c)])
+        out_shape = tuple(out_shape)
+
+        if a_spec != out_spec:
+            tt = tuple(a_spec.find(c) for c in out_spec if c in a_spec)
+            av = g.apply(P.transpose, av, tt)
+            ts = tuple(out_shape[i] if c in a_spec else 1
+                       for i, c in enumerate(out_spec))
+            av = g.apply(P.reshape, av, ts)
+            av = g.apply(P.distribute, av, out_shape)
+
+        if b_spec != out_spec:
+            tt = tuple(b_spec.find(c) for c in out_spec if c in b_spec)
+            bv = g.apply(P.transpose, bv, tt)
+            ts = tuple(out_shape[i] if c in b_spec else 1
+                       for i, c in enumerate(out_spec))
+            bv = g.apply(P.reshape, bv, ts)
+            bv = g.apply(P.distribute, bv, out_shape)
+
+        # elemwise
+        res = (g.apply(P.array_map, P.scalar_mul, av, bv), out_shape)
+        res_spec = out_spec
+        return _reduce_transpose(g, res_spec, output_spec, res)
 
     else:
         raise InferenceError(f"Can't support this pattern in einsum: {spec}")
@@ -109,6 +130,7 @@ async def einsum(info, r_spec, *r_args):
     _, *args = await info.abstracts()
     spec = await info.build(r_spec)
     shapes = tuple(a.xshape() for a in args)
+    assert isinstance(spec, str), "Macro was called to late in the process and string is now a number"
     try:
         path = contract_expression(spec, *shapes,
                                    optimize='dynamic-programming')
@@ -118,8 +140,10 @@ async def einsum(info, r_spec, *r_args):
 
     nodes = [(a.node, sh) for a, sh in zip(r_args, shapes)]
 
+    print("EINSUM:", spec)
     for contraction in path.contraction_list:
         inds, idx_rm, einsum_str, remaining, blas_flag = contraction
+        print("Step:", contraction)
 
         tmp_nodes = [nodes.pop(x) for x in inds]
         if blas_flag:
@@ -144,7 +168,8 @@ async def einsum(info, r_spec, *r_args):
                             tuple(new_node[1][i] for i in transpose))
 
         else:
-            new_node = _simple_einsum(g, einsum_str, *tmp_nodes)
+            new_node = _simple_einsum(g, einsum_str, idx_rm, remaining,
+                                      tmp_nodes)
 
         nodes.append(new_node)
 
