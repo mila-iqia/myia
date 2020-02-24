@@ -221,10 +221,11 @@ def run_episode(net, e, env):
                 return False
 
 
-# for e in range(10000):
-for e in range(10):
-    complete = run_episode(model, e, ENV)
+if __name__ == '__main__':
+    # for e in range(10000):
+    for e in range(10):
+        complete = run_episode(model, e, ENV)
 
-    if complete:
-        print('complete...!')
-        break
+        if complete:
+            print('complete...!')
+            break
