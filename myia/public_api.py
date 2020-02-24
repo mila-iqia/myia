@@ -21,13 +21,13 @@ from functools import reduce
 import numpy as np
 import torch
 
-from .. import operations
-from ..abstract import myia_static
-from ..hypermap import hyper_map
-from ..operations import primitives as P
-from ..utils import MyiaValueError, core
-from ..xtype import TupleT, f32, i64, u64
-from .pytorch_abstract_types import APT, APT_bool
+from . import operations
+from .abstract import myia_static
+from .hypermap import hyper_map
+from .operations import primitives as P
+from .utils import MyiaValueError, core
+from .xtype import TupleT, f32, i64, u64
+from .frontends.pytorch_abstract_types import APT, APT_bool
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 
@@ -293,16 +293,8 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
     groups = _ensure_u64(groups)
     ret = P.conv2d(input, weight, stride, padding, dilation, groups)
     if bias is not None:
-        ret = ret + bias.reshape((1, bias.shape[0], 1, 1))
+        ret = ret + reshape(bias, (1, bias.shape[0], 1, 1))
     return ret
-
-
-@core
-def conv_transpose2d(input, weight, bias, stride=1, padding=0,
-                     output_padding=0, groups=1, dilation=1):
-    """Map of Pytorch method torch.nn.functional.conv_transpose2d."""
-    return P.conv_transpose2d(input, weight, bias, stride, padding,
-                              output_padding, groups, dilation)
 
 
 @core
@@ -388,21 +380,16 @@ def item(x):
     return P.array_to_scalar(x.reshape(()))
 
 
+# TODO 2_array_compare_max also; will probably need multitype graph
 @core
 def _max(self, dim=None, keepdim=False):
     """Map of 'max' pytorch method."""
     x = self
     dim_orig = dim
-
     if dim is None:
         dim = _build_fwd_tuple(x.shape)
     elif isinstance(dim, int):
         dim = (dim,)
-    elif isinstance(dim, tuple):
-        pass
-    else:
-        assert keepdim is False
-        return P.array_map(P.scalar_max, x, dim)
 
     dim = _dim_tuple_explicit(x.shape, dim)
 
@@ -476,10 +463,14 @@ def mse_loss(input, target, reduction='mean'):
 @core
 def nll_loss(logs, targets, reduction='mean'):
     """Map of 'nll_loss' pytorch method."""
-    out = -torch.gather(
+
+    # TODO: is this still correct?
+    out = -gather(
         logs,
         1,
-        targets.reshape((logs.shape[0], 1))).reshape((logs.shape[0],))
+        P.array_cast(
+            reshape(
+                reshape(targets, (logs.shape[0], 1)), (logs.shape[0],)), i64))
 
     if reduction == 'none':
         out = out
