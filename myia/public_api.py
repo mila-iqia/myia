@@ -23,11 +23,11 @@ import torch
 
 from . import operations
 from .abstract import myia_static
+from .frontends.pytorch_abstract_types import APT, APT_bool
 from .hypermap import hyper_map
 from .operations import primitives as P
 from .utils import MyiaValueError, core
 from .xtype import TupleT, f32, i64, u64
-from .frontends.pytorch_abstract_types import APT, APT_bool
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 
@@ -463,14 +463,13 @@ def mse_loss(input, target, reduction='mean'):
 @core
 def nll_loss(logs, targets, reduction='mean'):
     """Map of 'nll_loss' pytorch method."""
-
-    # TODO: is this still correct?
     out = -gather(
         logs,
         1,
         P.array_cast(
             reshape(
                 reshape(targets, (logs.shape[0], 1)), (logs.shape[0],)), i64))
+    # ^TODO: is this still correct?
 
     if reduction == 'none':
         out = out
