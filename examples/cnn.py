@@ -3,27 +3,23 @@
 Myia is still a work in progress, and this example may change in the future.
 """
 from __future__ import print_function
+
+import time
+from dataclasses import dataclass
+
+import numpy
 import torch
+from numpy.random import RandomState
 from torchvision import datasets, transforms
 
 from myia import ArithmeticData, myia
-# TODO: add back value_and_grad
-from myia.frontends import activate_frontend
-
-from myia.debug import traceback
-
-from dataclasses import dataclass
-
-import time
-
-import numpy
-from numpy.random import RandomState
-
 from myia.api import to_device
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
-
+# TODO: add back value_and_grad
+from myia.frontends import activate_frontend
 from myia.public_api import conv2d, log_softmax, max_pool2d, reshape
+
 # TODO: add back nll_loss
 
 activate_frontend('pytorch')
