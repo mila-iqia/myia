@@ -388,16 +388,21 @@ def item(x):
     return P.array_to_scalar(x.reshape(()))
 
 
-# TODO 2_array_compare_max also; will probably need multitype graph
 @core
 def _max(self, dim=None, keepdim=False):
     """Map of 'max' pytorch method."""
     x = self
     dim_orig = dim
+
     if dim is None:
         dim = _build_fwd_tuple(x.shape)
     elif isinstance(dim, int):
         dim = (dim,)
+    elif isinstance(dim, tuple):
+        pass
+    else:
+        assert keepdim is False
+        return P.array_map(P.scalar_max, x, dim)
 
     dim = _dim_tuple_explicit(x.shape, dim)
 
