@@ -124,8 +124,6 @@ model = to_device(model, backend, backend_options, broaden=False)
 
 
 use_cuda = torch.cuda.is_available()
-if use_cuda:
-    model.cuda()
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if use_cuda else torch.LongTensor
 
