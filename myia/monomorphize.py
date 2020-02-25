@@ -444,7 +444,7 @@ class Monomorphizer:
                 else:
                     # Keep traversing the graph. Element 0 is special.
                     todo.append(_TodoEntry(irefs[0], tuple(argvals),
-                                       (ref, 0)))
+                                           (ref, 0)))
                     # Iterate through the rest of the inputs
                     for i, iref in enumerate(irefs[1:]):
                         todo.append(_TodoEntry(iref, None, (ref, i + 1)))

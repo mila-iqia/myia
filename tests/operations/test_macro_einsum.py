@@ -1,10 +1,11 @@
 
-from myia.operations import einsum
-from myia.lib import InferenceError
 import pytest
 
-from ..multitest import infer, mt, run_debug
+from myia.lib import InferenceError
+from myia.operations import einsum
+
 from ..common import MA, MB
+from ..multitest import infer, mt, run_debug
 
 
 @run_debug(MA(4, 1)[0])
@@ -77,6 +78,7 @@ def test_einsum_elemwise2d(a, b):
 @run_debug(MA(3, 4), MB(4, 3))
 def test_einsum_elemwise2d_T(a, b):
     return einsum('ij,ji->ij', a, b)
+
 
 @mt(
     run_debug(MA(2, 3), MB(3, 4)),

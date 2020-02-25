@@ -1,7 +1,8 @@
 """Implementation of the 'einsum' macro."""
 
-from ..lib import macro, InferenceError
-from opt_einsum import contract_expression, contract
+from opt_einsum import contract, contract_expression
+
+from ..lib import InferenceError, macro
 from . import primitives as P
 
 
@@ -130,7 +131,6 @@ async def einsum(info, r_spec, *r_args):
     _, *args = await info.abstracts()
     spec = await info.build(r_spec)
     shapes = tuple(a.xshape() for a in args)
-    assert isinstance(spec, str), "Macro was called to late in the process and string is now a number"
     try:
         path = contract_expression(spec, *shapes,
                                    optimize='dynamic-programming')
@@ -140,10 +140,8 @@ async def einsum(info, r_spec, *r_args):
 
     nodes = [(a.node, sh) for a, sh in zip(r_args, shapes)]
 
-    print("EINSUM:", spec)
     for contraction in path.contraction_list:
         inds, idx_rm, einsum_str, remaining, blas_flag = contraction
-        print("Step:", contraction)
 
         tmp_nodes = [nodes.pop(x) for x in inds]
         if blas_flag:
