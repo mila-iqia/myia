@@ -17,7 +17,6 @@ def test_einsum_sum1d(a):
     return einsum('i->', a)
 
 
-@pytest.mark.xfail
 @run_debug(MA(4, 1)[0], MB(4, 1)[0])
 def test_einsum_elemwise1d(a, b):
     return einsum('i,i->i', a, b)
