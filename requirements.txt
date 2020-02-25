@@ -1,8 +1,9 @@
+antlr4-python3-runtime==4.7.2
 asttokens
+black==19.10b0
 codecov
+gym
 prettyprinter
 ruamel.yaml
 ruamel.yaml.clib>=0.2
 pydocstyle==5.0.1
-antlr4-python3-runtime==4.7.2
-black==19.10b0
