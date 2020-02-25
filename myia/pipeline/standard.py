@@ -86,6 +86,7 @@ python_operation_map = {
     np.tanh: operations.array_tanh,
     np.sum: operations.sum,
     np.prod: operations.prod,
+    np.einsum: operations.einsum,
 }
 
 

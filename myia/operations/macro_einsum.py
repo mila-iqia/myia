@@ -69,7 +69,7 @@ def _reduce_transpose(g, input_spec, output_spec, arg):
     return (res, final_shape)
 
 
-def _simple_einsum(g, spec, idx_rm, remaining, args):
+def _simple_einsum(g, spec, idx_rm, args):
     input_spec, output_spec = spec.split('->')
 
     if len(input_spec) == len(set(input_spec)):
@@ -89,7 +89,7 @@ def _simple_einsum(g, spec, idx_rm, remaining, args):
         idx_rm = list(idx_rm)
 
         out_shape = []
-        out_spec = ''.join(remaining + idx_rm)
+        out_spec = output_spec + ''.join(idx_rm)
 
         for c in out_spec:
             p = a_spec.find(c)
@@ -168,8 +168,7 @@ async def einsum(info, r_spec, *r_args):
                             tuple(new_node[1][i] for i in transpose))
 
         else:
-            new_node = _simple_einsum(g, einsum_str, idx_rm, remaining,
-                                      tmp_nodes)
+            new_node = _simple_einsum(g, einsum_str, idx_rm, tmp_nodes)
 
         nodes.append(new_node)
 
