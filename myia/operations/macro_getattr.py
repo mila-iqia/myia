@@ -4,7 +4,6 @@ from .. import lib, operations
 from ..lib import (
     ABSENT,
     ANYTHING,
-    AbstractType,
     Constant,
     Graph,
     InferenceError,
