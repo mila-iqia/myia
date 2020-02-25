@@ -240,7 +240,7 @@ def pytest_runtest_setup(item):
         def __init__(self, skip=None):
             super().__init__(None, skip=skip)
 
-        def set_trace(self, frame=None, skip=None):
+        def set_trace(self, frame=None):
             interactor.show(synchronous=True)
             self.repl = interactor.repl
             super().set_trace(frame)
