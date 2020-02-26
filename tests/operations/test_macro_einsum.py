@@ -8,12 +8,12 @@ from ..common import MA, MB
 from ..multitest import infer, mt, run_debug
 
 
-@run_debug(MA(4, 1)[0])
+@run_debug(MA(1, 4)[0])
 def test_einsum_view1d(a):
     return einsum('i', a)
 
 
-@run_debug(MA(4, 1)[0])
+@run_debug(MA(1, 4)[0])
 def test_einsum_sum1d(a):
     return einsum('i->', a)
 
@@ -72,7 +72,7 @@ def test_einsum_sum2d_01(a):
 
 @run_debug(MA(3, 4), MB(3, 4))
 def test_einsum_elemwise2d(a, b):
-    return einsum('ij,ij->i', a, b)
+    return einsum('ij,ij->ij', a, b)
 
 
 @run_debug(MA(3, 4), MB(4, 3))

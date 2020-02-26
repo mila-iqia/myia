@@ -7,6 +7,12 @@ from . import primitives as P
 
 
 def _tensordot(g, a, b, *, axes):
+    """Tensordot for myia.
+
+    This a a generalized version of dot where the
+    multiplication/contraction can happen on an arbitrary set of axes.
+    Analogous to np.tensordot.
+    """
     axes_a, axes_b = axes
     axes_a = list(axes_a)
     axes_b = list(axes_b)
@@ -47,6 +53,13 @@ def _tensordot(g, a, b, *, axes):
 
 
 def _reduce_transpose(g, input_spec, output_spec, arg):
+    """Does a sum-reduction and transpose of a single arguemnt.
+
+    It uses input_spec and output_spec (einsum-like strings) to infer
+    the dimensions to sum over (those that are not in output_spec) and
+    the ordering of the output.
+
+    """
     if input_spec == output_spec:
         return arg
 
@@ -71,6 +84,13 @@ def _reduce_transpose(g, input_spec, output_spec, arg):
 
 
 def _simple_einsum(g, spec, idx_rm, args):
+    """Does an einsum operation on one or two arguments.
+
+    This doesn't cover all cases that might arise from a full einsum
+    operation, but should be enough to cover the cases that tensordot
+    doesn't handle, except for diagonals.
+
+    """
     input_spec, output_spec = spec.split('->')
 
     if len(input_spec) == len(set(input_spec)):
