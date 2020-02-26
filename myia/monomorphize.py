@@ -437,18 +437,19 @@ class Monomorphizer:
                            for iref in irefs[1:]]
 
                 prim = absfn.get_prim()
+                method = None
                 if prim is not None:
                     method = getattr(self, f'_special_{prim}', None)
-                    if method is not None:
-                        method(todo, ref, irefs, argvals)
-                        continue
 
-                # Keep traversing the graph. Element 0 is special.
-                todo.append(_TodoEntry(irefs[0], tuple(argvals),
-                                       (ref, 0)))
-                # Iterate through the rest of the inputs
-                for i, iref in enumerate(irefs[1:]):
-                    todo.append(_TodoEntry(iref, None, (ref, i + 1)))
+                if method is not None:
+                    method(todo, ref, irefs, argvals)
+                else:
+                    # Keep traversing the graph. Element 0 is special.
+                    todo.append(_TodoEntry(irefs[0], tuple(argvals),
+                                           (ref, 0)))
+                    # Iterate through the rest of the inputs
+                    for i, iref in enumerate(irefs[1:]):
+                        todo.append(_TodoEntry(iref, None, (ref, i + 1)))
 
             elif ref.node.is_constant_graph() \
                     or ref.node.is_constant(MetaGraph) \

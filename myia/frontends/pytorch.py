@@ -74,6 +74,7 @@ standard_object_map.update({
     torch.cat: cat,
     torch.chunk: chunk,
     torch.detach: operations.stop_gradient,
+    torch.einsum: operations.einsum,
     torch.eq: operations.array_eq,
     torch.exp: operations.array_exp,
     torch.gather: gather,
