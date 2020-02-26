@@ -15,17 +15,27 @@
 #           pytorch original.                                               #
 #############################################################################
 
-import operator
-from functools import reduce
-
 import numpy as np
 import torch
 
 from .. import operations
-from ..abstract import myia_static
 from ..hypermap import hyper_map
 from ..operations import primitives as P
-from ..utils import MyiaValueError, core
+from ..public_api import (
+    _build_fwd_tuple,
+    _chunks_to_split_sections,
+    _dim_explicit,
+    _dim_explicit_unsqueeze,
+    _dim_tuple_explicit,
+    _prepare_dims_to_norm,
+    _shp_explicit,
+    _shp_squeeze,
+    _shp_unsqueeze,
+    _total_elements,
+    _transpose_dims,
+    _var_denom,
+)
+from ..utils import core
 from ..xtype import TupleT, f32, i64, u64
 from .pytorch_abstract_types import APT, APT_bool
 
@@ -33,64 +43,6 @@ from .pytorch_abstract_types import APT, APT_bool
 
 
 # HELPER FUNCTIONS ##########################################################
-
-@myia_static
-def _chunks_to_split_sections(a_dim_shp, chunks):
-    rem = a_dim_shp % chunks
-    sections = ()
-    if rem == 0:
-        def_sec_size = int(a_dim_shp / chunks)
-        for i in range(chunks):
-            sections = sections + (def_sec_size,)
-    elif a_dim_shp < chunks:
-        for i in range(a_dim_shp):
-            sections = sections + (1,)
-    else:
-        def_sec_size = a_dim_shp // chunks + 1
-        sec_rem = (a_dim_shp // def_sec_size) % chunks
-        for i in range(chunks - sec_rem):
-            sections = sections + (def_sec_size,)
-        new_rem = a_dim_shp % (def_sec_size * (chunks - sec_rem))
-        if new_rem != 0 and (chunks < a_dim_shp):
-            sections = sections + (new_rem,)
-    return sections
-
-
-@myia_static
-def _dim_explicit(a_shp, dim):
-    if dim is None:
-        return dim
-
-    if dim < 0:
-        dim = len(a_shp) + dim
-    return dim
-
-
-@myia_static
-def _dim_explicit_unsqueeze(a_shp, dim):
-    if dim < 0:
-        dim = len(a_shp) + dim + 1
-    return dim
-
-
-@myia_static
-def _dim_tuple_explicit(a_shp, dim):
-    shp_explicit = ()
-    for s in dim:
-        if s < 0:
-            shp_explicit = shp_explicit + (len(a_shp) + s,)
-        else:
-            shp_explicit = shp_explicit + (s,)
-    return shp_explicit
-
-
-@myia_static
-def _build_fwd_tuple(shp):
-    t = ()
-    for d in range(len(shp)):
-        t = t + (d,)
-    return t
-
 
 @core
 def _ensure_u64(x):
@@ -106,139 +58,6 @@ def _pair(x):
     x = (_ensure_u64(x[0]), x[1])
     x = (x[0], _ensure_u64(x[1]))
     return x
-
-
-@myia_static
-def _prepare_dims_to_norm(shape, dim):
-    # Make sure dim is a tuple.
-    if not isinstance(dim, tuple):
-        dim = (dim,)
-    # If no dim, norm all dimensions.
-    if len(dim) == 0:
-        dim = shape
-
-    leading_dims = ()
-    dims_to_norm = ()
-    for i in range(len(shape)):
-        if i in dim:
-            dims_to_norm = dims_to_norm + (i,)
-        else:
-            leading_dims = leading_dims + (i,)
-    permutation = ()
-    leading_shape = ()
-    reshaping_tuple = ()
-    if leading_dims:
-        permutation = leading_dims + dims_to_norm
-        leading_shape = tuple(shape[d] for d in leading_dims)
-        reshaping_tuple = leading_shape + (-1,)
-    else:
-        leading_dims = None
-    return leading_dims, permutation, leading_shape, reshaping_tuple
-
-
-def prod(x):
-    return reduce(operator.mul, x, 1)
-
-
-@myia_static
-def _shp_explicit(a_shp, shp):
-
-    unk_count = 0
-    for s in shp:
-        if s < -1:
-            e_msg = "New shape cannot contain value less than -1 in reshape"
-            raise MyiaValueError(e_msg)
-        if s == -1:
-            unk_count = unk_count + 1
-
-    if unk_count > 1:
-        e_msg = "New shape can only contain 1 unknown (-1) dim in reshape"
-        raise MyiaValueError(e_msg)
-
-    if (prod(a_shp) % prod(shp) != 0 if unk_count == 1
-            else prod(shp) != prod(a_shp)):
-        e_msg = "Cannot change the total number of elements in reshape"
-        raise MyiaValueError(e_msg)
-
-    known_unk_dim = int(abs(prod(a_shp) / prod(shp)))
-    shp_explicit = ()
-    for s in shp:
-        if s == -1:
-            shp_explicit = shp_explicit + (known_unk_dim, )
-        else:
-            shp_explicit = shp_explicit + (s, )
-
-    return shp_explicit
-
-
-@myia_static
-def _shp_squeeze(orig_shp, dim, keepdim):
-
-    final_shape = ()
-    skip = False
-
-    if keepdim:
-        final_shape = orig_shp
-    else:
-        if dim is not None:
-            if orig_shp[dim] != 1:
-                final_shape = orig_shp
-                skip = True
-        if not skip:
-            new_shape = ()
-            if dim is None:
-                for _x in orig_shp:
-                    if _x != 1:
-                        new_shape = new_shape + (_x,)
-            else:
-                i = 0
-                for _x in orig_shp:
-                    if _x == 1 and dim == i:
-                        new_shape = new_shape
-                    else:
-                        new_shape = new_shape + (_x,)
-                    i = i + 1
-            final_shape = new_shape
-    return final_shape
-
-
-@myia_static
-def _shp_unsqueeze(orig_shp, dim):
-
-    final_shape = ()
-
-    for ddx, d in enumerate(orig_shp):
-        if ddx == dim:
-            final_shape = final_shape + (1, d)
-        else:
-            final_shape = final_shape + (d,)
-
-    if dim == len(orig_shp):
-        final_shape = final_shape + (1,)
-
-    return final_shape
-
-
-@myia_static
-def _total_elements(shp):
-
-    _tot_elems = int(prod(shp))
-
-    return _tot_elems
-
-
-@myia_static
-def _var_denom(shp, dim, unbiased):
-
-    if dim is None:
-        denom = int(prod(shp))
-    else:
-        denom = shp[dim]
-
-    if unbiased is True:
-        denom = denom - 1
-
-    return denom
 
 
 # ACTUAL FUNCTIONS ##########################################################
@@ -701,6 +520,7 @@ def tensor_dim(t):
     return len(P.shape(t))
 
 
+"""
 @myia_static
 def _transpose_dims(a_dims, dim0, dim1):
     dims = ()
@@ -712,6 +532,7 @@ def _transpose_dims(a_dims, dim0, dim1):
         else:
             dims = dims + (d,)
     return dims
+#"""
 
 
 @core
