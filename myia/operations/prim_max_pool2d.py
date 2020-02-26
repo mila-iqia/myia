@@ -2,7 +2,7 @@
 
 from .. import lib, xtype
 from ..lib import SHAPE, TYPE, bprop_to_grad_transform, standard_prim
-from ..operations import max_pool2d_grad
+from ..operations import max_pool2d_grad, zeros_like
 from . import primitives as P
 
 
@@ -53,7 +53,12 @@ def bprop_max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode,
     """Backpropagator for `max_pool2d`."""
     gI = max_pool2d_grad(input, kernel_size, stride, padding, dilation,
                          ceil_mode, dout)
-    return (gI,)
+    return (gI,
+            zeros_like(kernel_size),
+            zeros_like(stride),
+            zeros_like(padding),
+            zeros_like(dilation),
+            zeros_like(ceil_mode))
 
 
 __operation_defaults__ = {

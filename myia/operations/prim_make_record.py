@@ -15,7 +15,7 @@ from . import primitives as P
 @standard_prim(P.make_record)
 async def infer_make_record(self, engine, _cls: lib.AbstractType, *elems):
     """Infer the return type of primitive `make_record`."""
-    cls = _cls.xvalue()
+    cls = _cls.element
     cls = type_to_abstract(cls)
     expected = list(cls.attributes.items())
     if len(expected) != len(elems):

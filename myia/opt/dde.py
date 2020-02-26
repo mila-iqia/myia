@@ -6,7 +6,7 @@ from .. import abstract, xtype
 from ..abstract import ANYTHING, DEAD, PartialApplication
 from ..ir import Constant, Graph
 from ..operations import Primitive, primitives as P
-from ..utils import Named, Partializable, Registry, newenv
+from ..utils import Named, Partializable, Registry, newenv, tracer
 
 WILDCARD = Named('WILDCARD')
 MAX_NEED_DEPTH = 5
@@ -453,6 +453,7 @@ class DeadDataElimination(Partializable):
     def __init__(self, resources=None):
         """Initialize a DeadDataElimination."""
         self.resources = resources
+        self.name = 'dde'
 
     def make_dead(self, node):
         """Create a dead version of the node."""
@@ -469,22 +470,30 @@ class DeadDataElimination(Partializable):
 
     def __call__(self, root):
         """Apply dead data elimination."""
-        root.manager.keep_roots(root)
-        vprop = ValuePropagator(self.resources, root)
-        present = {node for node, needs in vprop.need.items() if needs}
-        missing = vprop.manager.all_nodes - present
-        mng = root.manager
-        for node in missing:
-            g = node.graph
-            if g not in mng.graphs:
-                # This might happen if replace removes a graph.
-                continue
-            if g and node is g.return_:
-                continue
-            repl = self.make_dead(node)
-            if repl is not None:
-                mng.replace(node, repl)
-        return False  # Pretend there are no changes, for now
+        args = dict(
+            opt=self,
+            node=None,
+            manager=root.manager,
+        )
+        with tracer('opt', **args) as tr:
+            tr.set_results(success=False, **args)
+            root.manager.keep_roots(root)
+            vprop = ValuePropagator(self.resources, root)
+            present = {node for node, needs in vprop.need.items() if needs}
+            missing = vprop.manager.all_nodes - present
+            mng = root.manager
+            for node in missing:
+                g = node.graph
+                if g not in mng.graphs:
+                    # This might happen if replace removes a graph.
+                    continue
+                if g and node is g.return_:
+                    continue
+                repl = self.make_dead(node)
+                if repl is not None:
+                    mng.replace(node, repl)
+            tracer().emit_success(**args, new_node=None)
+            return False  # Pretend there are no changes, for now
 
 
 __all__ = [

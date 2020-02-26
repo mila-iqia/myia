@@ -530,7 +530,7 @@ class PyTorchBackend(Backend):
         elif isinstance(t, abstract.AbstractType):
             # Handle abstract types.
             # Return None if type does not match any torch type.
-            myia_type = t.xvalue().xtype()
+            myia_type = t.element.xtype()
             return _type_map.get(myia_type, None)
         elif isinstance(t, abstract.AbstractArray):
             return self.from_numpy(v)

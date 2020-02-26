@@ -149,11 +149,14 @@ def _brk(w):
 
 def _resolve_path(p, variant=''):
     if not p:
-        return '**'
+        rval = '**'
     elif p.startswith('+'):
-        return globals()[f'_path{variant}_{p[1:]}']
+        rval = globals()[f'_path{variant}_{p[1:]}']
     else:
-        return p
+        rval = p
+    if isinstance(rval, str):
+        rval = [rval]
+    return rval
 
 
 ###########
@@ -191,7 +194,7 @@ def log(path=None, *fields, **kwfields):
         results = getters(kwargs)
         _display(_curpath, results)
 
-    return DoTrace({_resolve_path(path): _p})
+    return DoTrace({pth: _p for pth in _resolve_path(path)})
 
 
 def opts():
@@ -293,8 +296,8 @@ def stat(path=None, *fields, **kwfields):
 #########
 
 
-_path_opt = 'step_opt/**/opt/success'
-_pathcmp_opt = 'step_opt/**/opt'
+_path_opt = ['step_opt/**/opt/success', 'step_opt2/**/opt/success']
+_pathcmp_opt = ['step_opt/**/opt', 'step_opt2/**/opt']
 
 
 #########
@@ -308,6 +311,15 @@ def _rule_optname(opt=None, **kwargs):
     return opt.name
 
 
+def _rule_optparam(node=None, **kwargs):
+    if node is None:
+        return '<NOT FOUND>'
+    try:
+        return str(node.inputs[1])
+    except Exception:
+        return '<???>'
+
+
 def _rule_countnodes(graph=None, manager=None, **kwargs):
     if manager is None:
         if graph is None:
@@ -316,6 +328,16 @@ def _rule_countnodes(graph=None, manager=None, **kwargs):
             return '<NO MANAGER>'
         manager = graph.manager
     return len(manager.all_nodes)
+
+
+def _rule_countgraphs(graph=None, manager=None, **kwargs):
+    if manager is None:
+        if graph is None:
+            return '<NOT FOUND>'
+        if graph._manager is None:
+            return '<NO MANAGER>'
+        manager = graph.manager
+    return len(manager.graphs)
 
 
 def _rule_time(**kwargs):

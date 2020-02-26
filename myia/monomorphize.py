@@ -154,7 +154,8 @@ _count = count(1)
 def _const(v, t):
     ct = Constant(v)
     ct.abstract = t
-    ct.force_abstract = True
+    if t is not None:
+        ct.force_abstract = True
     return ct
 
 
@@ -222,6 +223,7 @@ class Monomorphizer:
         self.ctcache = {}
         self.infcaches = {}
         self.reuse_existing = reuse_existing
+        self.invmap = {}
 
     def run(self, context):
         """Run monomorphization."""
@@ -563,16 +565,6 @@ class Monomorphizer:
 
         for ctx, orig_ctx, newgraph in self.tasks:
 
-            def fix_node(node, new_node):
-                if getattr(node, 'force_abstract', False):
-                    new_node.abstract = node.abstract
-                else:
-                    ref = self.engine.ref(node, orig_ctx)
-                    if ref in self.engine.cache.cache:
-                        new_node.abstract = ref.get_resolved()
-                    else:
-                        new_node.abstract = AbstractError(DEAD)
-
             def fv_function(fv, ctx=ctx):
                 fv_ctx = ctx.filter(fv.graph)
                 if fv_ctx in cloners:
@@ -587,7 +579,8 @@ class Monomorphizer:
 
             if newgraph is ctx.graph:
                 for node in chain(ctx.graph.nodes, ctx.graph.constants):
-                    fix_node(node, node)
+                    self.invmap[node] = self.engine.ref(node, orig_ctx)
+
                 with m.transact() as tr_fv:
                     for node in ctx.graph.free_variables_direct:
                         new_node = fv_function(node)
@@ -613,8 +606,10 @@ class Monomorphizer:
             cloners[ctx] = cl
 
             # Populate the abstract field
-            for node in chain(ctx.graph.nodes, ctx.graph.constants):
-                fix_node(node, cl[node])
+            for old_node, new_node in cl.remapper.repl.items():
+                if isinstance(old_node, tuple):
+                    old_node = old_node[1]
+                self.invmap[new_node] = self.engine.ref(old_node, orig_ctx)
 
             # Undo changes to the original graph
             tr.undo()
@@ -650,7 +645,21 @@ class Monomorphizer:
     def fix_types(self):
         """Fix all node types."""
         for node in self.manager.all_nodes:
+            old_ref = self.invmap.get(node, None)
+            assert old_ref is not None
+            if getattr(old_ref.node, 'force_abstract', False):
+                assert old_ref.node.abstract is not None
+                node.abstract = old_ref.node.abstract
+            elif old_ref in self.engine.cache.cache:
+                node.abstract = old_ref.get_resolved()
+            else:
+                node.abstract = AbstractError(DEAD)
+
+        for node in self.manager.all_nodes:
+            if node.is_constant(Graph):
+                node.abstract = node.value.abstract
             node.abstract = _fix_type(node.abstract, self)
+            assert node.abstract is not None
 
 
 class _MonoRemapper(CloneRemapper):

@@ -1263,6 +1263,25 @@ class _AbstractJTagged:
         )
 
 
+@mixin(abstract.AbstractType)
+class _AbstractType:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_iterable(
+            [
+                H.div(
+                    hrepr.stdrepr_object(
+                        '', _clean(self.values).items(), delimiter="↦",
+                        cls='noborder'
+                    ),
+                    hrepr(self.element),
+                    style='display:flex;flex-direction:column;'
+                )
+            ],
+            before='★Type',
+            cls='abstract',
+        )
+
+
 @mixin(abstract.AbstractHandle)
 class _AbstractHandle:
     def __hrepr__(self, H, hrepr):

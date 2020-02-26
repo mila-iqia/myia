@@ -636,7 +636,8 @@ class GraphManager(Partializable):
         keep = OrderedSet()
         for root in roots:
             keep.update(self.graphs_reachable[root])
-        self._maybe_drop_graphs(self.graphs - keep, ignore_users=True)
+        self._maybe_drop_graphs(self.graphs - keep, ignore_users=True,
+                                recursive=False)
 
     def _ensure_graph(self, graph):
         """Ensure that the graph is managed by this manager."""
@@ -646,7 +647,7 @@ class GraphManager(Partializable):
             graph._manager = self
         self.graphs.add(graph)
 
-    def _maybe_drop_graphs(self, graphs, ignore_users=False):
+    def _maybe_drop_graphs(self, graphs, ignore_users=False, recursive=True):
         todo = OrderedSet(graphs)
         dropped = OrderedSet()
 
@@ -662,7 +663,9 @@ class GraphManager(Partializable):
 
             dropped.add(graph)
 
-            todo |= self._maybe_drop_nodes(OrderedSet([graph.return_]))
+            other_graphs = self._maybe_drop_nodes(OrderedSet([graph.return_]))
+            if recursive:
+                todo |= other_graphs
 
         for g in dropped:
             self.events.drop_graph(g)

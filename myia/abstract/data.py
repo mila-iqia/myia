@@ -326,19 +326,6 @@ class AbstractScalar(AbstractAtom):
         return rval
 
 
-@serializable('AbstractType')
-class AbstractType(AbstractAtom):
-    """Represents a type as a first class value."""
-
-    def __init__(self, typ):
-        """Initialize an AbstractType."""
-        super().__init__({VALUE: typ})
-
-    def __pretty__(self, ctx):
-        t = pretty_type(self.values[VALUE])
-        return pretty_join(['Ty(', t, ')'])
-
-
 @serializable('AbstractError')
 class AbstractError(AbstractAtom):
     """This represents some kind of problem in the computation.
@@ -495,6 +482,35 @@ class AbstractWrapper(AbstractStructure):
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
         return AttrEK(self, (v, 'element'))
+
+
+@serializable('AbstractType')
+class AbstractType(AbstractWrapper):
+    """Represents a type as a first class value."""
+
+    def __init__(self, typ, values={}):
+        """Initialize an AbstractType."""
+        super().__init__(typ, values)
+
+    def _serialize(self):
+        data = super()._serialize()
+        data['element'] = self.element
+        return data
+
+    @classmethod
+    def _construct(cls):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.element = data.pop('element')
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
+
+    def __pretty__(self, ctx):
+        t = pretty_type(self.element)
+        return pretty_join(['Ty(', t, ')'])
 
 
 @serializable('AbstractTuple')

@@ -1,7 +1,7 @@
 """Implementation of 'to_scalar_type' operation.
 
 Convert given data into an appropriate abstract scalar.
-If data is already an abstract type, return the result of method xvalue().
+If data is already an abstract type, return the element.
 If data is already an abstract scalar with a number type, return it as is.
 If data is an abstract scalar with a string type, try to infer type
 from given string and return an abstract scalar with inferred type.
@@ -64,7 +64,7 @@ async def to_scalar_type(info, data):
     # - an abstract scalar containing a string to be parsed to a scalar type
 
     if isinstance(sync_data, AbstractType):
-        abstract_scalar = sync_data.xvalue()
+        abstract_scalar = sync_data.element
         if isinstance(abstract_scalar, AbstractScalar):
             xtype = await force_pending(abstract_scalar.xtype())
             if inspect.isclass(xtype) and issubclass(xtype, Number):
