@@ -687,7 +687,10 @@ class CompileGraph:
         if node.value.parent is None:
             return self.graph_map[node.value]
         if node not in self.node_map:
-            self.node_map[node] = self.convert_func(node.value)
+            v = relay.var(f"lv.{id(node)}")
+            self.node_map[node] = v
+            g = self.convert_func(node.value)
+            self.node_map[node] = relay.Let(v, g, v)
         return self.node_map[node]
 
     def ref(self, node):
