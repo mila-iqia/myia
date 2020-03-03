@@ -15,7 +15,7 @@ from ...operations import Primitive, primitives as P
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
 from ...xtype import UniverseType, type_to_np_dtype
 from ..channel import handle
-from ..transform import get_prim_graph, return_handles, wrap_result
+from ..transform import get_prim_graph, return_handles, wrap_result, lift_switch_call
 from . import Backend, Converter, HandleBackend, relay_philox
 from .relay_helpers import (
     TypeHelper,
@@ -616,6 +616,8 @@ class CompileGraph:
         mng = manage(graph)
 
         graph, handles_params = return_handles(graph)
+
+        graph = lift_switch_call(graph)
 
         self.module = tvm.IRModule({})
         self.types = TypeHelper()
