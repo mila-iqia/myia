@@ -635,10 +635,8 @@ class CompileGraph:
                 if g is graph:
                     self.graph_map[g] = relay.GlobalVar("main")
                 else:
-                    # Mangle a "main" from the user
-                    name = g.debug.debug_name
-                    if name == "main":  # pragma: no cover
-                        name = "!main"
+                    # Mangle user names
+                    name = "_" + g.debug.debug_name
                     self.graph_map[g] = relay.GlobalVar(name)
 
         for g in self.graph_map.keys():
