@@ -89,7 +89,6 @@ class TypeHelper:
                     self.env_val_map[key.value] = tt
         env_val_keys = sorted(list(self.env_val_map.keys()))
 
-        # This both inserts the indexes and sorts the dict by keys
         for i, k in enumerate(env_val_keys):
             self.env_val_map[k] = (i, self.env_val_map[k])
 
@@ -101,11 +100,13 @@ class TypeHelper:
 
     def build_default_env_val(self):
         return self.env_ctr(
-            relay.Tuple([nil() for _ in self.env_val_map.items()]))
+            relay.Tuple([nil() for _ in self.env_val_map]))
 
     def _build_env_type(self):
-        return relay.ty.TupleType([option_type(tt)
-                                   for _, tt in self.env_val_map.values()])
+        map = dict((i, tt) for (i, tt) in self.env_val_map.values())
+
+        return relay.ty.TupleType([option_type(map[i])
+                                   for i in range(len(map))])
 
     def do_env_update(self, env_, key, val):
         """Return a function to update a grad env."""
@@ -114,9 +115,10 @@ class TypeHelper:
             adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
         env = adt.Match(env_, [cl])
 
+        map = dict((i, k) for k, (i, _) in self.env_val_map.items())
         new_env = relay.Tuple([
-            some(val) if k == key else relay.TupleGetItem(env, i)
-            for i, k in enumerate(self.env_val_map.keys())
+            some(val) if map[i] == key else relay.TupleGetItem(env, i)
+            for i in range(len(map))
         ])
         return self.env_ctr(new_env)
 
