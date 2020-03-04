@@ -18,7 +18,7 @@ from myia.api import to_device
 from myia.debug import traceback  # noqa
 # TODO: add back value_and_grad
 from myia.frontends import activate_frontend
-from myia.public_api import conv2d, log_softmax, max_pool2d, reshape
+from myia.public_api import conv2d, log_softmax, max_pool2d, nll_loss, reshape
 
 # TODO: add back nll_loss
 
@@ -193,8 +193,7 @@ class Sequential(ArithmeticData):
 
 def cost(model, x, target):
     output = model.apply(x)
-    # return nll_loss(output, target)
-    return sum(output)
+    return nll_loss(output, target)
 
 
 @myia(backend=backend, backend_options=backend_options, return_backend=True,

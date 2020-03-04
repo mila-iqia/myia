@@ -466,9 +466,10 @@ def nll_loss(logs, targets, reduction='mean'):
     out = -gather(
         logs,
         1,
-        P.array_cast(
+        unsqueeze(P.array_cast(
             reshape(
-                reshape(targets, (logs.shape[0], 1)), (logs.shape[0],)), i64))
+                reshape(targets,
+                        (logs.shape[0], 1)), (logs.shape[0],)), i64), 1))
     # ^TODO: is this still correct?
 
     if reduction == 'none':
@@ -716,7 +717,7 @@ def unsqueeze(self, dim=None):
     """Map of 'unsqueeze' pytorch method."""
     dim = _dim_explicit_unsqueeze(self.shape, dim)
     final_shape = _shp_unsqueeze(self.shape, dim)
-    return self.reshape(final_shape)
+    return reshape(self, final_shape)
 
 
 # TODO: var with tuple dim (reduce over multiple chosen dims)
