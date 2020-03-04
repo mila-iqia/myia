@@ -21,7 +21,6 @@ from .relay_helpers import (
     TypeHelper,
     add_functions,
     dead_value,
-    empty_env,
     fill_reverse_tag_map,
     get_myia_tag,
     get_union_ctr,
@@ -213,14 +212,12 @@ def relay_tagged(c, x, tag):
 
 def relay_env_setitem(c, env, key, x):
     """Implementation of env_setitem for Relay."""
-    gv = c.types.get_env_update(x.abstract)
-    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(x)])
+    return c.types.do_env_update(c.ref(env), key.value, c.ref(x))
 
 
 def relay_env_getitem(c, env, key, dft):
     """Implementation of env_getitem for Relay."""
-    gv = c.types.get_env_find(dft.abstract)
-    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(dft)])
+    return c.types.do_env_find(c.ref(env), key.value, c.ref(dft))
 
 
 def relay_unsafe_static_cast(c, val, ty):
@@ -559,9 +556,10 @@ class NodeVisitor:
 class RelayConstantConverter(Converter):
     """Convert values to Relay constants."""
 
-    def __init__(self, context):
+    def __init__(self, context, types):
         """Set the context."""
         self.context = context
+        self.types = types
 
     def convert_array(self, v, t):  # pragma: no cover
         """Make a TVM array from a numpy array."""
@@ -585,7 +583,7 @@ class RelayConstantConverter(Converter):
 
     def convert_env(self, v, t):
         assert len(v) == 0
-        return empty_env()
+        return self.types.build_default_env_val()
 
     def convert_tuple(self, v, t):
         return relay.Tuple([self(e, et) for e, et in
@@ -622,7 +620,7 @@ class CompileGraph:
         self.module = tvm.IRModule({})
         self.types = TypeHelper()
         self.types.initialize(self.module, mng)
-        self.make_const = RelayConstantConverter(context)
+        self.make_const = RelayConstantConverter(context, self.types)
         self.universe_helper = None
 
         # Analyze and create a global union type of all the possible types
@@ -646,8 +644,7 @@ class CompileGraph:
         for g in self.graph_map.keys():
             function_map[self.graph_map[g]] = self.convert_func(g)
 
-        self.types.finalize(self.module)
-        add_functions(self.module, function_map)
+        add_functions(self.module, function_map, self.types)
 
         vm = relay.create_executor(mod=self.module, ctx=context,
                                    target=target, kind=EXEC_KIND)
@@ -747,7 +744,7 @@ class RelayInputConverter(Converter):
         """Set the context."""
         self.context = context
         self.th = TypeHelper()
-        self.cst_conv = RelayConstantConverter(self.context)
+        self.cst_conv = RelayConstantConverter(self.context, self.th)
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
@@ -781,7 +778,6 @@ class RelayInputConverter(Converter):
         self.th.initialize(mod, None)
         cst = self.cst_conv.convert_tagged(v, t)
         mod["main"] = relay.Function([], cst)
-        self.th.finalize(mod)
         vm = relay.create_executor(ctx=self.context, mod=mod, kind=EXEC_KIND)
         return vm.evaluate()()
 
