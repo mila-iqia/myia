@@ -37,7 +37,29 @@ def convert_grad(graph):
     return graph
 
 
+def collapse_constants(graph):
+    """Collapse all graph constants into a single one per graph."""
+    mng = graph.manager
+
+    with mng.transact() as tr:
+        for g in mng.graphs:
+            gcsts = mng.graph_constants[g]
+            if len(gcsts) > 1:
+                gcst = gcsts[0]
+                for c in gcsts[1:]:
+                    tr.replace(c, gcst)
+
+    return graph
+
+
 def lift_switch_call(graph):
+    """Lift calls of switch into the branches and inline the functions.
+
+    This transform is only a good idea if the backend has a switch
+    construct that doesn't evaluate both branches. Otherwise it is
+    better to keep the original switch as-is.
+
+    """
     mng = graph.manager
 
     with mng.transact() as tr:

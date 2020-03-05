@@ -10,12 +10,12 @@ from tvm.relay.backend import interpreter
 
 from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
-from ...ir import manage
+from ...ir import manage, Graph
 from ...operations import Primitive, primitives as P
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
 from ...xtype import UniverseType, type_to_np_dtype
 from ..channel import handle
-from ..transform import get_prim_graph, return_handles, wrap_result, lift_switch_call
+from ..transform import get_prim_graph, return_handles, wrap_result, lift_switch_call, collapse_constants
 from . import Backend, Converter, HandleBackend, relay_philox
 from .relay_helpers import (
     TypeHelper,
@@ -28,7 +28,7 @@ from .relay_helpers import (
     to_relay_type,
 )
 
-EXEC_KIND = 'debug'
+EXEC_KIND = 'vm'
 
 
 @wrap_result.register
@@ -542,15 +542,31 @@ class NodeVisitor:
     def __call__(self, node):
         """Don't visit called primitives."""
         if node.inputs:
-            if node.inputs[0].is_constant(Primitive):
-                prim = node.inputs[0].value
+            fn = node.inputs[0]
+            if fn.is_constant(Primitive):
+                prim = fn.value
                 visit = getattr(self, f'_visit_{prim}', None)
                 if visit is None:
                     return node.inputs[1:]
                 return visit(node)
             else:
                 return node.inputs
+        elif node.is_constant_graph():
+            return [fv if not isinstance(fv, Graph) else
+                    list(fv.manager.graph_constants[fv])[0]
+                    for fv in node.value.free_variables_total]
         return []
+
+
+def in_graph(g):
+    def filter(node):
+        if node.graph is None:
+            return 'follow'
+        elif node.graph is g:
+            return 'follow'
+        else:
+            return 'exclude'
+    return filter
 
 
 class RelayConstantConverter(Converter):
@@ -615,13 +631,17 @@ class CompileGraph:
 
         graph, handles_params = return_handles(graph)
 
-        graph = lift_switch_call(graph)
+        #graph = lift_switch_call(graph)
+        graph = collapse_constants(graph)
+
+        mng.keep_roots(graph)
 
         self.module = tvm.IRModule({})
         self.types = TypeHelper()
         self.types.initialize(self.module, mng)
         self.make_const = RelayConstantConverter(context, self.types)
         self.universe_helper = None
+        self.i = 0
 
         # Analyze and create a global union type of all the possible types
         # and then use it for all union values.
@@ -631,6 +651,10 @@ class CompileGraph:
         self.graph_map = {}
 
         for g in mng.graphs:
+
+            from myia.ir.utils import print_graph
+            print(print_graph(g))
+
             if g.parent is None:
                 if g is graph:
                     self.graph_map[g] = relay.GlobalVar("main")
@@ -643,6 +667,9 @@ class CompileGraph:
             function_map[self.graph_map[g]] = self.convert_func(g)
 
         add_functions(self.module, function_map, self.types)
+
+        print(str(self.module))
+        #breakpoint()
 
         vm = relay.create_executor(mod=self.module, ctx=context,
                                    target=target, kind=EXEC_KIND)
@@ -679,57 +706,48 @@ class CompileGraph:
                 get_prim_graph({}, node.value, node.abstract))
         return self.make_const(node.value, node.abstract)
 
-    def on_graph(self, node):
-        """Convert a graph constant."""
-        if node.value.parent is None:
-            return self.graph_map[node.value]
-        if node not in self.node_map:
-            v = relay.var(f"lv.{id(node)}")
-            self.node_map[node] = v
-            g = self.convert_func(node.value)
-            self.node_map[node] = relay.Let(v, g, v)
-        return self.node_map[node]
-
     def ref(self, node):
         """Return the value for a node."""
         return self.node_map[node]
 
     def convert_func(self, graph):
         """Convert a graph."""
-        vname = "handle_seq" + graph.debug.debug_name
-        i = 0
         for p in graph.parameters:
             self.node_map[p] = self.on_parameter(p)
 
         params = [self.ref(p) for p in graph.parameters]
 
-        useq = []
-        for node in toposort(graph.output, NodeVisitor()):
-            if any(p.abstract.xtype() is UniverseType
-                   for p in node.inputs[1:]):
-                useq.append(node)
-                self.node_map[node] = relay.var(f"{vname}.{i}")
-                i += 1
-            elif node.is_apply():
-                self.node_map[node] = self.on_apply(node)
+        seq = []
+        for node in toposort(graph.output, NodeVisitor(), in_graph(graph)):
+            if node in self.node_map:
+                continue
             elif node.is_constant_graph():
-                self.node_map[node] = self.on_graph(node)
+                if node.value.parent is None:
+                    self.node_map[node] = self.graph_map[node.value]
+                else:
+                    self.node_map[node] = relay.var(f'seq.{self.i}')
+                    self.i += 1
+                    seq.append(node)
             elif node.is_constant():
                 self.node_map[node] = self.on_constant(node)
+            else:
+                self.node_map[node] = relay.var(f"seq.{self.i}")
+                self.i += 1
+                seq.append(node)
 
         out = self.ref(graph.output)
 
-        for uop in reversed(useq):
-            assert node.is_apply()
-            out = relay.Let(
-                self.node_map[uop],
-                self.on_apply(uop),
-                out)
+        for op in reversed(seq):
+            if op.is_apply():
+                val = self.on_apply(op)
+            elif op.is_constant_graph():
+                val = self.convert_func(op.value)
+            else:
+                raise ValueError(f"Bad node for sequence: {op}")
+            out = relay.Let(self.node_map[op], val, out)
 
-        res = relay.Function(params, out,
-                             ret_type=to_relay_type(graph.output.abstract))
-
-        return res
+        return relay.Function(params, out,
+                              ret_type=to_relay_type(graph.output.abstract))
 
 
 compiler = CompileGraph()
