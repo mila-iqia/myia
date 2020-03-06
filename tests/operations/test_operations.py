@@ -114,6 +114,19 @@ def test_cos(a):
 
 
 @mt(
+    # seems to not accept integers
+    run(0., result=0),
+    run(np.float16(0), result=0),
+    run(np.float32(0), result=0),
+    run(np.float64(0), result=0),
+    run(math.pi / 4, result=1),
+    run(2 * math.pi / 3, result=math.tan(2 * math.pi / 3))
+)
+def test_tan(a):
+    return math.tan(a)
+
+
+@mt(
     run(-2.7, result=-2),
     run(7.8, result=7),
     run(np.float16(7.8), result=7),
@@ -140,6 +153,15 @@ def test_elemwise_sin(a):
 )
 def test_elemwise_cos(a):
     return np.cos(a)
+
+
+@mt(
+    # cos seems not supported for pytorch/CPU/float16
+    run(MA(3, 3, dtype='float32'), result=np.tan(MA(3, 3, dtype='float32'))),
+    run(MA(3, 3, dtype='float64'), result=np.tan(MA(3, 3, dtype='float64'))),
+)
+def test_elemwise_tan(a):
+    return np.tan(a)
 
 
 @mt(

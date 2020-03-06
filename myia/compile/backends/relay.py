@@ -61,6 +61,7 @@ SIMPLE_MAP = {
     P.scalar_tanh: relay.op.tanh,
     P.scalar_sin: relay.op.sin,
     P.scalar_cos: relay.op.cos,
+    P.scalar_tan: relay.op.tan,
     P.scalar_trunc: relay.op.trunc,
     P.scalar_sign: relay.sign,
     P.scalar_abs: relay.abs,
