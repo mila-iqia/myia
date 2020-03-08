@@ -1,4 +1,4 @@
-"""PyTorch Frontend."""
+"""Myia Frontend API of functions."""
 
 #############################################################################
 # WARNING:  None of this file is explicitly executed by pytest or forced    #
@@ -298,6 +298,14 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
 
 
 @core
+def conv_transpose2d(input, weight, bias, stride=1, padding=0,
+                     output_padding=0, groups=1, dilation=1):
+    """Map of Pytorch method torch.nn.functional.conv_transpose2d."""
+    return P.conv_transpose2d(input, weight, bias, stride, padding,
+                              output_padding, groups, dilation)
+
+
+@core
 def cross_entropy(input, target, reduction='mean'):
     """Map of method torch.nn.functional.cross_entropy."""
     a = torch.nn.functional.log_softmax(input, 1)
@@ -463,14 +471,12 @@ def mse_loss(input, target, reduction='mean'):
 @core
 def nll_loss(logs, targets, reduction='mean'):
     """Map of 'nll_loss' pytorch method."""
-    out = -gather(
-        logs,
-        1,
-        unsqueeze(P.array_cast(
-            reshape(
-                reshape(targets,
-                        (logs.shape[0], 1)), (logs.shape[0],)), i64), 1))
-    # ^TODO: is this still correct?
+    out = -reshape(
+        gather(logs,
+               1,
+               P.array_cast(reshape(targets, (logs.shape[0], 1)), i64)),
+        (logs.shape[0],)
+    )
 
     if reduction == 'none':
         out = out
