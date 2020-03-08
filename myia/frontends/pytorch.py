@@ -22,14 +22,7 @@ from ..hypermap import hyper_map
 from ..operations import primitives as P
 from ..pipeline.resources import default_convert
 from ..pipeline.standard import standard_method_map, standard_object_map
-from ..utils import OrderedSet, core, get_fields
-from ..xtype import NDArray
-from .pytorch_abstract_types import (
-    AbstractModule,
-    PyTorchTensor,
-    pytorch_dtype_to_type,
-)
-from .pytorch_functions import (
+from ..public_api import (
     _max,
     _sum,
     argmax,
@@ -66,6 +59,13 @@ from .pytorch_functions import (
     var,
     view_as,
     zeros,
+)
+from ..utils import OrderedSet, core, get_fields
+from ..xtype import NDArray
+from .pytorch_abstract_types import (
+    AbstractModule,
+    PyTorchTensor,
+    pytorch_dtype_to_type,
 )
 
 standard_object_map.update(
