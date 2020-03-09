@@ -474,6 +474,7 @@ class DeadDataElimination(Partializable):
             opt=self,
             node=None,
             manager=root.manager,
+            profile=False,
         )
         with tracer('opt', **args) as tr:
             tr.set_results(success=False, **args)
