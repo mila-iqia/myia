@@ -651,10 +651,6 @@ class CompileGraph:
         self.graph_map = {}
 
         for g in mng.graphs:
-
-            from myia.ir.utils import print_graph
-            print(print_graph(g))
-
             if g.parent is None:
                 if g is graph:
                     self.graph_map[g] = relay.GlobalVar("main")
@@ -667,9 +663,6 @@ class CompileGraph:
             function_map[self.graph_map[g]] = self.convert_func(g)
 
         add_functions(self.module, function_map, self.types)
-
-        print(str(self.module))
-        #breakpoint()
 
         vm = relay.create_executor(mod=self.module, ctx=context,
                                    target=target, kind=EXEC_KIND)
@@ -721,30 +714,30 @@ class CompileGraph:
         for node in toposort(graph.output, NodeVisitor(), in_graph(graph)):
             if node in self.node_map:
                 continue
-            elif node.is_constant_graph():
-                if node.value.parent is None:
-                    self.node_map[node] = self.graph_map[node.value]
-                else:
-                    self.node_map[node] = relay.var(f'seq.{self.i}')
-                    self.i += 1
-                    seq.append(node)
-            elif node.is_constant():
-                self.node_map[node] = self.on_constant(node)
+            if node.is_constant_graph() and node.value.parent is None:
+                self.node_map[node] = self.graph_map[node.value]
             else:
-                self.node_map[node] = relay.var(f"seq.{self.i}")
+                self.node_map[node] = relay.var(f'seq.{self.i}')
                 self.i += 1
                 seq.append(node)
 
         out = self.ref(graph.output)
 
         for op in reversed(seq):
+            var = self.node_map[op]
             if op.is_apply():
                 val = self.on_apply(op)
             elif op.is_constant_graph():
                 val = self.convert_func(op.value)
+            elif op.is_constant():
+                val = self.on_constant(op)
+                # This forces the rebuild of constants every time they
+                # are encountered since they may be shared amongst
+                # multiple graphs and it causes problems otherwise.
+                del self.node_map[op]
             else:
                 raise ValueError(f"Bad node for sequence: {op}")
-            out = relay.Let(self.node_map[op], val, out)
+            out = relay.Let(var, val, out)
 
         return relay.Function(params, out,
                               ret_type=to_relay_type(graph.output.abstract))
