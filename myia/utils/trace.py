@@ -304,23 +304,38 @@ class Profiler(TraceListener):
         super().__init__(focus)
         self.hierarchical = ProfileResults()
         self.aggregate = defaultdict(list)
+        self._ctr = 0
         self.overhead = 0
         self.print_results = print_results
 
-    def on_enter(self, _stack=None, **kwargs):
+    def on_enter(self, _stack=None, profile=True, **kwargs):
         """Executed when a block is entered."""
+        if not profile:
+            return
         d = self.hierarchical
-        for part in _stack:
-            d.setdefault(part.name, ProfileResults(part.name))
+        for part in _stack[:-1]:
+            if not part.kwargs.get('profile', True):
+                return
             d = d[part.name]
-        d.start = perf_counter()
+        lpart = _stack[-1]
+        m = ProfileResults(lpart.name)
+        if lpart.name in d:
+            lpart.name =  f"{lpart.name}.{self._ctr}"
+            self._ctr += 1
+        d[lpart.name] = m
+        m.start = perf_counter()
 
-    def on_exit(self, _stack=None, **kwargs):
+    def on_exit(self, _stack=None, profile=True, **kwargs):
         """Executed when a block is exited."""
+        if not profile:
+            return
+        end = perf_counter()
         d = self.hierarchical
         for part in _stack:
+            if not part.kwargs.get('profile', True):
+                return
             d = d[part.name]
-        d.end = perf_counter()
+        d.end = end
         d.total = d.end - d.start
         d.parts_total = sum(v.total for v in d.values())
         if d.parts_total:
@@ -328,7 +343,7 @@ class Profiler(TraceListener):
         else:
             d.overhead = 0
         self.overhead += d.overhead
-        self.aggregate[part.name].append(d)
+        self.aggregate[d.name].append(d)
 
     def post(self):
         """Print the results."""
