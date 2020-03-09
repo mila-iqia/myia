@@ -20,11 +20,10 @@ from ...abstract import (
     AbstractType,
     TypedPrimitive,
     VirtualFunction,
-    broaden,
 )
+from ...operations import primitives as P
 from ...utils import overload
 from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
-from ...operations import primitives as P
 
 union_type = relay.GlobalTypeVar('$_union_adt')
 empty_union = adt.Constructor("empty", [], union_type)
@@ -99,6 +98,7 @@ class TypeHelper:
         mod[env_type] = adt.TypeData(env_type, [], [self.env_ctr])
 
     def build_default_env_val(self):
+        """Build the default value for env, which is empty."""
         return self.env_ctr(
             relay.Tuple([nil() for _ in self.env_val_map]))
 
@@ -109,7 +109,7 @@ class TypeHelper:
                                    for i in range(len(map))])
 
     def do_env_update(self, env_, key, val):
-        """Return a function to update a grad env."""
+        """Build the code to update the env."""
         v = relay.var('v')
         cl = adt.Clause(
             adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
@@ -123,6 +123,7 @@ class TypeHelper:
         return self.env_ctr(new_env)
 
     def do_env_find(self, env, key, dft):
+        """Build the code to find a value in env."""
         v = relay.var('v')
         cl = adt.Clause(
             adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
@@ -278,7 +279,6 @@ __all__ = [
     'TypeHelper',
     'add_functions',
     'dead_value',
-    'empty_env',
     'fill_reverse_tag_map',
     'get_myia_tag',
     'get_union_ctr',

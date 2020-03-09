@@ -52,54 +52,6 @@ def collapse_constants(graph):
     return graph
 
 
-def lift_switch_call(graph):
-    """Lift calls of switch into the branches and inline the functions.
-
-    This transform is only a good idea if the backend has a switch
-    construct that doesn't evaluate both branches. Otherwise it is
-    better to keep the original switch as-is.
-
-    """
-    mng = graph.manager
-
-    with mng.transact() as tr:
-        for node in mng.all_nodes:
-            if not node.is_apply():
-                continue
-            fn = node.inputs[0]
-            if len(node.inputs) > 1:
-                continue
-            if not fn.is_apply():
-                continue
-            fn_fn = fn.inputs[0]
-            if not fn_fn.is_constant() and fn_fn.value == P.switch:
-                continue
-            # Don't want to mess with cross-graph
-            if node.graph is not fn.graph:
-                continue
-            X1 = fn.inputs[1]
-            X2 = fn.graph.apply(fn.inputs[2])
-            X2.abstract = node.abstract
-            X3 = fn.graph.apply(fn.inputs[3])
-            X3.abstract = node.abstract
-            new_node = fn.graph.apply(P.switch, X1, X2, X3)
-            new_node.abstract = node.abstract
-            tr.replace(node, new_node)
-
-    # run inline
-    from myia.opt import lib as optlib, NodeMap, LocalPassOptimizer
-    nmap = NodeMap()
-    opt_list = [
-        optlib.inline_unique_uses,
-    ]
-    for opt in opt_list:
-        nmap.register(getattr(opt, 'interest', None), opt)
-    spec = LocalPassOptimizer(nmap, None)
-    spec(graph)
-
-    return graph
-
-
 def get_prim_graph(cache, prim, typ):
     """Make a graph that wraps a primitive."""
     if (prim, typ) not in cache:

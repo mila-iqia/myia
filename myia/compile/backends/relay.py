@@ -10,12 +10,17 @@ from tvm.relay.backend import interpreter
 
 from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
-from ...ir import manage, Graph
+from ...ir import Graph, manage
 from ...operations import Primitive, primitives as P
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
-from ...xtype import UniverseType, type_to_np_dtype
+from ...xtype import type_to_np_dtype
 from ..channel import handle
-from ..transform import get_prim_graph, return_handles, wrap_result, lift_switch_call, collapse_constants
+from ..transform import (
+    collapse_constants,
+    get_prim_graph,
+    return_handles,
+    wrap_result,
+)
 from . import Backend, Converter, HandleBackend, relay_philox
 from .relay_helpers import (
     TypeHelper,
@@ -630,8 +635,6 @@ class CompileGraph:
         mng = manage(graph)
 
         graph, handles_params = return_handles(graph)
-
-        #graph = lift_switch_call(graph)
         graph = collapse_constants(graph)
 
         mng.keep_roots(graph)
