@@ -77,7 +77,7 @@ class Tracer:
         cp = Tracer()
         cp.stack = list(self.stack)
         cp.curpath = self.curpath
-        cp.listener = list(self.listeners)
+        cp.listeners = list(self.listeners)
         return cp
 
     def __call__(self, name, *args, **kwargs):
