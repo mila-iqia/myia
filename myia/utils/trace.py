@@ -320,7 +320,7 @@ class Profiler(TraceListener):
         lpart = _stack[-1]
         m = ProfileResults(lpart.name)
         if lpart.name in d:
-            lpart.name =  f"{lpart.name}.{self._ctr}"
+            lpart.name = f"{lpart.name}.{self._ctr}"
             self._ctr += 1
         d[lpart.name] = m
         m.start = perf_counter()
