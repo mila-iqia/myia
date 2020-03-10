@@ -125,9 +125,22 @@ def test_focus():
     }
 
 
+def badsleep():
+    with tracer('sleep') as tr:
+        with tracer('fence', profile=False) as tr:
+            for i in range(10):
+                with tracer('sheep', number=i) as tr:
+                    tr.set_results(counted=True, profile=False)
+            with tracer('stare', at='ceiling') as tr:
+                tracer().emit_time(hours=5)
+
+
 def test_profile():
     with Profiler():
         day()
+
+    with Profiler():
+       badsleep()
 
 
 def test_dotrace():
