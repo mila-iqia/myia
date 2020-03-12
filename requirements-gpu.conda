@@ -2,8 +2,9 @@ python>=3.7,<3.8a0
 colorama
 numpy
 opt_einsum
-abergeron/label/cuda::tvm-libs
-abergeron::tvm==0.7dev+0.*
+cudatoolkit=10.0
+cudnn
+abergeron::tvm==0.7dev1+0.*
 pytest
 pytest-cov
 yaml
