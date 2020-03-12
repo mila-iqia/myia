@@ -140,7 +140,7 @@ def test_profile():
         day()
 
     with Profiler():
-       badsleep()
+        badsleep()
 
 
 def test_dotrace():
