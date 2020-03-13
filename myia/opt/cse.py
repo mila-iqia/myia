@@ -102,6 +102,7 @@ class CSE(Partializable):
             opt=self,
             node=None,
             manager=self.resources.manager,
+            profile=False,
         )
         with tracer('opt', **args) as tr:
             tr.set_results(success=False, **args)

@@ -141,12 +141,13 @@ class InferenceResource(Partializable):
                     outspec=outspec) as tr:
             if clear:
                 self.engine.reset()
-            rval = self.engine.run(
-                graph,
-                argspec=tuple(arg['abstract'] if isinstance(arg, dict)
-                              else arg for arg in argspec),
-                outspec=outspec,
-            )
+            with tracer('engine', profile=False) as tr:
+                rval = self.engine.run(
+                    graph,
+                    argspec=tuple(arg['abstract'] if isinstance(arg, dict)
+                                  else arg for arg in argspec),
+                    outspec=outspec,
+                )
             tr.set_results(output=rval)
             return rval
 

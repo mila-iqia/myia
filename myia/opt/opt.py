@@ -215,6 +215,7 @@ class LocalPassOptimizer:
                     opt=transformer,
                     node=n,
                     manager=mng,
+                    profile=False,
                 )
                 with tracer('opt', **args) as tr:
                     tr.set_results(success=False, **args)
