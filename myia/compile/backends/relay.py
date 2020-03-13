@@ -42,8 +42,7 @@ def wrap_result(data: tvm.runtime.container.ADT):
     if data.tag == 0:
         return tuple(handle(d) for d in data)
     else:
-        raise ValueError(  # pragma: no cover
-            "Returning non-tuple from top-level function.")
+        return handle(data)
 
 
 def ashape(node):
@@ -538,10 +537,16 @@ class NodeVisitor:
     def _visit_array_reduce(self, node):
         return node.inputs[2:]
 
+    def _visit_array_cast(self, node):
+        return [node.inputs[1]]
+
     def _visit_scalar_to_array(self, node):
         return [node.inputs[1]]
 
     def _visit_unsafe_static_cast(self, node):
+        return [node.inputs[1]]
+
+    def _visit_scalar_cast(self, node):
         return [node.inputs[1]]
 
     def __call__(self, node):
@@ -717,7 +722,7 @@ class CompileGraph:
         for node in toposort(graph.output, NodeVisitor(), in_graph(graph)):
             if node in self.node_map:
                 continue
-            if node.is_constant_graph() and node.value.parent is None:
+            elif node.is_constant_graph() and node.value.parent is None:
                 self.node_map[node] = self.graph_map[node.value]
             else:
                 self.node_map[node] = relay.var(f'seq.{self.i}')
