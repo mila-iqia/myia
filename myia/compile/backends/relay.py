@@ -185,6 +185,21 @@ def relay_tuple_getitem(c, t, idx):
     return relay.expr.TupleGetItem(c.ref(t), idx.value)
 
 
+def relay_tuple_setitem(c, t, idx, val):
+    assert idx.is_constant(int)
+    len_tuple = len(t.abstract.elements)
+    tuple_value = c.ref(t)
+    new_value = c.ref(val)
+    value_idx = idx.value
+    return relay.expr.Tuple(
+        [relay.expr.TupleGetItem(tuple_value, i)
+         for i in range(value_idx)]
+        + [new_value]
+        + [relay.expr.TupleGetItem(tuple_value, i)
+           for i in range(value_idx + 1, len_tuple)]
+    )
+
+
 def relay_casttag(c, x, tag):
     """Implementation of casttag for Relay."""
     assert tag.is_constant(int)
@@ -467,6 +482,7 @@ COMPLEX_MAP = {
     P.array_cast: relay_cast,
     P.scalar_cast: relay_cast,
     P.tuple_getitem: relay_tuple_getitem,
+    P.tuple_setitem: relay_tuple_setitem,
     P.casttag: relay_casttag,
     P.hastag: relay_hastag,
     P.tagged: relay_tagged,

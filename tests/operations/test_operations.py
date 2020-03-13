@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 
+from myia import operations
 from myia.utils.errors import MyiaTypeError
 from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
 
@@ -268,3 +269,25 @@ def test_infer_scalar_cast(dtype, value):
 )
 def test_scalar_cast(dtype, value):
     return dtype(value)
+
+
+@mt(
+    run((7, 4, 9), 0, result=7),
+    run((7, 4, 9), 1, result=4),
+    run((7, 4, 9), 2, result=9),
+    # Only index must be passed as raw (constant) value
+    broad_specs=(True, False)
+)
+def test_tuple_getitem(t, i):
+    return t[i]
+
+
+@mt(
+    run((7, 4, 9), 0, 44, result=(44, 4, 9)),
+    run((7, 4, 9), 1, 44, result=(7, 44, 9)),
+    run((7, 4, 9), 2, 44, result=(7, 4, 44)),
+    # Only index must be passed as raw value
+    broad_specs=(True, False, True)
+)
+def test_tuple_setitem(t, i, v):
+    return operations.tuple_setitem(t, i, v)
