@@ -23,7 +23,8 @@ def increment(h):
 
 def test_increment():
 
-    @myia(use_universe=True, backend='relay')
+    @myia(use_universe=True, backend='relay',
+          backend_options={'exec_kind': 'debug'})
     def plus4(x):
         h = handle(x)
         increment(h)
@@ -38,7 +39,8 @@ def test_increment():
 
 def test_increment_interleave():
 
-    @myia(use_universe=True, backend='relay')
+    @myia(use_universe=True, backend='relay',
+          backend_options={'exec_kind': 'debug'})
     def plus2(x, y):
         h1 = handle(x)
         h2 = handle(y)
@@ -54,7 +56,8 @@ def test_increment_interleave():
 
 def test_increment_loop():
 
-    @myia(use_universe=True, backend='relay')
+    @myia(use_universe=True, backend='relay',
+          backend_options={'exec_kind': 'debug'})
     def plus(x, y):
         h = handle(x)
         i = y
@@ -69,7 +72,8 @@ def test_increment_loop():
 
 def test_increment_recursion():
 
-    @myia(use_universe=True, backend='relay')
+    @myia(use_universe=True, backend='relay',
+          backend_options={'exec_kind': 'debug'})
     def length(h, xs):
         if not isinstance(xs, Empty):
             increment(h)
@@ -83,7 +87,8 @@ def test_increment_recursion():
 
 def test_give_handle():
 
-    @myia(use_universe=True, backend='relay')
+    @myia(use_universe=True, backend='relay',
+          backend_options={'exec_kind': 'debug'})
     def plus(h, y):
         i = y
         while i > 0:
@@ -105,7 +110,8 @@ def test_give_handle():
 
 def test_return_handle():
 
-    @myia(use_universe=True, backend='relay')
+    @myia(use_universe=True, backend='relay',
+          backend_options={'exec_kind': 'debug'})
     def plus2(h):
         increment(h)
         increment(h)

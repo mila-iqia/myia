@@ -33,8 +33,6 @@ from .relay_helpers import (
     to_relay_type,
 )
 
-EXEC_KIND = 'vm'
-
 
 @wrap_result.register
 def wrap_result(data: tvm.runtime.container.ADT):
@@ -635,7 +633,7 @@ class CompileGraph:
         output: a wrapped relay graph
     """
 
-    def run(self, graph, context, target):
+    def run(self, graph, context, target, exec_kind):
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
@@ -673,7 +671,7 @@ class CompileGraph:
         add_functions(self.module, function_map, self.types)
 
         vm = relay.create_executor(mod=self.module, ctx=context,
-                                   target=target, kind=EXEC_KIND)
+                                   target=target, kind=exec_kind)
         res = vm.evaluate()
 
         fill_reverse_tag_map()
@@ -757,9 +755,10 @@ compiler = CompileGraph()
 class RelayInputConverter(Converter):
     """Convert values to Relay."""
 
-    def __init__(self, context):
+    def __init__(self, context, exec_kind):
         """Set the context."""
         self.context = context
+        self.exec_kind = exec_kind
         self.th = TypeHelper()
         self.cst_conv = RelayConstantConverter(self.context, self.th)
 
@@ -795,7 +794,8 @@ class RelayInputConverter(Converter):
         self.th.initialize(mod, None)
         cst = self.cst_conv.convert_tagged(v, t)
         mod["main"] = relay.Function([], cst)
-        vm = relay.create_executor(ctx=self.context, mod=mod, kind=EXEC_KIND)
+        vm = relay.create_executor(ctx=self.context, mod=mod,
+                                   kind=self.exec_kind)
         return vm.evaluate()()
 
     def convert_type(self, v, t):
@@ -850,12 +850,13 @@ class RelayBackend(Backend):
 
     Backend options:
 
-        :target: the target device class ('cpu', 'cuda')
+        :target: the target device class ('cpu', 'cuda', ...)
         :device_id: the target device identifier (an int)
+        :exec_kind: a string ('vm' or 'debug')
 
     """
 
-    def __init__(self, target, device_id):
+    def __init__(self, target, device_id, exec_kind):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.runtime.ndarray.context(target, device_id)
@@ -865,18 +866,23 @@ class RelayBackend(Backend):
         if not self.context.exist:
             raise RuntimeError("No hardware to support selected target "
                                f"'{target}' on device {device_id}")
+        if exec_kind not in ('vm', 'debug'):
+            raise ValueError(f"Invalid exec_kind: {exec_kind}")
+        self.exec_kind = exec_kind
         self.compiler = compiler
-        self.to_backend_value = RelayInputConverter(self.context)
+        self.to_backend_value = RelayInputConverter(self.context,
+                                                    self.exec_kind)
         self.from_backend_value = RelayOutputConverter()
 
     def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
-        return self.compiler.run(graph, self.context, self.target)
+        return self.compiler.run(graph, self.context, self.target,
+                                 self.exec_kind)
 
 
-def RelayBackendR(target, device_id):
+def RelayBackendR(target, device_id, exec_kind):
     """Relay proxy."""
-    return HandleBackend(RelayBackend(target, device_id))
+    return HandleBackend(RelayBackend(target, device_id, exec_kind))
 
 
 __all__ = [

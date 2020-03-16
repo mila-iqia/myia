@@ -251,6 +251,8 @@ def _placeholder_body(type, types):
             params,
             _placeholder_body(type.ret_type, types),
             ret_type=type.ret_type)
+    elif isinstance(type, relay.RefType):
+        return relay.RefCreate(_placeholder_body(type.value, types))
     elif isinstance(type, Object):
         if type.func == union_type:
             return empty_union()
@@ -258,8 +260,6 @@ def _placeholder_body(type, types):
             return types.build_default_env_val()
         else:  # pragma: no cover
             raise ValueError(f"Can't build value for adt: {type.func}")
-    elif isinstance(type, relay.RefType):
-        return relay.RefCreate(_placeholder_body(type.value, types))
     else:  # pragma: no cover
         raise ValueError(f"Can't build value of type {type}")
 
