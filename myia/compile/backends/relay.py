@@ -619,9 +619,6 @@ class RelayConstantConverter(Converter):
         conv_val = self(v.value, real_t)
         return ctr(conv_val)
 
-    def convert_type(self, v, t):
-        return to_relay_type(v)
-
 
 class CompileGraph:
     """Step to convert a myia graph to a relay graph.

@@ -75,9 +75,6 @@ class EnvInstance:
     def _serialize(self):
         return self._contents
 
-    def __repr__(self):
-        return f"EnvInstance({self._contents})"
-
     @classmethod
     def _construct(cls):
         res = cls([])
