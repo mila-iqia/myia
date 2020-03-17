@@ -16,7 +16,6 @@ from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
 from ...xtype import type_to_np_dtype
 from ..channel import handle
 from ..transform import (
-    collapse_constants,
     get_prim_graph,
     return_handles,
     wrap_result,
@@ -635,7 +634,6 @@ class CompileGraph:
         mng = manage(graph)
 
         graph, handles_params = return_handles(graph)
-        graph = collapse_constants(graph)
 
         mng.keep_roots(graph)
 

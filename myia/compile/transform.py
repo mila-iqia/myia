@@ -37,21 +37,6 @@ def convert_grad(graph):
     return graph
 
 
-def collapse_constants(graph):
-    """Collapse all graph constants into a single one per graph."""
-    mng = graph.manager
-
-    with mng.transact() as tr:
-        for g in mng.graphs:
-            gcsts = mng.graph_constants[g]
-            if len(gcsts) > 1:
-                gcst = gcsts[0]
-                for c in gcsts[1:]:
-                    tr.replace(c, gcst)
-
-    return graph
-
-
 def get_prim_graph(cache, prim, typ):
     """Make a graph that wraps a primitive."""
     if (prim, typ) not in cache:
