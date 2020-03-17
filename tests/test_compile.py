@@ -12,7 +12,7 @@ from myia.operations import (
 from myia.pipeline import standard_pipeline
 
 from .common import MA, MB, Point
-from .multitest import mt, run, run_no_relay
+from .multitest import mt, run, run_no_relay, run_relay_debug
 
 run_no_opt = run.configure(
     pipeline=standard_pipeline.configure({'opt.phases.main': []})
@@ -170,6 +170,7 @@ def test_is_not(x):
     run(1, 1.7, Point(3, 4), (8, 9)),
     run(0, 1.7, Point(3, 4), (8, 9)),
     run(-1, 1.7, Point(3, 4), (8, 9)),
+    run_relay_debug(0, 1.7, Point(3, 4), (8, 9)),
 )
 def test_tagged(c, x, y, z):
     if c > 0:

@@ -341,10 +341,6 @@ def relay_conv_transpose2d(c, input, weight, bias, stride, padding,
     assert dilation.is_constant(tuple)
     assert groups.is_constant(int)
 
-    if stride.value != (1, 1):
-        raise ValueError("non unit stride is not supported "
-                         "for relay conv_transpose2d "
-                         "for now, it gives bad values")
     data_shape = input.abstract.xshape()
     weight_shape = weight.abstract.xshape()
     _, in_channels, _, _ = data_shape
@@ -737,7 +733,7 @@ class CompileGraph:
                 # multiple graphs and it causes problems otherwise.
                 del self.node_map[op]
             else:
-                raise ValueError(f"Bad node for sequence: {op}")
+                raise AssertionError(f"Bad node for sequence: {op}")
             out = relay.Let(var, val, out)
 
         return relay.Function(params, out,
