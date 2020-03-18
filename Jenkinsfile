@@ -23,9 +23,17 @@ conda activate test &&
 ./cov.sh &&
 coverage xml
 """
-    sh script: '$HOME/miniconda/bin/pip install codecov'
+    sh script: """
+. $HOME/miniconda/etc/profile.d/conda.sh &&
+conda activate test &&
+pip install codecov
+"""
     withCredentials([string(credentialsId: 'myia_codecov', variable: 'CODECOV_TOKEN')]) {
-      sh script: '$HOME/miniconda/bin/codecov --commit `git rev-parse origin/$BRANCH_NAME`'
+      sh script: """
+. $HOME/miniconda/etc/profile.d/conda.sh &&
+conda activate test &&
+codecov --commit `git rev-parse origin/$BRANCH_NAME`
+"""
     }
   }
 }
