@@ -10,10 +10,10 @@ from tvm.relay.backend import interpreter
 
 from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
-from ...ir import manage
+from ...ir import Graph, manage
 from ...operations import Primitive, primitives as P
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
-from ...xtype import UniverseType, type_to_np_dtype
+from ...xtype import type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result
 from . import Backend, Converter, HandleBackend, relay_philox
@@ -21,15 +21,12 @@ from .relay_helpers import (
     TypeHelper,
     add_functions,
     dead_value,
-    empty_env,
     fill_reverse_tag_map,
     get_myia_tag,
     get_union_ctr,
     handle_wrapper,
     to_relay_type,
 )
-
-EXEC_KIND = 'debug'
 
 
 @wrap_result.register
@@ -38,8 +35,7 @@ def wrap_result(data: tvm.runtime.container.ADT):
     if data.tag == 0:
         return tuple(handle(d) for d in data)
     else:
-        raise ValueError(  # pragma: no cover
-            "Returning non-tuple from top-level function.")
+        return handle(data)
 
 
 def ashape(node):
@@ -228,14 +224,12 @@ def relay_tagged(c, x, tag):
 
 def relay_env_setitem(c, env, key, x):
     """Implementation of env_setitem for Relay."""
-    gv = c.types.get_env_update(x.abstract)
-    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(x)])
+    return c.types.do_env_update(c.ref(env), key.value, c.ref(x))
 
 
 def relay_env_getitem(c, env, key, dft):
     """Implementation of env_getitem for Relay."""
-    gv = c.types.get_env_find(dft.abstract)
-    return relay.Call(gv, [c.ref(env), c.ref(key), c.ref(dft)])
+    return c.types.do_env_find(c.ref(env), key.value, c.ref(dft))
 
 
 def relay_unsafe_static_cast(c, val, ty):
@@ -358,10 +352,6 @@ def relay_conv_transpose2d(c, input, weight, bias, stride, padding,
     assert dilation.is_constant(tuple)
     assert groups.is_constant(int)
 
-    if stride.value != (1, 1):
-        raise ValueError("non unit stride is not supported "
-                         "for relay conv_transpose2d "
-                         "for now, it gives bad values")
     data_shape = input.abstract.xshape()
     weight_shape = weight.abstract.xshape()
     _, in_channels, _, _ = data_shape
@@ -552,32 +542,55 @@ class NodeVisitor:
     def _visit_array_reduce(self, node):
         return node.inputs[2:]
 
+    def _visit_array_cast(self, node):
+        return [node.inputs[1]]
+
     def _visit_scalar_to_array(self, node):
         return [node.inputs[1]]
 
     def _visit_unsafe_static_cast(self, node):
         return [node.inputs[1]]
 
+    def _visit_scalar_cast(self, node):
+        return [node.inputs[1]]
+
     def __call__(self, node):
         """Don't visit called primitives."""
         if node.inputs:
-            if node.inputs[0].is_constant(Primitive):
-                prim = node.inputs[0].value
+            fn = node.inputs[0]
+            if fn.is_constant(Primitive):
+                prim = fn.value
                 visit = getattr(self, f'_visit_{prim}', None)
                 if visit is None:
                     return node.inputs[1:]
                 return visit(node)
             else:
                 return node.inputs
+        elif node.is_constant_graph():
+            return [fv if not isinstance(fv, Graph) else
+                    list(fv.manager.graph_constants[fv])[0]
+                    for fv in node.value.free_variables_total]
         return []
+
+
+def in_graph(g):
+    def filter(node):
+        if node.graph is None:
+            return 'follow'
+        elif node.graph is g:
+            return 'follow'
+        else:
+            return 'exclude'
+    return filter
 
 
 class RelayConstantConverter(Converter):
     """Convert values to Relay constants."""
 
-    def __init__(self, context):
+    def __init__(self, context, types):
         """Set the context."""
         self.context = context
+        self.types = types
 
     def convert_array(self, v, t):  # pragma: no cover
         """Make a TVM array from a numpy array."""
@@ -601,7 +614,7 @@ class RelayConstantConverter(Converter):
 
     def convert_env(self, v, t):
         assert len(v) == 0
-        return empty_env()
+        return self.types.build_default_env_val()
 
     def convert_tuple(self, v, t):
         return relay.Tuple([self(e, et) for e, et in
@@ -612,9 +625,6 @@ class RelayConstantConverter(Converter):
         ctr = get_union_ctr(v.tag, real_t)
         conv_val = self(v.value, real_t)
         return ctr(conv_val)
-
-    def convert_type(self, v, t):
-        return to_relay_type(v)
 
 
 class CompileGraph:
@@ -627,17 +637,20 @@ class CompileGraph:
         output: a wrapped relay graph
     """
 
-    def run(self, graph, context, target):
+    def run(self, graph, context, target, exec_kind):
         """Convert the graph into a relay callable."""
         mng = manage(graph)
 
         graph, handles_params = return_handles(graph)
 
-        self.module = relay.Module({})
+        mng.keep_roots(graph)
+
+        self.module = tvm.IRModule({})
         self.types = TypeHelper()
         self.types.initialize(self.module, mng)
-        self.make_const = RelayConstantConverter(context)
+        self.make_const = RelayConstantConverter(context, self.types)
         self.universe_helper = None
+        self.i = 0
 
         # Analyze and create a global union type of all the possible types
         # and then use it for all union values.
@@ -651,20 +664,17 @@ class CompileGraph:
                 if g is graph:
                     self.graph_map[g] = relay.GlobalVar("main")
                 else:
-                    # Mangle a "main" from the user
-                    name = g.debug.debug_name
-                    if name == "main":  # pragma: no cover
-                        name = "!main"
+                    # Mangle user names
+                    name = "_" + g.debug.debug_name
                     self.graph_map[g] = relay.GlobalVar(name)
 
         for g in self.graph_map.keys():
             function_map[self.graph_map[g]] = self.convert_func(g)
 
-        self.types.finalize(self.module)
-        add_functions(self.module, function_map)
+        add_functions(self.module, function_map, self.types)
 
         vm = relay.create_executor(mod=self.module, ctx=context,
-                                   target=target, kind=EXEC_KIND)
+                                   target=target, kind=exec_kind)
         res = vm.evaluate()
 
         fill_reverse_tag_map()
@@ -698,57 +708,48 @@ class CompileGraph:
                 get_prim_graph({}, node.value, node.abstract))
         return self.make_const(node.value, node.abstract)
 
-    def on_graph(self, node):
-        """Convert a graph constant."""
-        if node.value.parent is None:
-            return self.graph_map[node.value]
-        if node not in self.node_map:
-            v = relay.var(f"lv.{id(node)}")
-            self.node_map[node] = v
-            g = self.convert_func(node.value)
-            self.node_map[node] = relay.Let(v, g, v)
-        return self.node_map[node]
-
     def ref(self, node):
         """Return the value for a node."""
         return self.node_map[node]
 
     def convert_func(self, graph):
         """Convert a graph."""
-        vname = "handle_seq" + graph.debug.debug_name
-        i = 0
         for p in graph.parameters:
             self.node_map[p] = self.on_parameter(p)
 
         params = [self.ref(p) for p in graph.parameters]
 
-        useq = []
-        for node in toposort(graph.output, NodeVisitor()):
-            if any(p.abstract.xtype() is UniverseType
-                   for p in node.inputs[1:]):
-                useq.append(node)
-                self.node_map[node] = relay.var(f"{vname}.{i}")
-                i += 1
-            elif node.is_apply():
-                self.node_map[node] = self.on_apply(node)
-            elif node.is_constant_graph():
-                self.node_map[node] = self.on_graph(node)
-            elif node.is_constant():
-                self.node_map[node] = self.on_constant(node)
+        seq = []
+        for node in toposort(graph.output, NodeVisitor(), in_graph(graph)):
+            if node in self.node_map:
+                continue
+            elif node.is_constant_graph() and node.value.parent is None:
+                self.node_map[node] = self.graph_map[node.value]
+            else:
+                self.node_map[node] = relay.var(f'seq.{self.i}')
+                self.i += 1
+                seq.append(node)
 
         out = self.ref(graph.output)
 
-        for uop in reversed(useq):
-            assert node.is_apply()
-            out = relay.Let(
-                self.node_map[uop],
-                self.on_apply(uop),
-                out)
+        for op in reversed(seq):
+            var = self.node_map[op]
+            if op.is_apply():
+                val = self.on_apply(op)
+            elif op.is_constant_graph():
+                val = self.convert_func(op.value)
+            elif op.is_constant():
+                val = self.on_constant(op)
+                # This forces the rebuild of constants every time they
+                # are encountered since they may be shared amongst
+                # multiple graphs and it causes problems otherwise.
+                del self.node_map[op]
+            else:
+                raise AssertionError(f"Bad node for sequence: {op}")
+            out = relay.Let(var, val, out)
 
-        res = relay.Function(params, out,
-                             ret_type=to_relay_type(graph.output.abstract))
-
-        return res
+        return relay.Function(params, out,
+                              ret_type=to_relay_type(graph.output.abstract))
 
 
 compiler = CompileGraph()
@@ -757,11 +758,12 @@ compiler = CompileGraph()
 class RelayInputConverter(Converter):
     """Convert values to Relay."""
 
-    def __init__(self, context):
+    def __init__(self, context, exec_kind):
         """Set the context."""
         self.context = context
+        self.exec_kind = exec_kind
         self.th = TypeHelper()
-        self.cst_conv = RelayConstantConverter(self.context)
+        self.cst_conv = RelayConstantConverter(self.context, self.th)
 
     def convert_array(self, v, t):
         """Make a TVM array from a numpy array."""
@@ -791,12 +793,12 @@ class RelayInputConverter(Converter):
         return interpreter.RefValue(v)
 
     def convert_tagged(self, v, t):
-        mod = relay.Module({})
+        mod = tvm.IRModule({})
         self.th.initialize(mod, None)
         cst = self.cst_conv.convert_tagged(v, t)
         mod["main"] = relay.Function([], cst)
-        self.th.finalize(mod)
-        vm = relay.create_executor(ctx=self.context, mod=mod, kind=EXEC_KIND)
+        vm = relay.create_executor(ctx=self.context, mod=mod,
+                                   kind=self.exec_kind)
         return vm.evaluate()()
 
     def convert_type(self, v, t):
@@ -851,12 +853,13 @@ class RelayBackend(Backend):
 
     Backend options:
 
-        :target: the target device class ('cpu', 'cuda')
+        :target: the target device class ('cpu', 'cuda', ...)
         :device_id: the target device identifier (an int)
+        :exec_kind: a string ('vm' or 'debug')
 
     """
 
-    def __init__(self, target, device_id):
+    def __init__(self, target, device_id, exec_kind):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.runtime.ndarray.context(target, device_id)
@@ -866,18 +869,23 @@ class RelayBackend(Backend):
         if not self.context.exist:
             raise RuntimeError("No hardware to support selected target "
                                f"'{target}' on device {device_id}")
+        if exec_kind not in ('vm', 'debug'):
+            raise ValueError(f"Invalid exec_kind: {exec_kind}")
+        self.exec_kind = exec_kind
         self.compiler = compiler
-        self.to_backend_value = RelayInputConverter(self.context)
+        self.to_backend_value = RelayInputConverter(self.context,
+                                                    self.exec_kind)
         self.from_backend_value = RelayOutputConverter()
 
     def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
-        return self.compiler.run(graph, self.context, self.target)
+        return self.compiler.run(graph, self.context, self.target,
+                                 self.exec_kind)
 
 
-def RelayBackendR(target, device_id):
+def RelayBackendR(target, device_id, exec_kind):
     """Relay proxy."""
-    return HandleBackend(RelayBackend(target, device_id))
+    return HandleBackend(RelayBackend(target, device_id, exec_kind))
 
 
 __all__ = [

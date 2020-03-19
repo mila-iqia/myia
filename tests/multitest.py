@@ -308,6 +308,9 @@ backend_no_relay = Multiple(
                  marks=pytest.mark.pytorch),
 )
 run = _run.configure(backend=backend_all)
+run_relay_debug = _run.configure(backend=Multiple(
+    pytest.param(('relay', {'exec_kind': 'debug'}),
+                 id='relay-cpu-debug', marks=pytest.mark.relay)))
 run_gpu = _run.configure(backend=backend_gpu)
 run_no_relay = _run.configure(backend=backend_no_relay)
 run_debug = run.configure(pipeline=standard_debug_pipeline, validate=False,

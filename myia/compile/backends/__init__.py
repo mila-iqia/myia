@@ -34,9 +34,9 @@ def channel_loader(pkg, name):
     return loader
 
 
-def relay_defaults(target='cpu', device_id=0):
+def relay_defaults(target='cpu', device_id=0, exec_kind='vm'):
     """Format options for relay."""
-    return dict(target=target, device_id=device_id)
+    return dict(target=target, device_id=device_id, exec_kind=exec_kind)
 
 
 def pytorch_default(device='cpu:0'):

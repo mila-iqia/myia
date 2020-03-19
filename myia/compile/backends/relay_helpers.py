@@ -6,6 +6,7 @@ Most of those should go away as Relay main development progresses.
 import numpy as np
 from tvm import relay
 from tvm.relay import adt
+from tvm.runtime.object import Object
 
 from ...abstract import (
     AbstractArray,
@@ -19,8 +20,8 @@ from ...abstract import (
     AbstractType,
     TypedPrimitive,
     VirtualFunction,
-    broaden,
 )
+from ...operations import primitives as P
 from ...utils import overload
 from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
@@ -59,13 +60,11 @@ def get_myia_tag(rtag):
     return rev_tag_map[rtag]
 
 
-env_val = relay.GlobalTypeVar('$_env_val')
-
-env_type = relay.GlobalTypeVar('$_env_adt')
-a = relay.ty.TypeVar("a")
-empty_env = adt.Constructor("empty_env", [], env_type)
-cons_env = adt.Constructor("cons_env", [relay.ty.scalar_type('int64'),
-                                        a, env_type(a)], env_type)
+option_type = relay.GlobalTypeVar("_option")
+a = relay.ty.TypeVar('a')
+nil = adt.Constructor("None", [], option_type)
+some = adt.Constructor("Some", [a], option_type)
+env_type = relay.GlobalTypeVar("env_type")
 
 
 class TypeHelper:
@@ -76,111 +75,66 @@ class TypeHelper:
         self.env_val_map = {}
 
     def initialize(self, mod, mng):
-        """Add stub types to the module."""
-        mod[env_type] = adt.TypeData(env_type, [a], [empty_env, cons_env])
+        """Add types to the module."""
         if mng is not None:
             for node in mng.all_nodes:
                 if isinstance(node.abstract, AbstractTaggedUnion):
                     for opt in node.abstract.options:
                         get_union_ctr(*opt)
+                elif node.is_apply(P.env_setitem):
+                    key = node.inputs[2]
+                    tt = to_relay_type(node.inputs[3].abstract)
+                    assert key.is_constant()
+                    self.env_val_map[key.value] = tt
+        env_val_keys = sorted(list(self.env_val_map.keys()))
+
+        for i, k in enumerate(env_val_keys):
+            self.env_val_map[k] = (i, self.env_val_map[k])
+
         mod[union_type] = adt.TypeData(
             union_type, [], list(tag_map.values()))
+        mod[option_type] = adt.TypeData(option_type, [a], [nil, some])
+        self.env_ctr = adt.Constructor("v", [self._build_env_type()], env_type)
+        mod[env_type] = adt.TypeData(env_type, [], [self.env_ctr])
 
-    def finalize(self, mod):
-        """Fill in stub type definitions."""
-        mod[env_val] = adt.TypeData(
-            env_val, [], list(m['ctr'] for m in self.env_val_map.values()))
-        for m in self.env_val_map.values():
-            for k, v in m.items():
-                if k == 'ctr':
-                    continue
-                mod[v[0]] = v[1]
+    def build_default_env_val(self):
+        """Build the default value for env, which is empty."""
+        return self.env_ctr(
+            relay.Tuple([nil() for _ in self.env_val_map]))
 
-    def _get_env_val_map(self, t):
-        t = broaden(t)
-        rt = to_relay_type(t)
-        if t not in self.env_val_map:
-            name = f"v{len(self.env_val_map)}"
-            self.env_val_map[t] = {
-                'ctr': adt.Constructor(name, [rt], env_val)
-            }
-        return self.env_val_map[t], rt
+    def _build_env_type(self):
+        map = dict((i, tt) for (i, tt) in self.env_val_map.values())
 
-    def get_env_update(self, val_t):
-        """Return a function to update a grad env."""
-        m, rt = self._get_env_val_map(val_t)
-        res = m.get('env_update', None)
-        if res is None:
-            res = self._make_env_update(m, rt)
-        return res[0]
+        return relay.ty.TupleType([option_type(map[i])
+                                   for i in range(len(map))])
 
-    def get_env_find(self, val_t):
-        """Return a function to get a value from a grad env."""
-        m, rt = self._get_env_val_map(val_t)
-        res = m.get('env_find', None)
-        if res is None:
-            res = self._make_env_find(m, rt)
-        return res[0]
+    def do_env_update(self, env_, key, val):
+        """Build the code to update the env."""
+        v = relay.var('v')
+        cl = adt.Clause(
+            adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
+        env = adt.Match(env_, [cl])
 
-    def _make_env_update(self, m, rval_t):
-        ctr = m['ctr']
-        gv = relay.GlobalVar(f"$_env_update<{ctr.name_hint}>")
+        map = dict((i, k) for k, (i, _) in self.env_val_map.items())
+        new_env = relay.Tuple([
+            some(val) if map[i] == key else relay.TupleGetItem(env, i)
+            for i in range(len(map))
+        ])
+        return self.env_ctr(new_env)
 
-        env = relay.Var("env", env_type(env_val()))
-        key = relay.Var("key", relay.ty.scalar_type('int64'))
-        val = relay.Var("val", rval_t)
+    def do_env_find(self, env, key, dft):
+        """Build the code to find a value in env."""
+        v = relay.var('v')
+        cl = adt.Clause(
+            adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
+        env_v = adt.Match(env, [cl])
 
-        k = relay.Var("k")
-        v = relay.Var("v")
-        r = relay.Var("r")
-
-        empty_clause = adt.Clause(
-            adt.PatternConstructor(empty_env, []),
-            cons_env(key, ctr(val), env))
-        cons_clause = adt.Clause(
-            adt.PatternConstructor(cons_env, [adt.PatternVar(k),
-                                              adt.PatternVar(v),
-                                              adt.PatternVar(r)]),
-            relay.If(relay.equal(key, k),
-                     cons_env(key, ctr(val), env),
-                     cons_env(k, v, relay.Call(gv, [r, key, val]))))
-        body = adt.Match(env, [empty_clause, cons_clause])
-        fn = relay.Function([env, key, val], body, env_type(env_val()))
-        m['env_update'] = (gv, fn)
-        return gv, fn
-
-    def _make_env_find(self, m, rval_t):
-        ctr = m['ctr']
-        gv = relay.GlobalVar(f"$_env_find<{ctr.name_hint}>")
-
-        env = relay.Var("env", env_type(env_val()))
-        key = relay.Var("key", relay.ty.scalar_type('int64'))
-        dft = relay.Var("dft", rval_t)
-
-        k = relay.Var("k")
-        v = relay.Var("v")
-        r = relay.Var("r")
-        x = relay.Var("x")
-
-        extract_clause = adt.Clause(
-            adt.PatternConstructor(ctr, [adt.PatternVar(x)]),
-            x)
-
-        empty_clause = adt.Clause(
-            adt.PatternConstructor(empty_env, []),
-            dft)
-        cons_clause = adt.Clause(
-            adt.PatternConstructor(cons_env, [adt.PatternVar(k),
-                                              adt.PatternVar(v),
-                                              adt.PatternVar(r)]),
-
-            relay.If(relay.equal(key, k),
-                     adt.Match(v, [extract_clause], complete=False),
-                     relay.Call(gv, [r, key, dft])))
-        body = adt.Match(env, [empty_clause, cons_clause])
-        fn = relay.Function([env, key, dft], body, rval_t)
-        m['env_find'] = (gv, fn)
-        return gv, fn
+        val = relay.TupleGetItem(env_v, self.env_val_map[key][0])
+        x = relay.var('x')
+        nil_c = adt.Clause(adt.PatternConstructor(nil, []), dft)
+        some_c = adt.Clause(
+            adt.PatternConstructor(some, [adt.PatternVar(x)]), x)
+        return adt.Match(val, [some_c, nil_c])
 
 
 @overload(bootstrap=True)
@@ -192,7 +146,7 @@ def to_relay_type(self, a: AbstractScalar):
     elif issubclass(tp, Nil):
         return relay.ty.TupleType([])
     elif issubclass(tp, EnvType):
-        return env_type(env_val())
+        return env_type()
     elif issubclass(tp, UniverseType):
         return relay.ty.TupleType([])
     else:
@@ -213,7 +167,7 @@ def to_relay_type(self, a: AbstractRandomState):
 def to_relay_type(self, a: AbstractType):
     # Abstract types are not currently used in the graph,
     # they are replaced with other calls,
-    #  and appear here just as unused graph parameters.
+    # and appear here just as unused graph parameters.
     # So, let's just replace them with an integer type as placeholder.
     return relay.ty.scalar_type('int32')
 
@@ -262,7 +216,7 @@ def dead_value(t):
     """Make a value of the specified type."""
     if isinstance(t, AbstractError):
         return relay.const(0xDEAD, 'uint16')
-    return _placeholder_body(to_relay_type(t))
+    return _placeholder_body(to_relay_type(t), None)
 
 
 def handle_wrapper(fn, handle_params):
@@ -281,13 +235,13 @@ def handle_wrapper(fn, handle_params):
         return wrapper
 
 
-def _placeholder_body(type):
+def _placeholder_body(type, types):
     if isinstance(type, relay.TensorType):
         sh = [sh.value for sh in type.shape]
         return relay.const(np.array(np.random.rand(*sh)).astype(type.dtype),
                            dtype=type.dtype)
     elif isinstance(type, relay.TupleType):
-        return relay.Tuple([_placeholder_body(f) for f in type.fields])
+        return relay.Tuple([_placeholder_body(f, types) for f in type.fields])
     elif isinstance(type, relay.FuncType):
         params = []
         for arg_ty in type.arg_types:
@@ -295,26 +249,26 @@ def _placeholder_body(type):
 
         return relay.Function(
             params,
-            _placeholder_body(type.ret_type),
+            _placeholder_body(type.ret_type, types),
             ret_type=type.ret_type)
-    elif isinstance(type, relay.TypeCall):
+    elif isinstance(type, relay.RefType):
+        return relay.RefCreate(_placeholder_body(type.value, types))
+    elif isinstance(type, Object):
         if type.func == union_type:
             return empty_union()
         elif type.func == env_type:
-            return empty_env()
+            return types.build_default_env_val()
         else:  # pragma: no cover
             raise ValueError(f"Can't build value for adt: {type.func}")
-    elif isinstance(type, relay.RefType):
-        return relay.RefCreate(_placeholder_body(type.value))
     else:  # pragma: no cover
         raise ValueError(f"Can't build value of type {type}")
 
 
-def add_functions(mod, funcs):
+def add_functions(mod, funcs, types):
     """Workaround for type checker and mutually recursive functions."""
     for gv in funcs:
         func = funcs[gv]
-        body = _placeholder_body(func.ret_type)
+        body = _placeholder_body(func.ret_type, types)
         mod[gv] = relay.Function(func.params, body, func.ret_type)
 
     for gv in funcs:
@@ -325,7 +279,6 @@ __all__ = [
     'TypeHelper',
     'add_functions',
     'dead_value',
-    'empty_env',
     'fill_reverse_tag_map',
     'get_myia_tag',
     'get_union_ctr',
