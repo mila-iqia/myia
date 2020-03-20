@@ -1,5 +1,7 @@
 """Exceptions that may be raised within Myia."""
 
+import warnings
+from contextlib import contextmanager
 from contextvars import ContextVar
 
 infer_trace = ContextVar('infer_trace', default={})
@@ -86,6 +88,20 @@ class TypeMismatchError(MyiaTypeError):
 
 class MyiaInputTypeError(TypeError):
     """Represents a type error on an input to a Myia function."""
+
+
+@contextmanager
+def untested_legacy():
+    """Wrap legacy code that isn't covered anymore but we are not sure why."""
+    warnings.warn(
+        UserWarning(
+            "You triggered code that used to be essential but stopped being"
+            " covered for some reason. Please report your use case so that we"
+            " can validate the code again and add a test for it."
+        ),
+        stacklevel=3,
+    )
+    yield
 
 
 __consolidate__ = True
