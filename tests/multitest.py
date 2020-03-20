@@ -23,7 +23,10 @@ def eqtest(t1: tuple, t2, **kwargs):
 @overload  # noqa: F811
 def eqtest(a1: (np.ndarray, int, float), a2,
            rtol=1e-5, atol=1e-8, **kwargs):
-    return np.allclose(a1, a2, rtol=rtol, atol=atol)
+    try:
+        return np.allclose(a1, a2, rtol=rtol, atol=atol)
+    except TypeError:
+        return False
 
 
 @overload  # noqa: F811
