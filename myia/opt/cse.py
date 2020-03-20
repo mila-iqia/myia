@@ -3,27 +3,9 @@
 
 from collections import defaultdict
 
-from ..abstract import AbstractFunction, TypedPrimitive
 from ..graph_utils import toposort
 from ..ir import succ_incoming
 from ..utils import Partializable, tracer
-
-
-def _absof(node):
-    # We use .abstract to differentiate identical values with different
-    # types, e.g. 1.0::f32 and 1.0::f64.
-    if isinstance(node.abstract, AbstractFunction):
-        fn = node.abstract.get_unique()
-        if isinstance(fn, TypedPrimitive):
-            return fn
-        else:
-            # test_model::test_backward_specialize behaves differently if we
-            # do not return fn here (it keeps an extra tuple_setitem operation
-            # through the optimization)
-            # TODO: Figure out why.
-            return None
-    else:
-        return node.abstract
 
 
 def group_nodes(root, manager):
@@ -41,7 +23,7 @@ def group_nodes(root, manager):
                 continue
 
             if node.is_constant():
-                h = hash((node.value, _absof(node)))
+                h = hash((node.value, node.abstract))
             elif node.is_apply():
                 h = hash(tuple(hashes[inp] for inp in node.inputs))
             elif node.is_parameter():
@@ -69,8 +51,8 @@ def cse(root, manager):
             assert main.graph is other.graph
 
             if main.is_constant() and other.is_constant():
-                repl = _absof(main) == _absof(other) \
-                    and main.value == other.value
+                repl = (main.abstract == other.abstract
+                        and main.value == other.value)
 
             elif main.is_apply() and other.is_apply():
                 # The inputs to both should have been merged beforehand
