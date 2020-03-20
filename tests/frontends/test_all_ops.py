@@ -26,7 +26,6 @@ from ..common import MA, MB, to_abstract_test
 from ..multitest import (
     Multiple,
     backend_all,
-    backend_no_relay,
     eqtest,
     mt,
     myia_function_test,
@@ -226,7 +225,6 @@ fwd_and_bwd = _fwd_and_bwd.configure(backend=backend_all)
 fwd_and_bwd_no_numpy_compat = _fwd_and_bwd.configure(
     backend=backend_all, numpy_compat=False
 )
-fwd_and_bwd_no_relay = _fwd_and_bwd.configure(backend=backend_no_relay)
 
 
 @myia_function_test(marks=[pytest.mark.run], id="run")
@@ -476,7 +474,6 @@ def test_conv2d_no_dil_stride(inp, w):
         nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
         None,
     ),
-    backend=backend_no_relay,
 )
 def test_torch_conv2d(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 3)
@@ -494,14 +491,13 @@ def test_torch_conv2d(inp, w, b):
         nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
         None,
     ),
-    backend=backend_no_relay,
 )
 def test_torch_conv2d__non_tuple_args(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, 2, 3, 4, 3)
     return torch.sum(value)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.randn(2, 1, 4, 5, dtype=torch.float32)),
     nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
     nn.Parameter(torch.randn(3, dtype=torch.float32)),
@@ -512,7 +508,7 @@ def test_torch_conv2d__group3(inp, w, b):
 
 
 @mt(
-    run_no_relay(
+    run(
         torch.randn(1, 2, 4, 4),
         torch.randn(2, 3, 2, 2),
         torch.randn(6),
@@ -522,7 +518,7 @@ def test_torch_conv2d__group3(inp, w, b):
         2,
         (1, 1),
     ),
-    run_no_relay(
+    run(
         torch.randn(1, 2, 5, 4),
         torch.randn(2, 4, 1, 3),
         None,
@@ -532,7 +528,7 @@ def test_torch_conv2d__group3(inp, w, b):
         2,
         (5, 4),
     ),
-    run_no_relay(
+    run(
         torch.randn(5, 2, 5, 6),
         torch.randn(2, 2, 4, 4),
         None,
@@ -542,7 +538,7 @@ def test_torch_conv2d__group3(inp, w, b):
         1,
         (1, 1),
     ),
-    run_no_relay(
+    run(
         torch.randn(1, 1, 4, 4),
         torch.randn(1, 3, 2, 2),
         None,
@@ -559,17 +555,17 @@ def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
 
 
 @mt(
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.Tensor(torch.randn(3, 5))),
         nn.Parameter(torch.randint(5, (3,)), requires_grad=False),
         "mean",
     ),
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.Tensor(torch.randn(3, 5))),
         nn.Parameter(torch.randint(5, (3,)), requires_grad=False),
         "none",
     ),
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.Tensor(torch.randn(3, 5))),
         nn.Parameter(torch.randint(5, (3,)), requires_grad=False),
         "sum",
@@ -608,7 +604,7 @@ def test_torch_detach(x):
     return r
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.Tensor(MA(3, 4))),
     torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
 )
@@ -640,12 +636,12 @@ def test_torch_norm(inp, p, dim):
     return torch.norm(inp, p, dim)
 
 
-@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_get(x):
     return x[:, -3:-1:2, -2]
 
 
-@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_get2(x):
     return x[1, 2]
 
@@ -655,7 +651,6 @@ def test_torch_tensor_get2(x):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
     broad_specs=(True, False),
-    backend=backend_no_relay,
 )
 def test_torch_log_softmax(x, y):
     return torch.log_softmax(x, y)
@@ -666,7 +661,6 @@ def test_torch_log_softmax(x, y):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
     broad_specs=(True, False),
-    backend=backend_no_relay,
 )
 def test_torch_functional_log_softmax(x, y):
     return torch.nn.functional.log_softmax(x, y)
@@ -686,15 +680,15 @@ def test_lstm_cell(inp, hx, cx, w_ih, w_hh, b_ih, b_hh):
     return torch.lstm_cell(inp, (hx, cx), w_ih, w_hh, b_ih, b_hh)
 
 
-@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_max_1_arg(x):
     return torch.max(x)
 
 
 @mt(
-    fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)), -1, True),
-    fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)), 1, True),
-    fwd_and_bwd_no_relay(nn.Parameter(torch.randn(4)), 0, True),
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)), -1, True),
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)), 1, True),
+    fwd_and_bwd(nn.Parameter(torch.randn(4)), 0, True),
     run(nn.Parameter(torch.randn(2, 4, 3)), -1, True),
     broad_specs=(True, False, False),
 )
@@ -739,7 +733,7 @@ def test_torch_mse_loss(x, y):
     return torch.nn.functional.mse_loss(x, y)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.Tensor(MA(2, 3))), torch.tensor([1, 2])
 )
 def test_torch_nll_loss(x, y):
@@ -757,13 +751,12 @@ def test_torch_nll_loss(x, y):
         nn.Parameter(torch.Tensor(MA(2, 3))), torch.tensor([1, 2]), "mean"
     ),
     broad_specs=(True, True, False),
-    backend=backend_no_relay,
 )
 def test_torch_nll_loss_reduce_options(x, y, z):
     return torch.nn.functional.nll_loss(x, y, reduction=z)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.randn(2, 3, dtype=torch.float64)), torch.tensor([1, 2])
 )
 def test_torch_nll_loss_reduce_cast(x, y):
@@ -792,7 +785,7 @@ def test_torch_tensor_reshape(x, y):
     return torch.reshape(x, y)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.Tensor(MA(3, 4))),
     torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
     nn.Parameter(torch.Tensor(MA(2, 4))),
@@ -801,7 +794,7 @@ def test_torch_scatter(x, index, src):
     return torch.scatter(x, 0, index, src)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.Tensor(MA(3, 4))),
     torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
     nn.Parameter(torch.Tensor(MA(2, 4))),
@@ -810,7 +803,7 @@ def test_torch_scatter_add(x, index, src):
     return torch.scatter_add(x, 0, index, src)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.Tensor(MA(3, 4))),
     torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
     nn.Parameter(torch.Tensor([2.1]).reshape(())),
@@ -819,7 +812,7 @@ def test_torch_scatter_broadcast_source(x, index, src):
     return torch.scatter(x, 0, index, src)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.randn(3, 4, dtype=torch.float64)),
     torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
     1.23,
@@ -855,7 +848,6 @@ def test_torch_smooth_l1_loss(x, y):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
     broad_specs=(True, False),
-    backend=backend_no_relay,
 )
 def test_torch_softmax(x, y):
     return torch.softmax(x, y)
