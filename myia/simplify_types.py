@@ -11,6 +11,9 @@ from .abstract import (
     AbstractArray,
     AbstractClassBase,
     AbstractDict,
+    AbstractError,
+    AbstractExternal,
+    AbstractFunction,
     AbstractHandle,
     AbstractKeywordArgument,
     AbstractRandomState,
@@ -204,7 +207,8 @@ def simplify_types(root, manager):
             real_typ = type_to_abstract(typ.value)
             matches, _ = split_type(x.abstract, real_typ)
             assert not isinstance(matches, AbstractUnion)
-            new_node = node.graph.apply(P.hastag, x, type_to_tag(matches))
+            tag = type_to_tag(matches)
+            new_node = node.graph.apply(P.hastag, x, _mkct(tag))
 
         elif node.is_apply(P.unsafe_static_cast):
             # unsafe_static_cast(x, type) -> casttag(x, tag)
@@ -216,7 +220,7 @@ def simplify_types(root, manager):
                 keep_abstract = False
             else:
                 tag = type_to_tag(typ.value)
-                new_node = node.graph.apply(P.casttag, x, tag)
+                new_node = node.graph.apply(P.casttag, x, _mkct(tag))
 
         elif node.is_apply(P.tagged):
             # tagged(x) -> tagged(x, tag)
@@ -224,7 +228,7 @@ def simplify_types(root, manager):
             if len(node.inputs) == 2:
                 _, x = node.inputs
                 tag = type_to_tag(x.abstract)
-                new_node = node.graph.apply(P.tagged, x, tag)
+                new_node = node.graph.apply(P.tagged, x, _mkct(tag))
 
         elif node.is_apply(P.string_eq):
             new_node = node.graph.apply(P.scalar_eq,
@@ -237,7 +241,9 @@ def simplify_types(root, manager):
             new_node = node.inputs[2]
 
         elif node.is_constant((str, AbstractValue)):
-            new_node = Constant(to_canonical(node.value, node.abstract))
+            new_value = to_canonical(node.value, node.abstract)
+            new_node = Constant(new_value)
+            new_node.abstract = from_value(new_value)
             keep_abstract = False
 
         if new_node is not None:
@@ -250,6 +256,11 @@ def simplify_types(root, manager):
         graph._user_graph = None
 
     for node in manager.all_nodes:
+        if (node.is_constant()
+            and node.abstract
+            and not isinstance(node.abstract, (AbstractFunction,
+                                               AbstractExternal))):
+            node.value = to_canonical(node.value, node.abstract, coerce=True)
         node.abstract = _reabs(node.abstract)
 
 
@@ -259,7 +270,7 @@ def simplify_types(root, manager):
 
 
 @overload.wrapper(bootstrap=True)
-def to_canonical(fn, self, arg, orig_t):
+def to_canonical(fn, self, arg, orig_t, coerce=False):
     """Check and convert an argument to the canonical representation.
 
     Arguments:
@@ -277,21 +288,21 @@ def to_canonical(fn, self, arg, orig_t):
         return arg
     if fn is None:
         raise AssertionError(f'to_canonical not defined for {orig_t}')
-    return fn(self, arg, orig_t)
+    return fn(self, arg, orig_t, coerce)
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractTuple):
+def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError('Expected tuple')
     oe = orig_t.elements
     if len(arg) != len(oe):
         raise MyiaInputTypeError(f'Expected {len(oe)} elements')
-    return tuple(self(x, o) for x, o in zip(arg, oe))
+    return tuple(self(x, o, coerce) for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractDict):
+def to_canonical(self, arg, orig_t: AbstractDict, coerce):
     if not isinstance(arg, dict):
         raise MyiaInputTypeError('Expected dict')
     types = orig_t.entries
@@ -301,11 +312,11 @@ def to_canonical(self, arg, orig_t: AbstractDict):
         )
     if set(arg.keys()) != set(types.keys()):
         raise MyiaInputTypeError("Mismatched keys for input dictionary.")
-    return tuple(self(arg[k], o) for k, o in orig_t.entries.items())
+    return tuple(self(arg[k], o, coerce) for k, o in orig_t.entries.items())
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractClassBase):
+def to_canonical(self, arg, orig_t: AbstractClassBase, coerce):
     if orig_t.tag is Empty:
         if arg != []:
             raise MyiaInputTypeError(f'Expected empty list')
@@ -316,7 +327,7 @@ def to_canonical(self, arg, orig_t: AbstractClassBase):
         if not isinstance(arg, list):
             raise MyiaInputTypeError(f'Expected list')
         ot = orig_t.attributes['head']
-        li = list(self(x, ot) for x in arg)
+        li = list(self(x, ot, coerce) for x in arg)
         rval = TaggedValue(type_to_tag(empty), ())
         for elem in reversed(li):
             rval = TaggedValue(type_to_tag(orig_t), (elem, rval))
@@ -326,12 +337,12 @@ def to_canonical(self, arg, orig_t: AbstractClassBase):
             raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
         arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
         oe = list(orig_t.attributes.values())
-        res = tuple(self(x, o) for x, o in zip(arg, oe))
+        res = tuple(self(x, o, coerce) for x, o in zip(arg, oe))
         return res
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractArray):
+def to_canonical(self, arg, orig_t: AbstractArray, coerce):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
     et = et.xtype()
@@ -351,10 +362,10 @@ def to_canonical(self, arg, orig_t: AbstractArray):
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractUnion):
+def to_canonical(self, arg, orig_t: AbstractUnion, coerce):
     for opt in orig_t.options:
         try:
-            value = self(arg, opt)
+            value = self(arg, opt, coerce)
             tag = type_to_tag(opt)
         except TypeError:
             continue
@@ -365,31 +376,42 @@ def to_canonical(self, arg, orig_t: AbstractUnion):
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractHandle):
+def to_canonical(self, arg, orig_t: AbstractHandle, coerce):
     if not isinstance(arg, HandleInstance):
         raise MyiaInputTypeError(f'Expected handle')
-    arg.state = self(arg.state, orig_t.element)
+    arg.state = self(arg.state, orig_t.element, coerce)
     return arg
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractScalar):
+def to_canonical(self, arg, orig_t: AbstractScalar, coerce):
     if not typecheck(orig_t, from_value(arg)):
-        raise MyiaInputTypeError(
-            f'Scalar has wrong type: expected {orig_t}, got {arg}'
-        )
+        xt = orig_t.xtype()
+        if coerce and issubclass(xt, xtype.Number):
+            # TODO: Actually coerce the arg to the proper dtype instead
+            # of returning it unchanged.
+            return arg
+        else:
+            raise MyiaInputTypeError(
+                f'Scalar has wrong type: expected {orig_t}, got {arg}'
+            )
     if issubclass(orig_t.xtype(), xtype.String):
         arg = str_to_tag(arg)
     return arg
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractType):
+def to_canonical(self, arg, orig_t: AbstractType, coerce):
     return _reabs(arg)
 
 
 @overload  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractKeywordArgument):
+def to_canonical(self, arg, orig_t: AbstractError, coerce):
+    return _reabs(arg)
+
+
+@overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractKeywordArgument, coerce):
     return arg
 
 
