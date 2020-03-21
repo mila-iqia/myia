@@ -501,7 +501,8 @@ def transformable_clone(graph, relation='transform'):
         newg = Graph()
     for p in graph.parameters:
         with About(p.debug, 'copy'):
-            newg.add_parameter()
+            p2 = newg.add_parameter()
+            p2.abstract = p.abstract
     cl = GraphCloner(inline=(graph, newg, newg.parameters))
     newg.output = cl[graph.output]
     return newg

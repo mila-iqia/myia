@@ -131,11 +131,18 @@ def setitem_tuple_ct(resources, node, equiv):
     setitem((a, b, c, ...), 1, z) => (a, z, c, ...)
     ...
     """
-    tup = equiv[C1].value
+    def _const(val, t):
+        ct = Constant(val)
+        ct.abstract = t
+        return ct
+    tup_node = equiv[C1]
+    assert tup_node.abstract is not None
+    tup = tup_node.value
     i = equiv[C2].value
     assert isinstance(tup, tuple)
     assert isinstance(i, int)
-    elems = list(tup)
+    elems = [_const(t, typ)
+             for t, typ in zip(tup, tup_node.abstract.elements)]
     elems[i] = equiv[Z]
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
@@ -445,6 +452,10 @@ def unfuse_composite(resources, node, equiv):
     r = UnfuseRemapper(g, xs[0])
     r.run()
     ng = r.get_graph(g)
+
+    for param, orig in zip(ng.parameters, xs):
+        param.abstract = orig.abstract
+    _set_out_abstract(ng, node.abstract)
     return node.graph.apply(ng, *xs)
 
 
@@ -838,19 +849,28 @@ def specialize_on_graph_arguments(resources, node, equiv):
 #################
 
 
+def _set_out_abstract(g, a):
+    g.output.abstract = a
+    g.return_.abstract = a
+    g.return_.inputs[0].abstract = AbstractFunction(
+        VirtualFunction([a], a)
+    )
+
+
 @GraphTransform
-def getitem_transform(graph, idx):
+def getitem_transform(orig_graph, idx):
     """Map to a graph that only returns the idx-th output.
 
     If idx == 1, then:
 
     (x -> (a, b, c)) => (x -> b)
     """
-    graph = transformable_clone(graph, relation=f'[{idx}]')
+    graph = transformable_clone(orig_graph, relation=f'[{idx}]')
     if graph.output.is_apply(P.make_tuple):
         graph.output = graph.output.inputs[idx + 1]
     else:
         graph.output = graph.apply(P.tuple_getitem, graph.output, idx)
+    graph.return_.abstract = orig_graph.return_.abstract.elements[idx]
     return graph
 
 
@@ -895,17 +915,20 @@ def incorporate_getitem_through_switch(resources, node, equiv):
 
 
 @GraphTransform
-def env_getitem_transform(graph, key, default):
+def env_getitem_transform(orig_graph, key, default):
     """Map to a graph that incorporates a call to env_getitem."""
     rel = getattr(key, 'node', key)
-    graph = transformable_clone(graph, relation=f'[{rel}]')
+    graph = transformable_clone(orig_graph, relation=f'[{rel}]')
     out = graph.output
     while out.is_apply(P.env_setitem):
         _, out, key2, value = out.inputs
         if key == key2.value:
             graph.output = value
-            return graph
-    graph.output = graph.apply(P.env_getitem, out, key, default)
+            break
+    else:
+        with untested_legacy():
+            graph.output = graph.apply(P.env_getitem, out, key, default)
+    graph.return_.abstract = key.abstract
     return graph
 
 
@@ -938,14 +961,23 @@ def incorporate_env_getitem_through_switch(resources, node, equiv):
 
 
 @GraphTransform
-def call_output_transform(graph, nargs):
+def call_output_transform(orig_graph, abstracts):
     """Map to a graph that calls its output.
 
     ((*args1) -> (*args2) -> f) => (*args1, *args2) -> f(*args2)
     """
-    graph = transformable_clone(graph, relation='call')
-    newp = [graph.add_parameter() for _ in range(nargs)]
+    graph = transformable_clone(orig_graph, relation='call')
+    newp = []
+    for a in abstracts:
+        assert a is not None
+        p = graph.add_parameter()
+        p.abstract = a
+        newp.append(p)
     graph.output = graph.apply(graph.output, *newp)
+    _set_out_abstract(
+        graph,
+        orig_graph.return_.abstract.get_unique().output
+    )
     return graph
 
 
@@ -963,7 +995,7 @@ def incorporate_call(resources, node, equiv):
     xs = equiv[Xs]
     ys = equiv[Ys]
     if check_used_once(g):
-        g2 = call_output_transform(g, len(ys))
+        g2 = call_output_transform(g, tuple(y.abstract for y in ys))
         return node.graph.apply(g2, *xs, *ys)
 
 
@@ -985,8 +1017,8 @@ def incorporate_call_through_switch(resources, node, equiv):
     ys = equiv[Ys]
 
     if check_used_once(g1) and check_used_once(g2):
-        g1t = call_output_transform(g1, len(ys))
-        g2t = call_output_transform(g2, len(ys))
+        g1t = call_output_transform(g1, tuple(y.abstract for y in ys))
+        g2t = call_output_transform(g2, tuple(y.abstract for y in ys))
 
         new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
         return sexp_to_node(new, node.graph)
