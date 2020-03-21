@@ -565,6 +565,9 @@ class GraphManager(Partializable):
     def clear(self):
         """Clear the manager entirely."""
         self.roots = []
+        if self.manage:
+            for graph in self.graphs:
+                graph._manager = None
         self.reset()
 
     def reset(self):
@@ -671,7 +674,8 @@ class GraphManager(Partializable):
             self.events.drop_graph(g)
             self.all_nodes.difference_update(g.parameters)
             self.graphs.remove(g)
-            if g._manager is self:
+            if g._manager is not None and self.manage:
+                assert g._manager is self
                 g._manager = None
 
     def _process_edge(self, node, key, inp, direction):
