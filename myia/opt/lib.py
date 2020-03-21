@@ -194,8 +194,8 @@ gadd_switch = psub(
              (P.switch, Y, X1, X2),
              (P.switch, Y, X3, X4)),
     replacement=(P.switch, Y,
-                 (gadd, X1, X3),
-                 (gadd, X2, X4)),
+                 (_gadd, X1, X3),
+                 (_gadd, X2, X4)),
     name='gadd_switch'
 )
 
