@@ -25,7 +25,7 @@ from ..utils import (
     new_universe,
     tracer,
 )
-from ..validate import validate
+from ..validate import ValidationError, validate
 from ..xtype import UniverseType
 
 #############
@@ -376,7 +376,7 @@ step_opt2 = Optimizer.partial(
 ############
 
 
-def step_validate(resources, graph):
+def step_validate(resources, graph, outspec=None):
     """Pipeline step to validate a graph prior to compilation.
 
     Inputs:
@@ -385,6 +385,10 @@ def step_validate(resources, graph):
     Outputs:
         None.
     """
+    if graph.output.abstract != outspec:
+        raise ValidationError(
+            "The output type of the graph changed during optimization."
+        )
     validate(graph)
     return {'graph': graph}
 
