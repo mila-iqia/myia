@@ -235,6 +235,7 @@ class InferenceEngine:
 
     @get_inferrer_for.register
     def get_inferrer_for(self, g: GraphFunction):
+        assert g.graph.abstract is None
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
         return self.constructors[g]

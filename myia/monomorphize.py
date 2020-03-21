@@ -706,6 +706,7 @@ class _MonoRemapper(CloneRemapper):
 
     def gen_constant_graph(self, g, ng, ct):
         """Constant graphs that get through here cannot be reachable."""
+        assert ct.value.abstract is None
         with About(ct.debug, self.relation):
             new = _const(DEAD, AbstractError(DEAD))
             self.remap_node(ct, g, ct, ng, new)
