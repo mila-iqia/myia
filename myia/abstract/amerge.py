@@ -1,5 +1,6 @@
 """Implementation of the amerge utility."""
 
+from contextvars import ContextVar
 from functools import reduce
 from itertools import chain
 
@@ -21,6 +22,7 @@ from .data import (
     Possibilities,
     TaggedPossibilities,
     TrackDict,
+    VirtualFunction,
 )
 from .loop import (
     Pending,
@@ -36,6 +38,9 @@ from .utils import (
     is_broad,
     union_simplify,
 )
+
+amerge_engine = ContextVar('amerge_engine', default=None)
+
 
 ###################
 # Tentative check #
@@ -210,6 +215,31 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
 
 @overload  # noqa: F811
 def amerge(self, x1: Possibilities, x2, forced, bp):
+    eng = amerge_engine.get()
+    poss = x1 + x2
+    if all(isinstance(x, VirtualFunction) for x in poss):
+        assert not forced
+        return Possibilities([
+            VirtualFunction(
+                reduce(self, [x.args for x in poss]),
+                reduce(self, [x.output for x in poss]),
+            )
+        ])
+
+    for standard in poss:
+        # TODO: This is a hack of sorts until we replace Possibilities
+        # inside AbstractFunction by AbstractUnion, and AbsFunc only has
+        # one function inside it.
+        if isinstance(standard, VirtualFunction):
+            for entry in poss:
+                if not isinstance(entry, VirtualFunction):
+                    eng.loop.schedule(
+                        eng.infer_function(
+                            entry, standard.args, standard.output
+                        )
+                    )
+            break
+
     if set(x1).issuperset(set(x2)):
         return x1
     if forced:

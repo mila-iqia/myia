@@ -326,7 +326,13 @@ class InferenceEngine:
 
     def abstract_merge(self, *values):
         """Merge a list of AbstractValues together."""
-        return reduce(amerge, values)
+        from .amerge import amerge_engine
+        token = amerge_engine.set(self)
+        try:
+            rval = reduce(amerge, values)
+        finally:
+            amerge_engine.reset(token)
+        return rval
 
     def check_predicate(self, predicate, x):
         """Returns whether the predicate applies on x.
