@@ -311,7 +311,8 @@ step_opt = Optimizer.partial(
             optlib.elim_jinv_j,
             optlib.cancel_env_set_get,
             optlib.getitem_newenv,
-            optlib.getitem_env_add,
+            # TODO: reintegrate the getitem_env_add optimization
+            # optlib.getitem_env_add,
             optlib.simplify_array_map,
             optlib.gadd_zero_l,
             optlib.gadd_zero_r,

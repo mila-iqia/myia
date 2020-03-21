@@ -555,6 +555,9 @@ getitem_newenv = psub(
 getitem_env_add = psub(
     pattern=(P.env_getitem, (P.env_add, X, Y), C, Z),
     replacement=(gadd,
+                 # BUG: With the live infer, a metagraph like gadd cannot
+                 # be inserted directly in an optimization: the graph needs
+                 # to be generated/monomorphized using the existing types.
                  (P.env_getitem, X, C, Z),
                  (P.env_getitem, Y, C, Z)),
     name='getitem_env_add'
