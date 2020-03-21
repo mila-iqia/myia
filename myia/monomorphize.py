@@ -683,7 +683,8 @@ class _MonoRemapper(CloneRemapper):
                  clone_constants,
                  engine,
                  graph_repl,
-                 fv_function):
+                 fv_function,
+                 quarantine):
         """Initialize the _MonoRemapper."""
         super().__init__(
             graphs=graphs,
@@ -694,6 +695,7 @@ class _MonoRemapper(CloneRemapper):
             graph_relation=graph_relation,
             clone_constants=clone_constants,
             set_abstract=False,
+            quarantine=quarantine,
         )
         self.engine = engine
         self.fv_function = fv_function
