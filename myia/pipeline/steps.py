@@ -11,6 +11,7 @@ from ..ir import Graph
 from ..opt import (
     CSE,
     DeadDataElimination,
+    ForceConstants,
     LocalPassOptimizer,
     NodeMap,
     lib as optlib,
@@ -333,6 +334,7 @@ step_opt = Optimizer.partial(
         ],
         renormalize='renormalize',
         cse=CSE.partial(report_changes=False),
+        fct=ForceConstants.partial(),
         jelim=optlib.JElim.partial(),
     )
 )
@@ -361,6 +363,7 @@ step_opt2 = Optimizer.partial(
             optlib.elim_stop_gradient,
         ],
         cse=CSE.partial(report_changes=False),
+        fct=ForceConstants.partial(),
     )
 )
 

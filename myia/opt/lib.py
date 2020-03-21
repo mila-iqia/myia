@@ -1057,4 +1057,46 @@ class JElim(Partializable):
         return len(nodes) > 0
 
 
-__all__ = []
+class ForceConstants(Partializable):
+    """Replace nodes with a constant value if the value is in its type."""
+
+    def __init__(self, resources):
+        """Initialize ForceConstants."""
+        self.resources = resources
+        self.name = 'force_constants'
+
+    def __call__(self, root):
+        """Apply ForceConstants on root."""
+        mng = self.resources.manager
+        args = dict(
+            opt=self,
+            node=None,
+            manager=self.resources.manager,
+        )
+        subs = []
+        with tracer('opt', **args) as tr:
+            tr.set_results(success=False, **args)
+            for node in mng.all_nodes:
+                if (node.is_constant()
+                        or node.is_parameter()
+                        or node.graph and node is node.graph.return_):
+                    continue
+                try:
+                    val = build_value(node.abstract)
+                except Exception:
+                    continue
+                ct = Constant(val)
+                ct.abstract = node.abstract
+                subs.append((node, ct))
+
+            if subs:
+                for old, new in subs:
+                    mng.replace(old, new)
+                tracer().emit_success(**args, new_node=None)
+
+        return bool(subs)
+
+
+__all__ = [
+    'ForceConstants'
+]
