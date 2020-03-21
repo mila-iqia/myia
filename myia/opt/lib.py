@@ -94,6 +94,20 @@ def getitem_tuple(resources, node, equiv):
     return equiv[Xs][i]
 
 
+@pattern_replacer(P.tuple_getitem, C1, C2)
+def getitem_constant_tuple(resources, node, equiv):
+    """Match a constant index in a constant tuple."""
+    c1 = equiv[C1].value
+    i = equiv[C2].value
+    assert isinstance(c1, tuple)
+    assert isinstance(i, int)
+    ct = Constant(c1[i])
+    old_abs = equiv[C1].abstract
+    if old_abs is not None:
+        ct.abstract = old_abs.elements[i]
+    return ct
+
+
 @pattern_replacer(P.tuple_setitem, (P.make_tuple, Xs), C, Z)
 def setitem_tuple(resources, node, equiv):
     """Match a constant setitem in an explicit tuple.

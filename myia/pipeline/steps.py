@@ -303,6 +303,7 @@ step_opt = Optimizer.partial(
             # Miscellaneous
             optlib.elim_identity,
             optlib.getitem_tuple,
+            optlib.getitem_constant_tuple,
             optlib.getitem_setitem_tuple,
             optlib.setitem_tuple,
             optlib.setitem_tuple_ct,
@@ -347,6 +348,7 @@ step_opt2 = Optimizer.partial(
         main=[
             optlib.unfuse_composite,
             optlib.getitem_tuple,
+            optlib.getitem_constant_tuple,
             optlib.getitem_setitem_tuple,
             optlib.setitem_tuple,
             optlib.setitem_tuple_ct,
