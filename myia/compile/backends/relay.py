@@ -672,7 +672,7 @@ class CompileGraph:
         for g in self.graph_map.keys():
             function_map[self.graph_map[g]] = self.convert_func(g)
 
-        add_functions(self.module, function_map, self.types)
+        add_functions(self.module, function_map)
 
         vm = relay.create_executor(mod=self.module, ctx=context,
                                    target=target, kind=exec_kind)

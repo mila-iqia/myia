@@ -65,6 +65,7 @@ a = relay.ty.TypeVar('a')
 nil = adt.Constructor("None", [], option_type)
 some = adt.Constructor("Some", [a], option_type)
 env_type = relay.GlobalTypeVar("env_type")
+dead_env = adt.Constructor("DeadEnv", [], env_type)
 
 
 class TypeHelper:
@@ -95,7 +96,7 @@ class TypeHelper:
             union_type, [], list(tag_map.values()))
         mod[option_type] = adt.TypeData(option_type, [a], [nil, some])
         self.env_ctr = adt.Constructor("v", [self._build_env_type()], env_type)
-        mod[env_type] = adt.TypeData(env_type, [], [self.env_ctr])
+        mod[env_type] = adt.TypeData(env_type, [], [self.env_ctr, dead_env])
 
     def build_default_env_val(self):
         """Build the default value for env, which is empty."""
@@ -113,7 +114,7 @@ class TypeHelper:
         v = relay.var('v')
         cl = adt.Clause(
             adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
-        env = adt.Match(env_, [cl])
+        env = adt.Match(env_, [cl], complete=False)
 
         map = dict((i, k) for k, (i, _) in self.env_val_map.items())
         new_env = relay.Tuple([
@@ -127,7 +128,7 @@ class TypeHelper:
         v = relay.var('v')
         cl = adt.Clause(
             adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
-        env_v = adt.Match(env, [cl])
+        env_v = adt.Match(env, [cl], complete=False)
 
         val = relay.TupleGetItem(env_v, self.env_val_map[key][0])
         x = relay.var('x')
@@ -186,8 +187,7 @@ def to_relay_type(self, a: AbstractArray):
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractFunction):
     sings = list(self(sing) for sing in a.get_sync())
-    for sing in sings[1:]:
-        assert sing == sings[0]
+    assert len(sings) == 1
     return sings[0]
 
 
@@ -207,16 +207,10 @@ def to_relay_type(self, a: AbstractHandle):
     return relay.ty.RefType(self(a.element))
 
 
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractError):
-    return relay.ty.scalar_type('uint16')
-
-
 def dead_value(t):
     """Make a value of the specified type."""
-    if isinstance(t, AbstractError):
-        return relay.const(0xDEAD, 'uint16')
-    return _placeholder_body(to_relay_type(t), None)
+    assert not isinstance(t, AbstractError)
+    return _placeholder_body(to_relay_type(t))
 
 
 def handle_wrapper(fn, handle_params):
@@ -235,13 +229,13 @@ def handle_wrapper(fn, handle_params):
         return wrapper
 
 
-def _placeholder_body(type, types):
+def _placeholder_body(type):
     if isinstance(type, relay.TensorType):
         sh = [sh.value for sh in type.shape]
         return relay.const(np.array(np.random.rand(*sh)).astype(type.dtype),
                            dtype=type.dtype)
     elif isinstance(type, relay.TupleType):
-        return relay.Tuple([_placeholder_body(f, types) for f in type.fields])
+        return relay.Tuple([_placeholder_body(f) for f in type.fields])
     elif isinstance(type, relay.FuncType):
         params = []
         for arg_ty in type.arg_types:
@@ -249,26 +243,26 @@ def _placeholder_body(type, types):
 
         return relay.Function(
             params,
-            _placeholder_body(type.ret_type, types),
+            _placeholder_body(type.ret_type),
             ret_type=type.ret_type)
     elif isinstance(type, relay.RefType):
-        return relay.RefCreate(_placeholder_body(type.value, types))
+        return relay.RefCreate(_placeholder_body(type.value))
     elif isinstance(type, Object):
         if type.func == union_type:
             return empty_union()
         elif type.func == env_type:
-            return types.build_default_env_val()
+            return dead_env()
         else:  # pragma: no cover
             raise ValueError(f"Can't build value for adt: {type.func}")
     else:  # pragma: no cover
         raise ValueError(f"Can't build value of type {type}")
 
 
-def add_functions(mod, funcs, types):
+def add_functions(mod, funcs):
     """Workaround for type checker and mutually recursive functions."""
     for gv in funcs:
         func = funcs[gv]
-        body = _placeholder_body(func.ret_type, types)
+        body = _placeholder_body(func.ret_type)
         mod[gv] = relay.Function(func.params, body, func.ret_type)
 
     for gv in funcs:
