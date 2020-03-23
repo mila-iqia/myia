@@ -476,7 +476,7 @@ def test_conv2d_no_dil_stride(inp, w):
     ),
 )
 def test_torch_conv2d(inp, w, b):
-    value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 3)
+    value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (1, 1), 1)
     return torch.sum(value)
 
 
