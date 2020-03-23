@@ -14,8 +14,9 @@ from myia.opt import (
 from myia.pipeline import scalar_pipeline
 from myia.utils import InferenceError, Merge
 from myia.utils.unify import Var, var
+from myia.validate import ValidationError
 
-from ..common import f64, i64, to_abstract_test
+from ..common import i64, to_abstract_test
 
 X = Var('X')
 Y = Var('Y')
@@ -372,40 +373,13 @@ opt_err1 = psub(
 )
 
 
-opt_err2 = psub(
-    prim.scalar_div,
-    prim.scalar_lt,
-    name='opt_err2'
-)
-
-
-@pattern_replacer('just', prim.scalar_mul)
-def opt_newg(optimizer, node, equiv):
-    from myia.ir import clone
-
-    @parse
-    def newf(a, b):
-        return a - (a + b)
-    return Constant(clone(newf))
-
-
-@pattern_replacer('just', prim.scalar_div)
-def opt_newg_bad(optimizer, node, equiv):
-    from myia.ir import clone
-
-    @parse
-    def newf(a):
-        return a + a
-    return Constant(clone(newf))
-
-
 def test_type_tracking():
 
     pip = scalar_pipeline \
         .select('resources', 'parse', 'infer', 'specialize',
                 'simplify_types', 'opt', 'validate') \
         .configure({
-            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1, opt_err2],
+            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1],
         })
 
     def fn_ok1(x, y):
@@ -422,37 +396,27 @@ def test_type_tracking():
     def fn_err1(x, y):
         return x - y
 
-    with pytest.raises(InferenceError):
+    with pytest.raises(ValidationError):
         pip.run(input=fn_err1, argspec=(to_abstract_test(i64),
                                         to_abstract_test(i64)))
 
-    def fn_err2(x, y):
-        return x / y
 
-    with pytest.raises(InferenceError):
-        pip.run(input=fn_err2, argspec=(to_abstract_test(i64),
-                                        to_abstract_test(i64)))
-
-
-def test_type_tracking_newgraph():
+@pytest.mark.xfail(
+    reason="Not enough checks that replacement nodes have the same"
+    " type as the original ones."
+)
+def test_type_tracking_2():
 
     pip = scalar_pipeline \
         .select('resources', 'parse', 'infer', 'specialize',
                 'simplify_types', 'opt', 'validate') \
         .configure({
-            'opt.phases.main': [opt_newg, opt_newg_bad],
+            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1],
         })
 
-    def fn1(x, y):
-        return x * y
-
-    pip.run(input=fn1, argspec=(to_abstract_test(i64),
-                                to_abstract_test(i64)))
-
-    def fn2(x, y):
-        return x / y
+    def fn_err3(x, y):
+        return x - y + x
 
     with pytest.raises(InferenceError):
-        pip.run(input=fn2,
-                argspec=(to_abstract_test(f64),
-                         to_abstract_test(f64)))
+        pip.run(input=fn_err3, argspec=(to_abstract_test(i64),
+                                        to_abstract_test(i64)))
