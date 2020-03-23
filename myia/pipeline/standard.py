@@ -20,6 +20,7 @@ from .resources import (
     DebugVMResource,
     InferenceResource,
     Resources,
+    Tracker,
 )
 
 py_registry = Registry(default_field='python_implementation')
@@ -266,6 +267,7 @@ standard_resources = Resources.partial(
         constructors=inferrer_registry,
         context_class=Context,
     ),
+    tracker=Tracker.partial(),
     backend=BackendResource.partial(),
     debug_vm=DebugVMResource.partial(
         implementations=vm_registry,

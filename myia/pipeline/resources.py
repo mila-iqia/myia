@@ -119,6 +119,33 @@ class ConverterResource(Partializable):
         return v
 
 
+class Tracker(Partializable):
+    """Track new nodes that require type inference."""
+
+    def __init__(self, resources):
+        """Initialize a Tracker."""
+        self.todo = set()
+        self.manager = resources.manager
+        self.activated = False
+
+    def activate(self):
+        """Activate the tracker.
+
+        If the tracker is already activated, this does nothing.
+        """
+        if not self.activated:
+            self.manager.events.add_node.register(self._on_add_node)
+            self.manager.events.drop_node.register(self._on_drop_node)
+            self.activated = True
+
+    def _on_add_node(self, event, node):
+        if node.abstract is None:
+            self.todo.add(node)
+
+    def _on_drop_node(self, event, node):
+        self.todo.discard(node)
+
+
 class InferenceResource(Partializable):
     """Performs inference and monomorphization."""
 
@@ -250,5 +277,6 @@ __all__ = [
     'InferenceResource',
     'NumpyChecker',
     'Resources',
+    'Tracker',
     'default_convert',
 ]
