@@ -26,11 +26,13 @@ from myia.abstract import (
     AbstractUnion,
     Context,
     InferenceLoop,
+    JTransformedFunction,
     Pending,
     PendingFromList,
     Possibilities,
     TaggedPossibilities,
     TrackDict,
+    VirtualFunction,
     abstract_clone,
     amerge,
     broaden,
@@ -136,6 +138,10 @@ def test_amerge():
     assert amerge(AbstractError(DEAD),
                   AbstractError(ANYTHING),
                   forced=False) is AbstractError(ANYTHING)
+
+    assert amerge(AbstractError(ANYTHING),
+                  AbstractError(DEAD),
+                  forced=True) is AbstractError(ANYTHING)
 
     d1 = {'x': 1}
     d2 = {'y': 2}
@@ -292,6 +298,10 @@ def test_abstract_clone():
     a1 = T([s1, AbstractClass(object, {'field': s1})])
     a2 = T([s2, AbstractClass(object, {'field': s2})])
     assert upcast(a1, 64) is a2
+
+    jt = JTransformedFunction(VirtualFunction((s1,), s1))
+    assert upcast(jt, 64).fn.args == [s2]
+    assert upcast(jt, 64).fn.output is s2
 
 
 def test_abstract_clone_pending():
