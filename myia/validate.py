@@ -7,9 +7,12 @@ from .abstract import (
     AbstractClass,
     AbstractError,
     AbstractExternal,
+    AbstractFunction,
     AbstractJTagged,
     AbstractScalar,
     AbstractType,
+    DummyFunction,
+    VirtualFunction,
     abstract_check,
 )
 from .ir import manage
@@ -69,6 +72,20 @@ def validate_abstract(self, a: AbstractType, uses):
     return True
 
 
+@overload  # noqa: F811
+def validate_abstract(self, a: AbstractFunction, uses):
+    fns = a.get_sync()
+    if len(fns) != 1:
+        raise ValidationError(
+            f'Only one function type should be here: {a}'
+        )
+    fn, = fns
+    if not isinstance(fn, (VirtualFunction, DummyFunction)):
+        raise ValidationError(
+            f'All function types should be VirtualFunction, not {fn}'
+        )
+
+
 class NodeValidator:
     """Validate each node in a graph."""
 
@@ -119,6 +136,41 @@ class OperatorValidator(NodeValidator):
                 raise ValidationError(f'Illegal primitive: {node.value}')
 
 
+class CallValidator(NodeValidator):  # pragma: no cover
+    """Test that every operation has a valid type."""
+    # This validator works for most tests, but it still has a few issues to
+    # work out.
+
+    def __init__(self, *, check_none=True):
+        self.check_none = check_none
+
+    def test_node(self, node):
+        """Test that the operation for this call has a valid type."""
+        if node.is_apply():
+            from .abstract import broaden
+            fn, *args = node.inputs
+            if any(node.abstract is None for node in node.inputs):
+                if self.check_none:
+                    raise ValidationError(f'None in call')
+                else:
+                    return
+            vfn = fn.abstract.get_unique()
+            argv = [broaden(arg) for arg in vfn.args]
+            argt = [broaden(arg.abstract) for arg in args]
+            if argv != argt:
+                raise ValidationError(
+                    f'Inconsistent call arguments: {vfn.args}',
+                    expected=argv,
+                    got=argt,
+                )
+            if broaden(vfn.output) != broaden(node.abstract):
+                raise ValidationError(
+                    f'Inconsistent call output: {vfn.output}',
+                    expected=broaden(vfn.output),
+                    got=broaden(node.abstract),
+                )
+
+
 class MultiValidator(NodeValidator):
     """Combine multiple validators."""
 
@@ -148,6 +200,7 @@ def validate(root):
     mv = MultiValidator(
         OperatorValidator(),
         AbstractValidator(),
+        # CallValidator(),
     )
     mv.run(root)
 
