@@ -1,20 +1,31 @@
 """Library of optimizations."""
 
 from .. import operations
-from ..abstract import DEAD, AbstractFunction, AbstractJTagged, abstract_clone
+from ..abstract import (
+    DEAD,
+    AbstractFunction,
+    AbstractJTagged,
+    VirtualFunction,
+    abstract_check,
+    abstract_clone,
+    build_value,
+)
 from ..ir import (
     Apply,
     BasicRemapper,
     Constant,
     Graph,
     GraphCloner,
+    Quarantined,
+    clone,
     transformable_clone,
 )
 from ..operations import Primitive, primitives as P
 from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
-from ..utils import Partializable, overload
+from ..utils import Partializable, overload, tracer
+from ..utils.errors import untested_legacy
 from ..utils.unify import Var, var
 from ..utils.variables import (
     C1,
@@ -1048,6 +1059,15 @@ elim_jinv_j = psub(
 )
 
 
+@pattern_replacer(P.Jinv, G)
+def replace_Jinv_on_graph(resources, node, equiv):
+    g = equiv[G].value
+    assert isinstance(g, Graph)
+    ct = Constant(g.transforms['primal'])
+    ct.abstract = node.abstract
+    return ct
+
+
 @pattern_replacer(P.J, C)
 def expand_J(resources, node, equiv):
     """Replaces a call to J(f) by the graph for J(f).
@@ -1055,9 +1075,60 @@ def expand_J(resources, node, equiv):
     This will not replace J(x) when x is not a constant graph.
     """
     from ..grad import Jimpl
+
     arg = equiv[C].value
+    assert getattr(arg, 'parent', None) is None
+
+    prev_resources = resources
+
+    if not hasattr(prev_resources, 'grad_cache'):
+        prev_resources.grad_cache = {}
+
     try:
-        newg = Jimpl(arg, resources, node)
+        if isinstance(arg, Graph):
+            key = arg
+        else:
+            key = (arg, equiv[C].abstract)
+
+        if key in prev_resources.grad_cache:
+            ct = Constant(prev_resources.grad_cache[key])
+            ct.abstract = ct.value.abstract
+            return ct
+
+        newg = Jimpl(arg, prev_resources, node)
+
+        resources = resources.copy()
+        inf = resources.inferrer
+        vfn = node.abstract.get_unique()
+        argspec = vfn.args
+        outspec = vfn.output
+        if not isinstance(newg, Graph):
+            sig = newg.make_signature(argspec)
+            newg = newg.generate_graph(sig)
+        newg = clone(
+            newg,
+            quarantine=lambda g: g.abstract is not None
+        )
+        resources.manager.add_graph(newg)
+        empty = inf.engine.context_class.empty()
+        context = empty.add(newg, tuple(argspec))
+        inf.engine.run_coroutine(
+            inf.engine.infer_function(newg, argspec, outspec)
+        )
+        newg2 = inf.monomorphize(context)
+
+        newg = newg2
+        for node in inf.manager.all_nodes:
+            if node.is_constant(Quarantined):
+                node.value = node.value.graph
+        for g in inf.manager.graphs:
+            g._manager = None
+
+        if isinstance(arg, Graph):
+            arg.transforms['grad'] = newg
+
+        prev_resources.grad_cache[key] = newg
+
     except NotImplementedError:
         return None
     return Constant(newg)
@@ -1073,37 +1144,56 @@ def _jelim_retype_helper(self, f: AbstractFunction):
     raise TypeError('Function found')
 
 
+@abstract_check.variant
+def _jelim_nofunc(self, f: AbstractFunction):
+    return False
+
+
 class JElim(Partializable):
     """Eliminate J, iff it is only applied to non-functions."""
 
     def __init__(self, resources):
         """Initialize JElim."""
         self.resources = resources
+        self.name = 'jelim'
 
     def __call__(self, root):
         """Apply JElim on root."""
         mng = self.resources.manager
-        mng.keep_roots(root)
-        nodes = []
-        typesubs = []
-        for node in mng.all_nodes:
-            try:
-                newtype = _jelim_retype(node.abstract)
-            except TypeError:
-                return False
-            if node.is_apply(P.J) or node.is_apply(P.Jinv):
-                _, x = node.inputs
-                nodes.append((node, x))
-            typesubs.append((node, newtype))
+        args = dict(
+            opt=self,
+            node=None,
+            manager=self.resources.manager,
+        )
+        with tracer('opt', **args) as tr:
+            tr.set_results(success=False, **args)
+            mng.keep_roots(root)
+            nodes = []
+            typesubs = []
+            for node in mng.all_nodes:
+                try:
+                    newtype = _jelim_retype(node.abstract)
+                except TypeError:
+                    return False
+                if node.is_apply(P.J) or node.is_apply(P.Jinv):
+                    if not _jelim_nofunc(node.abstract):
+                        return False
+                    _, x = node.inputs
+                    nodes.append((node, x))
+                if newtype is not node.abstract:
+                    typesubs.append((node, newtype))
 
-        with mng.transact() as tr:
-            for node, repl in nodes:
-                tr.replace(node, repl)
+            with mng.transact() as tr:
+                for node, repl in nodes:
+                    tr.replace(node, repl)
 
-        for node, newtype in typesubs:
-            node.abstract = newtype
+            for node, newtype in typesubs:
+                node.abstract = newtype
 
-        return len(nodes) > 0
+            if len(nodes) > 0:
+                tracer().emit_success(**args, new_node=None)
+
+            return len(nodes) > 0
 
 
 class ForceConstants(Partializable):

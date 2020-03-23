@@ -235,6 +235,7 @@ step_debug_opt = Optimizer.partial(
             # Miscellaneous
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
+            optlib.replace_Jinv_on_graph,
         ],
         grad=[
             optlib.expand_J,
@@ -307,6 +308,7 @@ step_opt = Optimizer.partial(
             optlib.setitem_tuple_ct,
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
+            optlib.replace_Jinv_on_graph,
             optlib.cancel_env_set_get,
             optlib.getitem_newenv,
             # TODO: reintegrate the getitem_env_add optimization

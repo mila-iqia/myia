@@ -511,16 +511,13 @@ def Jimpl(prim: Primitive, resources, node):
             f"Missing a backpropagator for primitive '{prim}'",
             refs=[node]
         )
-    return resources.convert(g)
+    return resources.convert(g, manage=False)
 
 
 @overload  # noqa: F811
 def Jimpl(graph: Graph, resources, node):
     """Implement J on a Graph."""
-    if graph.transforms.get('grad', None):
-        return graph.transforms['grad']
     manager = resources.manager
-    manager.add_graph(graph)
     return _grad(manager, graph)
 
 

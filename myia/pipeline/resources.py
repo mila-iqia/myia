@@ -104,7 +104,7 @@ class ConverterResource(Partializable):
                 v = object_map[v]
             self.object_map[k] = _Unconverted(v)
 
-    def __call__(self, value):
+    def __call__(self, value, manage=True):
         """Convert a value."""
         try:
             v = self.object_map[value]
@@ -114,7 +114,7 @@ class ConverterResource(Partializable):
         except (TypeError, KeyError):
             v = default_convert(self, value)
 
-        if isinstance(v, Graph):
+        if manage and isinstance(v, Graph):
             self.resources.manager.add_graph(v)
         return v
 
@@ -278,6 +278,10 @@ class Resources(Partializable):
     def __call__(self):
         """Run the Resources as a pipeline step."""
         return {'resources': self}
+
+    def copy(self):
+        """Copy the resources object."""
+        return Resources(**self._members)
 
 
 __consolidate__ = True
