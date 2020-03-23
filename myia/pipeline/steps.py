@@ -268,8 +268,8 @@ step_opt = Optimizer.partial(
             optlib.simplify_partial,
             optlib.replace_applicator,
 
-            # Specialization
-            optlib.specialize_on_graph_arguments,
+            # # Specialization
+            # optlib.specialize_on_graph_arguments,
 
             # Arithmetic simplifications
             optlib.multiply_by_one_l,
