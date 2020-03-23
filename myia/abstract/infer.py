@@ -642,6 +642,20 @@ class VirtualInferrer(Inferrer):
         return self.output
 
 
+def compute_bprop_type(orig_fn, args, out):
+    """Compute the abstract type of the bprop for orig_fn."""
+    fn = AbstractFunction(orig_fn)
+    bparams = [sensitivity_transform(fn)]
+    bparams += [sensitivity_transform(a) for a in args]
+    bparams_final = AbstractTuple(bparams)
+    return AbstractFunction(
+        VirtualFunction(
+            (sensitivity_transform(out),),
+            bparams_final
+        )
+    )
+
+
 class JInferrer(Inferrer):
     """Inferrer for a function transformed through J."""
 
@@ -671,16 +685,7 @@ class JInferrer(Inferrer):
                                  for arg in jinv_args)
             res = await self.fn.run(engine, None, jinv_argrefs)
             res_wrapped = await self._jtag(res)
-            orig_fn = AbstractFunction(self.orig_fn)
-            bparams = [sensitivity_transform(orig_fn)]
-            bparams += [sensitivity_transform(a) for a in args]
-            bparams_final = AbstractTuple(bparams)
-            bprop = AbstractFunction(
-                VirtualFunction(
-                    (sensitivity_transform(res),),
-                    bparams_final
-                )
-            )
+            bprop = compute_bprop_type(self.orig_fn, args, res)
             self.cache[args] = AbstractTuple([res_wrapped, bprop])
         return self.cache[args]
 
@@ -880,6 +885,7 @@ __all__ = [
     'TrackedInferrer',
     'UniformPrimitiveInferrer',
     'VirtualInferrer',
+    'compute_bprop_type',
     'execute_inferrers',
     'standard_prim',
 ]
