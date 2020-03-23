@@ -5,7 +5,7 @@ from types import FunctionType
 import numpy as np
 
 from .. import parser, xtype
-from ..abstract import InferenceEngine, type_to_abstract
+from ..abstract import InferenceEngine, LiveInferenceEngine, type_to_abstract
 from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
@@ -149,25 +149,41 @@ class Tracker(Partializable):
 class InferenceResource(Partializable):
     """Performs inference and monomorphization."""
 
-    def __init__(self, resources, constructors, context_class):
+    def __init__(self, resources, constructors, max_stack_depth):
         """Initialize an InferenceResource."""
+        self.resources = resources
         self.manager = resources.manager
-        self.context_class = context_class
         self.constructors = constructors
+        self.max_stack_depth = max_stack_depth
         self.engine = InferenceEngine(
             resources,
             constructors=self.constructors,
-            context_class=self.context_class,
+            max_stack_depth=self.max_stack_depth,
+        )
+        self.live = LiveInferenceEngine(
+            resources,
+            constructors=self.constructors,
         )
 
-    def infer(self, graph, argspec, outspec=None, clear=False):
+    def infer_incremental(self):
+        """Perform inference."""
+        tracker = self.resources.tracker
+        if not tracker.activated:
+            return
+        mng = self.manager
+        todo = tracker.todo
+        while todo:
+            nodes = [node for node in todo
+                     if node.abstract is None and node in mng.all_nodes]
+            todo.clear()
+            self.live.run(nodes)
+
+    def infer(self, graph, argspec, outspec=None):
         """Perform inference."""
         with tracer('infer',
                     graph=graph,
                     argspec=argspec,
                     outspec=outspec) as tr:
-            if clear:
-                self.engine.reset()
             with tracer('engine', profile=False) as tr:
                 rval = self.engine.run(
                     graph,
@@ -186,11 +202,6 @@ class InferenceResource(Partializable):
             rval = monomorphize(self.engine, context, reuse_existing=True)
             tr.set_results(output=rval)
             return rval
-
-    def renormalize(self, graph, argspec, outspec=None):
-        """Perform inference and specialization."""
-        _, context = self.infer(graph, argspec, outspec, clear=True)
-        return self.monomorphize(context)
 
 
 class NumpyChecker:

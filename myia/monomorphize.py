@@ -6,6 +6,7 @@ function may be called with.
 
 from collections import defaultdict
 from dataclasses import dataclass, replace as dc_replace
+from functools import reduce
 from itertools import chain, count
 from typing import Optional
 from warnings import warn
@@ -15,23 +16,31 @@ from .abstract import (
     POLY,
     AbstractError,
     AbstractFunction,
+    AbstractJTagged,
+    AbstractTuple,
     AbstractValue,
     Context,
     DummyFunction,
     GraphFunction,
     GraphInferrer,
+    JTransformedFunction,
     MetaGraphFunction,
+    PartialApplication,
     PrimitiveFunction,
     Reference,
     TrackedInferrer,
     TypedPrimitive,
+    VirtualFunction,
     VirtualReference,
     abstract_check,
     abstract_clone,
+    amerge,
     broaden,
     build_value,
+    compute_bprop_type,
     concretize_abstract,
 )
+from .abstract.infer import VirtualInferrer
 from .abstract.utils import CheckState, CloneState
 from .graph_utils import dfs
 from .info import About
@@ -57,30 +66,91 @@ class Unspecializable(Exception):
         self.data = data
 
 
-@abstract_clone.variant
-def _fix_type(self, a: GraphFunction, spc):
-    ctx = spc.ctcache.get(a.tracking_id, None)
-    if ctx is None:
-        ctx = spc.ctcache.get(a.graph, None)
-    if ctx is None:
-        assert a.graph not in spc.results
-        return DummyFunction()
-    else:
-        return GraphFunction(spc.results[ctx], Context.empty(), None)
+def type_fixer(finder, monomorphizer=None):
 
+    fn = abstract_clone.copy()
 
-@overload  # noqa: F811
-def _fix_type(self, a: PrimitiveFunction, spc):
-    try:
-        return self(spc.analyze_function(None, a, None)[0], spc)
-    except Unspecializable:
-        return DummyFunction()
+    @fn.register
+    def _fix_type(self, a: GraphFunction):
+        if a.graph.abstract is not None:
+            return self(a.graph.abstract.get_unique())
+        elif a.tracking_id in monomorphizer.ctcache:
+            ctx = monomorphizer.ctcache[a.tracking_id]
+            g = monomorphizer.results[ctx]
+            return VirtualFunction(
+                tuple(self(p.abstract) for p in g.parameters),
+                self(g.return_.abstract)
+            )
+        else:
+            return DummyFunction()
 
+    @fn.register  # noqa: F811
+    def _fix_type(self, a: PartialApplication):
+        vfn = self(a.fn)
+        if isinstance(vfn, VirtualFunction):
+            vfn = VirtualFunction(vfn.args[len(a.args):], vfn.output)
+        return vfn
 
-@overload  # noqa: F811
-def _fix_type(self, a: TypedPrimitive, spc):
-    return TypedPrimitive(a.prim, tuple(self(ar, spc) for ar in a.args),
-                          self(a.output, spc))
+    @fn.register  # noqa: F811
+    def _fix_type(self, a: VirtualFunction):
+        return (yield VirtualFunction)(
+            tuple(self(arg) for arg in a.args),
+            self(a.output)
+        )
+
+    @fn.register  # noqa: F811
+    def _fix_type(self, a: JTransformedFunction):
+        def _jtag(x):
+            if isinstance(x, AbstractFunction):
+                v = x.get_sync()
+                rval = AbstractFunction(*[self(JTransformedFunction(poss))
+                                        for poss in v])
+            else:
+                rval = AbstractJTagged(self(x))
+            return rval
+
+        vfn = self(a.fn)
+        jargs = tuple(_jtag(arg) for arg in vfn.args)
+        jres = _jtag(vfn.output)
+        bprop = compute_bprop_type(vfn, vfn.args, vfn.output)
+        out = AbstractTuple([jres, bprop])
+        return VirtualFunction(jargs, out)
+
+    @fn.register  # noqa: F811
+    def _fix_type(self, a: AbstractFunction):
+        vfns = self(a.get_sync())
+        if len(vfns) == 1:
+            vfn, = vfns
+        else:
+            vfns = [v for v in vfns if not isinstance(v, DummyFunction)]
+            assert vfns and all(isinstance(v, VirtualFunction) for v in vfns)
+            vfn = VirtualFunction(
+                reduce(amerge, [v.args for v in vfns]),
+                reduce(amerge, [v.output for v in vfns]),
+            )
+        return (yield AbstractFunction)(vfn)
+
+    @fn.register  # noqa: F811
+    def _fix_type(self, a: PrimitiveFunction):
+        try:
+            return self(
+                finder.analyze_function(None, a, None)[0]
+            )
+        except Unspecializable:
+            return DummyFunction()
+
+    @fn.register  # noqa: F811
+    def _fix_type(self, a: MetaGraphFunction):
+        inf = finder.engine.get_inferrer_for(a)
+        argvals, outval = finder._find_unique_argvals(None, inf, None)
+        return VirtualFunction(tuple(argvals), outval)
+
+    @fn.register  # noqa: F811
+    def _fix_type(self, a: TypedPrimitive):
+        return VirtualFunction(tuple(self(ar) for ar in a.args),
+                               self(a.output))
+
+    return fn
 
 
 @abstract_check.variant(
@@ -202,47 +272,13 @@ def _normalize_context(ctx):
     return _refmap(_no_tracking_id, ctx)
 
 
-class Monomorphizer:
-    """Monomorphize graphs using inferred type information.
+class TypeFinder:
+    """Find a unique type for inferrers, constants, etc."""
 
-    Monomorphization creates a separate function for each type signature the
-    function may be called with.
-
-    Arguments:
-        engine: The InferenceEngine containing the type information.
-        reuse_existing: Whether to reuse existing graphs when possible.
-
-    """
-
-    def __init__(self, engine, reuse_existing=True):
-        """Initialize the monomorphizer."""
+    def __init__(self, engine):
+        """Initialize a TypeFinder."""
         self.engine = engine
-        self.specializations = {}
-        self.replacements = defaultdict(dict)
-        self.results = {}
-        self.ctcache = {}
         self.infcaches = {}
-        self.reuse_existing = reuse_existing
-        self.invmap = {}
-
-    def run(self, context):
-        """Run monomorphization."""
-        self.manager = context.graph.manager
-        concretize_cache(self.engine.cache.cache)
-        concretize_cache(self.engine.reference_map)
-        self.collect(context)
-        self.order_tasks()
-        self.create_graphs()
-        self.monomorphize()
-        self.fill_placeholders()
-        result = self.results[context]
-        self.manager.keep_roots(result)
-        self.fix_types()
-        return result
-
-    #########
-    # Build #
-    #########
 
     def analyze_function(self, a, fn, argvals):
         """Analyze a function for the collect phase.
@@ -269,17 +305,15 @@ class Monomorphizer:
         if isinstance(fn, PrimitiveFunction):
             tfn = TypedPrimitive(fn.prim, argvals, outval)
             a = AbstractFunction(tfn)
-            return tfn, _const(fn.prim, a), None
+            return tfn, _const(fn.prim, a), None, None
 
         assert isinstance(inf, GraphInferrer)
         concretize_cache(inf.graph_cache)
 
         ctx = inf.make_context(self.engine, argvals)
         norm_ctx = _normalize_context(ctx)
-        if norm_ctx not in self.specializations:
-            self.specializations[norm_ctx] = ctx
         new_ct = _const(_Placeholder(norm_ctx), None)
-        return None, new_ct, norm_ctx
+        return None, new_ct, ctx, norm_ctx
 
     def _find_choices(self, inf):
         if inf not in self.infcaches:
@@ -364,6 +398,14 @@ class Monomorphizer:
                 # Return the only element
                 return choice
         elif len(choices) == 0:
+            assert not isinstance(inf, VirtualInferrer)
+            currinf = inf
+            while hasattr(currinf, 'subinf'):
+                currinf = currinf.subinf
+            if currinf is not inf:
+                return self._find_unique_argvals_helper(
+                    a, currinf, argvals, try_generalize
+                )
             raise Unspecializable(DEAD)
         elif try_generalize:
             generalized, outval = self._find_generalized(inf)
@@ -372,6 +414,46 @@ class Monomorphizer:
             raise Unspecializable(POLY, (a, *choices.keys()))
         else:
             raise Unspecializable(POLY, (a, *choices.keys()))
+
+
+class Monomorphizer:
+    """Monomorphize graphs using inferred type information.
+
+    Monomorphization creates a separate function for each type signature the
+    function may be called with.
+
+    Arguments:
+        engine: The InferenceEngine containing the type information.
+        reuse_existing: Whether to reuse existing graphs when possible.
+
+    """
+
+    def __init__(self, engine, reuse_existing=True):
+        """Initialize the monomorphizer."""
+        self.engine = engine
+        self.specializations = {}
+        self.replacements = defaultdict(dict)
+        self.results = {}
+        self.ctcache = {}
+        self.reuse_existing = reuse_existing
+        self.invmap = {}
+        self.finder = TypeFinder(self.engine)
+        self._fix_type = type_fixer(self.finder, self)
+
+    def run(self, context):
+        """Run monomorphization."""
+        self.manager = context.graph.manager
+        concretize_cache(self.engine.cache.cache)
+        concretize_cache(self.engine.reference_map)
+        self.collect(context)
+        self.order_tasks()
+        self.create_graphs()
+        self.monomorphize()
+        self.fill_placeholders()
+        result = self.results[context]
+        self.manager.keep_roots(result)
+        self.fix_types()
+        return result
 
     ###########
     # Collect #
@@ -455,24 +537,38 @@ class Monomorphizer:
                     or ref.node.is_constant(MetaGraph) \
                     or ref.node.is_constant(Primitive):
 
-                fn = a.get_unique()
-                with About(ref.node.debug, 'equiv'):
-                    try:
-                        _, new_node, norm_ctx = self.analyze_function(
-                            a, fn, entry.argvals)
-                    except Unspecializable as e:
-                        aerr = AbstractError(e.problem, e.data)
-                        new_node = _const(e.problem, aerr)
-                    else:
-                        if isinstance(fn, GraphFunction):
-                            self.ctcache[ref.node] = norm_ctx
-                            if fn.tracking_id:
-                                self.ctcache[fn.tracking_id] = norm_ctx
+                if ref.node.is_constant_graph():
+                    ctabs = ref.node.value.abstract
+                else:
+                    ctabs = ref.node.abstract
 
-                        if norm_ctx is not None:
-                            retref = self.engine.ref(norm_ctx.graph.return_,
-                                                     norm_ctx)
-                            todo.append(_TodoEntry(retref, None, None))
+                if (ctabs is None
+                        or not isinstance(ctabs.get_unique(),
+                                          VirtualFunction)):
+                    fn = a.get_unique()
+                    with About(ref.node.debug, 'equiv'):
+                        try:
+                            _, new_node, ctx, norm_ctx = \
+                                self.finder.analyze_function(
+                                    a, fn, entry.argvals
+                                )
+                            if (norm_ctx
+                                    and norm_ctx not in self.specializations):
+                                self.specializations[norm_ctx] = ctx
+                        except Unspecializable as e:
+                            aerr = AbstractError(e.problem, e.data)
+                            new_node = _const(e.problem, aerr)
+                        else:
+                            if isinstance(fn, GraphFunction):
+                                self.ctcache[ref.node] = norm_ctx
+                                if fn.tracking_id:
+                                    self.ctcache[fn.tracking_id] = norm_ctx
+
+                            if norm_ctx is not None:
+                                retref = self.engine.ref(
+                                    norm_ctx.graph.return_, norm_ctx
+                                )
+                                todo.append(_TodoEntry(retref, None, None))
 
             if new_node is not entry.ref.node:
                 if entry.link is None:
@@ -538,7 +634,6 @@ class Monomorphizer:
                 newgraph = ctx.graph.make_new(relation=next(_count))
                 newgraph.set_flags(reference=False)
             self.results[ctx] = newgraph
-            self.ctcache[newgraph] = ctx
             entry.append(newgraph)
 
     ################
@@ -568,10 +663,8 @@ class Monomorphizer:
 
             def fv_function(fv, ctx=ctx):
                 fv_ctx = ctx.filter(fv.graph)
-                if fv_ctx in cloners:
-                    return cloners[fv_ctx][fv]
-                else:
-                    return fv
+                assert fv_ctx in cloners
+                return cloners[fv_ctx][fv]
 
             # Rewire the graph to clone
             with m.transact() as tr:
@@ -659,7 +752,7 @@ class Monomorphizer:
         for node in self.manager.all_nodes:
             if node.is_constant(Graph):
                 node.abstract = node.value.abstract
-            node.abstract = _fix_type(node.abstract, self)
+            node.abstract = self._fix_type(node.abstract)
             assert node.abstract is not None
 
 

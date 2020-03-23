@@ -7,7 +7,7 @@ import operator
 import numpy as np
 
 from .. import operations, xtype
-from ..abstract import ABSENT, Context
+from ..abstract import ABSENT
 from ..ir import GraphManager
 from ..operations import primitives as P
 from ..operations.gen import lop, reverse_binop, rop
@@ -265,7 +265,7 @@ standard_resources = Resources.partial(
     ),
     inferrer=InferenceResource.partial(
         constructors=inferrer_registry,
-        context_class=Context,
+        max_stack_depth=50,
     ),
     tracker=Tracker.partial(),
     backend=BackendResource.partial(),

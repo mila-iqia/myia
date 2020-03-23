@@ -46,19 +46,20 @@ class Optimizer(Partializable):
         graph: The optimized graph.
     """
 
-    def __init__(self, phases, run_only_once=False):
+    def __init__(self, phases, run_only_once=False, use_tracker=True):
         """Initialize an Optimizer."""
         self.run_only_once = run_only_once
         self.phases = phases
+        self.use_tracker = use_tracker
 
     def __call__(self, resources, graph, argspec=None, outspec=None):
         """Optimize the graph using the given patterns."""
+        if self.use_tracker:
+            resources.tracker.activate()
         final_phases = []
         names = []
         for name, spec in self.phases.items():
-            if spec == 'renormalize':
-                pass
-            elif isinstance(spec, list):
+            if isinstance(spec, list):
                 nmap = NodeMap()
                 for opt in spec:
                     nmap.register(getattr(opt, 'interest', None), opt)
@@ -81,12 +82,7 @@ class Optimizer(Partializable):
                 nn = iter(names)
                 for opt in final_phases:
                     with tracer(next(nn)):
-                        if opt == 'renormalize':
-                            assert argspec is not None
-                            graph = resources.inferrer.renormalize(
-                                graph, argspec, outspec
-                            )
-                        elif opt(graph):
+                        if opt(graph):
                             changes = True
                 if run_only_once:
                     break
@@ -131,7 +127,8 @@ step_resolve = Optimizer.partial(
     run_only_once=True,
     phases=dict(
         resolve=[optlib.resolve_globals]
-    )
+    ),
+    use_tracker=False
 )
 
 
@@ -204,10 +201,12 @@ def step_simplify_types(resources, graph, argspec, outspec):
     Outputs:
         graph: The prepared graph.
     """
+    resources.tracker.activate()
     mng = resources.manager
     simplify_types(graph, mng)
+    mng.keep_roots(graph)
     new_argspec = tuple(p.abstract for p in graph.parameters)
-    graph = resources.inferrer.renormalize(graph, new_argspec)
+    resources.inferrer.infer_incremental()
     new_outspec = graph.output.abstract
     return {'graph': graph,
             'argspec': new_argspec,
@@ -240,7 +239,6 @@ step_debug_opt = Optimizer.partial(
         grad=[
             optlib.expand_J,
         ],
-        renormalize='renormalize',
         cse=CSE.partial(report_changes=False),
         jelim=optlib.JElim.partial(),
     )
@@ -334,7 +332,6 @@ step_opt = Optimizer.partial(
         grad=[
             optlib.expand_J,
         ],
-        renormalize='renormalize',
         cse=CSE.partial(report_changes=False),
         fct=ForceConstants.partial(),
         jelim=optlib.JElim.partial(),
@@ -344,7 +341,6 @@ step_opt = Optimizer.partial(
 
 step_opt2 = Optimizer.partial(
     phases=dict(
-        renormalize='renormalize',
         dde=DeadDataElimination.partial(),
         main=[
             optlib.unfuse_composite,
