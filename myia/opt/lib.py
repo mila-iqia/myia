@@ -113,9 +113,7 @@ def getitem_constant_tuple(resources, node, equiv):
     assert isinstance(c1, tuple)
     assert isinstance(i, int)
     ct = Constant(c1[i])
-    old_abs = equiv[C1].abstract
-    if old_abs is not None:
-        ct.abstract = old_abs.elements[i]
+    ct.abstract = node.abstract
     return ct
 
 
