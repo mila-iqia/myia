@@ -11,7 +11,6 @@ from ..ir import Graph
 from ..opt import (
     CSE,
     DeadDataElimination,
-    ForceConstants,
     LocalPassOptimizer,
     NodeMap,
     lib as optlib,
@@ -250,6 +249,9 @@ step_debug_opt = Optimizer.partial(
 step_opt = Optimizer.partial(
     phases=dict(
         main=[
+            # Force constants
+            optlib.force_constants,
+
             # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,
@@ -335,7 +337,6 @@ step_opt = Optimizer.partial(
             optlib.expand_J,
         ],
         cse=CSE.partial(report_changes=False),
-        fct=ForceConstants.partial(),
         jelim=optlib.JElim.partial(),
     )
 )
@@ -345,6 +346,7 @@ step_opt2 = Optimizer.partial(
     phases=dict(
         dde=DeadDataElimination.partial(),
         main=[
+            optlib.force_constants,
             optlib.unfuse_composite,
             optlib.getitem_tuple,
             optlib.getitem_constant_tuple,
@@ -364,7 +366,6 @@ step_opt2 = Optimizer.partial(
             optlib.elim_stop_gradient,
         ],
         cse=CSE.partial(report_changes=False),
-        fct=ForceConstants.partial(),
     )
 )
 
