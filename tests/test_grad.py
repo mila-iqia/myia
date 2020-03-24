@@ -49,6 +49,7 @@ from .multitest import backend_all, mt, myia_function_test
 def _backend_fixture(request):
     return request.param
 
+
 @dataclass
 class Point:
     x: f64

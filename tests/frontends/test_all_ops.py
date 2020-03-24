@@ -674,6 +674,7 @@ def test_torch_functional_log_softmax(x, y):
     torch.randn(4, 4, dtype=torch.float32, requires_grad=True),
     torch.randn(4, 4, dtype=torch.float32, requires_grad=True),
     torch.randn(4, 4, dtype=torch.float32, requires_grad=True),
+    atol=1e-5,
     grad_atol=1e-5,
 )
 def test_lstm_cell(inp, hx, cx, w_ih, w_hh, b_ih, b_hh):
