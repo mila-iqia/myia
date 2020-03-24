@@ -720,6 +720,8 @@ def force_constants(resources, node, equiv):
         val = build_value(node.abstract)
     except Exception:
         return None
+    if val is DEAD:
+        return None
     ct = Constant(val)
     ct.abstract = node.abstract
     return ct
