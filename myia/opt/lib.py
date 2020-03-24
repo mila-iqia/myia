@@ -1083,6 +1083,7 @@ elim_jinv_j = psub(
 
 @pattern_replacer(P.Jinv, G)
 def replace_Jinv_on_graph(resources, node, equiv):
+    """Replace J(graph) by the primal."""
     g = equiv[G].value
     assert isinstance(g, Graph)
     ct = Constant(g.transforms['primal'])
