@@ -394,6 +394,7 @@ def relay_conv_transpose2d(
     _, w_c, filter_h, filter_w = weight_shape
     _i = c.ref(input)
     _w = c.ref(weight)
+    output_channels = w_c * groups.value
     return relay.nn.conv2d_transpose(
         _i,
         _w,
@@ -403,7 +404,7 @@ def relay_conv_transpose2d(
         groups=groups.value,
         output_padding=output_padding.value,
         kernel_size=(filter_h, filter_w),
-        channels=in_channels,
+        channels=output_channels,
     )
 
 
