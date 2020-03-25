@@ -374,14 +374,8 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
 
 
 def relay_conv_transpose2d(
-    c, input, weight, bias, stride, padding, output_padding, groups, dilation
+    c, input, weight, stride, padding, output_padding, groups, dilation
 ):
-
-    if not bias.is_constant(type(None)):
-        raise NotImplementedError(
-            "conv_transpose2d: bias not yet supported " "in relay backend."
-        )
-
     assert stride.is_constant(tuple)
     assert padding.is_constant(tuple)
     assert output_padding.is_constant(tuple)

@@ -313,7 +313,7 @@ def conv_transpose2d(
 ):
     """Map of Pytorch method torch.nn.functional.conv_transpose2d."""
     return P.conv_transpose2d(
-        input, weight, bias, stride, padding, output_padding, groups, dilation
+        input, weight, stride, padding, output_padding, groups, dilation
     )
 
 
