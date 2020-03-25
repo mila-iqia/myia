@@ -43,8 +43,8 @@ from .multitest import backend_all, mt, myia_function_test
 
 
 @pytest.fixture(params=[
-    pytest.param('pytorch'),
-    pytest.param('relay'),
+    pytest.param("pytorch"),
+    pytest.param("relay"),
 ])
 def _backend_fixture(request):
     return request.param
