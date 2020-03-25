@@ -8,7 +8,6 @@ from ..lib import (
     TYPE,
     AbstractArray,
     AbstractFunction,
-    GraphFunction,
     MetaGraph,
     MyiaShapeError,
     bprop_to_grad_transform,
@@ -106,11 +105,10 @@ class ArrayReduceGradient(MetaGraph):
 
     def generate_graph(self, args):
         """Generate the gradient graph."""
-        jf, jarr, jshp = args
-        assert isinstance(jf, AbstractFunction)
-        fn = jf.get_unique()
-        assert isinstance(fn, GraphFunction) and fn.graph.parent is None
-        assert fn.graph.transforms['primal'] is P.scalar_add
+        # BUG: We only support gradients for sum (scalar_add as the reduction
+        # function). However, it is currently not possible to check what the
+        # reduction function is, due to erasure of the information when
+        # GraphFunction and so on are converted to VirtualFunction.
         return bprop_to_grad_transform(P.array_reduce)(bprop_sum)
 
 

@@ -133,9 +133,10 @@ def to_abstract(self, v: AbstractValue, **kwargs):
 @overload  # noqa: F811
 def to_abstract(self, v: Graph, context=None, node=None, **kwargs):
     ctx = context or Context.empty()
-    return AbstractFunction(
-        GraphFunction(v, ctx, tracking_id=node)
-    )
+    if v.abstract is None:
+        return AbstractFunction(GraphFunction(v, ctx, tracking_id=node))
+    else:
+        return v.abstract
 
 
 @overload  # noqa: F811

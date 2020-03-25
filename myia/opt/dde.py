@@ -462,7 +462,7 @@ class DeadDataElimination(Partializable):
         if isinstance(a, abstract.AbstractScalar):
             if a.xtype() == xtype.EnvType:
                 val = newenv
-            elif a.xtype() == xtype.UniverseType:  # pragma: no cover
+            elif a.xtype() == xtype.UniverseType:
                 return None
         repl = Constant(val)
         repl.abstract = node.abstract

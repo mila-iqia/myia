@@ -187,14 +187,18 @@ class FPropRemapper(GradRemapper):
 
         Remapped free variables are remapped elsewhere.
         """
-        if fv.graph not in self.graphs:
+        if fv.graph not in self.graphs:  # pragma: no cover
+            # TODO: should be covered when supported for grad on closures
+            # is supported again.
             return self.gen_constant(g, ng, fv)
 
     def gen_fv_graph(self, g, ng, fvg):
         """Free variables that are graphs are handled like constants."""
         if fvg in self.graphs:
             return self.gen_constant_graph(g, ng, Constant(fvg))
-        else:
+        else:  # pragma: no cover
+            # TODO: should be covered when supported for grad on closures
+            # is supported again.
             return self.gen_constant(g, ng, fvg)
 
     def link_apply(self, link):
@@ -223,7 +227,9 @@ class FPropRemapper(GradRemapper):
         """Generate Jinv(B:node)."""
         if (node, 'jinv') not in self.repl:
             if isinstance(node, Graph):
-                if node not in self.graphs:
+                if node not in self.graphs:  # pragma: no cover
+                    # TODO: should be covered when supported for grad on
+                    # closures is supported again.
                     new_node = Constant(node)
                 else:
                     assert node.parent is not None
@@ -232,7 +238,9 @@ class FPropRemapper(GradRemapper):
                     with About(node.debug, 'equiv'):
                         new_node = ng.apply(P.Jinv, ct)
             else:
-                if node.graph not in self.graphs:
+                if node.graph not in self.graphs:  # pragma: no cover
+                    # TODO: should be covered when supported for grad on
+                    # closures is supported again.
                     new_node = node
                 else:
                     ng = self.get_graph(node.graph)
@@ -503,16 +511,13 @@ def Jimpl(prim: Primitive, resources, node):
             f"Missing a backpropagator for primitive '{prim}'",
             refs=[node]
         )
-    return resources.convert(g)
+    return resources.convert(g, manage=False)
 
 
 @overload  # noqa: F811
 def Jimpl(graph: Graph, resources, node):
     """Implement J on a Graph."""
-    if graph.transforms.get('grad', None):
-        return graph.transforms['grad']
     manager = resources.manager
-    manager.add_graph(graph)
     return _grad(manager, graph)
 
 

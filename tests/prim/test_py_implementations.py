@@ -57,6 +57,7 @@ from myia.operations import (
     transpose,
     tuple_getitem,
     tuple_setitem,
+    unsafe_static_cast,
 )
 from myia.pipeline import scalar_debug_pipeline
 from myia.utils import assert_scalar, newenv
@@ -607,6 +608,10 @@ def test_prim_scalar_abs(x):
 )
 def test_prim_scalar_sign(x):
     return scalar_sign(x)
+
+
+def test_prim_unsafe_static_cast():
+    assert unsafe_static_cast(1234, type_to_abstract(float)) == 1234
 
 
 def test_env():

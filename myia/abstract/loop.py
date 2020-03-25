@@ -246,6 +246,12 @@ class PendingFromList(Pending):
                 return e
         return self.default
 
+    def set_result(self, res):
+        """Set the result of this Pending."""
+        # Sanity check
+        assert res in self.possibilities
+        super().set_result(res)
+
 
 class PendingTentative(Pending):
     """Represents a Pending with a tentative resolution.

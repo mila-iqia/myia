@@ -12,6 +12,7 @@ from ..utils import (
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,
+    OrderedSet,
     Overload,
     Partializable,
     infer_trace,
@@ -29,7 +30,6 @@ from .data import (
     AbstractScalar,
     AbstractTuple,
     AbstractValue,
-    DummyFunction,
     Function,
     GraphFunction,
     JTransformedFunction,
@@ -42,7 +42,13 @@ from .data import (
 )
 from .loop import InferenceLoop, Pending, force_pending
 from .macro import AnnotationBasedChecker
-from .ref import Context, EvaluationCache, Reference, VirtualReference
+from .ref import (
+    CONTEXTLESS,
+    Context,
+    EvaluationCache,
+    Reference,
+    VirtualReference,
+)
 from .to_abstract import to_abstract
 from .utils import (
     broaden as _broaden,
@@ -125,6 +131,8 @@ class InferenceEngine:
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
+        if context is CONTEXTLESS:
+            return Reference(self, node, CONTEXTLESS)
         if node.is_constant_graph():
             graph = node.value.parent
         else:
@@ -147,13 +155,12 @@ class InferenceEngine:
 
         tracer().emit('request_ref', engine=self, reference=ref)
 
-        if node.is_constant():
-            inferred = ref.node.abstract
-            if (inferred is not None
-                    and not isinstance(inferred, AbstractFunction)):
-                result = inferred
-            else:
-                result = await self.infer_constant(ref)
+        inferred = ref.node.abstract
+        if inferred is not None:
+            result = inferred
+
+        elif node.is_constant():
+            result = await self.infer_constant(ref)
 
         elif node.is_apply():
             result = await self.infer_apply(ref)
@@ -235,6 +242,7 @@ class InferenceEngine:
 
     @get_inferrer_for.register
     def get_inferrer_for(self, g: GraphFunction):
+        assert g.graph.abstract is None
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
         return self.constructors[g]
@@ -259,10 +267,6 @@ class InferenceEngine:
             vf.args,
             vf.output
         )
-
-    @get_inferrer_for.register
-    def get_inferrer_for(self, df: DummyFunction):
-        raise MyiaTypeError(f'Trying to call dummy')
 
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraphFunction):
@@ -325,7 +329,13 @@ class InferenceEngine:
 
     def abstract_merge(self, *values):
         """Merge a list of AbstractValues together."""
-        return reduce(amerge, values)
+        from .amerge import amerge_engine
+        token = amerge_engine.set(self)
+        try:
+            rval = reduce(amerge, values)
+        finally:
+            amerge_engine.reset(token)
+        return rval
 
     def check_predicate(self, predicate, x):
         """Returns whether the predicate applies on x.
@@ -377,6 +387,54 @@ class InferenceEngine:
         immediately.
         """
         return await force_pending(self.check(predicate, *values))
+
+
+class LiveInferenceEngine(InferenceEngine):
+    """Implements an inference engine for live inference.
+
+    Each node of each graph is only allowed to have a single type.
+    """
+
+    def __init__(self, resources, *, constructors):
+        """Initialize a LiveInferenceEngine."""
+        from ..monomorphize import type_fixer, TypeFinder
+        super().__init__(
+            resources,
+            constructors=constructors,
+            max_stack_depth=50,
+        )
+        self.fix_type = type_fixer(TypeFinder(self))
+
+    def run(self, nodes):
+        """Infer the types of the given nodes."""
+        async def _run(todo):
+            for node in todo:
+                await self.get_inferred(self.ref(node, CONTEXTLESS))
+
+        self.reset()
+        todo = OrderedSet()
+        nodes = OrderedSet(nodes)
+
+        while nodes:
+            node = nodes.pop()
+            calls = OrderedSet(
+                [user for user, idx in self.mng.uses[node] if idx == 0]
+            )
+            for call in calls:
+                call.abstract = None
+            nodes.update(calls)
+            todo.add(node)
+
+        self.run_coroutine(_run(todo))
+
+        for ref, fut in self.cache.cache.items():
+            new_ref = self.get_actual_ref(ref)
+            if new_ref is not ref:
+                self.mng.replace(ref.node, new_ref.node)
+                ref = new_ref
+            result = fut.result()
+            result = self.fix_type(result)
+            ref.node.abstract = concretize_abstract(result)
 
 
 class Inferrer(Partializable):
@@ -635,6 +693,20 @@ class VirtualInferrer(Inferrer):
         return self.output
 
 
+def compute_bprop_type(orig_fn, args, out):
+    """Compute the abstract type of the bprop for orig_fn."""
+    fn = AbstractFunction(orig_fn)
+    bparams = [sensitivity_transform(fn)]
+    bparams += [sensitivity_transform(a) for a in args]
+    bparams_final = AbstractTuple(bparams)
+    return AbstractFunction(
+        VirtualFunction(
+            (sensitivity_transform(out),),
+            bparams_final
+        )
+    )
+
+
 class JInferrer(Inferrer):
     """Inferrer for a function transformed through J."""
 
@@ -664,16 +736,7 @@ class JInferrer(Inferrer):
                                  for arg in jinv_args)
             res = await self.fn.run(engine, None, jinv_argrefs)
             res_wrapped = await self._jtag(res)
-            orig_fn = AbstractFunction(self.orig_fn)
-            bparams = [sensitivity_transform(orig_fn)]
-            bparams += [sensitivity_transform(a) for a in args]
-            bparams_final = AbstractTuple(bparams)
-            bprop = AbstractFunction(
-                VirtualFunction(
-                    (sensitivity_transform(res),),
-                    bparams_final
-                )
-            )
+            bprop = compute_bprop_type(self.orig_fn, args, res)
             self.cache[args] = AbstractTuple([res_wrapped, bprop])
         return self.cache[args]
 
@@ -867,12 +930,14 @@ __all__ = [
     'InferenceEngine',
     'Inferrer',
     'JInferrer',
+    'LiveInferenceEngine',
     'MacroInferrer',
     'PartialInferrer',
     'StandardInferrer',
     'TrackedInferrer',
     'UniformPrimitiveInferrer',
     'VirtualInferrer',
+    'compute_bprop_type',
     'execute_inferrers',
     'standard_prim',
 ]

@@ -1,11 +1,12 @@
 
 import pytest
 
+from myia.abstract import AbstractFunction, VirtualFunction
 from myia.operations import partial, primitives as P
 from myia.pipeline import scalar_parse, scalar_pipeline
-from myia.validate import ValidationError, validate
+from myia.validate import ValidationError, validate, validate_abstract
 
-from .common import Point, i64, to_abstract_test
+from .common import Point, f64, i64, to_abstract_test
 
 Point_a = Point(i64, i64)
 
@@ -121,3 +122,12 @@ def test_clean():
         def f(x):
             return partial(P.make_record, Point, x)
         return f(x)(y)
+
+
+def test_validate_abstract():
+    fn = AbstractFunction(
+        VirtualFunction((), to_abstract_test(i64)),
+        VirtualFunction((), to_abstract_test(f64)),
+    )
+    with pytest.raises(ValidationError):
+        validate_abstract(fn, {})

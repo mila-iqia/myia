@@ -7,9 +7,7 @@ from myia.utils.errors import MyiaTypeError
 
 from .. import operations, xtype
 from ..lib import (
-    DATA,
     AbstractClassBase,
-    AbstractError,
     AbstractScalar,
     AbstractType,
     macro,
@@ -44,12 +42,6 @@ async def call_object(info, fn, *n_args):
             newfn = g.apply(P.partial, P.make_record, val)
             newcall = g.apply(newfn, *arg_nodes)
         return newcall
-
-    elif isinstance(fn, AbstractError):
-        raise MyiaTypeError(
-            f'Trying to call a function with type '
-            f'{fn.xvalue()} {fn.values[DATA] or ""}.'
-        )
 
     elif isinstance(fn, AbstractClassBase):
         newfn = g.apply(operations.getattr, fn_node, '__call__')

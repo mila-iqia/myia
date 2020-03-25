@@ -1,20 +1,31 @@
 """Library of optimizations."""
 
 from .. import operations
-from ..abstract import DEAD, AbstractFunction, AbstractJTagged, abstract_clone
+from ..abstract import (
+    DEAD,
+    AbstractFunction,
+    AbstractJTagged,
+    VirtualFunction,
+    abstract_check,
+    abstract_clone,
+    build_value,
+)
 from ..ir import (
     Apply,
     BasicRemapper,
     Constant,
     Graph,
     GraphCloner,
+    Quarantined,
+    clone,
     transformable_clone,
 )
 from ..operations import Primitive, primitives as P
 from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
-from ..utils import Partializable, overload
+from ..utils import Partializable, overload, tracer
+from ..utils.errors import untested_legacy
 from ..utils.unify import Var, var
 from ..utils.variables import (
     C1,
@@ -94,6 +105,18 @@ def getitem_tuple(resources, node, equiv):
     return equiv[Xs][i]
 
 
+@pattern_replacer(P.tuple_getitem, C1, C2)
+def getitem_constant_tuple(resources, node, equiv):
+    """Match a constant index in a constant tuple."""
+    c1 = equiv[C1].value
+    i = equiv[C2].value
+    assert isinstance(c1, tuple)
+    assert isinstance(i, int)
+    ct = Constant(c1[i])
+    ct.abstract = node.abstract
+    return ct
+
+
 @pattern_replacer(P.tuple_setitem, (P.make_tuple, Xs), C, Z)
 def setitem_tuple(resources, node, equiv):
     """Match a constant setitem in an explicit tuple.
@@ -117,11 +140,18 @@ def setitem_tuple_ct(resources, node, equiv):
     setitem((a, b, c, ...), 1, z) => (a, z, c, ...)
     ...
     """
-    tup = equiv[C1].value
+    def _const(val, t):
+        ct = Constant(val)
+        ct.abstract = t
+        return ct
+    tup_node = equiv[C1]
+    assert tup_node.abstract is not None
+    tup = tup_node.value
     i = equiv[C2].value
     assert isinstance(tup, tuple)
     assert isinstance(i, int)
-    elems = list(tup)
+    elems = [_const(t, typ)
+             for t, typ in zip(tup, tup_node.abstract.elements)]
     elems[i] = equiv[Z]
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
@@ -173,8 +203,8 @@ gadd_switch = psub(
              (P.switch, Y, X1, X2),
              (P.switch, Y, X3, X4)),
     replacement=(P.switch, Y,
-                 (gadd, X1, X3),
-                 (gadd, X2, X4)),
+                 (_gadd, X1, X3),
+                 (_gadd, X2, X4)),
     name='gadd_switch'
 )
 
@@ -431,6 +461,10 @@ def unfuse_composite(resources, node, equiv):
     r = UnfuseRemapper(g, xs[0])
     r.run()
     ng = r.get_graph(g)
+
+    for param, orig in zip(ng.parameters, xs):
+        param.abstract = orig.abstract
+    _set_out_abstract(ng, node.abstract)
     return node.graph.apply(ng, *xs)
 
 
@@ -530,6 +564,9 @@ getitem_newenv = psub(
 getitem_env_add = psub(
     pattern=(P.env_getitem, (P.env_add, X, Y), C, Z),
     replacement=(gadd,
+                 # BUG: With the live infer, a metagraph like gadd cannot
+                 # be inserted directly in an optimization: the graph needs
+                 # to be generated/monomorphized using the existing types.
                  (P.env_getitem, X, C, Z),
                  (P.env_getitem, Y, C, Z)),
     name='getitem_env_add'
@@ -664,6 +701,30 @@ def resolve_globals(resources, node, equiv):
     x = equiv[C]
     res = resources.convert(ns.value[x.value])
     return Constant(res)
+
+
+#############
+# Constants #
+#############
+
+
+@pattern_replacer('just', X, interest=None)
+def force_constants(resources, node, equiv):
+    """Replace nodes with a constant value if the value is in its type."""
+    node = equiv[X]
+    if (node.is_constant()
+            or node.is_parameter()
+            or node.graph and node is node.graph.return_):
+        return None
+    try:
+        val = build_value(node.abstract)
+    except Exception:
+        return None
+    if val is DEAD:
+        return None
+    ct = Constant(val)
+    ct.abstract = node.abstract
+    return ct
 
 
 ############
@@ -824,19 +885,28 @@ def specialize_on_graph_arguments(resources, node, equiv):
 #################
 
 
+def _set_out_abstract(g, a):
+    g.output.abstract = a
+    g.return_.abstract = a
+    g.return_.inputs[0].abstract = AbstractFunction(
+        VirtualFunction([a], a)
+    )
+
+
 @GraphTransform
-def getitem_transform(graph, idx):
+def getitem_transform(orig_graph, idx):
     """Map to a graph that only returns the idx-th output.
 
     If idx == 1, then:
 
     (x -> (a, b, c)) => (x -> b)
     """
-    graph = transformable_clone(graph, relation=f'[{idx}]')
+    graph = transformable_clone(orig_graph, relation=f'[{idx}]')
     if graph.output.is_apply(P.make_tuple):
         graph.output = graph.output.inputs[idx + 1]
     else:
         graph.output = graph.apply(P.tuple_getitem, graph.output, idx)
+    graph.return_.abstract = orig_graph.return_.abstract.elements[idx]
     return graph
 
 
@@ -881,17 +951,20 @@ def incorporate_getitem_through_switch(resources, node, equiv):
 
 
 @GraphTransform
-def env_getitem_transform(graph, key, default):
+def env_getitem_transform(orig_graph, key, default):
     """Map to a graph that incorporates a call to env_getitem."""
     rel = getattr(key, 'node', key)
-    graph = transformable_clone(graph, relation=f'[{rel}]')
+    graph = transformable_clone(orig_graph, relation=f'[{rel}]')
     out = graph.output
     while out.is_apply(P.env_setitem):
         _, out, key2, value = out.inputs
         if key == key2.value:
             graph.output = value
-            return graph
-    graph.output = graph.apply(P.env_getitem, out, key, default)
+            break
+    else:
+        with untested_legacy():
+            graph.output = graph.apply(P.env_getitem, out, key, default)
+    graph.return_.abstract = key.abstract
     return graph
 
 
@@ -924,14 +997,23 @@ def incorporate_env_getitem_through_switch(resources, node, equiv):
 
 
 @GraphTransform
-def call_output_transform(graph, nargs):
+def call_output_transform(orig_graph, abstracts):
     """Map to a graph that calls its output.
 
     ((*args1) -> (*args2) -> f) => (*args1, *args2) -> f(*args2)
     """
-    graph = transformable_clone(graph, relation='call')
-    newp = [graph.add_parameter() for _ in range(nargs)]
+    graph = transformable_clone(orig_graph, relation='call')
+    newp = []
+    for a in abstracts:
+        assert a is not None
+        p = graph.add_parameter()
+        p.abstract = a
+        newp.append(p)
     graph.output = graph.apply(graph.output, *newp)
+    _set_out_abstract(
+        graph,
+        orig_graph.return_.abstract.get_unique().output
+    )
     return graph
 
 
@@ -949,7 +1031,7 @@ def incorporate_call(resources, node, equiv):
     xs = equiv[Xs]
     ys = equiv[Ys]
     if check_used_once(g):
-        g2 = call_output_transform(g, len(ys))
+        g2 = call_output_transform(g, tuple(y.abstract for y in ys))
         return node.graph.apply(g2, *xs, *ys)
 
 
@@ -971,8 +1053,8 @@ def incorporate_call_through_switch(resources, node, equiv):
     ys = equiv[Ys]
 
     if check_used_once(g1) and check_used_once(g2):
-        g1t = call_output_transform(g1, len(ys))
-        g2t = call_output_transform(g2, len(ys))
+        g1t = call_output_transform(g1, tuple(y.abstract for y in ys))
+        g2t = call_output_transform(g2, tuple(y.abstract for y in ys))
 
         new = ((P.switch, equiv[X], g1t, g2t), *xs, *ys)
         return sexp_to_node(new, node.graph)
@@ -999,6 +1081,16 @@ elim_jinv_j = psub(
 )
 
 
+@pattern_replacer(P.Jinv, G)
+def replace_Jinv_on_graph(resources, node, equiv):
+    """Replace J(graph) by the primal."""
+    g = equiv[G].value
+    assert isinstance(g, Graph)
+    ct = Constant(g.transforms['primal'])
+    ct.abstract = node.abstract
+    return ct
+
+
 @pattern_replacer(P.J, C)
 def expand_J(resources, node, equiv):
     """Replaces a call to J(f) by the graph for J(f).
@@ -1006,9 +1098,60 @@ def expand_J(resources, node, equiv):
     This will not replace J(x) when x is not a constant graph.
     """
     from ..grad import Jimpl
+
     arg = equiv[C].value
+    assert getattr(arg, 'parent', None) is None
+
+    prev_resources = resources
+
+    if not hasattr(prev_resources, 'grad_cache'):
+        prev_resources.grad_cache = {}
+
     try:
-        newg = Jimpl(arg, resources, node)
+        if isinstance(arg, Graph):
+            key = arg
+        else:
+            key = (arg, equiv[C].abstract)
+
+        if key in prev_resources.grad_cache:
+            ct = Constant(prev_resources.grad_cache[key])
+            ct.abstract = ct.value.abstract
+            return ct
+
+        newg = Jimpl(arg, prev_resources, node)
+
+        resources = resources.copy()
+        inf = resources.inferrer
+        vfn = node.abstract.get_unique()
+        argspec = vfn.args
+        outspec = vfn.output
+        if not isinstance(newg, Graph):
+            sig = newg.make_signature(argspec)
+            newg = newg.generate_graph(sig)
+        newg = clone(
+            newg,
+            quarantine=lambda g: g.abstract is not None
+        )
+        resources.manager.add_graph(newg)
+        empty = inf.engine.context_class.empty()
+        context = empty.add(newg, tuple(argspec))
+        inf.engine.run_coroutine(
+            inf.engine.infer_function(newg, argspec, outspec)
+        )
+        newg2 = inf.monomorphize(context)
+
+        newg = newg2
+        for node in inf.manager.all_nodes:
+            if node.is_constant(Quarantined):
+                node.value = node.value.graph
+        for g in inf.manager.graphs:
+            g._manager = None
+
+        if isinstance(arg, Graph):
+            arg.transforms['grad'] = newg
+
+        prev_resources.grad_cache[key] = newg
+
     except NotImplementedError:
         return None
     return Constant(newg)
@@ -1024,37 +1167,53 @@ def _jelim_retype_helper(self, f: AbstractFunction):
     raise TypeError('Function found')
 
 
+@abstract_check.variant
+def _jelim_nofunc(self, f: AbstractFunction):
+    return False
+
+
 class JElim(Partializable):
     """Eliminate J, iff it is only applied to non-functions."""
 
     def __init__(self, resources):
         """Initialize JElim."""
         self.resources = resources
+        self.name = 'jelim'
 
     def __call__(self, root):
         """Apply JElim on root."""
         mng = self.resources.manager
-        mng.keep_roots(root)
-        nodes = []
-        typesubs = []
-        for node in mng.all_nodes:
-            try:
-                newtype = _jelim_retype(node.abstract)
-            except TypeError:
-                return False
-            if node.is_apply(P.J) or node.is_apply(P.Jinv):
-                _, x = node.inputs
-                nodes.append((node, x))
-            typesubs.append((node, newtype))
+        args = dict(
+            opt=self,
+            node=None,
+            manager=self.resources.manager,
+        )
+        with tracer('opt', **args) as tr:
+            tr.set_results(success=False, **args)
+            mng.keep_roots(root)
+            nodes = []
+            typesubs = []
+            for node in mng.all_nodes:
+                try:
+                    newtype = _jelim_retype(node.abstract)
+                except TypeError:
+                    return False
+                if node.is_apply(P.J) or node.is_apply(P.Jinv):
+                    if not _jelim_nofunc(node.abstract):
+                        return False
+                    _, x = node.inputs
+                    nodes.append((node, x))
+                if newtype is not node.abstract:
+                    typesubs.append((node, newtype))
 
-        with mng.transact() as tr:
-            for node, repl in nodes:
-                tr.replace(node, repl)
+            with mng.transact() as tr:
+                for node, repl in nodes:
+                    tr.replace(node, repl)
 
-        for node, newtype in typesubs:
-            node.abstract = newtype
+            for node, newtype in typesubs:
+                node.abstract = newtype
 
-        return len(nodes) > 0
+            if len(nodes) > 0:
+                tracer().emit_success(**args, new_node=None)
 
-
-__all__ = []
+            return len(nodes) > 0

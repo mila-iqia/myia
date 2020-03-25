@@ -7,7 +7,7 @@ import operator
 import numpy as np
 
 from .. import operations, xtype
-from ..abstract import ABSENT, Context
+from ..abstract import ABSENT
 from ..ir import GraphManager
 from ..operations import primitives as P
 from ..operations.gen import lop, reverse_binop, rop
@@ -20,6 +20,7 @@ from .resources import (
     DebugVMResource,
     InferenceResource,
     Resources,
+    Tracker,
 )
 
 py_registry = Registry(default_field='python_implementation')
@@ -264,8 +265,9 @@ standard_resources = Resources.partial(
     ),
     inferrer=InferenceResource.partial(
         constructors=inferrer_registry,
-        context_class=Context,
+        max_stack_depth=50,
     ),
+    tracker=Tracker.partial(),
     backend=BackendResource.partial(),
     debug_vm=DebugVMResource.partial(
         implementations=vm_registry,

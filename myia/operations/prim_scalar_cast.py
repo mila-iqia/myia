@@ -8,6 +8,7 @@ from ..lib import (
     AbstractScalar,
     MyiaTypeError,
     bprop_to_grad_transform,
+    force_pending,
     standard_prim,
     type_to_abstract,
 )
@@ -26,15 +27,14 @@ def pyimpl_scalar_cast(x, t):
 
 
 @standard_prim(P.scalar_cast)
-async def infer_scalar_cast(self, engine,
-                            scalar: xtype.Number,
-                            typ: lib.AbstractType):
+async def infer_scalar_cast(self, engine, scalar, typ: lib.AbstractType):
     """Infer the return type of primitive `scalar_cast`."""
     a = typ.element
     if not isinstance(a, AbstractScalar):
         raise MyiaTypeError('scalar_cast must cast to a scalar type')
     t = a.xtype()
     engine.check(xtype.Number, t)
+    engine.check(xtype.Number, await force_pending(scalar.xtype()))
     values = {**scalar.values, TYPE: t}
     return lib.AbstractScalar(values)
 

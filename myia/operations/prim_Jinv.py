@@ -11,10 +11,12 @@ from ..lib import (
     MyiaTypeError,
     Primitive,
     PrimitiveFunction,
+    VirtualFunction,
     bprop_to_grad_transform,
     standard_prim,
 )
 from ..operations import J
+from ..utils.errors import untested_legacy
 from . import primitives as P
 
 
@@ -31,7 +33,6 @@ async def infer_Jinv(self, engine, x):
                 g = f.graph
                 primal = g and g.transforms.get('primal', None)
                 if primal:
-                    primal = engine.resources.convert(primal)
                     if isinstance(primal, Graph):
                         if primal.parent:
                             # The primal for a closure can't be used
@@ -42,14 +43,25 @@ async def infer_Jinv(self, engine, x):
                             # to be fixed to support a few edge cases.
                             res = DummyFunction()
                         else:
-                            res = GraphFunction(primal, Context.empty())
+                            with untested_legacy():
+                                # Not sure why this never happens anymore
+                                primal = engine.resources.convert(primal)
+                                res = GraphFunction(primal, Context.empty())
                     else:
-                        res = primal
-                        if isinstance(res, Primitive):
-                            tid = getattr(f, 'tracking_id', None)
-                            res = PrimitiveFunction(res, tracking_id=tid)
+                        with untested_legacy():
+                            # Not sure why this never happens either
+                            res = primal
+                            if isinstance(res, Primitive):
+                                tid = getattr(f, 'tracking_id', None)
+                                res = PrimitiveFunction(res, tracking_id=tid)
                 else:
                     raise MyiaTypeError(f'Bad input type for {self.prim}: {f}')
+            elif isinstance(f, VirtualFunction):
+                res = VirtualFunction(
+                    tuple([await self._infer(self, engine, arg)
+                           for arg in f.args]),
+                    await self._infer(self, engine, f.output.elements[0])
+                )
             else:
                 raise MyiaTypeError(
                     f'Expected JTransformedFunction, not {f}'

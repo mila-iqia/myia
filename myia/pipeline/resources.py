@@ -5,7 +5,7 @@ from types import FunctionType
 import numpy as np
 
 from .. import parser, xtype
-from ..abstract import InferenceEngine, type_to_abstract
+from ..abstract import InferenceEngine, LiveInferenceEngine, type_to_abstract
 from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import monomorphize
@@ -104,7 +104,7 @@ class ConverterResource(Partializable):
                 v = object_map[v]
             self.object_map[k] = _Unconverted(v)
 
-    def __call__(self, value):
+    def __call__(self, value, manage=True):
         """Convert a value."""
         try:
             v = self.object_map[value]
@@ -114,33 +114,76 @@ class ConverterResource(Partializable):
         except (TypeError, KeyError):
             v = default_convert(self, value)
 
-        if isinstance(v, Graph):
+        if manage and isinstance(v, Graph):
             self.resources.manager.add_graph(v)
         return v
+
+
+class Tracker(Partializable):
+    """Track new nodes that require type inference."""
+
+    def __init__(self, resources):
+        """Initialize a Tracker."""
+        self.todo = set()
+        self.manager = resources.manager
+        self.activated = False
+
+    def activate(self):
+        """Activate the tracker.
+
+        If the tracker is already activated, this does nothing.
+        """
+        if not self.activated:
+            self.manager.events.add_node.register(self._on_add_node)
+            self.manager.events.drop_node.register(self._on_drop_node)
+            self.activated = True
+
+    def _on_add_node(self, event, node):
+        if node.abstract is None:
+            self.todo.add(node)
+
+    def _on_drop_node(self, event, node):
+        self.todo.discard(node)
 
 
 class InferenceResource(Partializable):
     """Performs inference and monomorphization."""
 
-    def __init__(self, resources, constructors, context_class):
+    def __init__(self, resources, constructors, max_stack_depth):
         """Initialize an InferenceResource."""
+        self.resources = resources
         self.manager = resources.manager
-        self.context_class = context_class
         self.constructors = constructors
+        self.max_stack_depth = max_stack_depth
         self.engine = InferenceEngine(
             resources,
             constructors=self.constructors,
-            context_class=self.context_class,
+            max_stack_depth=self.max_stack_depth,
+        )
+        self.live = LiveInferenceEngine(
+            resources,
+            constructors=self.constructors,
         )
 
-    def infer(self, graph, argspec, outspec=None, clear=False):
+    def infer_incremental(self):
+        """Perform inference."""
+        tracker = self.resources.tracker
+        if not tracker.activated:
+            return
+        mng = self.manager
+        todo = tracker.todo
+        while todo:
+            nodes = [node for node in todo
+                     if node.abstract is None and node in mng.all_nodes]
+            todo.clear()
+            self.live.run(nodes)
+
+    def infer(self, graph, argspec, outspec=None):
         """Perform inference."""
         with tracer('infer',
                     graph=graph,
                     argspec=argspec,
                     outspec=outspec) as tr:
-            if clear:
-                self.engine.reset()
             with tracer('engine', profile=False) as tr:
                 rval = self.engine.run(
                     graph,
@@ -159,11 +202,6 @@ class InferenceResource(Partializable):
             rval = monomorphize(self.engine, context, reuse_existing=True)
             tr.set_results(output=rval)
             return rval
-
-    def renormalize(self, graph, argspec, outspec=None):
-        """Perform inference and specialization."""
-        _, context = self.infer(graph, argspec, outspec, clear=True)
-        return self.monomorphize(context)
 
 
 class NumpyChecker:
@@ -241,6 +279,10 @@ class Resources(Partializable):
         """Run the Resources as a pipeline step."""
         return {'resources': self}
 
+    def copy(self):
+        """Copy the resources object."""
+        return Resources(**self._members)
+
 
 __consolidate__ = True
 __all__ = [
@@ -250,5 +292,6 @@ __all__ = [
     'InferenceResource',
     'NumpyChecker',
     'Resources',
+    'Tracker',
     'default_convert',
 ]

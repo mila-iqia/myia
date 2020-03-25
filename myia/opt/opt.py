@@ -230,6 +230,8 @@ class LocalPassOptimizer:
                         mng.replace(n, new)
                         tracer().emit_success(**args, new_node=new)
                         tr.set_results(success=True, **args)
+                        if self.resources and self.resources.inferrer:
+                            self.resources.inferrer.infer_incremental()
                         n = new
                         loop = True
                         changes = True

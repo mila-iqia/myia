@@ -33,7 +33,6 @@ Please install either ruamel.yaml or PyYAML with the C extension. The python
 import codecs
 import os
 import traceback
-from dataclasses import is_dataclass
 
 import numpy as np
 
@@ -120,17 +119,11 @@ def __serialize_scal__(self, dumper):
     return dumper.represent_scalar(getattr(self, '@SERIAL_TAG'), scal)
 
 
-def __serialize_dc__(self, dumper):
-    data = dict((k, getattr(self, k))
-                for k in self.__dataclass_fields__.keys())
-    return dumper.represent_mapping(getattr(self, '@SERIAL_TAG'), data)
-
-
 def _serialize(dumper, self):
     return self.__serialize__(dumper)
 
 
-def _make_construct(cls, dc, sequence, scalar):
+def _make_construct(cls, sequence, scalar):
     def _construct(loader, node):
         it = cls._construct()
         yield next(it)
@@ -140,12 +133,6 @@ def _make_construct(cls, dc, sequence, scalar):
         except StopIteration as e:
             if e.value is not None:
                 loader.add_finalizer(e.value)
-    if dc:
-        assert cls.__dataclass_params__.frozen
-
-        def _construct(loader, node):  # noqa: F811
-            data = loader.construct_mapping(node)
-            return cls(**data)
     if sequence:
         def _construct(loader, node):  # noqa: F811
             it = cls._construct()
@@ -162,27 +149,20 @@ def _make_construct(cls, dc, sequence, scalar):
     return _construct
 
 
-def serializable(tag, *, dc=None, sequence=False, scalar=False,
-                 construct=True):
+def serializable(tag, *, sequence=False, scalar=False, construct=True):
     """Class decorator to make the wrapped class serializable.
 
     Arguments:
         tag (string): serialization tag, must be unique
-        dc (bool): class is a dataclass (autodetected, but can override)
         sequence: _serialize returns a sequence (tuple or list)
         scalar: _serialize returns a single item.
         construct: register the deserialization function or not
 
     """
     def wrapper(cls):
-        nonlocal dc
-        if dc is None and is_dataclass(cls):
-            dc = True
         setattr(cls, '@SERIAL_TAG', tag)
         if not hasattr(cls, '__serialize__'):
             method = __serialize__
-            if dc:
-                method = __serialize_dc__
             if sequence:
                 method = __serialize_seq__
             if scalar:
@@ -190,7 +170,7 @@ def serializable(tag, *, dc=None, sequence=False, scalar=False,
             setattr(cls, '__serialize__', method)
         MyiaDumper.add_representer(cls, _serialize)
         if construct:
-            _construct = _make_construct(cls, dc, sequence, scalar)
+            _construct = _make_construct(cls, sequence, scalar)
             MyiaLoader.add_constructor(tag, _construct)
         return cls
     return wrapper
@@ -265,8 +245,6 @@ def _serialize_unique(dumper, obj):
                 'error',
                 '\n'.join(traceback.format_exception(type(obj), obj,
                                                      obj.__traceback__)))
-        elif hasattr(obj, '_serialize_replace'):
-            return dumper.represent_data(obj._serialize_replace())
         else:
             return dumper.represent_undefined(obj)
     else:

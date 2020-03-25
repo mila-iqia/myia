@@ -129,9 +129,6 @@ class GraphFunction(Function):
     context: Context
     tracking_id: object = None
 
-    def _serialize_replace(self):
-        return self.graph.abstract
-
 
 @dataclass(frozen=True)
 class PrimitiveFunction(Function):

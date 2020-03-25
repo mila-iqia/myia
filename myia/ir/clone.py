@@ -17,6 +17,13 @@ from .manager import manage
 
 
 @dataclass
+class Quarantined:
+    """Wraps a node's value to block it from the manager."""
+
+    graph: Graph
+
+
+@dataclass
 class _ToLink:
     """Describes a node that we want to link in the link phase."""
 
@@ -245,6 +252,7 @@ class CloneRemapper(BasicRemapper):
                  graph_repl,
                  graph_relation,
                  clone_constants,
+                 quarantine=None,
                  set_abstract=True):
         """Initialize the GraphCloner."""
         super().__init__(
@@ -257,6 +265,7 @@ class CloneRemapper(BasicRemapper):
         self.inlines = inlines
         self.clone_constants = clone_constants
         self.set_abstract = set_abstract
+        self.quarantine = quarantine
 
     def remap_node(self, key, graph, node, new_graph, new_node, link=None):
         """Remap the given node as normal and also copy the abstract."""
@@ -306,11 +315,18 @@ class CloneRemapper(BasicRemapper):
     def gen_constant_graph(self, graph, new_graph, constant):
         """Generate a constant for the cloned graph when applicable."""
         g = constant.value
-        if g not in self.inlines and g in self.graph_repl:
-            target_graph = self.get_graph(g)
+        if self.quarantine and self.quarantine(g):
             with About(constant.debug, self.relation):
-                new = Constant(target_graph)
+                new = Constant(Quarantined(g))
+                new.abstract = g.abstract
+                assert new.abstract
                 self.remap_node(constant, graph, constant, new_graph, new)
+        else:
+            if g not in self.inlines and g in self.graph_repl:
+                target_graph = self.get_graph(g)
+                with About(constant.debug, self.relation):
+                    new = Constant(target_graph)
+                    self.remap_node(constant, graph, constant, new_graph, new)
 
     def link_apply(self, link):
         """Fill a node's inputs."""
@@ -399,9 +415,11 @@ class GraphCloner:
                  clone_children=True,
                  graph_relation=None,
                  graph_repl=None,
-                 remapper_class=CloneRemapper):
+                 remapper_class=CloneRemapper,
+                 quarantine=None):
         """Initialize a GraphCloner."""
         self.total = total
+        self.quarantine = quarantine
         self.clone_children = clone_children
         if isinstance(inline, tuple):
             inline = [inline]
@@ -416,6 +434,7 @@ class GraphCloner:
             graph_repl=graph_repl,
             graph_relation=graph_relation,
             clone_constants=clone_constants,
+            quarantine=quarantine,
         )
         self.remapper.run()
 
@@ -445,6 +464,8 @@ class GraphCloner:
                 msg += ' Try setting the `total` option to False.'
             raise Exception(msg)
         self.graphs.update(self.inlines)
+        if self.quarantine is not None:
+            self.graphs = {g for g in self.graphs if not self.quarantine(g)}
 
     def __getitem__(self, x):
         """Get the clone of the given graph or node."""
@@ -458,13 +479,15 @@ def clone(g,
           total=True,
           relation='copy',
           clone_constants=False,
-          graph_relation=None):
+          graph_relation=None,
+          quarantine=None):
     """Return a clone of g."""
     return GraphCloner(g,
                        total=total,
                        relation=relation,
                        clone_constants=clone_constants,
-                       graph_relation=graph_relation)[g]
+                       graph_relation=graph_relation,
+                       quarantine=quarantine)[g]
 
 
 def transformable_clone(graph, relation='transform'):
@@ -478,7 +501,8 @@ def transformable_clone(graph, relation='transform'):
         newg = Graph()
     for p in graph.parameters:
         with About(p.debug, 'copy'):
-            newg.add_parameter()
+            p2 = newg.add_parameter()
+            p2.abstract = p.abstract
     cl = GraphCloner(inline=(graph, newg, newg.parameters))
     newg.output = cl[graph.output]
     return newg
@@ -490,6 +514,7 @@ __all__ = [
     'CloneRemapper',
     'GraphCloner',
     'GraphRemapper',
+    'Quarantined',
     'RemapperSet',
     'clone',
     'transformable_clone',

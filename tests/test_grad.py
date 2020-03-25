@@ -270,6 +270,9 @@ def test_hof(a, b):
     return f(g, a) + f(g, b)
 
 
+@mark.xfail(
+    reason="Further optimizations are currently needed to support this."
+)
 @gradient(4.0, 5.0)
 def test_hof_tup(a, b):
     """Test higher order functions."""
@@ -494,6 +497,7 @@ def _runwith(f, *args):
     return res['output'](*args)
 
 
+@pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freevar_outside_grad():
 
     def f(x, y):
@@ -507,6 +511,7 @@ def test_freevar_outside_grad():
     assert _runwith(f, 5.0, 8.0) == 25.0
 
 
+@pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freegraph_outside_grad():
 
     def f(x, y):
