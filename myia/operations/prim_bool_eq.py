@@ -13,25 +13,23 @@ def pyimpl_bool_eq(x: Bool, y: Bool) -> Bool:
 
 
 infer_bool_eq = UniformPrimitiveInferrer.partial(
-    prim=P.bool_eq,
-    impl=pyimpl_bool_eq,
-    infer_value=True
+    prim=P.bool_eq, impl=pyimpl_bool_eq, infer_value=True
 )
 
 
 __operation_defaults__ = {
-    'name': 'bool_eq',
-    'registered_name': 'bool_eq',
-    'mapping': P.bool_eq,
-    'python_implementation': pyimpl_bool_eq,
+    "name": "bool_eq",
+    "registered_name": "bool_eq",
+    "mapping": P.bool_eq,
+    "python_implementation": pyimpl_bool_eq,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'bool_eq',
-    'registered_name': 'bool_eq',
-    'type': 'backend',
-    'python_implementation': pyimpl_bool_eq,
-    'inferrer_constructor': infer_bool_eq,
-    'grad_transform': False,
+    "name": "bool_eq",
+    "registered_name": "bool_eq",
+    "type": "backend",
+    "python_implementation": pyimpl_bool_eq,
+    "inferrer_constructor": infer_bool_eq,
+    "grad_transform": False,
 }

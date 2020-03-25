@@ -145,7 +145,7 @@ class CounterStatistic(PerGraphStatistic):
         else:
             # If this happens, there's probably a bug elsewhere,
             # or a new features, in which case this can be a no-op
-            raise ValueError('qty cannot be 0')  # pragma: no cover
+            raise ValueError("qty cannot be 0")  # pragma: no cover
 
     def _on_mod_edge(self, event, node, key, inp, direction):
         raise NotImplementedError()
@@ -377,10 +377,10 @@ class ParentStatistic(NestingStatisticGraphWise):
         if len(deps) == 0:
             self[g] = None
         elif len(deps) == 1:
-            self[g], = deps
+            (self[g],) = deps
         else:
             # The way code is structured, this should never happen
-            raise AssertionError(f'Too many parents for {g}')
+            raise AssertionError(f"Too many parents for {g}")
         return self.get(g)
 
 
@@ -639,14 +639,15 @@ class GraphManager(Partializable):
         keep = OrderedSet()
         for root in roots:
             keep.update(self.graphs_reachable[root])
-        self._maybe_drop_graphs(self.graphs - keep, ignore_users=True,
-                                recursive=False)
+        self._maybe_drop_graphs(
+            self.graphs - keep, ignore_users=True, recursive=False
+        )
 
     def _ensure_graph(self, graph):
         """Ensure that the graph is managed by this manager."""
         if self.manage:
             if graph._manager and graph._manager is not self:
-                raise ManagerError('A graph can only have one manager.')
+                raise ManagerError("A graph can only have one manager.")
             graph._manager = self
         self.graphs.add(graph)
 
@@ -720,6 +721,7 @@ class GraphManager(Partializable):
 
     def _acquire_nodes(self, nodes):
         """Add newly connected nodes."""
+
         def limit(x):
             if x in self.all_nodes:
                 return EXCLUDE
@@ -818,7 +820,7 @@ class GraphManager(Partializable):
         undolog = []
 
         for operation, *args in changes:
-            if operation == 'set_edge':
+            if operation == "set_edge":
                 root_node, key, new_node = args
                 old_node = root_node.inputs[key]
                 rmedges[(root_node, key, old_node)] += 1
@@ -826,8 +828,8 @@ class GraphManager(Partializable):
                 rms[old_node] += 1
                 adds[new_node] += 1
                 root_node.inputs[key] = new_node
-                undolog.append(('set_edge', root_node, key, old_node))
-            elif operation == 'set_parameters':
+                undolog.append(("set_edge", root_node, key, old_node))
+            elif operation == "set_parameters":
                 graph, new_parameters = args
                 old_parameters = graph.parameters
                 for p in new_parameters:
@@ -835,7 +837,7 @@ class GraphManager(Partializable):
                 for p in old_parameters:
                     rms[p] += 1
                 graph.parameters = new_parameters
-                undolog.append(('set_parameters', graph, old_parameters))
+                undolog.append(("set_parameters", graph, old_parameters))
 
         for root_node, key, new_node in addedges - rmedges:
             self._process_edge(root_node, key, new_node, 1)
@@ -866,13 +868,13 @@ class GraphTransaction:
     def __init__(self, manager):
         """Initialize a GraphTransaction."""
         if not manager.allow_changes:
-            raise ManagerError('Cannot modify graph through this manager')
+            raise ManagerError("Cannot modify graph through this manager")
         self.manager = manager
         self.changes = []
 
     def set_parameters(self, graph, parameters):
         """Declare replacement of a graph's parameters."""
-        self.changes.append(('set_parameters', graph, parameters))
+        self.changes.append(("set_parameters", graph, parameters))
 
     def replace(self, old_node, new_node):
         """Declare replacement of old_node by new_node.
@@ -882,7 +884,7 @@ class GraphTransaction:
         """
         g = old_node.graph
         if g and g.return_ is old_node:
-            raise ManagerError('Cannot replace the return node of a graph.')
+            raise ManagerError("Cannot replace the return node of a graph.")
         uses = self.manager.uses[old_node]
         for node, key in uses:
             self.set_edge(node, key, new_node)
@@ -893,7 +895,7 @@ class GraphTransaction:
         This does not modify the graph. The change will occur in the next call
         to commit().
         """
-        self.changes.append(('set_edge', node, key, value))
+        self.changes.append(("set_edge", node, key, value))
 
     def commit(self):
         """Commit the changes."""
@@ -914,9 +916,4 @@ class GraphTransaction:
 
 
 __consolidate__ = True
-__all__ = [
-    'GraphManager',
-    'GraphTransaction',
-    'ManagerError',
-    'manage',
-]
+__all__ = ["GraphManager", "GraphTransaction", "ManagerError", "manage"]

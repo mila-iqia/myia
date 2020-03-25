@@ -74,10 +74,10 @@ class InferenceLoop(asyncio.AbstractEventLoop):
 
     def call_exception_handler(self, ctx):
         """Log an exception in the list of errors."""
-        if 'exception' in ctx:
-            self._errors.append(ctx['exception'])
+        if "exception" in ctx:
+            self._errors.append(ctx["exception"])
         else:
-            raise AssertionError('call_exception_handler', ctx)
+            raise AssertionError("call_exception_handler", ctx)
 
     def schedule(self, x, context_map=None):
         """Schedule a task."""
@@ -94,14 +94,15 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         """Return a collection of all exceptions from all futures."""
         futs, self._tasks = self._tasks, []
         errors, self._errors = self._errors, []
-        errors += [fut.exception()
-                   for fut in futs if fut.done() and fut.exception()]
+        errors += [
+            fut.exception() for fut in futs if fut.done() and fut.exception()
+        ]
         if not errors and any(fut for fut in futs if not fut.done()):
             exc = self.errtype(
-                f'Could not run inference to completion.'
-                ' There might be an infinite loop in the program'
-                ' which prevents type inference from working.',
-                refs=[]
+                f"Could not run inference to completion."
+                " There might be an infinite loop in the program"
+                " which prevents type inference from working.",
+                refs=[],
             )
             errors.append(exc)
         return errors
@@ -115,13 +116,13 @@ class InferenceLoop(asyncio.AbstractEventLoop):
     def call_later(self, delay, callback, *args, context=None):
         """Not supported."""
         raise NotImplementedError(
-            '_InferenceLoop does not allow timeouts or time-based scheduling.'
+            "_InferenceLoop does not allow timeouts or time-based scheduling."
         )
 
     def call_at(self, when, callback, *args, context=None):
         """Not supported."""
         raise NotImplementedError(
-            '_InferenceLoop does not allow time-based scheduling.'
+            "_InferenceLoop does not allow time-based scheduling."
         )
 
     def create_task(self, coro):
@@ -158,6 +159,7 @@ def is_simple(x):
     if we find more values to merge along.
     """
     from .data import AbstractScalar
+
     if isinstance(x, Pending):
         return x.is_simple()
     if isinstance(x, AbstractScalar):
@@ -225,11 +227,7 @@ class PendingFromList(Pending):
 
     def __init__(self, possibilities, default, priority, loop):
         """Initialize the PendingFromList."""
-        super().__init__(
-            resolve=None,
-            priority=priority,
-            loop=loop
-        )
+        super().__init__(resolve=None, priority=priority, loop=loop)
         self.default = default
         self.possibilities = possibilities
 
@@ -261,11 +259,7 @@ class PendingTentative(Pending):
 
     def __init__(self, tentative, loop):
         """Initialize the PendingTentative."""
-        super().__init__(
-            resolve=None,
-            priority=self._priority,
-            loop=loop
-        )
+        super().__init__(resolve=None, priority=self._priority, loop=loop)
         self.tentative = tentative
 
     def _priority(self):
@@ -304,7 +298,7 @@ def find_coherent_result_sync(v, fn):
     v is. Otherwise, an exception is raised.
     """
     if isinstance(v, PendingFromList):
-        exc = InferenceError('Nothing matches')
+        exc = InferenceError("Nothing matches")
         results = set()
         for option in v.possibilities:
             try:
@@ -316,9 +310,9 @@ def find_coherent_result_sync(v, fn):
         elif len(results) == 0:
             raise exc
         else:
-            raise InferenceError('Must resolve Pending to find result')
+            raise InferenceError("Must resolve Pending to find result")
     elif isinstance(v, Pending):
-        raise InferenceError('Must resolve Pending to find result')
+        raise InferenceError("Must resolve Pending to find result")
     else:
         return fn(v)
 
@@ -333,12 +327,12 @@ async def force_pending(v):
 
 __consolidate__ = True
 __all__ = [
-    'InferenceLoop',
-    'Pending',
-    'PendingFromList',
-    'PendingTentative',
-    'find_coherent_result',
-    'find_coherent_result_sync',
-    'force_pending',
-    'is_simple',
+    "InferenceLoop",
+    "Pending",
+    "PendingFromList",
+    "PendingTentative",
+    "find_coherent_result",
+    "find_coherent_result_sync",
+    "force_pending",
+    "is_simple",
 ]

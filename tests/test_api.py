@@ -5,10 +5,7 @@ from myia.api import myia, to_device
 from myia.compile import closure_convert
 from myia.ir import clone
 from myia.operations import tuple_getitem
-from myia.pipeline import (
-    scalar_debug_compile as compile,
-    scalar_parse as parse,
-)
+from myia.pipeline import scalar_debug_compile as compile, scalar_parse as parse
 from myia.simplify_types import from_canonical, to_canonical
 from myia.utils import DoTrace, HandleInstance, InferenceError, TaggedValue
 from myia.xtype import Bool
@@ -48,7 +45,7 @@ def test_myia():
 
 
 def test_myia_specialize_values():
-    @myia(specialize_values=['c'])
+    @myia(specialize_values=["c"])
     def f(c, x, y):
         if c:
             return x + y
@@ -84,14 +81,13 @@ def test_myia_return_struct():
 def test_myia_dict_field():
     @myia
     def f(d):
-        return d['x']
+        return d["x"]
 
-    v = f({'x': 2})
+    v = f({"x": 2})
     assert v == 2
 
 
 def test_to_canonical():
-
     def _convert(data, typ):
         return to_canonical(data, to_abstract_test(typ))
 
@@ -115,19 +111,23 @@ def test_to_canonical():
     with pytest.raises(TypeError):
         _convert((1, 2), Point(i64, i64))
 
-    assert list(_convert((pt, pt),
-                (Point(i64, i64), Point(i64, i64)))) == [(1, 2), (1, 2)]
+    assert list(_convert((pt, pt), (Point(i64, i64), Point(i64, i64)))) == [
+        (1, 2),
+        (1, 2),
+    ]
 
     li = _convert([1], [i64])
-    assert (isinstance(li, tuple)
-            and li[0] == 1
-            and isinstance(li[1], TaggedValue)
-            and li[1].value == ())
+    assert (
+        isinstance(li, tuple)
+        and li[0] == 1
+        and isinstance(li[1], TaggedValue)
+        and li[1].value == ()
+    )
 
     # Arrays
 
     fmat = np.ones((5, 8))
-    imat = np.ones((5, 8), dtype='int32')
+    imat = np.ones((5, 8), dtype="int32")
 
     assert _convert(fmat, af64_of(5, 8)) is fmat
     assert _convert(imat, ai32_of(5, 8)) is imat
@@ -161,15 +161,15 @@ def test_to_canonical():
     with pytest.raises(TypeError):
         _convert(1, D(x=i64))
     with pytest.raises(TypeError):
-        _convert({'x': 2.0}, D(x=i64))
+        _convert({"x": 2.0}, D(x=i64))
     with pytest.raises(TypeError):
-        _convert({'x': 2.0, 'y': 1}, D(x=i64))
+        _convert({"x": 2.0, "y": 1}, D(x=i64))
     with pytest.raises(TypeError):
-        _convert({'y': 2.0}, D(x=i64))
+        _convert({"y": 2.0}, D(x=i64))
     with pytest.raises(TypeError):
-        _convert('x', 1.0)
+        _convert("x", 1.0)
     with pytest.raises(TypeError):
-        _convert(1.0, to_abstract_test('x'))
+        _convert(1.0, to_abstract_test("x"))
     with pytest.raises(TypeError):
         _convert(1.0, to_abstract_test(HandleInstance(1.0)))
 
@@ -179,7 +179,6 @@ def test_to_canonical():
 
 
 def test_from_canonical():
-
     def _convert(data, typ):
         return from_canonical(data, to_abstract_test(typ))
 
@@ -194,14 +193,16 @@ def test_from_canonical():
 
     pt = Point(1, 2)
     assert _convert((1, 2), Point(i64, i64)) == pt
-    assert _convert(((1, 2), (1, 2)),
-                    (Point(i64, i64), Point(i64, i64))) == \
-        (pt, pt)
+    assert _convert(((1, 2), (1, 2)), (Point(i64, i64), Point(i64, i64))) == (
+        pt,
+        pt,
+    )
 
 
 @pytest.mark.xfail(reason="Cannot pass a function as an argument.")
 def test_function_arg():
     """Give a Python function as an argument."""
+
     def square(x):
         return x * x
 
@@ -215,6 +216,7 @@ def test_function_arg():
 @pytest.mark.xfail(reason="Cannot pass a function as an argument.")
 def test_function_in_tuple():
     """Give a tuple of functions as an argument."""
+
     def square(x):
         return x * x
 
@@ -232,10 +234,12 @@ def test_function_in_tuple():
 
 def test_return_closure():
     """Return a closure."""
+
     @compile
     def f(x, y):
         def g():
             return x + y
+
         return g
 
     assert f(4, 5)() == 9
@@ -243,10 +247,12 @@ def test_return_closure():
 
 def test_return_closure_partial():
     """Return a closure (after closure conversion)."""
+
     @parse
     def f(x, y):
         def g():
             return x + y
+
         return g
 
     f = clone(closure_convert(f))
@@ -258,6 +264,7 @@ def test_return_closure_partial():
 
 def test_return_closure_tuple():
     """Return a tuple of closures."""
+
     @compile
     def f(x, y):
         def g():
@@ -265,6 +272,7 @@ def test_return_closure_tuple():
 
         def h():
             return x * y
+
         return (g, h)
 
     g, h = f(4, 5)
@@ -274,10 +282,12 @@ def test_return_closure_tuple():
 
 def test_refeed():
     """Return a closure, then use the closure as an argument."""
+
     @compile
     def f(fn, x, y):
         def g():
             return x + y
+
         if x == 0:
             return g
         else:
@@ -290,6 +300,7 @@ def test_refeed():
 
 def test_return_primitive():
     """Return a primitive."""
+
     @compile
     def f():
         return tuple_getitem
@@ -303,6 +314,7 @@ def test_return_graph():
     def f():
         def g():
             return 42
+
         return g
 
     g = f()
@@ -323,6 +335,7 @@ def test_bad_call2():
     def f():
         def g():
             return 42
+
         return g(0)
 
     with pytest.raises(RuntimeError):
@@ -354,9 +367,9 @@ def test_raise():
         f(10)
     except Exception as exc:
         assert type(exc) is Exception
-        assert exc.args == ('too big',)
+        assert exc.args == ("too big",)
     else:
-        raise Exception('Expected an exception')
+        raise Exception("Expected an exception")
 
 
 def test_return_backend():
@@ -375,14 +388,14 @@ def _setflag1():
     def _set(**_):
         _flag1[0] = True
 
-    return DoTrace({'/compile/enter': _set})
+    return DoTrace({"/compile/enter": _set})
 
 
 def _setflag2():
     def _set(**_):
         _flag2[0] = True
 
-    return DoTrace({'/compile/exit': _set})
+    return DoTrace({"/compile/exit": _set})
 
 
 def test_env_tracer(monkeypatch):
@@ -390,8 +403,7 @@ def test_env_tracer(monkeypatch):
     _flag2[0] = False
 
     monkeypatch.setenv(
-        'MYIATRACER',
-        'tests.test_api._setflag1;tests.test_api._setflag2'
+        "MYIATRACER", "tests.test_api._setflag1;tests.test_api._setflag2"
     )
 
     @myia

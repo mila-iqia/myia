@@ -10,28 +10,28 @@ from ..operations import Primitive
 from ..utils import EnvInstance, Named, Namespace, SymbolicKeyInstance
 
 short_relation_symbols = {
-    'copy': '',
-    'cosmetic': '',
-    'phi': 'Φ',
-    'iterator': '*',
-    'fv': '⤋',
-    'if_true': '✓',
-    'if_false': '✗',
-    'if_after': '↓',
-    'while_header': '⤾',
-    'while_body': '⥁',
-    'while_after': '↓',
-    'for_header': '⤾',
-    'for_body': '⥁',
-    'for_after': '↓',
-    'specialized': '+',
-    'equiv': '',
-    'grad_fprop_app': '',
-    'grad_bprop_app': '▼',
-    'grad_fprop': '▶',
-    'grad_bprop': '◀',
-    'grad_sens': '∇',
-    'opt': '',
+    "copy": "",
+    "cosmetic": "",
+    "phi": "Φ",
+    "iterator": "*",
+    "fv": "⤋",
+    "if_true": "✓",
+    "if_false": "✗",
+    "if_after": "↓",
+    "while_header": "⤾",
+    "while_body": "⥁",
+    "while_after": "↓",
+    "for_header": "⤾",
+    "for_body": "⥁",
+    "for_after": "↓",
+    "specialized": "+",
+    "equiv": "",
+    "grad_fprop_app": "",
+    "grad_bprop_app": "▼",
+    "grad_fprop": "▶",
+    "grad_bprop": "◀",
+    "grad_sens": "∇",
+    "opt": "",
 }
 
 
@@ -46,10 +46,12 @@ class CosmeticPrimitive:
 class NodeLabeler:
     """Utility to label a node."""
 
-    def __init__(self,
-                 function_in_node=True,
-                 relation_symbols={},
-                 default_name=lambda dbg: f'#{dbg.id}'):
+    def __init__(
+        self,
+        function_in_node=True,
+        relation_symbols={},
+        default_name=lambda dbg: f"#{dbg.id}",
+    ):
         """Initialize a NodeLabeler."""
         self.function_in_node = function_in_node
         self.relation_symbols = relation_symbols
@@ -81,10 +83,11 @@ class NodeLabeler:
         if ids:
             relations.append(ids[-1])
 
-        tags = [self.relation_symbols.get(r, f'{r}:')
-                for r in reversed(relations)]
+        tags = [
+            self.relation_symbols.get(r, f"{r}:") for r in reversed(relations)
+        ]
 
-        return ''.join(tags) + root_name
+        return "".join(tags) + root_name
 
     def name(self, node, force=False):
         """Return a node's name."""
@@ -96,11 +99,9 @@ class NodeLabeler:
         if isinstance(node, DebugInfo):
             return self.name(node, True if force is None else force)
         elif isinstance(node, Graph):
-            return self.name(node.debug,
-                             True if force is None else force)
+            return self.name(node.debug, True if force is None else force)
         elif node.is_constant_graph():
-            return self.name(node.value.debug,
-                             True if force is None else force)
+            return self.name(node.value.debug, True if force is None else force)
         elif node.is_constant():
             v = node.value
             if v is None or (isinstance(v, tuple) and v == ()):
@@ -108,30 +109,30 @@ class NodeLabeler:
             elif isinstance(v, (int, float, str, Named, Namespace)):
                 return repr(v)
             elif isinstance(v, FunctionType):
-                return f'{v.__name__}::function'
+                return f"{v.__name__}::function"
             elif isinstance(v, (Primitive, MetaGraph)):
                 return v.name
             elif isinstance(v, CosmeticPrimitive):
                 return v.label
             elif isinstance(v, SymbolicKeyInstance):
-                return f'{self.name(v.node)}::Node'
+                return f"{self.name(v.node)}::Node"
             elif isinstance(v, EnvInstance):
                 if len(v):
-                    return 'EnvType(...)'
+                    return "EnvType(...)"
                 else:
                     return "∅"
             else:
                 class_name = v.__class__.__name__
                 s = str(v)
                 if len(s) > 10:
-                    s = f'{s[:10]}...'
-                return f'{s}::{class_name}'
+                    s = f"{s[:10]}..."
+                return f"{s}::{class_name}"
         elif node.is_special():
-            return f'{node.special}'
+            return f"{node.special}"
         elif node.is_parameter():
             return self.label(node.debug, True)
         else:
-            lbl = ''
+            lbl = ""
             if self.function_in_node:
                 if fn_label is None:
                     fn_label = self.const_fn(node)
@@ -141,10 +142,10 @@ class NodeLabeler:
             name = self.name(node, force)
             if name:
                 if lbl:
-                    lbl += f'→{name}'
+                    lbl += f"→{name}"
                 else:
                     lbl = name
-            return lbl or '·'
+            return lbl or "·"
 
     def const_fn(self, node):
         """Return name of function, if constant.
@@ -159,14 +160,12 @@ class NodeLabeler:
             return None
 
 
-short_labeler = NodeLabeler(
-    relation_symbols=short_relation_symbols
-)
+short_labeler = NodeLabeler(relation_symbols=short_relation_symbols)
 
 
 default_labeler = NodeLabeler(
     relation_symbols=short_relation_symbols,
-    default_name=lambda dbg: dbg.debug_name
+    default_name=lambda dbg: dbg.debug_name,
 )
 
 
@@ -181,9 +180,9 @@ def label(x, labeler=default_labeler):
 
 
 __all__ = [
-    'CosmeticPrimitive',
-    'NodeLabeler',
-    'default_labeler',
-    'label',
-    'short_labeler',
+    "CosmeticPrimitive",
+    "NodeLabeler",
+    "default_labeler",
+    "label",
+    "short_labeler",
 ]

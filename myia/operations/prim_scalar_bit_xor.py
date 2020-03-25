@@ -12,23 +12,21 @@ def pyimpl_scalar_bit_xor(x: Integral, y: Integral) -> Integral:
 
 
 infer_scalar_bit_xor = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_bit_xor,
-    impl=pyimpl_scalar_bit_xor,
-    infer_value=False
+    prim=P.scalar_bit_xor, impl=pyimpl_scalar_bit_xor, infer_value=False
 )
 
 __operation_defaults__ = {
-    'name': 'scalar_bit_xor',
-    'registered_name': 'scalar_bit_xor',
-    'mapping': P.scalar_bit_xor,
-    'python_implementation': pyimpl_scalar_bit_xor,
+    "name": "scalar_bit_xor",
+    "registered_name": "scalar_bit_xor",
+    "mapping": P.scalar_bit_xor,
+    "python_implementation": pyimpl_scalar_bit_xor,
 }
 
 __primitive_defaults__ = {
-    'name': 'scalar_bit_xor',
-    'registered_name': 'scalar_bit_xor',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_bit_xor,
-    'inferrer_constructor': infer_scalar_bit_xor,
-    'grad_transform': None,
+    "name": "scalar_bit_xor",
+    "registered_name": "scalar_bit_xor",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_bit_xor,
+    "inferrer_constructor": infer_scalar_bit_xor,
+    "grad_transform": None,
 }

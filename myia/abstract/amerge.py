@@ -39,7 +39,7 @@ from .utils import (
     union_simplify,
 )
 
-amerge_engine = ContextVar('amerge_engine', default=None)
+amerge_engine = ContextVar("amerge_engine", default=None)
 
 
 ###################
@@ -47,9 +47,7 @@ amerge_engine = ContextVar('amerge_engine', default=None)
 ###################
 
 
-@is_broad.variant(
-    initial_state=lambda: CheckState(cache={}, prop=None)
-)
+@is_broad.variant(initial_state=lambda: CheckState(cache={}, prop=None))
 def _is_tentative(self, x: (Possibilities, TaggedPossibilities), loop):
     return False
 
@@ -59,9 +57,7 @@ def _is_tentative(self, x: (Possibilities, TaggedPossibilities), loop):
 #############
 
 
-@broaden.variant(
-    initial_state=lambda: CloneState({}, None, _is_tentative)
-)
+@broaden.variant(initial_state=lambda: CloneState({}, None, _is_tentative))
 def tentative(self, p: Possibilities, loop):  # noqa: D417
     """Broaden an abstract value and make it tentative.
 
@@ -103,12 +99,10 @@ def nobottom(self, x: Pending, *args):
 #########
 
 
-@overload.wrapper(
-    bootstrap=True,
-    initial_state=dict
-)
-def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
-           accept_pending=True):
+@overload.wrapper(bootstrap=True, initial_state=dict)
+def amerge(
+    __call__, self, x1, x2, forced=False, bind_pending=True, accept_pending=True
+):
     """Merge two values.
 
     If forced is False, amerge will return a superset of x1 and x2, if it
@@ -141,9 +135,13 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
             # Setting forced=True will set the keypair to x1 (and then check
             # that x1 and x2 are compatible under forced=True), which lets us
             # return a result for self-referential data.
-            return amerge(x1, x2, forced=True,
-                          bind_pending=bind_pending,
-                          accept_pending=accept_pending)
+            return amerge(
+                x1,
+                x2,
+                forced=True,
+                bind_pending=bind_pending,
+                accept_pending=accept_pending,
+            )
         else:
             return result
 
@@ -162,21 +160,26 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
             x1.tentative = new_tentative
             return x1
         if isinstance(x2, PendingTentative):
-            new_tentative = self(x1, x2.tentative, forced,
-                                 bind_pending, accept_pending)
+            new_tentative = self(
+                x1, x2.tentative, forced, bind_pending, accept_pending
+            )
             assert not isinstance(new_tentative, Pending)
             x2.tentative = new_tentative
             return new_tentative if forced else x2
         if (isp1 or isp2) and (not accept_pending or not bind_pending):
             if forced and isp1:
-                raise MyiaTypeError('Cannot have Pending here.')
+                raise MyiaTypeError("Cannot have Pending here.")
             if isp1:
+
                 def chk(a):
                     return self(a, x2, forced, bind_pending)
+
                 return find_coherent_result_sync(x1, chk)
             if isp2:
+
                 def chk(a):
                     return self(x1, a, forced, bind_pending)
+
                 return find_coherent_result_sync(x2, chk)
         if isp1 and isp2:
             return bind(loop, x1 if forced else None, [], [x1, x2])
@@ -197,10 +200,11 @@ def amerge(__call__, self, x1, x2, forced=False, bind_pending=True,
             if forced:
                 raise TypeMismatchError(x1, x2)
             return x2
-        elif (type(x1) is not type(x2)
-              and not isinstance(x1, (int, float, bool))):
+        elif type(x1) is not type(x2) and not isinstance(
+            x1, (int, float, bool)
+        ):
             raise MyiaTypeError(
-                f'Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}'
+                f"Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}"
             )
         else:
             return self.map[type(x1)](self, x1, x2, forced, bind_pending)
@@ -219,12 +223,14 @@ def amerge(self, x1: Possibilities, x2, forced, bp):
     poss = x1 + x2
     if all(isinstance(x, VirtualFunction) for x in poss):
         assert not forced
-        return Possibilities([
-            VirtualFunction(
-                reduce(self, [x.args for x in poss]),
-                reduce(self, [x.output for x in poss]),
-            )
-        ])
+        return Possibilities(
+            [
+                VirtualFunction(
+                    reduce(self, [x.args for x in poss]),
+                    reduce(self, [x.output for x in poss]),
+                )
+            ]
+        )
 
     for standard in poss:
         # TODO: This is a hack of sorts until we replace Possibilities
@@ -243,9 +249,7 @@ def amerge(self, x1: Possibilities, x2, forced, bp):
     if set(x1).issuperset(set(x2)):
         return x1
     if forced:
-        raise MyiaTypeError(
-            'Additional Possibilities cannot be merged.'
-        )
+        raise MyiaTypeError("Additional Possibilities cannot be merged.")
     else:
         return Possibilities(x1 + x2)
 
@@ -266,9 +270,7 @@ def amerge(self, x1: TaggedPossibilities, x2, forced, bp):
     if res == x1:
         return x1
     elif forced:
-        raise MyiaTypeError(
-            'Additional TaggedPossibilities cannot be merged.'
-        )
+        raise MyiaTypeError("Additional TaggedPossibilities cannot be merged.")
     elif res == x2:
         return x2
     else:
@@ -303,14 +305,14 @@ def amerge(self, x1: TrackDict, x2, forced, bp):
         if res is not ABSENT:
             rval[k] = res
     if forced and changes and rval != x1:
-        raise MyiaTypeError('Cannot merge tracks')
+        raise MyiaTypeError("Cannot merge tracks")
     return x1 if forced or not changes else rval
 
 
 @overload  # noqa: F811
 def amerge(self, x1: dict, x2, forced, bp):
     if set(x1.keys()) != set(x2.keys()):
-        raise MyiaTypeError(f'Keys mismatch')
+        raise MyiaTypeError(f"Keys mismatch")
     changes = False
     rval = type(x1)()
     for k, v in x1.items():
@@ -324,7 +326,7 @@ def amerge(self, x1: dict, x2, forced, bp):
 @overload  # noqa: F811
 def amerge(self, x1: (tuple, list), x2, forced, bp):
     if len(x1) != len(x2):  # pragma: no cover
-        raise MyiaTypeError(f'Tuple length mismatch')
+        raise MyiaTypeError(f"Tuple length mismatch")
     changes = False
     rval = []
     for v1, v2 in zip(x1, x2):
@@ -403,8 +405,7 @@ def amerge(self, x1: AbstractDict, x2, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(self, x1: (AbstractUnion, AbstractTaggedUnion),
-           x2, forced, bp):
+def amerge(self, x1: (AbstractUnion, AbstractTaggedUnion), x2, forced, bp):
     args1 = x1.options
     args2 = x2.options
     merged = self(args1, args2, forced, bp)
@@ -438,17 +439,23 @@ def bind(loop, committed, resolved, pending):
         pending: A set of unresolved Pendings.
 
     """
+
     def amergeall():
         if committed is None:
-            v = reduce(lambda x1, x2: amerge(x1, x2,
-                                             forced=False,
-                                             accept_pending=False),
-                       resolved)
+            v = reduce(
+                lambda x1, x2: amerge(
+                    x1, x2, forced=False, accept_pending=False
+                ),
+                resolved,
+            )
         else:
-            v = reduce(lambda x1, x2: amerge(x1, x2,
-                                             forced=True,
-                                             accept_pending=False),
-                       resolved, committed)
+            v = reduce(
+                lambda x1, x2: amerge(
+                    x1, x2, forced=True, accept_pending=False
+                ),
+                resolved,
+                committed,
+            )
         return v
 
     resolved = list(resolved)
@@ -511,12 +518,11 @@ def bind(loop, committed, resolved, pending):
                     rval = p
                     break
             else:
-                raise AssertionError('unreachable')
+                raise AssertionError("unreachable")
 
     else:
         merged = loop.create_pending(
-            resolve=premature_resolve,
-            priority=priority,
+            resolve=premature_resolve, priority=priority
         )
         merged.equiv.update(resolved)
         for p in pending:
@@ -576,8 +582,7 @@ def split_type(t, model):
       the model.
     """
     if isinstance(t, AbstractUnion):
-        matching = [(opt, typecheck(model, opt))
-                    for opt in set(t.options)]
+        matching = [(opt, typecheck(model, opt)) for opt in set(t.options)]
         t1 = union_simplify(opt for opt, m in matching if m)
         t2 = union_simplify(opt for opt, m in matching if not m)
         return t1, t2
@@ -618,10 +623,10 @@ def typecheck(model, abstract):
 
 
 __all__ = [
-    'amerge',
-    'bind',
-    'hastype_helper',
-    'nobottom',
-    'split_type',
-    'typecheck',
+    "amerge",
+    "bind",
+    "hastype_helper",
+    "nobottom",
+    "split_type",
+    "typecheck",
 ]

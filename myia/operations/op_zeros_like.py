@@ -19,7 +19,7 @@ from ..operations import myia_to_array, typeof
 from ..xtype import Bool, Nil, Number
 from .primitives import distribute, scalar_cast, shape
 
-_leaf_zeros_like = MultitypeGraph('zeros_like')
+_leaf_zeros_like = MultitypeGraph("zeros_like")
 
 
 @_leaf_zeros_like.register(AbstractFunction(value=ANYTHING))
@@ -60,16 +60,21 @@ def _array_zero(xs):
 
 
 zeros_like = HyperMap(
-    name='zeros_like',
-    nonleaf=(AbstractTuple, AbstractClassBase,
-             AbstractUnion, AbstractTaggedUnion, AbstractDict),
-    fn_leaf=_leaf_zeros_like
+    name="zeros_like",
+    nonleaf=(
+        AbstractTuple,
+        AbstractClassBase,
+        AbstractUnion,
+        AbstractTaggedUnion,
+        AbstractDict,
+    ),
+    fn_leaf=_leaf_zeros_like,
 )
 
 
 __operation_defaults__ = {
-    'name': 'zeros_like',
-    'registered_name': 'zeros_like',
-    'mapping': zeros_like,
-    'python_implementation': None,
+    "name": "zeros_like",
+    "registered_name": "zeros_like",
+    "mapping": zeros_like,
+    "python_implementation": None,
 }

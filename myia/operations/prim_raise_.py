@@ -23,18 +23,18 @@ def bprop_raise(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'raise',
-    'registered_name': 'raise_',
-    'mapping': P.raise_,
-    'python_implementation': pyimpl_raise,
+    "name": "raise",
+    "registered_name": "raise_",
+    "mapping": P.raise_,
+    "python_implementation": pyimpl_raise,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'raise',
-    'registered_name': 'raise_',
-    'type': 'backend',
-    'python_implementation': pyimpl_raise,
-    'inferrer_constructor': infer_raise,
-    'grad_transform': bprop_raise,
+    "name": "raise",
+    "registered_name": "raise_",
+    "type": "backend",
+    "python_implementation": pyimpl_raise,
+    "inferrer_constructor": infer_raise,
+    "grad_transform": bprop_raise,
 }

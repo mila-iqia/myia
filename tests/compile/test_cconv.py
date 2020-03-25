@@ -7,12 +7,12 @@ from myia.pipeline import scalar_debug_pipeline
 
 def step_cconv(graph):
     closure_convert(graph)
-    return {'graph': graph}
+    return {"graph": graph}
 
 
-cconv_pipeline = scalar_debug_pipeline \
-    .select('resources', 'parse', 'resolve', 'export') \
-    .insert_after('resolve', cconv=step_cconv)
+cconv_pipeline = scalar_debug_pipeline.select(
+    "resources", "parse", "resolve", "export"
+).insert_after("resolve", cconv=step_cconv)
 
 
 def check_no_free_variables(root):
@@ -21,25 +21,24 @@ def check_no_free_variables(root):
         if not g:
             continue
         if g.parent is not None:
-            raise Exception(f'Nested graph detected: {g}')
+            raise Exception(f"Nested graph detected: {g}")
         for node in nodes:
             assert node.graph is g
             for inp in node.inputs:
                 if inp.graph is not None and inp.graph is not g:
-                    raise Exception(f'Free variable detected: {node}')
+                    raise Exception(f"Free variable detected: {node}")
 
 
 def cconv(*arglists):
-
     def decorate(fn):
         def run_test(args):
             result_py = fn(*args)
             res = cconv_pipeline.make()(input=fn)
-            check_no_free_variables(res['graph'])
-            result_final = res['output'](*args)
+            check_no_free_variables(res["graph"])
+            result_final = res["output"](*args)
             assert result_py == result_final
 
-        m = mark.parametrize('args', arglists)(run_test)
+        m = mark.parametrize("args", arglists)(run_test)
         m.__orig__ = fn
         return m
 
@@ -73,8 +72,11 @@ def test_deep_nesting(x):
         def g(z):
             def h():
                 return y + z
+
             return h
+
         return g(x)
+
     a = f(x + 1)
     b = f(x - 3)
     return a() + b()
@@ -109,4 +111,5 @@ def test_closure_as_fv(x):
 
     def g():
         return f()
+
     return g()

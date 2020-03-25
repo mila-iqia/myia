@@ -115,8 +115,10 @@ def gen_variants(self, obj: object, gen, path):
             for variants, p in self(x, gen, path + (field,)):
                 new_variants = []
                 for variant in variants:
-                    d = {f2: (variant if f2 == field else getattr(obj, f2))
-                         for f2 in fields}
+                    d = {
+                        f2: (variant if f2 == field else getattr(obj, f2))
+                        for f2 in fields
+                    }
                     new_variants.append(type(obj)(**d))
                 yield (new_variants, p)
     else:
@@ -127,9 +129,15 @@ def gen_variants(self, obj: object, gen, path):
 def gen_variants(self, obj: (list, tuple), gen, path):
     for i, x in enumerate(obj):
         for variants, p in self(x, gen, path + (i,)):
-            yield ([type(obj)(variant if i == j else y
-                              for j, y in enumerate(obj))
-                    for variant in variants], p)
+            yield (
+                [
+                    type(obj)(
+                        variant if i == j else y for j, y in enumerate(obj)
+                    )
+                    for variant in variants
+                ],
+                p,
+            )
 
 
 @overload  # noqa: F811
@@ -157,14 +165,16 @@ class GradTester:
 
     """
 
-    def __init__(self,
-                 fn: Callable,
-                 gfn: Callable,
-                 args: List[Any],
-                 argnames: List[str],
-                 outnames: List[str] = None,
-                 epsilon: float = eps,
-                 rel_error: float = rel_error) -> None:
+    def __init__(
+        self,
+        fn: Callable,
+        gfn: Callable,
+        args: List[Any],
+        argnames: List[str],
+        outnames: List[str] = None,
+        epsilon: float = eps,
+        rel_error: float = rel_error,
+    ) -> None:
         """Initialize a GradTester."""
         self.epsilon = epsilon
         self.rel_error = rel_error
@@ -176,7 +186,7 @@ class GradTester:
         out = fn(*self.clean_args)
         outname = fn.__name__
         if isinstance(out, tuple):
-            self.outnames = list(f'{outname}_{i+1}' for i in range(len(out)))
+            self.outnames = list(f"{outname}_{i+1}" for i in range(len(out)))
             self.out = out
             self.wrap = lambda x: x
             self.unwrap = lambda x: x
@@ -194,9 +204,9 @@ class GradTester:
     def _set_result(self, results, opath, ipath, value):
         opath = (self.outnames[opath[0]],) + opath[1:]
         ipath = (self.argnames[ipath[0]],) + ipath[1:]
-        outname = '.'.join(map(str, opath))
-        argname = '.'.join(map(str, ipath))
-        results[f'd{outname}/d{argname}'] = value
+        outname = ".".join(map(str, opath))
+        argname = ".".join(map(str, ipath))
+        results[f"d{outname}/d{argname}"] = value
 
     def compute_exact(self) -> Dict[str, float]:
         """Compute the exact gradient.
@@ -213,8 +223,9 @@ class GradTester:
             for ipath in gen_paths(grads, ()):
                 if isinstance(resolve_path(self.args, ipath), NoTestGrad):
                     continue
-                self._set_result(results, opath, ipath,
-                                 resolve_path(grads, ipath))
+                self._set_result(
+                    results, opath, ipath, resolve_path(grads, ipath)
+                )
         self.exact = results
         return results
 
@@ -249,8 +260,9 @@ class GradTester:
 
             diff = mkdiff(under_res, over_res)
             for opath in gen_paths(diff, ()):
-                self._set_result(results, opath, ipath,
-                                 resolve_path(diff, opath))
+                self._set_result(
+                    results, opath, ipath, resolve_path(diff, opath)
+                )
 
         self.finite_diff = results
         return results
@@ -271,47 +283,47 @@ class GradTester:
             e = exact[k]
             f = fin[k]
             if e is None:
-                match = (f == 0)
+                match = f == 0
             elif e == f:
                 match = True
             else:
                 threshold = max(abs(rel * e), abs(rel * f))
                 match = bool(abs(e - f) <= threshold)
-            results[k] = dict(
-                exact=e,
-                difference=f,
-                match=match
-            )
+            results[k] = dict(exact=e, difference=f, match=match)
         return results
 
     def assert_match(self):
         """Assert that the exact gradients match the estimated ones."""
         results = self.compare()
         failed = False
-        argspec = [f'{name}={arg}'
-                   for name, arg in zip(self.argnames, self.args)]
+        argspec = [
+            f"{name}={arg}" for name, arg in zip(self.argnames, self.args)
+        ]
         print(f"In:  {', '.join(argspec)}")
-        outspec = [f'{name}={arg}'
-                   for name, arg in zip(self.outnames, self.out)]
+        outspec = [
+            f"{name}={arg}" for name, arg in zip(self.outnames, self.out)
+        ]
         print(f"Out: {', '.join(outspec)}")
         for path, data in results.items():
-            if data['match']:
+            if data["match"]:
                 print(f"{path} OK: == {data['exact']}")
             else:
                 failed = True
-                print(f"{path} MISMATCH:"
-                      f" {data['exact']} != {data['difference']}"
-                      f" (exact / finite diff)")
+                print(
+                    f"{path} MISMATCH:"
+                    f" {data['exact']} != {data['difference']}"
+                    f" (exact / finite diff)"
+                )
 
         if failed:
-            raise Exception('Gradients do not match.')
+            raise Exception("Gradients do not match.")
 
 
 __all__ = [
-    'GradTester',
-    'NoTestGrad',
-    'clean_args',
-    'gen_paths',
-    'gen_variants',
-    'resolve_path',
+    "GradTester",
+    "NoTestGrad",
+    "clean_args",
+    "gen_paths",
+    "gen_variants",
+    "resolve_path",
 ]

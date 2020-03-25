@@ -1,4 +1,3 @@
-
 import pytest
 
 from myia import operations
@@ -18,100 +17,73 @@ from myia.validate import ValidationError
 
 from ..common import i64, to_abstract_test
 
-X = Var('X')
-Y = Var('Y')
+X = Var("X")
+Y = Var("Y")
 V = var(lambda n: n.is_constant())
 
 
-parse = scalar_pipeline \
-    .configure({
-        'resources.convert.object_map': Merge({
-            operations.getitem: prim.tuple_getitem,
-            operations.user_switch: prim.switch
-        })
-    }) \
-    .select('resources', 'parse', 'resolve') \
-    .make_transformer('input', 'graph')
+parse = (
+    scalar_pipeline.configure(
+        {
+            "resources.convert.object_map": Merge(
+                {
+                    operations.getitem: prim.tuple_getitem,
+                    operations.user_switch: prim.switch,
+                }
+            )
+        }
+    )
+    .select("resources", "parse", "resolve")
+    .make_transformer("input", "graph")
+)
 
 
-specialize = scalar_pipeline \
-    .configure({
-        'resources.convert.object_map': Merge({
-            operations.getitem: prim.tuple_getitem
-        })
-    }) \
-    .select('resources', 'parse', 'resolve', 'infer', 'specialize')
+specialize = scalar_pipeline.configure(
+    {
+        "resources.convert.object_map": Merge(
+            {operations.getitem: prim.tuple_getitem}
+        )
+    }
+).select("resources", "parse", "resolve", "infer", "specialize")
 
 
 # We will optimize patterns of these fake primitives
 
 
-P = Primitive('P')
-Q = Primitive('Q')
-R = Primitive('R')
+P = Primitive("P")
+Q = Primitive("Q")
+R = Primitive("R")
 
 
-idempotent_P = psub(
-    (P, (P, X)),
-    (P, X),
-    name='idempotent_P'
-)
+idempotent_P = psub((P, (P, X)), (P, X), name="idempotent_P")
 
-elim_R = psub(
-    (R, X),
-    X,
-    name='elim_R'
-)
+elim_R = psub((R, X), X, name="elim_R")
 
-Q0_to_R = psub(
-    (Q, 0),
-    (R, 0),
-    name='Q0_to_R'
-)
+Q0_to_R = psub((Q, 0), (R, 0), name="Q0_to_R")
 
-QP_to_QR = psub(
-    (Q, (P, X)),
-    (Q, (R, X)),
-    name='QP_to_QR'
-)
+QP_to_QR = psub((Q, (P, X)), (Q, (R, X)), name="QP_to_QR")
 
-multiply_by_zero_l = psub(
-    (prim.scalar_mul, 0, X),
-    0,
-    name='multiply_by_zero_l'
-)
+multiply_by_zero_l = psub((prim.scalar_mul, 0, X), 0, name="multiply_by_zero_l")
 
-multiply_by_zero_r = psub(
-    (prim.scalar_mul, X, 0),
-    0,
-    name='multiply_by_zero_r'
-)
+multiply_by_zero_r = psub((prim.scalar_mul, X, 0), 0, name="multiply_by_zero_r")
 
-add_zero_l = psub(
-    (prim.scalar_add, 0, X),
-    X,
-    name='add_zero_l'
-)
+add_zero_l = psub((prim.scalar_add, 0, X), X, name="add_zero_l")
 
-add_zero_r = psub(
-    (prim.scalar_add, X, 0),
-    X,
-    name='add_zero_r'
-)
+add_zero_r = psub((prim.scalar_add, X, 0), X, name="add_zero_r")
 
 
-def _check_transform(before, after, transform,
-                     argspec=None,
-                     argspec_after=None):
+def _check_transform(
+    before, after, transform, argspec=None, argspec_after=None
+):
     if argspec is None:
         gbefore = parse(before)
         gafter = parse(after)
     else:
         if argspec_after is None:
             argspec_after = argspec
-        gbefore = specialize.run(input=before, argspec=argspec)['graph']
+        gbefore = specialize.run(input=before, argspec=argspec)["graph"]
         if argspec_after:
-            gafter = specialize.run(input=after, argspec=argspec)['graph']
+            gafter = specialize.run(input=after, argspec=argspec)["graph"]
         else:
             gafter = parse(after)
     gbefore = GraphCloner(gbefore, total=True)[gbefore]
@@ -122,7 +94,7 @@ def _check_transform(before, after, transform,
 def _check_opt(before, after, *opts, argspec=None, argspec_after=None):
     nmap = NodeMap()
     for opt in opts:
-        nmap.register(getattr(opt, 'interest', None), opt)
+        nmap.register(getattr(opt, "interest", None), opt)
     eq = LocalPassOptimizer(nmap)
     _check_transform(before, after, eq, argspec, argspec_after)
 
@@ -138,8 +110,7 @@ def test_checkopt_is_cloning():
     _check_opt(before, before)
 
     with pytest.raises(AssertionError):
-        _check_opt(before, before,
-                   elim_R)
+        _check_opt(before, before, elim_R)
 
 
 def test_sexp_conversion():
@@ -160,8 +131,7 @@ def test_elim():
     def after(x):
         return x
 
-    _check_opt(before, after,
-               elim_R)
+    _check_opt(before, after, elim_R)
 
 
 def _idempotent_after(x):
@@ -172,24 +142,21 @@ def test_idempotent():
     def before(x):
         return P(P(x))
 
-    _check_opt(before, _idempotent_after,
-               idempotent_P)
+    _check_opt(before, _idempotent_after, idempotent_P)
 
 
 def test_idempotent_multi():
     def before(x):
         return P(P(P(P(x))))
 
-    _check_opt(before, _idempotent_after,
-               idempotent_P)
+    _check_opt(before, _idempotent_after, idempotent_P)
 
 
 def test_idempotent_and_elim():
     def before(x):
         return P(R(P(R(R(P(x))))))
 
-    _check_opt(before, _idempotent_after,
-               idempotent_P, elim_R)
+    _check_opt(before, _idempotent_after, idempotent_P, elim_R)
 
 
 def test_multiply_zero():
@@ -199,8 +166,7 @@ def test_multiply_zero():
     def after(x):
         return 0
 
-    _check_opt(before, after,
-               multiply_by_zero_l, multiply_by_zero_r)
+    _check_opt(before, after, multiply_by_zero_l, multiply_by_zero_r)
 
 
 def test_multiply_add_elim_zero():
@@ -210,8 +176,7 @@ def test_multiply_add_elim_zero():
     def after(x, y):
         return x
 
-    _check_opt(before, after,
-               elim_R, multiply_by_zero_r, add_zero_r)
+    _check_opt(before, after, elim_R, multiply_by_zero_r, add_zero_r)
 
 
 def test_replace_twice():
@@ -221,8 +186,7 @@ def test_replace_twice():
     def after(x):
         return 0
 
-    _check_opt(before, after,
-               Q0_to_R, elim_R)
+    _check_opt(before, after, Q0_to_R, elim_R)
 
 
 def test_revisit():
@@ -232,8 +196,7 @@ def test_revisit():
     def after(x):
         return Q(x)
 
-    _check_opt(before, after,
-               QP_to_QR, elim_R)
+    _check_opt(before, after, QP_to_QR, elim_R)
 
 
 def test_multi_function():
@@ -249,8 +212,7 @@ def test_multi_function():
     def after(x):
         return after_helper(x, 3)
 
-    _check_opt(before, after,
-               elim_R)
+    _check_opt(before, after, elim_R)
 
 
 def test_closure():
@@ -259,16 +221,16 @@ def test_closure():
 
         def sub():
             return Q(y)
+
         return sub()
 
     def after(x):
-
         def sub():
             return Q(x)
+
         return sub()
 
-    _check_opt(before, after,
-               QP_to_QR, elim_R)
+    _check_opt(before, after, QP_to_QR, elim_R)
 
 
 def test_closure_2():
@@ -278,15 +240,16 @@ def test_closure_2():
 
         def sub():
             return y
+
         return sub()
 
     def after(x):
         def sub():
             return x
+
         return sub()
 
-    _check_opt(before, after,
-               elim_R)
+    _check_opt(before, after, elim_R)
 
 
 def test_fn_replacement():
@@ -304,8 +267,7 @@ def test_fn_replacement():
             arg = arg.inputs[1]
         return arg
 
-    _check_opt(before, after,
-               elim_QPs)
+    _check_opt(before, after, elim_QPs)
 
 
 def test_constant_variable():
@@ -315,18 +277,12 @@ def test_constant_variable():
     def after(x):
         return P(15) + Q(x)
 
-    Qct_to_P = psub(
-        (Q, V),
-        (P, V),
-        name='Qct_to_P'
-    )
+    Qct_to_P = psub((Q, V), (P, V), name="Qct_to_P")
 
-    _check_opt(before, after,
-               Qct_to_P)
+    _check_opt(before, after, Qct_to_P)
 
 
 def test_cse():
-
     def helper(fn, before, after):
         g = parse(fn)
         assert len(g.nodes) == before
@@ -352,41 +308,35 @@ def test_cse():
     helper(f2, 12, 8)
 
 
-opt_ok1 = psub(
-    (prim.scalar_add, X, Y),
-    (prim.scalar_mul, X, Y),
-    name='opt_ok1'
-)
+opt_ok1 = psub((prim.scalar_add, X, Y), (prim.scalar_mul, X, Y), name="opt_ok1")
 
 
-opt_ok2 = psub(
-    prim.scalar_usub,
-    prim.scalar_uadd,
-    name='opt_ok2'
-)
+opt_ok2 = psub(prim.scalar_usub, prim.scalar_uadd, name="opt_ok2")
 
 
 opt_err1 = psub(
-    (prim.scalar_sub, X, Y),
-    (prim.scalar_lt, X, Y),
-    name='opt_err1'
+    (prim.scalar_sub, X, Y), (prim.scalar_lt, X, Y), name="opt_err1"
 )
 
 
 def test_type_tracking():
 
-    pip = scalar_pipeline \
-        .select('resources', 'parse', 'infer', 'specialize',
-                'simplify_types', 'opt', 'validate') \
-        .configure({
-            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1],
-        })
+    pip = scalar_pipeline.select(
+        "resources",
+        "parse",
+        "infer",
+        "specialize",
+        "simplify_types",
+        "opt",
+        "validate",
+    ).configure({"opt.phases.main": [opt_ok1, opt_ok2, opt_err1]})
 
     def fn_ok1(x, y):
         return x + y
 
-    pip.run(input=fn_ok1, argspec=(to_abstract_test(i64),
-                                   to_abstract_test(i64)))
+    pip.run(
+        input=fn_ok1, argspec=(to_abstract_test(i64), to_abstract_test(i64))
+    )
 
     def fn_ok2(x):
         return -x
@@ -397,8 +347,10 @@ def test_type_tracking():
         return x - y
 
     with pytest.raises(ValidationError):
-        pip.run(input=fn_err1, argspec=(to_abstract_test(i64),
-                                        to_abstract_test(i64)))
+        pip.run(
+            input=fn_err1,
+            argspec=(to_abstract_test(i64), to_abstract_test(i64)),
+        )
 
 
 @pytest.mark.xfail(
@@ -407,16 +359,21 @@ def test_type_tracking():
 )
 def test_type_tracking_2():
 
-    pip = scalar_pipeline \
-        .select('resources', 'parse', 'infer', 'specialize',
-                'simplify_types', 'opt', 'validate') \
-        .configure({
-            'opt.phases.main': [opt_ok1, opt_ok2, opt_err1],
-        })
+    pip = scalar_pipeline.select(
+        "resources",
+        "parse",
+        "infer",
+        "specialize",
+        "simplify_types",
+        "opt",
+        "validate",
+    ).configure({"opt.phases.main": [opt_ok1, opt_ok2, opt_err1]})
 
     def fn_err3(x, y):
         return x - y + x
 
     with pytest.raises(InferenceError):
-        pip.run(input=fn_err3, argspec=(to_abstract_test(i64),
-                                        to_abstract_test(i64)))
+        pip.run(
+            input=fn_err3,
+            argspec=(to_abstract_test(i64), to_abstract_test(i64)),
+        )

@@ -12,23 +12,21 @@ def pyimpl_scalar_bit_rshift(x: Integral, y: Integral) -> Integral:
 
 
 infer_scalar_bit_rshift = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_bit_rshift,
-    impl=pyimpl_scalar_bit_rshift,
-    infer_value=False
+    prim=P.scalar_bit_rshift, impl=pyimpl_scalar_bit_rshift, infer_value=False
 )
 
 __operation_defaults__ = {
-    'name': 'scalar_bit_rshift',
-    'registered_name': 'scalar_bit_rshift',
-    'mapping': P.scalar_bit_rshift,
-    'python_implementation': pyimpl_scalar_bit_rshift,
+    "name": "scalar_bit_rshift",
+    "registered_name": "scalar_bit_rshift",
+    "mapping": P.scalar_bit_rshift,
+    "python_implementation": pyimpl_scalar_bit_rshift,
 }
 
 __primitive_defaults__ = {
-    'name': 'scalar_bit_rshift',
-    'registered_name': 'scalar_bit_rshift',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_bit_rshift,
-    'inferrer_constructor': infer_scalar_bit_rshift,
-    'grad_transform': None,
+    "name": "scalar_bit_rshift",
+    "registered_name": "scalar_bit_rshift",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_bit_rshift,
+    "inferrer_constructor": infer_scalar_bit_rshift,
+    "grad_transform": None,
 }

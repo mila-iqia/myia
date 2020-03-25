@@ -24,8 +24,10 @@ def require_same(fns, objs):
     for fn in fns:
         for obj in rest:
             if fn(o) != fn(obj):
-                raise TypeError("Objects do not have the same properties:"
-                                f" `{o}` and `{obj}` are not conformant.")
+                raise TypeError(
+                    "Objects do not have the same properties:"
+                    f" `{o}` and `{obj}` are not conformant."
+                )
 
 
 @overload(bootstrap=True)
@@ -38,8 +40,7 @@ def smap(self, arg: object, *rest):
 def smap(self, arg: (list, tuple), *rest):
     seqs = [arg, *rest]
     require_same([type, len], seqs)
-    return type(arg)(self(*[s[i] for s in seqs])
-                     for i in range(len(arg)))
+    return type(arg)(self(*[s[i] for s in seqs]) for i in range(len(arg)))
 
 
 @overload  # noqa: F811
@@ -60,7 +61,7 @@ def _add(self, x: object, y):
     return x + y
 
 
-@serializable('Env')
+@serializable("Env")
 class EnvInstance:
     """Environment mapping keys to values.
 
@@ -110,9 +111,4 @@ newenv = EnvInstance()
 
 
 __consolidate__ = True
-__all__ = [
-    'EnvInstance',
-    'SymbolicKeyInstance',
-    'newenv',
-    'smap',
-]
+__all__ = ["EnvInstance", "SymbolicKeyInstance", "newenv", "smap"]

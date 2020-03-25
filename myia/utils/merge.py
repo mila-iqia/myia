@@ -5,7 +5,7 @@ from .misc import MISSING, Named, Registry
 from .overload import overload
 
 # Use in a merge to indicate that a key should be deleted
-DELETE = Named('DELETE')
+DELETE = Named("DELETE")
 
 
 class MergeMode:
@@ -19,7 +19,7 @@ class MergeMode:
 
     """
 
-    mode = 'merge'  # NOTE: This is the default merge mode used by merge()
+    mode = "merge"  # NOTE: This is the default merge mode used by merge()
 
     def __init__(self, __value=MISSING, **kwargs):
         """Initialize a MergeMode.
@@ -37,19 +37,19 @@ class MergeMode:
 class Merge(MergeMode):
     """Merge normally."""
 
-    mode = 'merge'
+    mode = "merge"
 
 
 class Override(MergeMode):
     """Do not concatenate sequences."""
 
-    mode = 'override'
+    mode = "override"
 
 
 class Reset(MergeMode):
     """Throw away the previous value."""
 
-    mode = 'reset'
+    mode = "reset"
 
 
 ###########
@@ -103,7 +103,7 @@ def merge(__call__, a, b, mode=MergeMode.mode):
         b = b.value
     assert not isinstance(a, MergeMode)
     if __call__ is None:
-        if hasattr(a, '__merge__'):
+        if hasattr(a, "__merge__"):
             return a.__merge__(b, mode)
         else:
             return cleanup(b)
@@ -113,7 +113,7 @@ def merge(__call__, a, b, mode=MergeMode.mode):
 
 @overload  # noqa: F811
 def merge(d1: dict, d2, mode):
-    if mode == 'reset':
+    if mode == "reset":
         assert not isinstance(d1, Registry)
         return type(d1)(d2)
 
@@ -140,7 +140,7 @@ def merge(d1: dict, d2, mode):
 def merge(xs: tuple, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
-    if mode == 'merge':
+    if mode == "merge":
         return xs + ys
     else:
         return ys
@@ -150,7 +150,7 @@ def merge(xs: tuple, ys, mode):
 def merge(xs: list, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
-    if mode == 'merge':
+    if mode == "merge":
         return xs + ys
     else:
         return ys
@@ -160,7 +160,7 @@ def merge(xs: list, ys, mode):
 def merge(xs: set, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
-    if mode == 'merge':
+    if mode == "merge":
         return xs | ys
     else:
         return ys
@@ -168,11 +168,11 @@ def merge(xs: set, ys, mode):
 
 __consolidate__ = True
 __all__ = [
-    'DELETE',
-    'Merge',
-    'MergeMode',
-    'Override',
-    'Reset',
-    'cleanup',
-    'merge',
+    "DELETE",
+    "Merge",
+    "MergeMode",
+    "Override",
+    "Reset",
+    "cleanup",
+    "merge",
 ]

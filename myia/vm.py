@@ -32,8 +32,13 @@ class VMFrame:
 
     """
 
-    def __init__(self, nodes: Iterable[ANFNode], values: Mapping[ANFNode, Any],
-                 *, closure: Mapping[ANFNode, Any] = None) -> None:
+    def __init__(
+        self,
+        nodes: Iterable[ANFNode],
+        values: Mapping[ANFNode, Any],
+        *,
+        closure: Mapping[ANFNode, Any] = None,
+    ) -> None:
         """Initialize a frame."""
         self.values = dict(values)
         self.todo = list(nodes)
@@ -59,7 +64,7 @@ class Closure:
         """Build a closure."""
         self.graph = graph
         self.values = values
-        self.vm: 'VM' = None
+        self.vm: "VM" = None
 
     def __call__(self, *args):
         """Evaluates the closure."""
@@ -99,14 +104,16 @@ class VM:
         """Initialize the VM."""
         self.convert = convert
         self.manager = manager
-        self._exporters = TypeMap({
-            tuple: self._export_sequence,
-            list: self._export_sequence,
-            Closure: self._export_Closure,
-            Graph: self._export_Graph,
-            Primitive: self._export_Primitive,
-            object: self._export_object,
-        })
+        self._exporters = TypeMap(
+            {
+                tuple: self._export_sequence,
+                list: self._export_sequence,
+                Closure: self._export_Closure,
+                Graph: self._export_Graph,
+                Primitive: self._export_Primitive,
+                object: self._export_object,
+            }
+        )
         self.implementations = implementations
         self.py_implementations = py_implementations
         self._vars = dict()
@@ -150,8 +157,13 @@ class VM:
         """Convert a value from the VM into a corresponding Python object."""
         return self._exporters[type(value)](value)
 
-    def evaluate(self, graph: Graph, _args: Iterable[Any], *,
-                 closure: Mapping[ANFNode, Any] = None) -> Any:
+    def evaluate(
+        self,
+        graph: Graph,
+        _args: Iterable[Any],
+        *,
+        closure: Mapping[ANFNode, Any] = None,
+    ) -> Any:
         """Run a graph.
 
         This will evaluate the passed-in graph and return the
@@ -164,9 +176,11 @@ class VM:
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
 
-        top_frame = VMFrame(toposort(graph.return_, self._succ_vm(graph)),
-                            dict(zip(graph.parameters, args)),
-                            closure=closure)
+        top_frame = VMFrame(
+            toposort(graph.return_, self._succ_vm(graph)),
+            dict(zip(graph.parameters, args)),
+            closure=closure,
+        )
         frames = [top_frame]
 
         while frames:
@@ -192,16 +206,21 @@ class VM:
 
     def _succ_vm(self, graph):
         """Return a visitor for the graph."""
+
         def succ(node: ANFNode) -> Iterable[ANFNode]:
             """Follow node.incoming and free variables."""
             for i in node.inputs:
-                if (i.graph == node.graph or
-                        i.is_constant_graph() and i.value.parent == graph):
+                if (
+                    i.graph == node.graph
+                    or i.is_constant_graph()
+                    and i.value.parent == graph
+                ):
                     yield i
             if node.is_constant_graph() and node.value.parent == graph:
                 for v in self._vars[node.value]:
                     if v.graph is graph or v.graph is None:
                         yield v
+
         return succ
 
     def _vmimpl(self, prim):
@@ -242,9 +261,13 @@ class VM:
         if len(args) != len(graph.parameters):
             raise RuntimeError("Call with wrong number of arguments")
 
-        raise self._Call(VMFrame(toposort(graph.return_, self._succ_vm(graph)),
-                                 dict(zip(graph.parameters, args)),
-                                 closure=clos))
+        raise self._Call(
+            VMFrame(
+                toposort(graph.return_, self._succ_vm(graph)),
+                dict(zip(graph.parameters, args)),
+                closure=clos,
+            )
+        )
 
     def _make_closure(self, graph: Graph, frame: VMFrame) -> Closure:
         clos = dict()
@@ -269,7 +292,7 @@ class VM:
         elif isinstance(fn, AbstractClassBase):
             frame.values[node] = fn.constructor(*args)
         else:
-            raise AssertionError(f'Invalid fn to call: {fn}')
+            raise AssertionError(f"Invalid fn to call: {fn}")
 
     def _handle_node(self, node: ANFNode, frame: VMFrame):
         if isinstance(node, Constant):
@@ -293,8 +316,4 @@ class VM:
             raise AssertionError("Unknown node type")  # pragma: no cover
 
 
-__all__ = [
-    'Closure',
-    'Partial',
-    'VM',
-]
+__all__ = ["Closure", "Partial", "VM"]

@@ -37,14 +37,13 @@ def full(shape, fill_value, dtype=None):
     abstract_scalar_type = to_scalar_type(dtype)
     scalar_value = scalar_cast(fill_value, abstract_scalar_type)
     return distribute(
-        myia_to_array(scalar_value, abstract_array(shape, scalar_value)),
-        shape
+        myia_to_array(scalar_value, abstract_array(shape, scalar_value)), shape
     )
 
 
 __operation_defaults__ = {
-    'name': 'full',
-    'registered_name': 'full',
-    'mapping': full,
-    'python_implementation': pyimpl_full,
+    "name": "full",
+    "registered_name": "full",
+    "mapping": full,
+    "python_implementation": pyimpl_full,
 }

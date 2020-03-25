@@ -17,42 +17,43 @@ from .utils import OperationDefinition, to_opdef
 
 def elemwise(name, op, infer_value=False):
     """Define an elemwise operation on one or more arrays."""
-    hm = HyperMap(name=name, fn_leaf=op, nonleaf=(lib.AbstractArray,),
-                  infer_value=infer_value)
-    return OperationDefinition(
+    hm = HyperMap(
         name=name,
-        registered_name=name,
-        mapping=hm,
-        python_implementation=None,
+        fn_leaf=op,
+        nonleaf=(lib.AbstractArray,),
+        infer_value=infer_value,
+    )
+    return OperationDefinition(
+        name=name, registered_name=name, mapping=hm, python_implementation=None
     )
 
 
-array_add = elemwise('array_add', operations.add)
-array_sub = elemwise('array_sub', operations.sub)
-array_mul = elemwise('array_mul', operations.mul)
-array_mod = elemwise('array_mod', operations.mod)
-array_pow = elemwise('array_pow', operations.pow)
-array_exp = elemwise('array_exp', operations.scalar_exp)
-array_log = elemwise('array_log', operations.scalar_log)
-array_sin = elemwise('array_sin', operations.scalar_sin)
-array_cos = elemwise('array_cos', operations.scalar_cos)
-array_tan = elemwise('array_tan', operations.scalar_tan)
-array_tanh = elemwise('array_tanh', operations.scalar_tanh)
-array_abs = elemwise('array_abs', operations.scalar_abs)
-array_sign = elemwise('array_sign', operations.scalar_sign)
-array_floor = elemwise('array_floor', operations.floor)
-array_trunc = elemwise('array_trunc', operations.trunc)
-array_uadd = elemwise('array_uadd', operations.pos)
-array_usub = elemwise('array_usub', operations.neg)
-array_truediv = elemwise('array_truediv', operations.truediv)
-array_floordiv = elemwise('array_floordiv', operations.floordiv)
+array_add = elemwise("array_add", operations.add)
+array_sub = elemwise("array_sub", operations.sub)
+array_mul = elemwise("array_mul", operations.mul)
+array_mod = elemwise("array_mod", operations.mod)
+array_pow = elemwise("array_pow", operations.pow)
+array_exp = elemwise("array_exp", operations.scalar_exp)
+array_log = elemwise("array_log", operations.scalar_log)
+array_sin = elemwise("array_sin", operations.scalar_sin)
+array_cos = elemwise("array_cos", operations.scalar_cos)
+array_tan = elemwise("array_tan", operations.scalar_tan)
+array_tanh = elemwise("array_tanh", operations.scalar_tanh)
+array_abs = elemwise("array_abs", operations.scalar_abs)
+array_sign = elemwise("array_sign", operations.scalar_sign)
+array_floor = elemwise("array_floor", operations.floor)
+array_trunc = elemwise("array_trunc", operations.trunc)
+array_uadd = elemwise("array_uadd", operations.pos)
+array_usub = elemwise("array_usub", operations.neg)
+array_truediv = elemwise("array_truediv", operations.truediv)
+array_floordiv = elemwise("array_floordiv", operations.floordiv)
 
-array_eq = elemwise('array_eq', operations.eq, infer_value=True)
-array_lt = elemwise('array_lt', operations.lt, infer_value=True)
-array_gt = elemwise('array_gt', operations.gt, infer_value=True)
-array_ne = elemwise('array_ne', operations.ne, infer_value=True)
-array_le = elemwise('array_le', operations.le, infer_value=True)
-array_ge = elemwise('array_ge', operations.ge, infer_value=True)
+array_eq = elemwise("array_eq", operations.eq, infer_value=True)
+array_lt = elemwise("array_lt", operations.lt, infer_value=True)
+array_gt = elemwise("array_gt", operations.gt, infer_value=True)
+array_ne = elemwise("array_ne", operations.ne, infer_value=True)
+array_le = elemwise("array_le", operations.le, infer_value=True)
+array_ge = elemwise("array_ge", operations.ge, infer_value=True)
 
 
 @to_opdef

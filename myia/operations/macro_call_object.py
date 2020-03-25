@@ -37,24 +37,24 @@ async def call_object(info, fn, *n_args):
             elif typ is xtype.Bool:
                 newcall = g.apply(operations.bool, *arg_nodes)
             else:
-                raise MyiaTypeError(f'Cannot compile typecast to {typ}')
+                raise MyiaTypeError(f"Cannot compile typecast to {typ}")
         else:
             newfn = g.apply(P.partial, P.make_record, val)
             newcall = g.apply(newfn, *arg_nodes)
         return newcall
 
     elif isinstance(fn, AbstractClassBase):
-        newfn = g.apply(operations.getattr, fn_node, '__call__')
+        newfn = g.apply(operations.getattr, fn_node, "__call__")
         newcall = g.apply(newfn, *arg_nodes)
         return newcall
 
     else:
-        raise MyiaTypeError(f'Myia does not know how to call {fn}')
+        raise MyiaTypeError(f"Myia does not know how to call {fn}")
 
 
 __operation_defaults__ = {
-    'name': 'call_object',
-    'registered_name': 'call_object',
-    'mapping': call_object,
-    'python_implementation': None,
+    "name": "call_object",
+    "registered_name": "call_object",
+    "mapping": call_object,
+    "python_implementation": None,
 }

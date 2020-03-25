@@ -22,18 +22,18 @@ def bprop_identity(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'identity',
-    'registered_name': 'identity',
-    'mapping': P.identity,
-    'python_implementation': pyimpl_identity,
+    "name": "identity",
+    "registered_name": "identity",
+    "mapping": P.identity,
+    "python_implementation": pyimpl_identity,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'identity',
-    'registered_name': 'identity',
-    'type': 'placeholder',
-    'python_implementation': pyimpl_identity,
-    'inferrer_constructor': infer_identity,
-    'grad_transform': None,
+    "name": "identity",
+    "registered_name": "identity",
+    "type": "placeholder",
+    "python_implementation": pyimpl_identity,
+    "inferrer_constructor": infer_identity,
+    "grad_transform": None,
 }

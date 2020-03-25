@@ -7,11 +7,14 @@ from . import primitives as P
 
 
 @standard_prim(P.scatter_add)
-async def infer_scatter_add(self, engine,
-                            input: lib.AbstractArray,
-                            dim: xtype.UInt[64],
-                            index: lib.AbstractArray,
-                            src: lib.AbstractArray):
+async def infer_scatter_add(
+    self,
+    engine,
+    input: lib.AbstractArray,
+    dim: xtype.UInt[64],
+    index: lib.AbstractArray,
+    src: lib.AbstractArray,
+):
     """Infer the return type of primitive `scatter_add`."""
     return input
 
@@ -24,18 +27,18 @@ def bprop_scatter_add(x, dim, index, src, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scatter_add',
-    'registered_name': 'scatter_add',
-    'mapping': P.scatter_add,
-    'python_implementation': None,
+    "name": "scatter_add",
+    "registered_name": "scatter_add",
+    "mapping": P.scatter_add,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scatter_add',
-    'registered_name': 'scatter_add',
-    'type': 'backend',
-    'python_implementation': None,
-    'inferrer_constructor': infer_scatter_add,
-    'grad_transform': bprop_scatter_add,
+    "name": "scatter_add",
+    "registered_name": "scatter_add",
+    "type": "backend",
+    "python_implementation": None,
+    "inferrer_constructor": infer_scatter_add,
+    "grad_transform": bprop_scatter_add,
 }

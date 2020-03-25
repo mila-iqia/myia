@@ -17,9 +17,7 @@ def pyimpl_scalar_ge(x: Number, y: Number) -> Bool:
 
 
 infer_scalar_ge = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_ge,
-    impl=pyimpl_scalar_ge,
-    infer_value=True
+    prim=P.scalar_ge, impl=pyimpl_scalar_ge, infer_value=True
 )
 
 
@@ -30,18 +28,18 @@ def bprop_scalar_ge(x, y, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_ge',
-    'registered_name': 'scalar_ge',
-    'mapping': P.scalar_ge,
-    'python_implementation': pyimpl_scalar_ge,
+    "name": "scalar_ge",
+    "registered_name": "scalar_ge",
+    "mapping": P.scalar_ge,
+    "python_implementation": pyimpl_scalar_ge,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_ge',
-    'registered_name': 'scalar_ge',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_ge,
-    'inferrer_constructor': infer_scalar_ge,
-    'grad_transform': bprop_scalar_ge,
+    "name": "scalar_ge",
+    "registered_name": "scalar_ge",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_ge,
+    "inferrer_constructor": infer_scalar_ge,
+    "grad_transform": bprop_scalar_ge,
 }

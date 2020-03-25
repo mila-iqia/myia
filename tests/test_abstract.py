@@ -1,4 +1,3 @@
-
 import asyncio
 import typing
 
@@ -101,10 +100,10 @@ def test_build_value():
 
 
 def test_tagged_possibilities():
-    abc = TaggedPossibilities([[1, 'a'], [2, 'b'], [3, 'c']])
-    cab = TaggedPossibilities([[3, 'c'], [1, 'a'], [2, 'b']])
+    abc = TaggedPossibilities([[1, "a"], [2, "b"], [3, "c"]])
+    cab = TaggedPossibilities([[3, "c"], [1, "a"], [2, "b"]])
     assert abc == cab
-    assert abc.get(1) == 'a'
+    assert abc.get(1) == "a"
     with pytest.raises(KeyError):
         abc.get(4)
 
@@ -135,16 +134,16 @@ def test_amerge():
     with pytest.raises(MyiaTypeError):
         amerge(ty.Int[64], ty.Int, forced=True)
 
-    assert amerge(AbstractError(DEAD),
-                  AbstractError(ANYTHING),
-                  forced=False) is AbstractError(ANYTHING)
+    assert amerge(
+        AbstractError(DEAD), AbstractError(ANYTHING), forced=False
+    ) is AbstractError(ANYTHING)
 
-    assert amerge(AbstractError(ANYTHING),
-                  AbstractError(DEAD),
-                  forced=True) is AbstractError(ANYTHING)
+    assert amerge(
+        AbstractError(ANYTHING), AbstractError(DEAD), forced=True
+    ) is AbstractError(ANYTHING)
 
-    d1 = {'x': 1}
-    d2 = {'y': 2}
+    d1 = {"x": 1}
+    d2 = {"y": 2}
     with pytest.raises(MyiaTypeError):
         print(amerge(d1, d2))
 
@@ -158,10 +157,8 @@ def test_amerge_pending():
     loop = asyncio.new_event_loop()
 
     p = PendingFromList([ty.Int[64], ty.Float[64]], None, None, loop=loop)
-    assert amerge(ty.Number, p, forced=False, bind_pending=False) \
-        is ty.Number
-    assert amerge(p, ty.Number, forced=False, bind_pending=False) \
-        is ty.Number
+    assert amerge(ty.Number, p, forced=False, bind_pending=False) is ty.Number
+    assert amerge(p, ty.Number, forced=False, bind_pending=False) is ty.Number
     with pytest.raises(MyiaTypeError):
         print(amerge(p, ty.Number, forced=True, bind_pending=False))
 
@@ -178,10 +175,8 @@ def test_merge_possibilities():
     a = Possibilities((1, 2))
     b = Possibilities((2, 3))
     c = Possibilities((2,))
-    assert set(amerge(a, b,
-                      forced=False)) == {1, 2, 3}
-    assert amerge(a, c,
-                  forced=False) is a
+    assert set(amerge(a, b, forced=False)) == {1, 2, 3}
+    assert amerge(a, c, forced=False) is a
 
     with pytest.raises(MyiaTypeError):
         amerge(a, b, forced=True)
@@ -190,10 +185,10 @@ def test_merge_possibilities():
 
 
 def test_merge_tagged_possibilities():
-    abc = TaggedPossibilities([[1, 'a'], [2, 'b'], [3, 'c']])
-    ab = TaggedPossibilities([[1, 'a'], [2, 'b']])
-    bc = TaggedPossibilities([[2, 'b'], [3, 'c']])
-    b = TaggedPossibilities([[2, 'b']])
+    abc = TaggedPossibilities([[1, "a"], [2, "b"], [3, "c"]])
+    ab = TaggedPossibilities([[1, "a"], [2, "b"]])
+    bc = TaggedPossibilities([[2, "b"], [3, "c"]])
+    b = TaggedPossibilities([[2, "b"]])
     assert amerge(ab, bc, forced=False) == abc
     assert amerge(ab, b, forced=False) is ab
     assert amerge(b, ab, forced=False) is ab
@@ -223,53 +218,51 @@ def test_merge_edge_cases():
     b = AbstractJTagged(123)
     assert amerge(a, b) is a
 
-    a = AbstractClass(object, {'x': ANYTHING, 'y': ANYTHING})
-    b = AbstractClass(object, {'x': 123, 'y': ANYTHING})
+    a = AbstractClass(object, {"x": ANYTHING, "y": ANYTHING})
+    b = AbstractClass(object, {"x": 123, "y": ANYTHING})
     assert amerge(a, b) is a
 
 
 def test_repr():
 
     s1 = to_abstract_test(1)
-    assert repr(s1) == 'AbstractScalar(Int[64] = 1)'
+    assert repr(s1) == "AbstractScalar(Int[64] = 1)"
 
     s2 = to_abstract_test(f32)
-    assert repr(s2) == 'AbstractScalar(Float[32])'
+    assert repr(s2) == "AbstractScalar(Float[32])"
 
     t1 = to_abstract_test((1, f32))
-    assert repr(t1) == f'AbstractTuple((Int[64] = 1, Float[32]))'
+    assert repr(t1) == f"AbstractTuple((Int[64] = 1, Float[32]))"
 
     a1 = to_abstract_test(af32_of(4, 5))
-    assert repr(a1) == f'AbstractArray(Float[32] x 4 x 5)'
+    assert repr(a1) == f"AbstractArray(Float[32] x 4 x 5)"
 
     p1 = to_abstract_test(Point(1, f32))
-    assert repr(p1) == \
-        f'AbstractClass(Point(x :: Int[64] = 1, y :: Float[32]))'
+    assert repr(p1) == f"AbstractClass(Point(x :: Int[64] = 1, y :: Float[32]))"
 
     j1 = AbstractJTagged(to_abstract_test(1))
-    assert repr(j1) == f'AbstractJTagged(J(Int[64] = 1))'
+    assert repr(j1) == f"AbstractJTagged(J(Int[64] = 1))"
 
     h1 = AbstractHandle(to_abstract_test(1))
-    assert repr(h1) == f'AbstractHandle(H(Int[64] = 1))'
+    assert repr(h1) == f"AbstractHandle(H(Int[64] = 1))"
 
-    kw1 = AbstractKeywordArgument('bucket', to_abstract_test(1))
-    assert repr(kw1) == f'AbstractKeywordArgument(KW(bucket :: Int[64] = 1))'
+    kw1 = AbstractKeywordArgument("bucket", to_abstract_test(1))
+    assert repr(kw1) == f"AbstractKeywordArgument(KW(bucket :: Int[64] = 1))"
 
     ty1 = Ty(f32)
-    assert repr(ty1) == 'AbstractType(Ty(AbstractScalar(Float[32])))'
+    assert repr(ty1) == "AbstractType(Ty(AbstractScalar(Float[32])))"
 
     e1 = AbstractError(DEAD)
-    assert repr(e1) == 'AbstractError(E(DEAD))'
+    assert repr(e1) == "AbstractError(E(DEAD))"
 
     f1 = AbstractFunction(P.scalar_mul)
-    assert repr(f1) == 'AbstractFunction(scalar_mul)'
+    assert repr(f1) == "AbstractFunction(scalar_mul)"
 
     tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
-    assert repr(tu1) == \
-        'AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))'
+    assert repr(tu1) == "AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))"
 
     bot = AbstractBottom()
-    assert repr(bot) == 'AbstractBottom(⊥)'
+    assert repr(bot) == "AbstractBottom(⊥)"
 
 
 def test_repr_recursive():
@@ -284,10 +277,7 @@ def test_repr_recursive():
 
 @abstract_clone.variant
 def upcast(self, x: AbstractScalar, nbits):
-    return AbstractScalar({
-        VALUE: x.xvalue(),
-        TYPE: ty.Int[nbits],
-    })
+    return AbstractScalar({VALUE: x.xvalue(), TYPE: ty.Int[nbits]})
 
 
 def test_abstract_clone():
@@ -295,8 +285,8 @@ def test_abstract_clone():
     s2 = S(t=ty.Int[64])
     assert upcast(s1, 64) is s2
 
-    a1 = T([s1, AbstractClass(object, {'field': s1})])
-    a2 = T([s2, AbstractClass(object, {'field': s2})])
+    a1 = T([s1, AbstractClass(object, {"field": s1})])
+    a2 = T([s2, AbstractClass(object, {"field": s2})])
     assert upcast(a1, 64) is a2
 
     jt = JTransformedFunction(VirtualFunction((s1,), s1))
@@ -347,7 +337,7 @@ def test_broaden_recursive():
 def test_find_coherent_result_sync():
     def fn(x):
         if x == 0:
-            raise ValueError('Oh no! Zero!')
+            raise ValueError("Oh no! Zero!")
         else:
             return x > 0
 
@@ -375,9 +365,9 @@ def test_type_to_abstract():
     assert type_to_abstract(int) is S(t=ty.Int[64])
     assert type_to_abstract(float) is S(t=ty.Float[64])
     assert type_to_abstract(bool) is S(t=ty.Bool)
-    assert (type_to_abstract(typing.List)
-            is U(type_to_abstract(Empty),
-                 type_to_abstract(Cons)))
+    assert type_to_abstract(typing.List) is U(
+        type_to_abstract(Empty), type_to_abstract(Cons)
+    )
     assert type_to_abstract(typing.Tuple) is T(ANYTHING)
 
 

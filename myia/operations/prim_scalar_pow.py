@@ -16,9 +16,7 @@ def pyimpl_scalar_pow(x: Number, y: Number) -> Number:
 
 
 infer_scalar_pow = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_pow,
-    impl=pyimpl_scalar_pow,
-    infer_value=False
+    prim=P.scalar_pow, impl=pyimpl_scalar_pow, infer_value=False
 )
 
 
@@ -33,18 +31,18 @@ def bprop_scalar_pow(x, y, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_pow',
-    'registered_name': 'scalar_pow',
-    'mapping': P.scalar_pow,
-    'python_implementation': pyimpl_scalar_pow,
+    "name": "scalar_pow",
+    "registered_name": "scalar_pow",
+    "mapping": P.scalar_pow,
+    "python_implementation": pyimpl_scalar_pow,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_pow',
-    'registered_name': 'scalar_pow',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_pow,
-    'inferrer_constructor': infer_scalar_pow,
-    'grad_transform': bprop_scalar_pow,
+    "name": "scalar_pow",
+    "registered_name": "scalar_pow",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_pow,
+    "inferrer_constructor": infer_scalar_pow,
+    "grad_transform": bprop_scalar_pow,
 }

@@ -14,25 +14,23 @@ def pyimpl_scalar_tan(x: Number) -> Number:
 
 
 infer_scalar_tan = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_tan,
-    impl=pyimpl_scalar_tan,
-    infer_value=False
+    prim=P.scalar_tan, impl=pyimpl_scalar_tan, infer_value=False
 )
 
 
 __operation_defaults__ = {
-    'name': 'scalar_tan',
-    'registered_name': 'scalar_tan',
-    'mapping': P.scalar_tan,
-    'python_implementation': pyimpl_scalar_tan,
+    "name": "scalar_tan",
+    "registered_name": "scalar_tan",
+    "mapping": P.scalar_tan,
+    "python_implementation": pyimpl_scalar_tan,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_tan',
-    'registered_name': 'scalar_tan',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_tan,
-    'inferrer_constructor': infer_scalar_tan,
-    'grad_transform': None,
+    "name": "scalar_tan",
+    "registered_name": "scalar_tan",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_tan,
+    "inferrer_constructor": infer_scalar_tan,
+    "grad_transform": None,
 }

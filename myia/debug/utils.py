@@ -14,6 +14,7 @@ class _Empty:
 
 def mixin(target):
     """Class decorator to add methods to the target class."""
+
     def apply(cls):
         methods = set(dir(cls))
         methods.difference_update(set(dir(_Empty)))
@@ -23,6 +24,7 @@ def mixin(target):
                 mthd = classmethod(mthd.__func__)
             setattr(target, method_name, mthd)
         return target
+
     return apply
 
 
@@ -33,11 +35,9 @@ class GraphIndex:
     encountered node is mapped to the node.
     """
 
-    def __init__(self,
-                 g,
-                 labeler=short_labeler,
-                 succ=succ_deeper,
-                 include=always_include):
+    def __init__(
+        self, g, labeler=short_labeler, succ=succ_deeper, include=always_include
+    ):
         """Create a GraphIndex."""
         self.labeler = labeler
         self._index = defaultdict(set)
@@ -59,11 +59,8 @@ class GraphIndex:
         return self._index[key]
 
     def __getitem__(self, key):
-        v, = self._index[key]
+        (v,) = self._index[key]
         return v
 
 
-__all__ = [
-    'GraphIndex',
-    'mixin',
-]
+__all__ = ["GraphIndex", "mixin"]

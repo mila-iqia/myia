@@ -26,19 +26,19 @@ from .loop import Pending
 from .ref import Context
 
 # Represents the absence of inferred data
-ABSENT = Named('ABSENT')
+ABSENT = Named("ABSENT")
 
 # Represents an unknown value
-ANYTHING = Named('ANYTHING')
-register_serialize(ANYTHING, 'Anything')
+ANYTHING = Named("ANYTHING")
+register_serialize(ANYTHING, "Anything")
 
 # Represents inference problems
-VOID = Named('VOID')
+VOID = Named("VOID")
 
 # Represents specialization problems
-DEAD = Named('DEAD')
-register_serialize(DEAD, 'DEAD')
-POLY = Named('POLY')
+DEAD = Named("DEAD")
+register_serialize(DEAD, "DEAD")
+POLY = Named("POLY")
 
 
 #####################
@@ -46,7 +46,7 @@ POLY = Named('POLY')
 #####################
 
 
-@serializable('Possibilities', sequence=True)
+@serializable("Possibilities", sequence=True)
 class Possibilities(list):
     """Represents a set of possible values.
 
@@ -76,7 +76,7 @@ class Possibilities(list):
         return hash(tuple(self))
 
 
-@serializable('TaggedPossibilities', sequence=True)
+@serializable("TaggedPossibilities", sequence=True)
 class TaggedPossibilities(list):
     """Represents a set of possible tag/type combos.
 
@@ -183,10 +183,10 @@ class PartialApplication(Function):
     """
 
     fn: Function
-    args: List['AbstractValue']
+    args: List["AbstractValue"]
 
     def __eqkey__(self):
-        return AttrEK(self, ('fn', 'args'))
+        return AttrEK(self, ("fn", "args"))
 
 
 @dataclass(frozen=True)
@@ -201,7 +201,7 @@ class JTransformedFunction(Function):
     fn: object
 
 
-@serializable('VirtualFunction')
+@serializable("VirtualFunction")
 class VirtualFunction(Function, Interned, PossiblyRecursive):
     """Represents some function with an explicitly given type signature.
 
@@ -211,8 +211,8 @@ class VirtualFunction(Function, Interned, PossiblyRecursive):
 
     """
 
-    args: List['AbstractValue']
-    output: 'AbstractValue'
+    args: List["AbstractValue"]
+    output: "AbstractValue"
 
     def __init__(self, args, output):
         """Initialize a VirtualFunction."""
@@ -221,21 +221,21 @@ class VirtualFunction(Function, Interned, PossiblyRecursive):
         self._incomplete = False
 
     def __eqkey__(self):
-        return AttrEK(self, ['args', 'output'])
+        return AttrEK(self, ["args", "output"])
 
     def _serialize(self):
-        return {'args': self.args, 'output': self.output}
+        return {"args": self.args, "output": self.output}
 
     @classmethod
     def _construct(cls):
         obj = cls.empty()
         data = yield obj
-        obj.args = data['args']
-        obj.output = data['output']
+        obj.args = data["args"]
+        obj.output = data["output"]
         obj._incomplete = False
 
 
-@serializable('TypedPrimitive')
+@serializable("TypedPrimitive")
 @dataclass(frozen=True)
 class TypedPrimitive(Function):
     """Represents a Primitive with an explicitly given type signature.
@@ -248,8 +248,8 @@ class TypedPrimitive(Function):
     """
 
     prim: Primitive
-    args: Tuple['AbstractValue']
-    output: 'AbstractValue'
+    args: Tuple["AbstractValue"]
+    output: "AbstractValue"
 
 
 @dataclass(frozen=True)
@@ -304,14 +304,14 @@ class AbstractValue(Interned, PossiblyRecursive):
         return Atom(self, tuple(sorted(self.values.items())))
 
     def __repr__(self):
-        return f'{type(self).__qualname__}({format_abstract(self)})'
+        return f"{type(self).__qualname__}({format_abstract(self)})"
 
 
 class AbstractAtom(AbstractValue):
     """Base class for abstract values that are not structures."""
 
 
-@serializable('AbstractScalar')
+@serializable("AbstractScalar")
 class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
 
@@ -319,11 +319,11 @@ class AbstractScalar(AbstractAtom):
         rval = pretty_type(self.values[TYPE])
         v = self.values[VALUE]
         if v is not ANYTHING:
-            rval += f' = {v}'
+            rval += f" = {v}"
         return rval
 
 
-@serializable('AbstractError')
+@serializable("AbstractError")
 class AbstractError(AbstractAtom):
     """This represents some kind of problem in the computation.
 
@@ -340,10 +340,10 @@ class AbstractError(AbstractAtom):
         super().__init__({VALUE: err, DATA: data})
 
     def __pretty__(self, ctx):
-        return f'E({self.values[VALUE]})'
+        return f"E({self.values[VALUE]})"
 
 
-@serializable('AbstractBottom')
+@serializable("AbstractBottom")
 class AbstractBottom(AbstractAtom):
     """Represents the type of an expression that does not return."""
 
@@ -352,7 +352,7 @@ class AbstractBottom(AbstractAtom):
         super().__init__({})
 
     def __pretty__(self, ctx):
-        return '⊥'
+        return "⊥"
 
 
 class AbstractExternal(AbstractAtom):
@@ -366,11 +366,11 @@ class AbstractExternal(AbstractAtom):
         rval = pretty_type(self.values[TYPE])
         v = self.values[VALUE]
         if v is not ANYTHING:
-            rval += f' = {v}'
+            rval += f" = {v}"
         return rval
 
 
-@serializable('AbstractFunction')
+@serializable("AbstractFunction")
 class AbstractFunction(AbstractAtom):
     """Represents a function or set of functions.
 
@@ -399,7 +399,7 @@ class AbstractFunction(AbstractAtom):
     async def get(self):
         """Return a set of all possible Functions (asynchronous)."""
         v = self.values[VALUE]
-        return (await v if isinstance(v, Pending) else v)
+        return await v if isinstance(v, Pending) else v
 
     def get_sync(self):
         """Return a set of all possible Functions (synchronous)."""
@@ -409,11 +409,11 @@ class AbstractFunction(AbstractAtom):
         poss = self.values[VALUE]
         if isinstance(poss, Pending):  # pragma: no cover
             # This is a bit circumstantial and difficult to test explicitly
-            raise MyiaTypeError('get_unique invalid because Pending')
+            raise MyiaTypeError("get_unique invalid because Pending")
         poss = frozenset(poss)
         if len(poss) != 1:
             return None
-        fn, = poss
+        (fn,) = poss
         return fn
 
     def get_unique(self):
@@ -424,7 +424,7 @@ class AbstractFunction(AbstractAtom):
         rval = self._maybe_get_unique()
         if rval is None:
             raise MyiaTypeError(
-                f'Expected unique function, not {self.values[VALUE]}'
+                f"Expected unique function, not {self.values[VALUE]}"
             )
         return rval
 
@@ -440,7 +440,7 @@ class AbstractFunction(AbstractAtom):
             return None
 
     def __eqkey__(self):
-        return AttrEK(self, ('values',))
+        return AttrEK(self, ("values",))
 
     def __pretty__(self, ctx):
         fns = self.get_sync()
@@ -448,14 +448,14 @@ class AbstractFunction(AbstractAtom):
             fns = [pretty_python_value(fn, ctx) for fn in fns]
         else:
             fns = [str(fns)]
-        return pretty_join(fns, sep=' | ')
+        return pretty_join(fns, sep=" | ")
 
 
 class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
 
 
-@serializable('AbstractRandomState')
+@serializable("AbstractRandomState")
 class AbstractRandomState(AbstractAtom):
     """Abstract class to represent a backend random state object."""
 
@@ -474,14 +474,14 @@ class AbstractWrapper(AbstractStructure):
 
     def children(self):
         """Return the element."""
-        return self.element,
+        return (self.element,)
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'element'))
+        return AttrEK(self, (v, "element"))
 
 
-@serializable('AbstractType')
+@serializable("AbstractType")
 class AbstractType(AbstractWrapper):
     """Represents a type as a first class value."""
 
@@ -491,7 +491,7 @@ class AbstractType(AbstractWrapper):
 
     def _serialize(self):
         data = super()._serialize()
-        data['element'] = self.element
+        data["element"] = self.element
         return data
 
     @classmethod
@@ -499,7 +499,7 @@ class AbstractType(AbstractWrapper):
         it = super()._construct()
         res = next(it)
         data = yield res
-        res.element = data.pop('element')
+        res.element = data.pop("element")
         try:
             it.send(data)
         except StopIteration:
@@ -507,10 +507,10 @@ class AbstractType(AbstractWrapper):
 
     def __pretty__(self, ctx):
         t = pretty_type(self.element)
-        return pretty_join(['Ty(', t, ')'])
+        return pretty_join(["Ty(", t, ")"])
 
 
-@serializable('AbstractTuple')
+@serializable("AbstractTuple")
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
 
@@ -523,7 +523,7 @@ class AbstractTuple(AbstractStructure):
 
     def _serialize(self):
         data = super()._serialize()
-        data['elements'] = self.elements
+        data["elements"] = self.elements
         return data
 
     @classmethod
@@ -531,7 +531,7 @@ class AbstractTuple(AbstractStructure):
         it = super()._construct()
         res = next(it)
         data = yield res
-        res.elements = data.pop('elements')
+        res.elements = data.pop("elements")
         try:
             it.send(data)
         except StopIteration:
@@ -543,13 +543,13 @@ class AbstractTuple(AbstractStructure):
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'elements'))
+        return AttrEK(self, (v, "elements"))
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "", self.elements)
 
 
-@serializable('AbstractArray')
+@serializable("AbstractArray")
 class AbstractArray(AbstractWrapper):
     """Represents an array.
 
@@ -565,7 +565,7 @@ class AbstractArray(AbstractWrapper):
 
     def _serialize(self):
         data = super()._serialize()
-        data['element'] = self.element
+        data["element"] = self.element
         return data
 
     @classmethod
@@ -573,7 +573,7 @@ class AbstractArray(AbstractWrapper):
         it = super()._construct()
         res = next(it)
         data = yield res
-        res.element = data.pop('element')
+        res.element = data.pop("element")
         try:
             it.send(data)
         except StopIteration:
@@ -587,11 +587,11 @@ class AbstractArray(AbstractWrapper):
         elem = pretty_python_value(self.element, ctx)
         shp = self.values[SHAPE]
         if isinstance(shp, tuple):
-            shp = ['?' if s is ANYTHING else str(s) for s in shp]
+            shp = ["?" if s is ANYTHING else str(s) for s in shp]
         else:
             shp = str(shp)
-        shp = pretty_join(shp, ' x ')
-        return pretty_join([elem, ' x ', shp])
+        shp = pretty_join(shp, " x ")
+        return pretty_join([elem, " x ", shp])
 
 
 class AbstractDict(AbstractStructure):
@@ -615,15 +615,16 @@ class AbstractDict(AbstractStructure):
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'entries',
-                             Atom(self, tuple(self.entries.keys()))))
+        return AttrEK(
+            self, (v, "entries", Atom(self, tuple(self.entries.keys())))
+        )
 
     def __pretty__(self, ctx):
-        lst = ['{']
+        lst = ["{"]
         for k, v in self.entries.items():
-            lst.append(f'{k}: {pretty_python_value(v, ctx)}')
-        lst.append('}')
-        return pretty_join(lst, sep=',\n')
+            lst.append(f"{k}: {pretty_python_value(v, ctx)}")
+        lst.append("}")
+        return pretty_join(lst, sep=",\n")
 
 
 class AbstractClassBase(AbstractStructure):
@@ -637,8 +638,7 @@ class AbstractClassBase(AbstractStructure):
 
     """
 
-    def __init__(self, tag, attributes, *, values={},
-                 constructor=None):
+    def __init__(self, tag, attributes, *, values={}, constructor=None):
         """Initialize an AbstractClass."""
         super().__init__({TYPE: tag, **values})
         self.tag = tag
@@ -654,6 +654,7 @@ class AbstractClassBase(AbstractStructure):
         is generated by the inferrer or other methods.
         """
         from .to_abstract import type_to_abstract
+
         return type_to_abstract(self.tag)
 
     def children(self):
@@ -662,7 +663,7 @@ class AbstractClassBase(AbstractStructure):
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'tag', 'attributes'))
+        return AttrEK(self, (v, "tag", "attributes"))
 
     def __pretty__(self, ctx):
         tagname = self.tag.__qualname__
@@ -693,7 +694,7 @@ class AbstractJTagged(AbstractWrapper):
         return pretty_call(ctx, "J", self.element)
 
 
-@serializable('AbstractHandle')
+@serializable("AbstractHandle")
 class AbstractHandle(AbstractWrapper):
     """Represents a value (non-function) transformed through J."""
 
@@ -702,13 +703,13 @@ class AbstractHandle(AbstractWrapper):
         super().__init__(element, values)
 
     def _serialize(self):
-        return {'element': self.element}
+        return {"element": self.element}
 
     @classmethod
     def _construct(cls):
         res = cls(None)
         data = yield res
-        res.element = data['element']
+        res.element = data["element"]
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "H", self.element)
@@ -737,13 +738,13 @@ class AbstractUnion(AbstractStructure):
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'options'))
+        return AttrEK(self, (v, "options"))
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "U", self.options)
 
 
-@serializable('AbstractTaggedUnion')
+@serializable("AbstractTaggedUnion")
 class AbstractTaggedUnion(AbstractStructure):
     """Represents a tagged union.
 
@@ -762,7 +763,7 @@ class AbstractTaggedUnion(AbstractStructure):
 
     def _serialize(self):
         data = super()._serialize()
-        data['options'] = self.options
+        data["options"] = self.options
         return data
 
     @classmethod
@@ -770,7 +771,7 @@ class AbstractTaggedUnion(AbstractStructure):
         it = super()._construct()
         res = next(it)
         data = yield res
-        res.options = data.pop('options')
+        res.options = data.pop("options")
         try:
             it.send(data)
         except StopIteration:
@@ -778,10 +779,10 @@ class AbstractTaggedUnion(AbstractStructure):
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, 'options'))
+        return AttrEK(self, (v, "options"))
 
     def __pretty__(self, ctx):
-        return pretty_struct(ctx, 'U', [], dict(self.options))
+        return pretty_struct(ctx, "U", [], dict(self.options))
 
 
 class AbstractKeywordArgument(AbstractStructure):
@@ -795,11 +796,11 @@ class AbstractKeywordArgument(AbstractStructure):
 
     def children(self):
         """Return the argument."""
-        return self.argument,
+        return (self.argument,)
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
-        return AttrEK(self, (v, Atom(self.key, self.key), 'argument'))
+        return AttrEK(self, (v, Atom(self.key, self.key), "argument"))
 
     def __pretty__(self, ctx):
         return pretty_struct(ctx, "KW", [], {self.key: self.argument})
@@ -846,7 +847,7 @@ class Track:
 
     def default(self):
         """Return the default value for the track."""
-        raise NotImplementedError(f'There is no default for track {self}')
+        raise NotImplementedError(f"There is no default for track {self}")
 
 
 class _ValueTrack(Track):
@@ -877,16 +878,16 @@ class _AliasIdTrack(Track):
         return ABSENT
 
 
-VALUE = _ValueTrack('VALUE')
-register_serialize(VALUE, 'VALUE')
-TYPE = _TypeTrack('TYPE')
-register_serialize(TYPE, 'TYPE')
-SHAPE = _ShapeTrack('SHAPE')
-register_serialize(SHAPE, 'SHAPE')
-DATA = _ValueTrack('DATA')
-register_serialize(DATA, 'DATA')
-ALIASID = _AliasIdTrack('ALIASID')
-register_serialize(ALIASID, 'ALIASID')
+VALUE = _ValueTrack("VALUE")
+register_serialize(VALUE, "VALUE")
+TYPE = _TypeTrack("TYPE")
+register_serialize(TYPE, "TYPE")
+SHAPE = _ShapeTrack("SHAPE")
+register_serialize(SHAPE, "SHAPE")
+DATA = _ValueTrack("DATA")
+register_serialize(DATA, "DATA")
+ALIASID = _AliasIdTrack("ALIASID")
+register_serialize(ALIASID, "ALIASID")
 
 
 ##########################
@@ -899,8 +900,8 @@ empty = AbstractADT(Empty, {})
 
 def listof(t):
     """Return the type of a list of t."""
-    rval = AbstractADT.new(Cons, {'head': t, 'tail': None})
-    rval.attributes['tail'] = AbstractUnion.new([empty, rval])
+    rval = AbstractADT.new(Cons, {"head": t, "tail": None})
+    rval.attributes["tail"] = AbstractUnion.new([empty, rval])
     return rval.intern()
 
 
@@ -921,8 +922,10 @@ def u64pair_typecheck(engine, shp):
     """Verify that tup is a pair of uint64."""
     tup_t = u64tup_typecheck(engine, shp)
     if len(tup_t.elements) != 2:
-        raise MyiaTypeError(f'Expected Tuple Length 2, not Tuple Length'
-                            f'{len(tup_t.elements)}')
+        raise MyiaTypeError(
+            f"Expected Tuple Length 2, not Tuple Length"
+            f"{len(tup_t.elements)}"
+        )
     return tup_t
 
 
@@ -949,7 +952,7 @@ def _force_sequence(x):
 def format_abstract(a):
     """Pretty print an AbstractValue."""
     rval = pp.pformat(a)
-    rval = re.sub(r'<<([^>]+)>>=', r'\1', rval)
+    rval = re.sub(r"<<([^>]+)>>=", r"\1", rval)
     return rval
 
 
@@ -958,16 +961,15 @@ def pretty_type(t):
     return str(t)
 
 
-def pretty_call(ctx, title, args, sep=' :: '):
+def pretty_call(ctx, title, args, sep=" :: "):
     """Pretty print a call."""
     args = _force_sequence(args)
     return pp.pretty_call_alt(ctx, str(title), args, {})
 
 
-def pretty_struct(ctx, title, args, kwargs, sep=' :: '):
+def pretty_struct(ctx, title, args, kwargs, sep=" :: "):
     """Pretty print a struct."""
-    kwargs = {f'{k}<<{sep}>>': v
-              for k, v in kwargs.items()}
+    kwargs = {f"{k}<<{sep}>>": v for k, v in kwargs.items()}
     return pp.pretty_call_alt(ctx, str(title), args, kwargs)
 
 
@@ -988,69 +990,69 @@ def pretty_join(elems, sep=None):
 @pp.register_pretty(AbstractValue)
 def _pretty_avalue(a, ctx):
     try:
-        if getattr(a, '_incomplete', False):  # pragma: no cover
-            return f'<{a.__class__.__qualname__}: incomplete>'
+        if getattr(a, "_incomplete", False):  # pragma: no cover
+            return f"<{a.__class__.__qualname__}: incomplete>"
         else:
             return a.__pretty__(ctx)
     except Exception:  # pragma: no cover
         # Pytest fails badly without this failsafe.
-        return f'<{a.__class__.__qualname__}: error in printing>'
+        return f"<{a.__class__.__qualname__}: error in printing>"
 
 
 __all__ = [
-    'ABSENT',
-    'ALIASID',
-    'ANYTHING',
-    'DATA',
-    'DEAD',
-    'POLY',
-    'SHAPE',
-    'TYPE',
-    'VALUE',
-    'VOID',
-    'AbstractADT',
-    'AbstractArray',
-    'AbstractAtom',
-    'AbstractBottom',
-    'AbstractClass',
-    'AbstractClassBase',
-    'AbstractDict',
-    'AbstractError',
-    'AbstractExternal',
-    'AbstractFunction',
-    'AbstractHandle',
-    'AbstractJTagged',
-    'AbstractKeywordArgument',
-    'AbstractRandomState',
-    'AbstractScalar',
-    'AbstractStructure',
-    'AbstractTaggedUnion',
-    'AbstractTuple',
-    'AbstractType',
-    'AbstractUnion',
-    'AbstractValue',
-    'DummyFunction',
-    'Function',
-    'GraphFunction',
-    'JTransformedFunction',
-    'MacroFunction',
-    'MetaGraphFunction',
-    'PartialApplication',
-    'Possibilities',
-    'PrimitiveFunction',
-    'TaggedPossibilities',
-    'Track',
-    'TrackDict',
-    'TypedPrimitive',
-    'VirtualFunction',
-    'empty',
-    'format_abstract',
-    'i64tup_typecheck',
-    'listof',
-    'pretty_call',
-    'pretty_join',
-    'pretty_struct',
-    'pretty_type',
-    'u64pair_typecheck',
-    'u64tup_typecheck',
+    "ABSENT",
+    "ALIASID",
+    "ANYTHING",
+    "DATA",
+    "DEAD",
+    "POLY",
+    "SHAPE",
+    "TYPE",
+    "VALUE",
+    "VOID",
+    "AbstractADT",
+    "AbstractArray",
+    "AbstractAtom",
+    "AbstractBottom",
+    "AbstractClass",
+    "AbstractClassBase",
+    "AbstractDict",
+    "AbstractError",
+    "AbstractExternal",
+    "AbstractFunction",
+    "AbstractHandle",
+    "AbstractJTagged",
+    "AbstractKeywordArgument",
+    "AbstractRandomState",
+    "AbstractScalar",
+    "AbstractStructure",
+    "AbstractTaggedUnion",
+    "AbstractTuple",
+    "AbstractType",
+    "AbstractUnion",
+    "AbstractValue",
+    "DummyFunction",
+    "Function",
+    "GraphFunction",
+    "JTransformedFunction",
+    "MacroFunction",
+    "MetaGraphFunction",
+    "PartialApplication",
+    "Possibilities",
+    "PrimitiveFunction",
+    "TaggedPossibilities",
+    "Track",
+    "TrackDict",
+    "TypedPrimitive",
+    "VirtualFunction",
+    "empty",
+    "format_abstract",
+    "i64tup_typecheck",
+    "listof",
+    "pretty_call",
+    "pretty_join",
+    "pretty_struct",
+    "pretty_type",
+    "u64pair_typecheck",
+    "u64tup_typecheck",
 ]

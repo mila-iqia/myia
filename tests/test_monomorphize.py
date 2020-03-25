@@ -1,4 +1,3 @@
-
 import numpy as np
 from pytest import mark
 
@@ -19,17 +18,31 @@ from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from .common import Point, U, f64, i64, mysum
 from .multitest import mt, run
 
-specialize_pipeline = scalar_debug_pipeline \
-    .select('resources', 'parse', 'infer', 'specialize', 'simplify_types',
-            'opt2', 'validate', 'export', 'wrap') \
-    .configure({
-        'opt2.phases.main': [],
-    })
+specialize_pipeline = scalar_debug_pipeline.select(
+    "resources",
+    "parse",
+    "infer",
+    "specialize",
+    "simplify_types",
+    "opt2",
+    "validate",
+    "export",
+    "wrap",
+).configure({"opt2.phases.main": []})
 
 
-specialize_pipeline_std = standard_debug_pipeline \
-    .select('resources', 'parse', 'infer', 'specialize', 'simplify_types',
-            'opt', 'opt2', 'validate', 'export', 'wrap')
+specialize_pipeline_std = standard_debug_pipeline.select(
+    "resources",
+    "parse",
+    "infer",
+    "specialize",
+    "simplify_types",
+    "opt",
+    "opt2",
+    "validate",
+    "export",
+    "wrap",
+)
 
 
 def specializer_decorator(pipeline):
@@ -42,13 +55,15 @@ def specializer_decorator(pipeline):
             else:
                 result = None
             mtentry = run(
-                *args, result=result,
+                *args,
+                result=result,
                 abstract=abstract,
                 validate=validate,
                 pipeline=pipeline
             )
             mtentries.append(mtentry)
         return mt(*mtentries)
+
     return deco
 
 
@@ -91,7 +106,6 @@ pt2 = Point(100, 200)
     mono_scalar(int1_np32, int2_np32),
 )
 def test_prim_arithmetic_np_same_precision(x, y):
-
     def test_prim_mul_np(x, y):
         return x * y
 
@@ -112,40 +126,31 @@ def test_prim_arithmetic_np_same_precision(x, y):
     return _a, _b, _c, _d
 
 
-@mt(
-    mono_scalar(int1, int2),
-    mono_scalar(fp1, fp2),
-)
+@mt(mono_scalar(int1, int2), mono_scalar(fp1, fp2))
 def test_prim_mul(x, y):
     return x * y
 
 
-@mt(
-    mono_scalar(int1, int2),
-    mono_scalar(fp1, int1),
-)
+@mt(mono_scalar(int1, int2), mono_scalar(fp1, int1))
 def test_polymorphic(x, y):
     def helper(a, b):
         return a * a + b * b
+
     return helper(x, x + x), helper(y, y + y)
 
 
-@mt(
-    mono_scalar(int1, int2),
-    mono_scalar(fp1, int1),
-)
+@mt(mono_scalar(int1, int2), mono_scalar(fp1, int1))
 def test_polymorphic_closure(x, y):
     def construct(z):
         def inner(w):
             return z + w
+
         return inner
+
     return construct(x + x)(x), construct(y + y)(y)
 
 
-@mt(
-    mono_scalar(True, int1, int2),
-    mono_scalar(True, fp1, int1),
-)
+@mt(mono_scalar(True, int1, int2), mono_scalar(True, fp1, int1))
 def test_switch_fn(c, x, y):
     def dee(y):
         return y * y
@@ -161,10 +166,7 @@ def test_switch_fn(c, x, y):
     return f(x), f(y)
 
 
-@mt(
-    mono_scalar(int1, int2),
-    mono_scalar(int1, fp1),
-)
+@mt(mono_scalar(int1, int2), mono_scalar(int1, fp1))
 def test_while(n, x):
     rval = x
     while n > 0:
@@ -205,8 +207,7 @@ def test_array_map(xs):
     return array_map(square, xs)
 
 
-@mono_scalar(np.array([fp1, fp2]),
-             np.array([int1, int2]))
+@mono_scalar(np.array([fp1, fp2]), np.array([int1, int2]))
 def test_array_map_polymorphic(xs, ys):
     def square(x):
         return x * x
@@ -214,8 +215,7 @@ def test_array_map_polymorphic(xs, ys):
     return array_map(square, xs), array_map(square, ys)
 
 
-@mono_scalar(np.array([fp1, fp2]),
-             np.array([int1, int2]))
+@mono_scalar(np.array([fp1, fp2]), np.array([int1, int2]))
 def test_array_map_polymorphic_indirect(xs, ys):
     def square(x):
         return x * x
@@ -226,8 +226,7 @@ def test_array_map_polymorphic_indirect(xs, ys):
     return helper(square)
 
 
-@mono_scalar(np.array([fp1, fp2]),
-             np.array([int1, int2]))
+@mono_scalar(np.array([fp1, fp2]), np.array([int1, int2]))
 def test_array_reduce_polymorphic_indirect(xs, ys):
     def helper(fn):
         return array_reduce(fn, xs, ()), array_reduce(fn, ys, ())
@@ -305,6 +304,7 @@ def test_unused_function_parameter(x):
 
     def helper(f, a):
         return a * a
+
     return helper(square, x)
 
 
@@ -361,10 +361,7 @@ def test_poly_with_constants2(c, x, y):
     return choose(c)(x, 2), choose(not c)(y, 3)
 
 
-@mt(
-    mono_scalar(int1, int2),
-    mono_scalar(fp1, fp2),
-)
+@mt(mono_scalar(int1, int2), mono_scalar(fp1, fp2))
 def test_method(x, y):
     return x.__add__(y)
 
@@ -378,27 +375,18 @@ def test_method_polymorphic(x, y):
 def test_partial_polymorphic(x, y):
     def f(a, b):
         return a + b
+
     return partial(f, x)(x), partial(f, y)(y)
 
 
-@mt(
-    mono_scalar(True, int1),
-    mono_scalar(False, int1),
-)
+@mt(mono_scalar(True, int1), mono_scalar(False, int1))
 def test_switch(c, x):
     return switch(c, scalar_usub, scalar_uadd)(x)
 
 
-@mt(
-    mono_scalar(True, int1, int2),
-    mono_scalar(False, int1, int2),
-)
+@mt(mono_scalar(True, int1, int2), mono_scalar(False, int1, int2))
 def test_switch2(c, x, y):
-    fn = switch(
-        c,
-        partial(scalar_sub, x),
-        partial(scalar_add, x)
-    )
+    fn = switch(c, partial(scalar_sub, x), partial(scalar_add, x))
     return fn(y)
 
 
@@ -415,6 +403,7 @@ def test_closure_stays_in_scope(x, y):
     def f(z):
         def g():
             return z
+
         return g
 
     def h(z):
@@ -435,6 +424,7 @@ def test_return_closure(x):
 
         def h():
             return f(z - 1)[0]()
+
         return (g, h)
 
     return f(x)[1]()
@@ -458,7 +448,7 @@ def test_partial_outside_scope(x, y):
     mono_standard(int1),
     mono_standard([int1, int2]),
     mono_standard((int1, int2), result=TypeError),
-    abstract=(U(i64, [i64]),)
+    abstract=(U(i64, [i64]),),
 )
 def test_union(x):
     if isinstance(x, int):
@@ -471,7 +461,7 @@ def test_union(x):
     mono_standard(int1, int2),
     mono_standard([int1, int2], int1),
     mono_standard((int1, int2), int1, result=TypeError),
-    abstract=(U(i64, f64, [i64]), i64)
+    abstract=(U(i64, f64, [i64]), i64),
 )
 def test_union_nested(x, y):
     if isinstance(x, int):
@@ -486,7 +476,7 @@ def test_union_nested(x, y):
     mono_standard(int1, int2),
     mono_standard([int1, int2], int1),
     mono_standard((int1, int2), int1, result=TypeError),
-    abstract=(U(i64, f64, [i64]), i64)
+    abstract=(U(i64, f64, [i64]), i64),
 )
 def test_union_nested_2(x, y):
     if isinstance(x, (int, float)):
@@ -534,6 +524,7 @@ def test_default_closure(x, y):
             return x - z
         else:
             return 0
+
     return clos() + clos(x)
 
 

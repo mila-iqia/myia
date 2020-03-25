@@ -37,16 +37,18 @@ class PatternSubstitutionOptimization:
 
     """
 
-    def __init__(self,
-                 pattern,
-                 replacement,
-                 *,
-                 condition=None,
-                 name=None,
-                 multigraph=True,
-                 interest=False):
+    def __init__(
+        self,
+        pattern,
+        replacement,
+        *,
+        condition=None,
+        name=None,
+        multigraph=True,
+        interest=False,
+    ):
         """Initialize va PatternSubstitutionOptimization."""
-        g: Var = Var('RootG')
+        g: Var = Var("RootG")
         self.sexp = pattern
         self.pattern = sexp_to_node(pattern, g, multigraph)
         if callable(replacement):
@@ -58,8 +60,9 @@ class PatternSubstitutionOptimization:
         self.condition = condition
         self.name = name
         if interest is False:
-            if (self.pattern.is_apply() and
-                    self.pattern.inputs[0].is_constant(Primitive)):
+            if self.pattern.is_apply() and self.pattern.inputs[0].is_constant(
+                Primitive
+            ):
                 interest = self.pattern.inputs[0].value
             else:
                 # Maybe warn in this case?
@@ -89,19 +92,21 @@ class PatternSubstitutionOptimization:
             return None
 
     def __str__(self):
-        return f'<PatternSubstitutionOptimization {self.name}>'
+        return f"<PatternSubstitutionOptimization {self.name}>"
 
     __repr__ = __str__
 
 
 def pattern_replacer(*pattern, interest=False):
     """Create a PatternSubstitutionOptimization using this function."""
-    if len(pattern) == 2 and pattern[0] == 'just':
+    if len(pattern) == 2 and pattern[0] == "just":
         pattern = pattern[1]
 
     def deco(f):
-        return PatternSubstitutionOptimization(pattern, f, name=f.__name__,
-                                               interest=interest)
+        return PatternSubstitutionOptimization(
+            pattern, f, name=f.__name__, interest=interest
+        )
+
     return deco
 
 
@@ -124,6 +129,7 @@ class NodeMap:
 
     def register(self, interests, opt=None):
         """Register an optimizer for some interests."""
+
         def do_register(opt):
             ints = interests
             if ints is None:
@@ -132,8 +138,9 @@ class NodeMap:
             if not isinstance(ints, tuple):
                 ints = (ints,)
             for interest in ints:
-                assert (isinstance(interest, Primitive) or
-                        (interest in (Graph, Apply)))
+                assert isinstance(interest, Primitive) or (
+                    interest in (Graph, Apply)
+                )
                 self._d.setdefault(interest, []).append(opt)
 
         # There could be the option to return do_register also.
@@ -211,15 +218,10 @@ class LocalPassOptimizer:
         while loop:
             loop = False
             for transformer in self.node_map.get(n):
-                args = dict(
-                    opt=transformer,
-                    node=n,
-                    manager=mng,
-                    profile=False,
-                )
-                with tracer('opt', **args) as tr:
+                args = dict(opt=transformer, node=n, manager=mng, profile=False)
+                with tracer("opt", **args) as tr:
                     tr.set_results(success=False, **args)
-                    with About(n.debug, 'opt', transformer.name):
+                    with About(n.debug, "opt", transformer.name):
                         new = transformer(self.resources, n)
                     if new is not None and new is not n:
                         tracer().emit_match(**args, new_node=new)
@@ -270,9 +272,9 @@ class GraphTransform:
 
 
 __all__ = [
-    'GraphTransform',
-    'LocalPassOptimizer',
-    'NodeMap',
-    'PatternSubstitutionOptimization',
-    'pattern_replacer',
+    "GraphTransform",
+    "LocalPassOptimizer",
+    "NodeMap",
+    "PatternSubstitutionOptimization",
+    "pattern_replacer",
 ]

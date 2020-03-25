@@ -38,8 +38,8 @@ def range_(start, stop=None, step=None):
 
 
 __operation_defaults__ = {
-    'name': 'range',
-    'registered_name': 'range',
-    'mapping': range_,
-    'python_implementation': range,
+    "name": "range",
+    "registered_name": "range",
+    "mapping": range_,
+    "python_implementation": range,
 }

@@ -21,39 +21,39 @@ from ..multitest import mt, run, run_gpu
 def test_default_backend():
     import os
 
-    before = os.environ.get('MYIA_BACKEND', None)
+    before = os.environ.get("MYIA_BACKEND", None)
     try:
-        os.environ['MYIA_BACKEND'] = 'pytorch'
-        assert parse_default() == ('pytorch', {})
+        os.environ["MYIA_BACKEND"] = "pytorch"
+        assert parse_default() == ("pytorch", {})
 
-        os.environ['MYIA_BACKEND'] = 'pytorch?target=cpu'
-        assert parse_default() == ('pytorch', {'target': 'cpu'})
+        os.environ["MYIA_BACKEND"] = "pytorch?target=cpu"
+        assert parse_default() == ("pytorch", {"target": "cpu"})
 
-        os.environ['MYIA_BACKEND'] = 'relay?target=cpu&device_id=0'
-        assert parse_default() == ('relay', {'target': 'cpu',
-                                             'device_id': '0'})
+        os.environ["MYIA_BACKEND"] = "relay?target=cpu&device_id=0"
+        assert parse_default() == ("relay", {"target": "cpu", "device_id": "0"})
     finally:
         # Make sure we don't switch the default for other tests.
         if before is None:
-            del os.environ['MYIA_BACKEND']
+            del os.environ["MYIA_BACKEND"]
         else:
-            os.environ['MYIA_BACKEND'] = before
+            os.environ["MYIA_BACKEND"] = before
 
 
 def test_load_backend_unknown():
     with pytest.raises(UnknownBackend):
-        load_backend('_fake_name_')
+        load_backend("_fake_name_")
 
 
 def test_backend_error():
     from myia.compile.backends import _backends, register_backend
-    name = '__testing_name000_'
+
+    name = "__testing_name000_"
 
     def format():
         return {}
 
     def f():
-        raise ValueError('test')
+        raise ValueError("test")
 
     register_backend(name, f, format)
 
@@ -68,10 +68,7 @@ def test_reshape2(x):
     return reshape(x, (6,))
 
 
-@mt(
-    run(MA(2, 3)),
-    run(MA(1, 3)),
-)
+@mt(run(MA(2, 3)), run(MA(1, 3)))
 def test_array_reduce(x):
     return array_reduce(scalar_add, x, (1, 3))
 
@@ -86,10 +83,7 @@ def test_array_to_scalar(x):
     return array_to_scalar(reshape(x, ()))
 
 
-@mt(
-    run(2, 3),
-    run(2.0, 3.0),
-)
+@mt(run(2, 3), run(2.0, 3.0))
 def test_truediv(x, y):
     return x / y
 
@@ -99,11 +93,7 @@ def test_to_array(x):
     return scalar_to_array(x, AN)
 
 
-@mt(
-    run(None),
-    run(True),
-    run(False)
-)
+@mt(run(None), run(True), run(False))
 def test_bool_and_nil_args(x):
     return x
 

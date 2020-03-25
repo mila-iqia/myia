@@ -17,8 +17,8 @@ from myia.utils import (
 
 
 def test_named():
-    named = Named('foo')
-    assert repr(named) == 'foo'
+    named = Named("foo")
+    assert repr(named) == "foo"
 
 
 @smap.variant
@@ -32,8 +32,7 @@ def test_smap():
     assert _sum((1, 2, 3), (4, 5, 6)) == (5, 7, 9)
     assert _sum([1, 2, 3], [4, 5, 6]) == [5, 7, 9]
     assert _sum([(1, [2]), 3], [(4, [5]), 6]) == [(5, [7]), 9]
-    assert (_sum(np.ones((2, 2)), np.ones((2, 2)))
-            == np.ones((2, 2)) * 2).all()
+    assert (_sum(np.ones((2, 2)), np.ones((2, 2))) == np.ones((2, 2)) * 2).all()
 
 
 def test_smap_failures():
@@ -51,7 +50,7 @@ def test_smap_failures():
 
 def test_event():
     accum = []
-    ev = Event('event')
+    ev = Event("event")
 
     @ev.register
     def double(ev_, x):
@@ -81,7 +80,7 @@ def test_history():
     def history():
         return [1, 2]
 
-    ev = Event('event', history=history)
+    ev = Event("event", history=history)
 
     @ev.register_with_history
     def push(ev, x):
@@ -120,7 +119,7 @@ def test_events():
 
 
 def test_events_str_repr():
-    ev = Event('event')
+    ev = Event("event")
     str(ev)
     repr(ev)
 
@@ -133,21 +132,21 @@ def test_NS():
 
     ns.a = 3
     assert ns.a == 3
-    assert ns['a'] == 3
+    assert ns["a"] == 3
 
-    ns['b'] = 4
-    assert ns['b'] == 4
+    ns["b"] = 4
+    assert ns["b"] == 4
     assert ns.b == 4
 
-    assert repr(ns) == 'NS(x=1, y=2, a=3, b=4)'
+    assert repr(ns) == "NS(x=1, y=2, a=3, b=4)"
 
 
 def test_env():
-    sk1 = SymbolicKeyInstance('x', 1234)
-    sk1b = SymbolicKeyInstance('x', 1234)
+    sk1 = SymbolicKeyInstance("x", 1234)
+    sk1b = SymbolicKeyInstance("x", 1234)
     assert sk1 == sk1b
 
-    sk2 = SymbolicKeyInstance('y', 1234)
+    sk2 = SymbolicKeyInstance("y", 1234)
 
     e = newenv.set(sk1, 100)
     assert e is not newenv
@@ -169,8 +168,8 @@ def test_env():
 
 
 def test_env_add():
-    skx = SymbolicKeyInstance('x', 1)
-    sky = SymbolicKeyInstance('y', 2)
+    skx = SymbolicKeyInstance("x", 1)
+    sky = SymbolicKeyInstance("y", 2)
 
     ex = newenv.set(skx, 10)
     ey = newenv.set(sky, 20)
@@ -191,7 +190,7 @@ def test_env_add():
 
 def test_operation_str():
     assert str(operations.user_switch) == repr(operations.user_switch)
-    assert str(operations.user_switch) == 'myia.operations.user_switch'
+    assert str(operations.user_switch) == "myia.operations.user_switch"
 
 
 def test_list_to_cons():
@@ -200,23 +199,21 @@ def test_list_to_cons():
     assert Cons.from_list(li) == li_c
 
 
-cantaloup = NS(
-    apple={'banana': 456}
-)
+cantaloup = NS(apple={"banana": 456})
 
 
 def test_registry():
-    r = Registry(default_field='banana')
-    a = HasDefaults('a', {'banana': 123}, defaults_field=None)
-    b = HasDefaults('b', {'banana': 123}, defaults_field=None)
-    c = HasDefaults('c',
-                    'tests.utils.test_misc.cantaloup',
-                    defaults_field='apple')
+    r = Registry(default_field="banana")
+    a = HasDefaults("a", {"banana": 123}, defaults_field=None)
+    b = HasDefaults("b", {"banana": 123}, defaults_field=None)
+    c = HasDefaults(
+        "c", "tests.utils.test_misc.cantaloup", defaults_field="apple"
+    )
     r.register(a)(2)
     assert r[a] == 2
     assert r[b] == 123
     assert r[c] == 456
     with pytest.raises(TypeError):
-        print(HasDefaults('d', 123, defaults_field='apple'))
+        print(HasDefaults("d", 123, defaults_field="apple"))
     with pytest.raises(KeyError):
-        print(r['xyz'])
+        print(r["xyz"])

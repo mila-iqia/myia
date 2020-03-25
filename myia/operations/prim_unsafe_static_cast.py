@@ -17,18 +17,18 @@ async def infer_unsafe_static_cast(self, engine, x, typ: lib.AbstractType):
 
 
 __operation_defaults__ = {
-    'name': 'unsafe_static_cast',
-    'registered_name': 'unsafe_static_cast',
-    'mapping': P.unsafe_static_cast,
-    'python_implementation': pyimpl_unsafe_static_cast,
+    "name": "unsafe_static_cast",
+    "registered_name": "unsafe_static_cast",
+    "mapping": P.unsafe_static_cast,
+    "python_implementation": pyimpl_unsafe_static_cast,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'unsafe_static_cast',
-    'registered_name': 'unsafe_static_cast',
-    'type': 'backend',
-    'python_implementation': pyimpl_unsafe_static_cast,
-    'inferrer_constructor': infer_unsafe_static_cast,
-    'grad_transform': None,
+    "name": "unsafe_static_cast",
+    "registered_name": "unsafe_static_cast",
+    "type": "backend",
+    "python_implementation": pyimpl_unsafe_static_cast,
+    "inferrer_constructor": infer_unsafe_static_cast,
+    "grad_transform": None,
 }

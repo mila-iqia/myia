@@ -25,7 +25,7 @@ from ...operations import primitives as P
 from ...utils import overload
 from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
-union_type = relay.GlobalTypeVar('$_union_adt')
+union_type = relay.GlobalTypeVar("$_union_adt")
 empty_union = adt.Constructor("empty", [], union_type)
 tag_map = {None: empty_union}
 rev_tag_map = {}
@@ -61,7 +61,7 @@ def get_myia_tag(rtag):
 
 
 option_type = relay.GlobalTypeVar("_option")
-a = relay.ty.TypeVar('a')
+a = relay.ty.TypeVar("a")
 nil = adt.Constructor("None", [], option_type)
 some = adt.Constructor("Some", [a], option_type)
 env_type = relay.GlobalTypeVar("env_type")
@@ -92,49 +92,53 @@ class TypeHelper:
         for i, k in enumerate(env_val_keys):
             self.env_val_map[k] = (i, self.env_val_map[k])
 
-        mod[union_type] = adt.TypeData(
-            union_type, [], list(tag_map.values()))
+        mod[union_type] = adt.TypeData(union_type, [], list(tag_map.values()))
         mod[option_type] = adt.TypeData(option_type, [a], [nil, some])
         self.env_ctr = adt.Constructor("v", [self._build_env_type()], env_type)
         mod[env_type] = adt.TypeData(env_type, [], [self.env_ctr, dead_env])
 
     def build_default_env_val(self):
         """Build the default value for env, which is empty."""
-        return self.env_ctr(
-            relay.Tuple([nil() for _ in self.env_val_map]))
+        return self.env_ctr(relay.Tuple([nil() for _ in self.env_val_map]))
 
     def _build_env_type(self):
         map = dict((i, tt) for (i, tt) in self.env_val_map.values())
 
-        return relay.ty.TupleType([option_type(map[i])
-                                   for i in range(len(map))])
+        return relay.ty.TupleType(
+            [option_type(map[i]) for i in range(len(map))]
+        )
 
     def do_env_update(self, env_, key, val):
         """Build the code to update the env."""
-        v = relay.var('v')
+        v = relay.var("v")
         cl = adt.Clause(
-            adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
+            adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v
+        )
         env = adt.Match(env_, [cl], complete=False)
 
         map = dict((i, k) for k, (i, _) in self.env_val_map.items())
-        new_env = relay.Tuple([
-            some(val) if map[i] == key else relay.TupleGetItem(env, i)
-            for i in range(len(map))
-        ])
+        new_env = relay.Tuple(
+            [
+                some(val) if map[i] == key else relay.TupleGetItem(env, i)
+                for i in range(len(map))
+            ]
+        )
         return self.env_ctr(new_env)
 
     def do_env_find(self, env, key, dft):
         """Build the code to find a value in env."""
-        v = relay.var('v')
+        v = relay.var("v")
         cl = adt.Clause(
-            adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v)
+            adt.PatternConstructor(self.env_ctr, [adt.PatternVar(v)]), v
+        )
         env_v = adt.Match(env, [cl], complete=False)
 
         val = relay.TupleGetItem(env_v, self.env_val_map[key][0])
-        x = relay.var('x')
+        x = relay.var("x")
         nil_c = adt.Clause(adt.PatternConstructor(nil, []), dft)
         some_c = adt.Clause(
-            adt.PatternConstructor(some, [adt.PatternVar(x)]), x)
+            adt.PatternConstructor(some, [adt.PatternVar(x)]), x
+        )
         return adt.Match(val, [some_c, nil_c])
 
 
@@ -143,7 +147,7 @@ def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
     tp = a.xtype()
     if issubclass(tp, Bool):
-        return relay.ty.scalar_type('bool')
+        return relay.ty.scalar_type("bool")
     elif issubclass(tp, Nil):
         return relay.ty.TupleType([])
     elif issubclass(tp, EnvType):
@@ -156,12 +160,14 @@ def to_relay_type(self, a: AbstractScalar):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: AbstractRandomState):
-    return relay.ty.TupleType([
-        # key
-        relay.ty.scalar_type('uint32'),
-        # counter
-        relay.ty.scalar_type('uint32'),
-    ])
+    return relay.ty.TupleType(
+        [
+            # key
+            relay.ty.scalar_type("uint32"),
+            # counter
+            relay.ty.scalar_type("uint32"),
+        ]
+    )
 
 
 @overload  # noqa: F811
@@ -170,7 +176,7 @@ def to_relay_type(self, a: AbstractType):
     # they are replaced with other calls,
     # and appear here just as unused graph parameters.
     # So, let's just replace them with an integer type as placeholder.
-    return relay.ty.scalar_type('int32')
+    return relay.ty.scalar_type("int32")
 
 
 @overload  # noqa: F811
@@ -193,8 +199,7 @@ def to_relay_type(self, a: AbstractFunction):
 
 @overload  # noqa: F811
 def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
-    return relay.ty.FuncType([self(aa) for aa in a.args],
-                             self(a.output))
+    return relay.ty.FuncType([self(aa) for aa in a.args], self(a.output))
 
 
 @overload  # noqa: F811
@@ -215,6 +220,7 @@ def dead_value(t):
 
 def handle_wrapper(fn, handle_params):
     """Wraps a model function to perform handle updates."""
+
     def wrapper(*args):
         handle_instances = list(args[i] for i in handle_params)
         res = fn(*args)
@@ -223,6 +229,7 @@ def handle_wrapper(fn, handle_params):
         for h, v in zip(handle_instances, u):
             h.value = v
         return (), res
+
     if len(handle_params) == 0:
         return fn
     else:
@@ -232,8 +239,9 @@ def handle_wrapper(fn, handle_params):
 def _placeholder_body(type):
     if isinstance(type, relay.TensorType):
         sh = [sh.value for sh in type.shape]
-        return relay.const(np.array(np.random.rand(*sh)).astype(type.dtype),
-                           dtype=type.dtype)
+        return relay.const(
+            np.array(np.random.rand(*sh)).astype(type.dtype), dtype=type.dtype
+        )
     elif isinstance(type, relay.TupleType):
         return relay.Tuple([_placeholder_body(f) for f in type.fields])
     elif isinstance(type, relay.FuncType):
@@ -242,9 +250,8 @@ def _placeholder_body(type):
             params.append(relay.var("p", type_annotation=arg_ty))
 
         return relay.Function(
-            params,
-            _placeholder_body(type.ret_type),
-            ret_type=type.ret_type)
+            params, _placeholder_body(type.ret_type), ret_type=type.ret_type
+        )
     elif isinstance(type, relay.RefType):
         return relay.RefCreate(_placeholder_body(type.value))
     elif isinstance(type, Object):
@@ -270,11 +277,11 @@ def add_functions(mod, funcs):
 
 
 __all__ = [
-    'TypeHelper',
-    'add_functions',
-    'dead_value',
-    'fill_reverse_tag_map',
-    'get_myia_tag',
-    'get_union_ctr',
-    'to_relay_type',
+    "TypeHelper",
+    "add_functions",
+    "dead_value",
+    "fill_reverse_tag_map",
+    "get_myia_tag",
+    "get_union_ctr",
+    "to_relay_type",
 ]

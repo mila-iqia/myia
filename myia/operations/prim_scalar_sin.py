@@ -14,25 +14,23 @@ def pyimpl_scalar_sin(x: Number) -> Number:
 
 
 infer_scalar_sin = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_sin,
-    impl=pyimpl_scalar_sin,
-    infer_value=False
+    prim=P.scalar_sin, impl=pyimpl_scalar_sin, infer_value=False
 )
 
 
 __operation_defaults__ = {
-    'name': 'scalar_sin',
-    'registered_name': 'scalar_sin',
-    'mapping': P.scalar_sin,
-    'python_implementation': pyimpl_scalar_sin,
+    "name": "scalar_sin",
+    "registered_name": "scalar_sin",
+    "mapping": P.scalar_sin,
+    "python_implementation": pyimpl_scalar_sin,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_sin',
-    'registered_name': 'scalar_sin',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_sin,
-    'inferrer_constructor': infer_scalar_sin,
-    'grad_transform': None,
+    "name": "scalar_sin",
+    "registered_name": "scalar_sin",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_sin,
+    "inferrer_constructor": infer_scalar_sin,
+    "grad_transform": None,
 }

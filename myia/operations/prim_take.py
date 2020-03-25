@@ -20,9 +20,7 @@ def pyimpl_take(inp, indices):
 
 
 @standard_prim(P.take)
-async def infer_take(self, engine,
-                     inp: AbstractArray,
-                     indices: AbstractArray):
+async def infer_take(self, engine, inp: AbstractArray, indices: AbstractArray):
     """Infer the return type of primitive `take`."""
     indices_shape = tuple(await force_pending(indices.xshape()))
     inp_shape = tuple(await force_pending(inp.xshape()))
@@ -30,30 +28,32 @@ async def infer_take(self, engine,
     output_shape = indices_shape + (inp_shape[1],)
     return AbstractArray(
         inp.element,
-        {SHAPE: output_shape, TYPE: await force_pending(inp.xtype())}
+        {SHAPE: output_shape, TYPE: await force_pending(inp.xtype())},
     )
 
 
 @bprop_to_grad_transform(P.take)
 def bprop_take(inp, indices, out, dout):
     """Backpropagator for primitive `take`."""
-    return (P.take_grad_inp(P.shape(inp)[0], indices, dout),
-            zeros_like(indices))
+    return (
+        P.take_grad_inp(P.shape(inp)[0], indices, dout),
+        zeros_like(indices),
+    )
 
 
 __operation_defaults__ = {
-    'name': 'take',
-    'registered_name': 'take',
-    'mapping': P.take,
-    'python_implementation': pyimpl_take,
+    "name": "take",
+    "registered_name": "take",
+    "mapping": P.take,
+    "python_implementation": pyimpl_take,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'take',
-    'registered_name': 'take',
-    'type': 'backend',
-    'python_implementation': pyimpl_take,
-    'inferrer_constructor': infer_take,
-    'grad_transform': bprop_take,
+    "name": "take",
+    "registered_name": "take",
+    "type": "backend",
+    "python_implementation": pyimpl_take,
+    "inferrer_constructor": infer_take,
+    "grad_transform": bprop_take,
 }

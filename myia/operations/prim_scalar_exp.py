@@ -18,9 +18,7 @@ def pyimpl_scalar_exp(x: Number) -> Number:
 
 
 infer_scalar_exp = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_exp,
-    impl=pyimpl_scalar_exp,
-    infer_value=False
+    prim=P.scalar_exp, impl=pyimpl_scalar_exp, infer_value=False
 )
 
 
@@ -31,18 +29,18 @@ def bprop_scalar_exp(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_exp',
-    'registered_name': 'scalar_exp',
-    'mapping': P.scalar_exp,
-    'python_implementation': pyimpl_scalar_exp,
+    "name": "scalar_exp",
+    "registered_name": "scalar_exp",
+    "mapping": P.scalar_exp,
+    "python_implementation": pyimpl_scalar_exp,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_exp',
-    'registered_name': 'scalar_exp',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_exp,
-    'inferrer_constructor': infer_scalar_exp,
-    'grad_transform': bprop_scalar_exp,
+    "name": "scalar_exp",
+    "registered_name": "scalar_exp",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_exp,
+    "inferrer_constructor": infer_scalar_exp,
+    "grad_transform": bprop_scalar_exp,
 }

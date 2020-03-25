@@ -31,7 +31,7 @@ class Cons(ADT):
     """
 
     head: object
-    tail: 'Cons'
+    tail: "Cons"
 
     @staticmethod
     def from_list(elems):
@@ -95,7 +95,7 @@ class Empty(ADT):
 
     @core(static_inline=True)
     def __getitem__(self, idx):
-        raise Exception('Index out of bounds')
+        raise Exception("Index out of bounds")
 
     @core(static_inline=True)
     def __myia_iter__(self):
@@ -103,7 +103,7 @@ class Empty(ADT):
 
     @core(static_inline=True)
     def __myia_next__(self):
-        raise Exception('Out of bounds')
+        raise Exception("Out of bounds")
 
     @core(static_inline=True)
     def __myia_hasnext__(self):
@@ -185,10 +185,4 @@ class ArithmeticData:
 
 
 __consolidate__ = True
-__all__ = [
-    'ADT',
-    'ArithmeticData',
-    'Cons',
-    'Empty',
-    'Slice',
-]
+__all__ = ["ADT", "ArithmeticData", "Cons", "Empty", "Slice"]

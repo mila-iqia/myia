@@ -14,7 +14,7 @@ def test_nested_info():
                 assert info.c == 3
                 assert info.d == 4
     info = DebugInfo(d=4)
-    for attr in 'abc':
+    for attr in "abc":
         assert not hasattr(info, attr)
     assert info.d == 4
 
@@ -30,8 +30,10 @@ def test_info_trace():
 
 def test_info_obj():
     """Test that NamedDebugInfo only holds a weak reference to its object."""
+
     class Ob:
         pass
+
     o = Ob()
     d = NamedDebugInfo(o)
     assert d.obj is o
@@ -43,14 +45,14 @@ def test_info_find():
     a = NamedDebugInfo()
     a.field1 = 1
     a.field2 = 2
-    with About(a, 'thing'):
+    with About(a, "thing"):
         b = NamedDebugInfo()
         b.field2 = 3
-    assert a.find('field1') == 1
-    assert a.find('field2') == 2
-    assert b.find('field1') == 1
-    assert b.find('field2') == 3
-    assert b.find('field3') is None
+    assert a.find("field1") == 1
+    assert a.find("field2") == 2
+    assert b.find("field1") == 1
+    assert b.find("field2") == 3
+    assert b.find("field3") is None
 
 
 def test_info_thread():
@@ -60,7 +62,7 @@ def test_info_thread():
         nonlocal exc
         try:
             a = NamedDebugInfo()
-            with About(a, 'thing'):
+            with About(a, "thing"):
                 NamedDebugInfo()
         except Exception as e:
             exc = e

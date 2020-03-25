@@ -13,18 +13,18 @@ async def infer_make_kwarg(self, engine, key, value):
 
 
 __operation_defaults__ = {
-    'name': 'make_kwarg',
-    'registered_name': 'make_kwarg',
-    'mapping': P.make_kwarg,
-    'python_implementation': None,
+    "name": "make_kwarg",
+    "registered_name": "make_kwarg",
+    "mapping": P.make_kwarg,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'make_kwarg',
-    'registered_name': 'make_kwarg',
-    'type': 'inference',
-    'python_implementation': None,
-    'inferrer_constructor': infer_make_kwarg,
-    'grad_transform': None,
+    "name": "make_kwarg",
+    "registered_name": "make_kwarg",
+    "type": "inference",
+    "python_implementation": None,
+    "inferrer_constructor": infer_make_kwarg,
+    "grad_transform": None,
 }

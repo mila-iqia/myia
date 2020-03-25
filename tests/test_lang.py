@@ -1,4 +1,3 @@
-
 from pytest import mark
 
 from myia.pipeline import scalar_debug_pipeline
@@ -6,8 +5,9 @@ from myia.pipeline import scalar_debug_pipeline
 from .common import Point, mysum
 from .multitest import mt, run, run_debug
 
-lang_pipeline = scalar_debug_pipeline \
-    .select('resources', 'parse', 'resolve', 'export')
+lang_pipeline = scalar_debug_pipeline.select(
+    "resources", "parse", "resolve", "export"
+)
 
 
 run_lang = run.configure(pipeline=lang_pipeline, backend=False)
@@ -28,18 +28,12 @@ def test_constant():
 ###################
 
 
-@mt(
-    run_lang(1, 4),
-    run_lang(5, -13),
-)
+@mt(run_lang(1, 4), run_lang(5, -13))
 def test_prim_add(x, y):
     return x + y
 
 
-@mt(
-    run_lang(1),
-    run_lang(-13),
-)
+@mt(run_lang(1), run_lang(-13))
 def test_prim_addct(x):
     return x + 1
 
@@ -110,7 +104,7 @@ def test_swap(x, y):
 ###################
 
 
-@mark.skip(reason='This test requires the inference step')
+@mark.skip(reason="This test requires the inference step")
 @run_lang(13)
 def test_list(x):
     return [x, x + 1, x + 2]
@@ -118,7 +112,7 @@ def test_list(x):
 
 @run_debug(2)
 def test_dict(x):
-    return {'x': x}
+    return {"x": x}
 
 
 @run_lang(13)
@@ -138,7 +132,7 @@ def test_getattr(pt):
 
 @run_debug(Point(x=5, y=2))
 def test_getattr_function(pt):
-    return getattr(pt, 'x')
+    return getattr(pt, "x")
 
 
 @run_debug(2, 3)
@@ -151,11 +145,7 @@ def test_method(x, y):
 ################
 
 
-@mt(
-    run_lang(-10),
-    run_lang(0),
-    run_lang(10),
-)
+@mt(run_lang(-10), run_lang(0), run_lang(10))
 def test_if(x):
     if x > 0:
         return 1
@@ -163,13 +153,7 @@ def test_if(x):
         return -1
 
 
-@mt(
-    run_lang(-100),
-    run_lang(-5),
-    run_lang(5),
-    run_lang(100),
-    run_lang(0),
-)
+@mt(run_lang(-100), run_lang(-5), run_lang(5), run_lang(100), run_lang(0))
 def test_nested_if(x):
     if x < 0:
         if x < -10:
@@ -185,11 +169,7 @@ def test_nested_if(x):
         return 5
 
 
-@mt(
-    run_lang(-1),
-    run_lang(0),
-    run_lang(1),
-)
+@mt(run_lang(-1), run_lang(0), run_lang(1))
 def test_if2(x):
     if x > 0:
         a = 10
@@ -200,11 +180,7 @@ def test_if2(x):
     return a + b
 
 
-@mt(
-    run_lang(-1),
-    run_lang(0),
-    run_lang(1),
-)
+@mt(run_lang(-1), run_lang(0), run_lang(1))
 def test_if3(x):
     a = 10
     b = 20
@@ -213,20 +189,14 @@ def test_if3(x):
     return a + b
 
 
-@mt(
-    run_lang(1),
-    run_lang(-1),
-)
+@mt(run_lang(1), run_lang(-1))
 def test_multiple_return(x):
     if x > 0:
         return 1
     return 2
 
 
-@mt(
-    run_lang(7, 3),
-    run_lang(1, 3),
-)
+@mt(run_lang(7, 3), run_lang(1, 3))
 def test_max(x, y):
     if x > y:
         return x
@@ -234,58 +204,32 @@ def test_max(x, y):
         return y
 
 
-@mt(
-    run_lang(7, 3),
-    run_lang(-1, 3),
-)
+@mt(run_lang(7, 3), run_lang(-1, 3))
 def test_ifexpr(x, y):
     return x * x if x > 0 else y * y
 
 
-@mt(
-    run_lang(7, 3),
-    run_lang(1, 3),
-)
+@mt(run_lang(7, 3), run_lang(1, 3))
 def test_max_expr(x, y):
     return x if x > y else y
 
 
-@mt(
-    run_lang(7, 3),
-    run_lang(-1, 3),
-    run_lang(-3, 1),
-    run_lang(-1, -1),
-)
+@mt(run_lang(7, 3), run_lang(-1, 3), run_lang(-3, 1), run_lang(-1, -1))
 def test_and(x, y):
     return x > 0 and y > 0
 
 
-@mt(
-    run_lang(7, 3),
-    run_lang(-1, 3),
-    run_lang(-3, 1),
-    run_lang(-1, -1),
-)
+@mt(run_lang(7, 3), run_lang(-1, 3), run_lang(-3, 1), run_lang(-1, -1))
 def test_or(x, y):
     return x > 0 or y > 0
 
 
-@mt(
-    run_lang(7, 3),
-    run_lang(-1, 3),
-    run_lang(-3, 1),
-    run_lang(-1, -1),
-)
+@mt(run_lang(7, 3), run_lang(-1, 3), run_lang(-3, 1), run_lang(-1, -1))
 def test_band(x, y):
     return (x > 0) & (y > 0)
 
 
-@mt(
-    run_lang(7, 3),
-    run_lang(-1, 3),
-    run_lang(-3, 1),
-    run_lang(-1, -1),
-)
+@mt(run_lang(7, 3), run_lang(-1, 3), run_lang(-3, 1), run_lang(-1, -1))
 def test_bor(x, y):
     return (x > 0) | (y > 0)
 
@@ -295,10 +239,7 @@ def test_bor(x, y):
 ###################
 
 
-@mt(
-    run_lang(100, 10),
-    run_lang(50, 7),
-)
+@mt(run_lang(100, 10), run_lang(50, 7))
 def test_while(x, y):
     while x > 0:
         x = x - y
@@ -369,6 +310,7 @@ def test_nested():
 
     def g():
         return x
+
     return g()
 
 
@@ -395,13 +337,14 @@ def test_closure_recur():
     def fn(x, y):
         def g(x):
             return x + 1
+
         if x == 0:
             return g(y)
         else:
             return f(x, g(y))
 
     py_result = fn(1, 2)
-    myia_fn = lang_pipeline.run(input=fn)['output']
+    myia_fn = lang_pipeline.run(input=fn)["output"]
     myia_result = myia_fn(1, 2)
     assert py_result == myia_result
 
@@ -411,7 +354,9 @@ def test_closure2():
     def g(x):
         def f():
             return x
+
         return f
+
     return g(2)()
 
 
@@ -420,7 +365,9 @@ def test_closure3(x):
     def g():
         def h():
             return x
+
         return h
+
     return g()()
 
 
@@ -432,7 +379,9 @@ def test_closure4(x):
     def g(y):
         def h():
             return y * f()
+
         return h()
+
     return g(5)
 
 
@@ -440,6 +389,7 @@ def test_closure4(x):
 def test_fn1(x):
     def g(x):
         return x
+
     return g(x)
 
 
@@ -448,7 +398,9 @@ def test_fn2():
     def g(x):
         def f():
             return x
+
         return f()
+
     return g(2)
 
 
@@ -457,7 +409,9 @@ def test_fn3():
     def g(x):
         def f():
             return x
+
         return f() + 1
+
     return g(2)
 
 
@@ -468,7 +422,9 @@ def test_fn4():
 
         def f():
             return y
+
         return f() + 1
+
     return g(2)
 
 
@@ -477,7 +433,9 @@ def test_fn5():
     def g(x):
         def f(y):
             return y + 1
+
         return f(x + 1)
+
     return g(2)
 
 
@@ -510,6 +468,7 @@ def test_rec1(x):
             return f(x - 1)
         else:
             return x
+
     return f(x)
 
 
@@ -528,10 +487,7 @@ def test_multitype(x, y, z):
 ###############
 
 
-@mt(
-    run_lang(2),
-    run_lang(1),
-)
+@mt(run_lang(2), run_lang(1))
 def test_pow8(x):
     i = 0
     while i < 3:

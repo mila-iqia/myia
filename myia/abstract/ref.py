@@ -45,10 +45,12 @@ class Context:
         return self._hash
 
     def __eq__(self, other):
-        return type(other) is Context \
-            and self.parent == other.parent \
-            and self.graph == other.graph \
+        return (
+            type(other) is Context
+            and self.parent == other.parent
+            and self.graph == other.graph
             and self.argkey == other.argkey
+        )
 
 
 _empty_context = Context(None, None, ())
@@ -118,22 +120,24 @@ class Reference(ReferenceBase):
             fut = c[self]
             if fut.done():
                 return fut.result()
-        word = 'computed' if self in c else 'seen'
+        word = "computed" if self in c else "seen"
         raise InternalInferenceError(
-            f'Trying to resolve a reference for {self.node} in function'
-            f' {self.node.graph}, but it was not {word} by the'
-            f' inferrer. This is a bug in the compiler, not'
-            f' in your code, so please report it.',
-            refs=[self]
+            f"Trying to resolve a reference for {self.node} in function"
+            f" {self.node.graph}, but it was not {word} by the"
+            f" inferrer. This is a bug in the compiler, not"
+            f" in your code, so please report it.",
+            refs=[self],
         )
 
     def __hash__(self):
         return self._hash
 
     def __eq__(self, other):
-        return isinstance(other, Reference) \
-            and self.node is other.node \
+        return (
+            isinstance(other, Reference)
+            and self.node is other.node
             and self.context == other.context
+        )
 
 
 @dataclass
@@ -145,7 +149,7 @@ class VirtualReference(ReferenceBase):
 
     """
 
-    abstract: 'AbstractValue'  # noqa: F821
+    abstract: "AbstractValue"  # noqa: F821
 
     async def get(self):
         """Get the value (asynchronous)."""
@@ -195,11 +199,11 @@ class EvaluationCache:
 
 __consolidate__ = True
 __all__ = [
-    'CONTEXTLESS',
-    'Context',
-    'Contextless',
-    'EvaluationCache',
-    'Reference',
-    'ReferenceBase',
-    'VirtualReference',
+    "CONTEXTLESS",
+    "Context",
+    "Contextless",
+    "EvaluationCache",
+    "Reference",
+    "ReferenceBase",
+    "VirtualReference",
 ]

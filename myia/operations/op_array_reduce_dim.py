@@ -21,21 +21,23 @@ class ArrayReduceDim(MetaGraph):
         try:
             dim = build_value(args[2])
         except ValueError:
-            raise MyiaTypeError("Dimension reduction must be known at "
-                                "compile time.")
+            raise MyiaTypeError(
+                "Dimension reduction must be known at " "compile time."
+            )
         if not isinstance(dim, tuple):
             dim = (dim,)
         new_shp_unsqueezed = orig_shp
         for d in dim:
-            new_shp_unsqueezed = g.apply(P.tuple_setitem, new_shp_unsqueezed,
-                                         d, 1)
+            new_shp_unsqueezed = g.apply(
+                P.tuple_setitem, new_shp_unsqueezed, d, 1
+            )
         array_squash = g.apply(
-            P.array_reduce, g.parameters[0], x, new_shp_unsqueezed)
+            P.array_reduce, g.parameters[0], x, new_shp_unsqueezed
+        )
         try:
             keepdim = build_value(args[3])
         except ValueError:
-            raise MyiaTypeError("Keepdim must be known at "
-                                "compile time.")
+            raise MyiaTypeError("Keepdim must be known at " "compile time.")
         g_output = array_squash
         if not keepdim:
             f_s = []
@@ -53,8 +55,8 @@ array_reduce_dim = ArrayReduceDim()
 
 
 __operation_defaults__ = {
-    'name': 'array_reduce_dim',
-    'registered_name': 'array_reduce_dim',
-    'mapping': array_reduce_dim,
-    'python_implementation': None,
+    "name": "array_reduce_dim",
+    "registered_name": "array_reduce_dim",
+    "mapping": array_reduce_dim,
+    "python_implementation": None,
 }

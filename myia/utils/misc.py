@@ -11,31 +11,31 @@ from .serialize import serializable
 builtins_d = vars(builtins)
 
 
-T1 = TypeVar('T1')
-T2 = TypeVar('T2')
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
 
 
-@serializable('RandomStateWrapper')
+@serializable("RandomStateWrapper")
 class RandomStateWrapper:
     """Represents a wrapper around a backend random state object."""
 
-    __slots__ = 'state',
+    __slots__ = ("state",)
 
     def __init__(self, backend_state):
         """Initialize wrapper with given backend random state object."""
         self.state = backend_state
 
     def _serialize(self):
-        return {'state': self.state}
+        return {"state": self.state}
 
     @classmethod
     def _construct(cls):
         res = cls(None)
         data = yield res
-        res.state = data['state']
+        res.state = data["state"]
 
 
-@serializable('TaggedValue')
+@serializable("TaggedValue")
 class TaggedValue:
     """Represents a tagged value for a TaggedUnion."""
 
@@ -45,15 +45,14 @@ class TaggedValue:
         self.value = value
 
     def _serialize(self):
-        return {'tag': self.tag,
-                'value': self.value}
+        return {"tag": self.tag, "value": self.value}
 
     @classmethod
     def _construct(cls):
         res = cls(None, None)
         data = yield res
-        res.tag = data['tag']
-        res.value = data['value']
+        res.tag = data["tag"]
+        res.value = data["value"]
 
     def has(self, tag):
         """Return whether this TaggedValue has the given tag."""
@@ -87,8 +86,8 @@ class Named:
         return self.name
 
 
-UNKNOWN = Named('UNKNOWN')
-MISSING = Named('MISSING')
+UNKNOWN = Named("UNKNOWN")
+MISSING = Named("MISSING")
 
 
 class Registry(Dict[T1, T2]):
@@ -101,11 +100,13 @@ class Registry(Dict[T1, T2]):
 
     def register(self, *prims):
         """Register a primitive."""
+
         def deco(fn):
             """Decorate the function."""
             for prim in prims:
                 self[prim] = fn
             return fn
+
         return deco
 
     def __missing__(self, prim):
@@ -137,8 +138,8 @@ class HasDefaults:
         else:
             ty = type(self).__qualname__
             raise TypeError(
-                f'{ty} defaults must be a dict or the qualified name'
-                ' of a module.'
+                f"{ty} defaults must be a dict or the qualified name"
+                " of a module."
             )
 
     def defaults(self):
@@ -164,10 +165,10 @@ def repr_(obj: Any, **kwargs: Any):
             of the string representation.
 
     """
-    name = f'{obj.__module__}.{obj.__class__.__name__}'
-    info = ', '.join(f'{key}={value}' for key, value in kwargs.items())
+    name = f"{obj.__module__}.{obj.__class__.__name__}"
+    info = ", ".join(f"{key}={value}" for key, value in kwargs.items())
     address = str(hex(id(obj)))
-    return f'<{name}({info}) object at {address}>'
+    return f"<{name}({info}) object at {address}>"
 
 
 def list_str(lst: List):
@@ -177,8 +178,8 @@ def list_str(lst: List):
     `repr` on each element.
 
     """
-    elements = ', '.join(str(elem) for elem in lst)
-    return f'[{elements}]'
+    elements = ", ".join(str(elem) for elem in lst)
+    return f"[{elements}]"
 
 
 class Event:
@@ -247,7 +248,7 @@ class Event:
         return repr(self)
 
     def __repr__(self):
-        return f'Event({self.name})'
+        return f"Event({self.name})"
 
 
 class Events:
@@ -299,7 +300,7 @@ class NS:
         self.__dict__[item] = value
 
     def __repr__(self):
-        args = [f'{k}={v}' for k, v in self.__dict__.items()]
+        args = [f"{k}={v}" for k, v in self.__dict__.items()]
         return f'NS({", ".join(args)})'
 
 
@@ -333,7 +334,7 @@ class Namespace:
             raise NameError(name)
 
     def __repr__(self):
-        return f':{self.label}'  # pragma: no cover
+        return f":{self.label}"  # pragma: no cover
 
 
 class ModuleNamespace(Namespace):
@@ -347,7 +348,7 @@ class ModuleNamespace(Namespace):
                 to `__import__` it.
 
         """
-        mod = vars(__import__(name, fromlist=['_']))
+        mod = vars(__import__(name, fromlist=["_"]))
         super().__init__(name, mod, builtins_d)
 
 
@@ -361,14 +362,14 @@ class ClosureNamespace(Namespace):
             fn: The function.
 
         """
-        lbl = f'{fn.__module__}..<{fn.__name__}>'
+        lbl = f"{fn.__module__}..<{fn.__name__}>"
         names = fn.__code__.co_freevars
         cells = fn.__closure__
         ns = dict(zip(names, cells or ()))
         super().__init__(lbl, ns)
 
     def __getitem__(self, name):
-        d, = self.dicts
+        (d,) = self.dicts
         try:
             return d[name].cell_contents
         except ValueError:
@@ -377,13 +378,12 @@ class ClosureNamespace(Namespace):
 
 def is_dataclass_type(cls):
     """Returns whether cls is a dataclass."""
-    return isinstance(cls, type) and hasattr(cls, '__dataclass_fields__')
+    return isinstance(cls, type) and hasattr(cls, "__dataclass_fields__")
 
 
 def dataclass_fields(dc):
     """Returns a dataclass's fields dictionary."""
-    return {name: getattr(dc, name)
-            for name in dc.__dataclass_fields__}
+    return {name: getattr(dc, name) for name in dc.__dataclass_fields__}
 
 
 class ErrorPool:
@@ -404,7 +404,7 @@ class ErrorPool:
         assert isinstance(error, Exception)
         self.errors.append(error)
 
-    def trigger(self, stringify=lambda err: f'* {err.args[0]}'):
+    def trigger(self, stringify=lambda err: f"* {err.args[0]}"):
         """Raise an exception if an error occurred."""
         if self.errors:
             msg = "\n".join(stringify(e) for e in self.errors)
@@ -415,15 +415,19 @@ class ErrorPool:
 
 def keyword_decorator(deco):
     """Wrap a decorator to optionally takes keyword arguments."""
+
     @functools.wraps(deco)
     def new_deco(fn=None, **kwargs):
         if fn is None:
+
             @functools.wraps(deco)
             def newer_deco(fn):
                 return deco(fn, **kwargs)
+
             return newer_deco
         else:
             return deco(fn, **kwargs)
+
     return new_deco
 
 
@@ -439,8 +443,8 @@ def core(fn=None, **flags):
     """
     flags = {
         # This is a function defined in Myia's core
-        'core': True,
-        'reference': True,
+        "core": True,
+        "reference": True,
         **flags,
     }
     fn._myia_flags = flags
@@ -449,7 +453,7 @@ def core(fn=None, **flags):
 
 def resolve_from_path(path):
     """Resolve a module or object from a path of the form x.y.z."""
-    modname, field = path.rsplit('.', 1)
+    modname, field = path.rsplit(".", 1)
     mod = __import__(modname, fromlist=[field])
     return getattr(mod, field)
 
@@ -462,34 +466,34 @@ def assert_scalar(*args):
     for x in args:
         if isinstance(x, np.ndarray):
             if x.shape != ():
-                msg = f'Expected scalar, not array with shape {x.shape}'
+                msg = f"Expected scalar, not array with shape {x.shape}"
                 raise TypeError(msg)
         elif not isinstance(x, (int, float, np.number)):
-            raise TypeError(f'Expected scalar, not {type(x)}')
+            raise TypeError(f"Expected scalar, not {type(x)}")
 
 
 __consolidate__ = True
 __all__ = [
-    'ClosureNamespace',
-    'ErrorPool',
-    'Event',
-    'Events',
-    'HasDefaults',
-    'RandomStateWrapper',
-    'MISSING',
-    'ModuleNamespace',
-    'NS',
-    'Named',
-    'Namespace',
-    'Registry',
-    'TaggedValue',
-    'UNKNOWN',
-    'assert_scalar',
-    'core',
-    'dataclass_fields',
-    'is_dataclass_type',
-    'keyword_decorator',
-    'list_str',
-    'repr_',
-    'resolve_from_path',
+    "ClosureNamespace",
+    "ErrorPool",
+    "Event",
+    "Events",
+    "HasDefaults",
+    "RandomStateWrapper",
+    "MISSING",
+    "ModuleNamespace",
+    "NS",
+    "Named",
+    "Namespace",
+    "Registry",
+    "TaggedValue",
+    "UNKNOWN",
+    "assert_scalar",
+    "core",
+    "dataclass_fields",
+    "is_dataclass_type",
+    "keyword_decorator",
+    "list_str",
+    "repr_",
+    "resolve_from_path",
 ]

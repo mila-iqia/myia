@@ -38,7 +38,6 @@ from myia.utils.orderedset import OrderedSet
 
 
 class TestOrderedset(unittest.TestCase):
-
     def setUp(self):
         self.lst = list(range(10))
 
@@ -242,8 +241,10 @@ class TestOrderedset(unittest.TestCase):
         oset1 = OrderedSet([1])
 
         self.assertEqual(oset1.union([2, 1]), OrderedSet([1, 2]))
-        self.assertEqual(OrderedSet([1, 2]) | OrderedSet([3, 1, 2, 4]),
-                         OrderedSet([1, 2, 3, 4]))
+        self.assertEqual(
+            OrderedSet([1, 2]) | OrderedSet([3, 1, 2, 4]),
+            OrderedSet([1, 2, 3, 4]),
+        )
 
         # union with unordered set should work,
         # though the order will be arbitrary
@@ -254,18 +255,24 @@ class TestOrderedset(unittest.TestCase):
 
         self.assertEqual(oset1.symmetric_difference([1]), OrderedSet([]))
 
-        self.assertEqual(OrderedSet([3, 1, 4, 2]).symmetric_difference([3, 4]),
-                         OrderedSet([1, 2]))
-        self.assertEqual(OrderedSet([3, 1, 4, 2]).symmetric_difference(
-            set([3, 4])), OrderedSet([1, 2]))
+        self.assertEqual(
+            OrderedSet([3, 1, 4, 2]).symmetric_difference([3, 4]),
+            OrderedSet([1, 2]),
+        )
+        self.assertEqual(
+            OrderedSet([3, 1, 4, 2]).symmetric_difference(set([3, 4])),
+            OrderedSet([1, 2]),
+        )
 
     def test_intersection_with_iterable(self):
-        self.assertEqual(OrderedSet([3, 2]).intersection([1, 2, 3]),
-                         OrderedSet([2, 3]))
+        self.assertEqual(
+            OrderedSet([3, 2]).intersection([1, 2, 3]), OrderedSet([2, 3])
+        )
 
     def test_difference_with_iterable(self):
-        self.assertEqual(OrderedSet([1, 2, 3, 4]).difference([3, 2]),
-                         OrderedSet([1, 4]))
+        self.assertEqual(
+            OrderedSet([1, 2, 3, 4]).difference([3, 2]), OrderedSet([1, 4])
+        )
 
     def test_isdisjoint(self):
         self.assertTrue(OrderedSet().isdisjoint(OrderedSet()))
@@ -286,7 +293,7 @@ class TestOrderedset(unittest.TestCase):
     def test_iter_mutated(self):
         oset = OrderedSet(self.lst)
         it = iter(oset)
-        oset.add('a')
+        oset.add("a")
 
         with self.assertRaises(RuntimeError):
             next(it)

@@ -11,8 +11,8 @@ async def tuple_len(info, tup: lib.AbstractTuple):
 
 
 __operation_defaults__ = {
-    'name': 'tuple_len',
-    'registered_name': 'tuple_len',
-    'mapping': tuple_len,
-    'python_implementation': len,
+    "name": "tuple_len",
+    "registered_name": "tuple_len",
+    "mapping": tuple_len,
+    "python_implementation": len,
 }

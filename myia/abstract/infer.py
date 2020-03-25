@@ -69,12 +69,14 @@ class InferenceEngine:
 
     """
 
-    def __init__(self,
-                 resources,
-                 *,
-                 constructors,
-                 max_stack_depth=50,
-                 context_class=Context):
+    def __init__(
+        self,
+        resources,
+        *,
+        constructors,
+        max_stack_depth=50,
+        context_class=Context,
+    ):
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop(InferenceError)
         self.resources = resources
@@ -90,7 +92,7 @@ class InferenceEngine:
         self.cache = EvaluationCache(
             loop=self.loop,
             keycalc=self.compute_ref,
-            keytransform=self.get_actual_ref
+            keytransform=self.get_actual_ref,
         )
         self.reference_map = {}
         self.constructors = {}
@@ -104,7 +106,7 @@ class InferenceEngine:
             self,
             [self.get_inferrer_for(fn)],
             VirtualReference(vfn.output),
-            [VirtualReference(arg) for arg in vfn.args]
+            [VirtualReference(arg) for arg in vfn.args],
         )
         if outspec is not None:
             self.abstract_merge(out, vfn.output)
@@ -123,9 +125,7 @@ class InferenceEngine:
         self.mng.add_graph(graph)
         empty_context = self.context_class.empty()
         root_context = empty_context.add(graph, argspec)
-        out = self.run_coroutine(
-            self.infer_function(graph, argspec, outspec)
-        )
+        out = self.run_coroutine(self.infer_function(graph, argspec, outspec))
         out = concretize_abstract(out)
         return out, root_context
 
@@ -145,7 +145,7 @@ class InferenceEngine:
                 f" from function '{context.graph}', but it is not visible"
                 " in that scope. This typically indicates either a bug"
                 " in a macro or a bug in Myia.",
-                refs=[ref]
+                refs=[ref],
             )
         return ref
 
@@ -153,7 +153,7 @@ class InferenceEngine:
         """Compute the value associated to the Reference."""
         node = ref.node
 
-        tracer().emit('request_ref', engine=self, reference=ref)
+        tracer().emit("request_ref", engine=self, reference=ref)
 
         inferred = ref.node.abstract
         if inferred is not None:
@@ -169,13 +169,12 @@ class InferenceEngine:
             # The check in the `ref` method should catch most of the situations
             # that would otherwise end up here, so this might be inaccessible.
             raise InternalInferenceError(
-                f'Type information for {ref.node} is unavailable.'
-                f' This indicates either a bug in a macro or a bug in Myia.',
-                refs=[ref]
+                f"Type information for {ref.node} is unavailable."
+                f" This indicates either a bug in a macro or a bug in Myia.",
+                refs=[ref],
             )
 
-        tracer().emit('compute_ref', engine=self, reference=ref,
-                      result=result)
+        tracer().emit("compute_ref", engine=self, reference=ref, result=result)
         return result
 
     def get_inferred(self, ref):
@@ -193,7 +192,7 @@ class InferenceEngine:
         if not new.node.debug.about:
             # This will link the old node's debug info to the new node, if
             # necessary.
-            new.node.debug.about = About(orig.node.debug, 'reroute')
+            new.node.debug.about = About(orig.node.debug, "reroute")
         self.reference_map[orig] = new
         return await self.get_inferred(new)
 
@@ -224,7 +223,7 @@ class InferenceEngine:
     @get_inferrer_for.wrapper
     def get_inferrer_for(__call__, self, fn):
         """Return the Inferrer for the given function."""
-        tracking = getattr(fn, 'tracking_id', None)
+        tracking = getattr(fn, "tracking_id", None)
         if tracking is None:
             return __call__(self, fn)
         if fn not in self.constructors:
@@ -249,24 +248,15 @@ class InferenceEngine:
 
     @get_inferrer_for.register
     def get_inferrer_for(self, part: PartialApplication):
-        return PartialInferrer(
-            self.get_inferrer_for(part.fn),
-            part.args
-        )
+        return PartialInferrer(self.get_inferrer_for(part.fn), part.args)
 
     @get_inferrer_for.register
     def get_inferrer_for(self, j: JTransformedFunction):
-        return JInferrer(
-            self.get_inferrer_for(j.fn),
-            j.fn
-        )
+        return JInferrer(self.get_inferrer_for(j.fn), j.fn)
 
     @get_inferrer_for.register
     def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
-        return VirtualInferrer(
-            vf.args,
-            vf.output
-        )
+        return VirtualInferrer(vf.args, vf.output)
 
     @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraphFunction):
@@ -282,8 +272,7 @@ class InferenceEngine:
 
     async def execute(self, fn, *args):
         r"""Infer the result of fn(\*args)."""
-        infs = [self.get_inferrer_for(poss)
-                for poss in await fn.get()]
+        infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
         argrefs = [VirtualReference(a) for a in args]
         return await execute_inferrers(self, infs, None, argrefs)
 
@@ -301,24 +290,21 @@ class InferenceEngine:
             newcall = g.apply(operations.call_object, n_fn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
 
-        infs = [self.get_inferrer_for(poss)
-                for poss in await fn.get()]
+        infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
 
         return await self.loop.schedule(
             execute_inferrers(self, infs, ref, argrefs),
-            context_map={
-                infer_trace: {**infer_trace.get(), ctx: ref}
-            }
+            context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
         )
 
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
-        if getattr(ctref.node, '_converted', False):
+        if getattr(ctref.node, "_converted", False):
             return to_abstract(
                 ctref.node.value,
                 context=ctref.context,
                 node=ctref.node,
-                loop=self.loop
+                loop=self.loop,
             )
 
         else:
@@ -330,6 +316,7 @@ class InferenceEngine:
     def abstract_merge(self, *values):
         """Merge a list of AbstractValues together."""
         from .amerge import amerge_engine
+
         token = amerge_engine.set(self)
         try:
             rval = reduce(amerge, values)
@@ -361,7 +348,7 @@ class InferenceEngine:
     def assert_predicate(self, predicate, x):
         """Check that the predicate applies, raise error if not."""
         if not self.check_predicate(predicate, x):
-            raise MyiaTypeError(f'Expected {predicate}, not {x}')
+            raise MyiaTypeError(f"Expected {predicate}, not {x}")
 
     def check(self, predicate, *values):
         """Merge all values and check that the predicate applies.
@@ -372,9 +359,7 @@ class InferenceEngine:
         for value in values:
             if isinstance(value, Pending):
                 value.add_done_callback(
-                    lambda fut: self.assert_predicate(
-                        predicate, fut.result()
-                    )
+                    lambda fut: self.assert_predicate(predicate, fut.result())
                 )
             else:
                 self.assert_predicate(predicate, value)
@@ -398,15 +383,15 @@ class LiveInferenceEngine(InferenceEngine):
     def __init__(self, resources, *, constructors):
         """Initialize a LiveInferenceEngine."""
         from ..monomorphize import type_fixer, TypeFinder
+
         super().__init__(
-            resources,
-            constructors=constructors,
-            max_stack_depth=50,
+            resources, constructors=constructors, max_stack_depth=50
         )
         self.fix_type = type_fixer(TypeFinder(self))
 
     def run(self, nodes):
         """Infer the types of the given nodes."""
+
         async def _run(todo):
             for node in todo:
                 await self.get_inferred(self.ref(node, CONTEXTLESS))
@@ -453,7 +438,7 @@ class Inferrer(Partializable):
         """Assert that there are no keyword arguments."""
         for arg in args:
             if isinstance(arg, AbstractKeywordArgument):
-                raise MyiaTypeError('Keyword arguments are not allowed here')
+                raise MyiaTypeError("Keyword arguments are not allowed here")
 
     async def normalize_args(self, args):
         """Return normalized versions of the arguments.
@@ -598,10 +583,7 @@ class GraphInferrer(Inferrer):
 
         # args were already normalized by run()
         context = self.make_context(engine, args, normalize=False)
-        tracer().emit_infer_context(
-            engine=engine,
-            context=context,
-        )
+        tracer().emit_infer_context(engine=engine, context=context)
 
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
@@ -644,16 +626,18 @@ class PartialInferrer(Inferrer):
                 if isinstance(fnfn, AbstractFunction):
                     poss = await fnfn.get()
                     if len(poss) == 1:
-                        prim, = poss
-                        if (isinstance(prim, PrimitiveFunction)
-                                and prim.prim is P.partial):
+                        (prim,) = poss
+                        if (
+                            isinstance(prim, PrimitiveFunction)
+                            and prim.prim is P.partial
+                        ):
                             args = fn.inputs[2:] + args
                             fn = fn.inputs[1]
                             collapse = True
                             continue
             break
         if collapse:
-            with About(outref.node.debug, 'equiv'):
+            with About(outref.node.debug, "equiv"):
                 new_node = outref.node.graph.apply(fn, *args)
             return engine.ref(new_node, ctx)
         else:
@@ -663,8 +647,9 @@ class PartialInferrer(Inferrer):
         """Run the inference."""
         argvals = tuple([await ref.get() for ref in argrefs])
         if argvals not in self.cache:
-            args = tuple(VirtualReference(arg)
-                         for arg in tuple(self.args) + argvals)
+            args = tuple(
+                VirtualReference(arg) for arg in tuple(self.args) + argvals
+            )
             self.cache[argvals] = await self.fn.run(engine, outref, args)
         return self.cache[argvals]
 
@@ -687,7 +672,7 @@ class VirtualInferrer(Inferrer):
     async def infer(self, engine, *args):
         """Check args against self.args and return self.output."""
         if len(args) != len(self.args):
-            raise MyiaTypeError('Wrong number of arguments')
+            raise MyiaTypeError("Wrong number of arguments")
         for given, expected in zip(args, self.args):
             engine.abstract_merge(given, expected)
         return self.output
@@ -700,10 +685,7 @@ def compute_bprop_type(orig_fn, args, out):
     bparams += [sensitivity_transform(a) for a in args]
     bparams_final = AbstractTuple(bparams)
     return AbstractFunction(
-        VirtualFunction(
-            (sensitivity_transform(out),),
-            bparams_final
-        )
+        VirtualFunction((sensitivity_transform(out),), bparams_final)
     )
 
 
@@ -723,8 +705,7 @@ class JInferrer(Inferrer):
     async def _jtag(self, x):
         if isinstance(x, AbstractFunction):
             v = await x.get()
-            return AbstractFunction(*[JTransformedFunction(poss)
-                                      for poss in v])
+            return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
         return AbstractJTagged(x)
 
     async def run(self, engine, outref, argrefs):
@@ -732,8 +713,7 @@ class JInferrer(Inferrer):
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
             jinv_args = tuple(self._jinv(a) for a in args)
-            jinv_argrefs = tuple(VirtualReference(arg)
-                                 for arg in jinv_args)
+            jinv_argrefs = tuple(VirtualReference(arg) for arg in jinv_args)
             res = await self.fn.run(engine, None, jinv_argrefs)
             res_wrapped = await self._jtag(res)
             bprop = compute_bprop_type(self.orig_fn, args, res)
@@ -778,23 +758,25 @@ class StandardInferrer(Inferrer):
         v = a.xvalue()
         if v is ANYTHING:
             raise MyiaTypeError(
-                f'Argument {argnum} to {self.prim} must be constant.'
+                f"Argument {argnum} to {self.prim} must be constant."
             )
         if range is not None and v not in range:
             raise MyiaTypeError(
-                f'Argument {argnum} to {self.prim} is out of range.'
-                f' It should lie in {range}'
+                f"Argument {argnum} to {self.prim} is out of range."
+                f" It should lie in {range}"
             )
         return v
 
 
 def standard_prim(prim):
     """Decorator to define and register a StandardInferrer."""
+
     def deco(fn):
         if isinstance(fn, type):
             return fn.partial()
         else:
             return StandardInferrer.partial(prim=prim, infer=fn)
+
     return deco
 
 
@@ -829,7 +811,7 @@ class UniformPrimitiveInferrer(Inferrer):
         """Infer the abstract result given the abstract arguments."""
         infer_trace.set({**infer_trace.get(), self.prim: (self.prim, args)})
         if any(not isinstance(arg, AbstractScalar) for arg in args):
-            raise MyiaTypeError(f'Expected scalar as argument to {self.prim}')
+            raise MyiaTypeError(f"Expected scalar as argument to {self.prim}")
         ts = [arg.xtype() for arg in args]
         outtype = await self.checker.check(engine, ts, uniform=True)
         return self.run_impl(engine, args, outtype)
@@ -853,30 +835,24 @@ class UniformPrimitiveInferrer(Inferrer):
             else:
                 outval = self.impl(*values)
 
-        return AbstractScalar({
-            VALUE: outval,
-            TYPE: outtype,
-        })
+        return AbstractScalar({VALUE: outval, TYPE: outtype})
 
 
 async def _run_trace(inf, engine, outref, argrefs):
     tracer_args = dict(
-        engine=engine,
-        inferrer=inf,
-        outref=outref,
-        argrefs=argrefs
+        engine=engine, inferrer=inf, outref=outref, argrefs=argrefs
     )
     if len(infer_trace.get()) > engine.max_stack_depth:
         raise InferenceError(
-            'Stack overflow encountered during abstract evaluation.'
-            ' This does not necessarily mean there would be a stack'
-            ' overflow at runtime, but it means the inferrer cannot'
-            ' find a stable typing for the program.'
-            ' For example, trying to convert a list of unknown length'
-            ' to a tuple would cause a stack overflow here because'
-            ' the return type of that function is the union over N'
-            ' of all tuples of length N and the inferrer is trying'
-            ' to enumerate that infinite union.'
+            "Stack overflow encountered during abstract evaluation."
+            " This does not necessarily mean there would be a stack"
+            " overflow at runtime, but it means the inferrer cannot"
+            " find a stable typing for the program."
+            " For example, trying to convert a list of unknown length"
+            " to a tuple would cause a stack overflow here because"
+            " the return type of that function is the union over N"
+            " of all tuples of length N and the inferrer is trying"
+            " to enumerate that infinite union."
         )
     tracer().emit_call(**tracer_args)
     result = await inf.run(engine, outref, argrefs)
@@ -895,49 +871,45 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
     The results of the inferrers will be bound together and an error will
     be raised eventually if they cannot be merged.
     """
-    reroutes = set([await inf.reroute(engine, outref, argrefs)
-                    for inf in inferrers])
+    reroutes = set(
+        [await inf.reroute(engine, outref, argrefs) for inf in inferrers]
+    )
     if len(reroutes) > 1:
         # We do no rerouting if there is more than one possibility
         reroutes = {None}
 
-    newref, = reroutes
+    (newref,) = reroutes
     if newref is not None:
         return await engine.reroute(outref, newref)
 
     if len(inferrers) == 1:
-        inf, = inferrers
+        (inf,) = inferrers
         return await _run_trace(inf, engine, outref, argrefs)
 
     else:
         pending = []
         for inf in inferrers:
-            p = engine.loop.create_pending(
-                resolve=None,
-                priority=lambda: None
-            )
+            p = engine.loop.create_pending(resolve=None, priority=lambda: None)
             pending.append(p)
-            engine.loop.schedule(
-                _inf_helper(engine, inf, outref, argrefs, p)
-            )
+            engine.loop.schedule(_inf_helper(engine, inf, outref, argrefs, p))
 
         return bind(engine.loop, None, [], pending)
 
 
 __consolidate__ = True
 __all__ = [
-    'GraphInferrer',
-    'InferenceEngine',
-    'Inferrer',
-    'JInferrer',
-    'LiveInferenceEngine',
-    'MacroInferrer',
-    'PartialInferrer',
-    'StandardInferrer',
-    'TrackedInferrer',
-    'UniformPrimitiveInferrer',
-    'VirtualInferrer',
-    'compute_bprop_type',
-    'execute_inferrers',
-    'standard_prim',
+    "GraphInferrer",
+    "InferenceEngine",
+    "Inferrer",
+    "JInferrer",
+    "LiveInferenceEngine",
+    "MacroInferrer",
+    "PartialInferrer",
+    "StandardInferrer",
+    "TrackedInferrer",
+    "UniformPrimitiveInferrer",
+    "VirtualInferrer",
+    "compute_bprop_type",
+    "execute_inferrers",
+    "standard_prim",
 ]

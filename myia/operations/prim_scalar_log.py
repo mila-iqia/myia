@@ -18,9 +18,7 @@ def pyimpl_scalar_log(x: Float) -> Float:
 
 
 infer_scalar_log = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_log,
-    impl=pyimpl_scalar_log,
-    infer_value=False
+    prim=P.scalar_log, impl=pyimpl_scalar_log, infer_value=False
 )
 
 
@@ -31,18 +29,18 @@ def bprop_scalar_log(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_log',
-    'registered_name': 'scalar_log',
-    'mapping': P.scalar_log,
-    'python_implementation': pyimpl_scalar_log,
+    "name": "scalar_log",
+    "registered_name": "scalar_log",
+    "mapping": P.scalar_log,
+    "python_implementation": pyimpl_scalar_log,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_log',
-    'registered_name': 'scalar_log',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_log,
-    'inferrer_constructor': infer_scalar_log,
-    'grad_transform': bprop_scalar_log,
+    "name": "scalar_log",
+    "registered_name": "scalar_log",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_log,
+    "inferrer_constructor": infer_scalar_log,
+    "grad_transform": bprop_scalar_log,
 }

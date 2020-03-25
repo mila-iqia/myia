@@ -1,4 +1,3 @@
-
 import pytest
 
 from myia.operations import (
@@ -34,7 +33,6 @@ from .test_opt import _check_opt
 
 
 def test_getitem_tuple_elem0():
-
     def before(x):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tup[0]
@@ -42,12 +40,10 @@ def test_getitem_tuple_elem0():
     def after(x):
         return x + 1
 
-    _check_opt(before, after,
-               lib.getitem_tuple)
+    _check_opt(before, after, lib.getitem_tuple)
 
 
 def test_getitem_tuple_elem3():
-
     def before(x):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tup[3]
@@ -55,22 +51,18 @@ def test_getitem_tuple_elem3():
     def after(x):
         return x + 4
 
-    _check_opt(before, after,
-               lib.getitem_tuple)
+    _check_opt(before, after, lib.getitem_tuple)
 
 
 def test_getitem_tuple_noopt():
-
     def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tup[y]
 
-    _check_opt(before, before,
-               lib.getitem_tuple)
+    _check_opt(before, before, lib.getitem_tuple)
 
 
 def test_setitem_tuple_elem0():
-
     def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tuple_setitem(tup, 0, y)
@@ -79,12 +71,10 @@ def test_setitem_tuple_elem0():
         tup = (y, x + 2, x + 3, x + 4)
         return tup
 
-    _check_opt(before, after,
-               lib.setitem_tuple)
+    _check_opt(before, after, lib.setitem_tuple)
 
 
 def test_setitem_tuple_elem3():
-
     def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tuple_setitem(tup, 3, y)
@@ -93,12 +83,10 @@ def test_setitem_tuple_elem3():
         tup = (x + 1, x + 2, x + 3, y)
         return tup
 
-    _check_opt(before, after,
-               lib.setitem_tuple)
+    _check_opt(before, after, lib.setitem_tuple)
 
 
 def test_getitem_setitem_tuple():
-
     def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tuple_setitem(tup, 0, y)[0]
@@ -106,12 +94,10 @@ def test_getitem_setitem_tuple():
     def after(x, y):
         return y
 
-    _check_opt(before, after,
-               lib.getitem_setitem_tuple)
+    _check_opt(before, after, lib.getitem_setitem_tuple)
 
 
 def test_getitem_setitem_tuple_2():
-
     def before(x, y):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tuple_setitem(tup, 0, y)[1]
@@ -120,30 +106,25 @@ def test_getitem_setitem_tuple_2():
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tup[1]
 
-    _check_opt(before, after,
-               lib.getitem_setitem_tuple)
+    _check_opt(before, after, lib.getitem_setitem_tuple)
 
 
 def test_setitem_tuple_noopt():
-
     def before(x, y, z):
         tup = (x + 1, x + 2, x + 3, x + 4)
         return tuple_setitem(tup, z, y)
 
-    _check_opt(before, before,
-               lib.setitem_tuple)
+    _check_opt(before, before, lib.setitem_tuple)
 
 
 def test_op_tuple_binary():
-
     def before(x, y, z):
         return (x, y, z) + (1, 2, 3)
 
     def after(x, y, z):
         return (x + 1, y + 2, z + 3)
 
-    _check_opt(before, after,
-               lib.bubble_op_tuple_binary)
+    _check_opt(before, after, lib.bubble_op_tuple_binary)
 
 
 #######################
@@ -152,20 +133,18 @@ def test_op_tuple_binary():
 
 
 def test_getitem_newenv():
-
     def before(x):
         return env_getitem(newenv, embed(x), 1234)
 
     def after(x):
         return 1234
 
-    _check_opt(before, after,
-               lib.getitem_newenv,
-               argspec=[to_abstract_test(f64)])
+    _check_opt(
+        before, after, lib.getitem_newenv, argspec=[to_abstract_test(f64)]
+    )
 
 
 def test_env_get_set():
-
     def before(x, y):
         a = 5678
         e = env_setitem(newenv, embed(x), y)
@@ -175,13 +154,15 @@ def test_env_get_set():
     def after(x, y):
         return y
 
-    _check_opt(before, after,
-               lib.cancel_env_set_get,
-               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.cancel_env_set_get,
+        argspec=[to_abstract_test(f64), to_abstract_test(f64)],
+    )
 
 
 def test_env_get_add():
-
     def before(x, y):
         e1 = env_setitem(newenv, embed(x), x)
         e1 = env_setitem(e1, embed(y), y)
@@ -194,11 +175,14 @@ def test_env_get_add():
     def after(x, y):
         return gadd(x, x)
 
-    _check_opt(before, after,
-               lib.getitem_env_add,
-               lib.cancel_env_set_get,
-               argspec=[to_abstract_test(i64), to_abstract_test(i64)],
-               argspec_after=False)
+    _check_opt(
+        before,
+        after,
+        lib.getitem_env_add,
+        lib.cancel_env_set_get,
+        argspec=[to_abstract_test(i64), to_abstract_test(i64)],
+        argspec_after=False,
+    )
 
 
 ##############################
@@ -207,7 +191,6 @@ def test_env_get_add():
 
 
 def test_mul_zero():
-
     def before1(x):
         return x * 0
 
@@ -217,17 +200,12 @@ def test_mul_zero():
     def after(x):
         return 0
 
-    _check_opt(before1, after,
-               lib.multiply_by_zero_l,
-               lib.multiply_by_zero_r)
+    _check_opt(before1, after, lib.multiply_by_zero_l, lib.multiply_by_zero_r)
 
-    _check_opt(before2, after,
-               lib.multiply_by_zero_l,
-               lib.multiply_by_zero_r)
+    _check_opt(before2, after, lib.multiply_by_zero_l, lib.multiply_by_zero_r)
 
 
 def test_mul_one():
-
     def before1(x):
         return x * 1
 
@@ -237,17 +215,12 @@ def test_mul_one():
     def after(x):
         return x
 
-    _check_opt(before1, after,
-               lib.multiply_by_one_l,
-               lib.multiply_by_one_r)
+    _check_opt(before1, after, lib.multiply_by_one_l, lib.multiply_by_one_r)
 
-    _check_opt(before2, after,
-               lib.multiply_by_one_l,
-               lib.multiply_by_one_r)
+    _check_opt(before2, after, lib.multiply_by_one_l, lib.multiply_by_one_r)
 
 
 def test_add_zero():
-
     def before1(x):
         return x + 0
 
@@ -257,17 +230,12 @@ def test_add_zero():
     def after(x):
         return x
 
-    _check_opt(before1, after,
-               lib.add_zero_l,
-               lib.add_zero_r)
+    _check_opt(before1, after, lib.add_zero_l, lib.add_zero_r)
 
-    _check_opt(before2, after,
-               lib.add_zero_l,
-               lib.add_zero_r)
+    _check_opt(before2, after, lib.add_zero_l, lib.add_zero_r)
 
 
 def test_elim_identity():
-
     def before(x, y):
         return identity(x) + identity(y)
 
@@ -278,7 +246,6 @@ def test_elim_identity():
 
 
 def test_elim_stop_gradient():
-
     def before(x, y):
         return stop_gradient(x) + stop_gradient(y)
 
@@ -294,24 +261,18 @@ def test_elim_stop_gradient():
 
 
 def test_elim_distribute():
-
     def before(x):
         return distribute(x, (3, 5))
 
     def after(x):
         return x
 
-    _check_opt(before, after,
-               lib.elim_distribute,
-               argspec=[af64_of(3, 5)])
+    _check_opt(before, after, lib.elim_distribute, argspec=[af64_of(3, 5)])
 
-    _check_opt(before, before,
-               lib.elim_distribute,
-               argspec=[af64_of(3, 1)])
+    _check_opt(before, before, lib.elim_distribute, argspec=[af64_of(3, 1)])
 
 
 def test_elim_transpose():
-
     def before1(x):
         return transpose(x, (0, 1))
 
@@ -326,75 +287,71 @@ def test_elim_transpose():
     def after(x):
         return x
 
-    _check_opt(before1, after,
-               lib.elim_transpose,
-               argspec=[af64_of(3, 5)])
+    _check_opt(before1, after, lib.elim_transpose, argspec=[af64_of(3, 5)])
 
-    _check_opt(before2, after,
-               lib.merge_transposes,
-               lib.elim_transpose,
-               argspec=[af64_of(3, 5)])
+    _check_opt(
+        before2,
+        after,
+        lib.merge_transposes,
+        lib.elim_transpose,
+        argspec=[af64_of(3, 5)],
+    )
 
-    _check_opt(before3, before3,
-               lib.merge_transposes,
-               lib.elim_transpose,
-               argspec=[af64_of(3, 5)])
+    _check_opt(
+        before3,
+        before3,
+        lib.merge_transposes,
+        lib.elim_transpose,
+        argspec=[af64_of(3, 5)],
+    )
 
 
 def test_elim_array_reduce():
-
     def before(x):
         return array_reduce(scalar_add, x, (3, 1))
 
     def after(x):
         return x
 
-    _check_opt(before, after,
-               lib.elim_array_reduce,
-               argspec=[af64_of(3, 1)])
+    _check_opt(before, after, lib.elim_array_reduce, argspec=[af64_of(3, 1)])
 
-    _check_opt(before, before,
-               lib.elim_array_reduce,
-               argspec=[af64_of(3, 5)])
+    _check_opt(before, before, lib.elim_array_reduce, argspec=[af64_of(3, 5)])
 
 
 def test_simplify_array_map():
-
     def before(xs, ys):
         def f(x, y):
             return scalar_add(y, x)
+
         return array_map(f, xs, ys)
 
     def after(xs, ys):
         return array_map(scalar_add, ys, xs)
 
-    _check_opt(before, after,
-               lib.simplify_array_map)
+    _check_opt(before, after, lib.simplify_array_map)
 
 
 def test_simplify_array_map_2():
-
     def before(xs, ys):
         def f(x, y):
             return y
+
         return array_map(f, xs, ys)
 
     def after(xs, ys):
         return ys
 
-    _check_opt(before, after,
-               lib.simplify_array_map)
+    _check_opt(before, after, lib.simplify_array_map)
 
 
 def test_simplify_array_map_3():
-
     def before(xs, ys):
         def f(x, y):
             return x * x + y * y
+
         return array_map(f, xs, ys)
 
-    _check_opt(before, before,
-               lib.simplify_array_map)
+    _check_opt(before, before, lib.simplify_array_map)
 
 
 def test_simplify_array_map_4():
@@ -403,25 +360,29 @@ def test_simplify_array_map_4():
     def before(xs):
         def f(x):
             return 3
+
         return array_map(f, xs)
 
     def after(xs):
         return distribute(scalar_to_array(3, arr_t), shape(xs))
 
-    _check_opt(before, after,
-               lib.simplify_array_map,
-               argspec=[arr_t],
-               argspec_after=False)
+    _check_opt(
+        before,
+        after,
+        lib.simplify_array_map,
+        argspec=[arr_t],
+        argspec_after=False,
+    )
 
 
 def test_simplify_array_map_5():
-
     def before(xs, ys, z):
         def g(x):
             return x * x * x
 
         def f(x, y):
             return g(x) + g(y)
+
         return array_map(f, xs, ys), g(z + 1), g(z + 2)
 
     def after(xs, ys, z):
@@ -430,24 +391,25 @@ def test_simplify_array_map_5():
 
         def f(x, y):
             return (x * x * x) + (y * y * y)
+
         return array_map(f, xs, ys), g(z + 1), g(z + 2)
 
-    _check_opt(before, after,
-               lib.simplify_array_map,
-               lib.inline_inside_marked_caller)
+    _check_opt(
+        before, after, lib.simplify_array_map, lib.inline_inside_marked_caller
+    )
 
 
 def test_simplify_array_map_6():
-
     def before(xs, ys, z):
         def f(x, y):
             def g(x):
                 return x * y
+
             return g(x)
+
         return array_map(f, xs, ys)
 
-    _check_opt(before, before,
-               lib.simplify_array_map)
+    _check_opt(before, before, lib.simplify_array_map)
 
 
 def test_unfuse_composite_constant():
@@ -456,17 +418,20 @@ def test_unfuse_composite_constant():
     def before(x):
         def p1(x):
             return x + 1
+
         return array_map(p1, x)
 
     def after(x):
         def up1(x2):
-            return array_map(scalar_add, x2,
-                             distribute(scalar_to_array(1, typeof(x)),
-                                        shape(x)))
+            return array_map(
+                scalar_add,
+                x2,
+                distribute(scalar_to_array(1, typeof(x)), shape(x)),
+            )
+
         return up1(x)
 
-    _check_opt(before, after,
-               lib.unfuse_composite)
+    _check_opt(before, after, lib.unfuse_composite)
 
 
 ######################
@@ -475,7 +440,6 @@ def test_unfuse_composite_constant():
 
 
 def test_true_branch():
-
     def before(x, y):
         if True:
             return x
@@ -485,14 +449,12 @@ def test_true_branch():
     def after(x, y):
         return x
 
-    _check_opt(before, after,
-               lib.elim_identity,
-               lib.simplify_always_true,
-               lib.inline)
+    _check_opt(
+        before, after, lib.elim_identity, lib.simplify_always_true, lib.inline
+    )
 
 
 def test_false_branch():
-
     def before(x, y):
         if False:
             return x
@@ -502,38 +464,32 @@ def test_false_branch():
     def after(x, y):
         return y
 
-    _check_opt(before, after,
-               lib.elim_identity,
-               lib.simplify_always_false,
-               lib.inline)
+    _check_opt(
+        before, after, lib.elim_identity, lib.simplify_always_false, lib.inline
+    )
 
 
 def test_true_branch_switch():
-
     def before(x, y):
         return switch(True, x, y)
 
     def after(x, y):
         return x
 
-    _check_opt(before, after,
-               lib.simplify_always_true)
+    _check_opt(before, after, lib.simplify_always_true)
 
 
 def test_false_branch_switch():
-
     def before(x, y):
         return switch(False, x, y)
 
     def after(x, y):
         return y
 
-    _check_opt(before, after,
-               lib.simplify_always_false)
+    _check_opt(before, after, lib.simplify_always_false)
 
 
 def test_nested_switch_same_cond():
-
     def before(a, b, c, d):
         x = a < 0
         return switch(x, switch(x, a, b), switch(x, c, d))
@@ -542,25 +498,19 @@ def test_nested_switch_same_cond():
         x = a < 0
         return switch(x, a, d)
 
-    _check_opt(before, after,
-               lib.simplify_switch1,
-               lib.simplify_switch2)
+    _check_opt(before, after, lib.simplify_switch1, lib.simplify_switch2)
 
 
 def test_nested_switch_diff_cond():
-
     def before(a, b, c, d):
         x = a < 0
         y = b < 0
         return switch(x, switch(y, a, b), switch(y, c, d))
 
-    _check_opt(before, before,
-               lib.simplify_switch1,
-               lib.simplify_switch2)
+    _check_opt(before, before, lib.simplify_switch1, lib.simplify_switch2)
 
 
 def test_switch_same_branch():
-
     def before(x, y):
         a = y * y
         return switch(x < 0, a, a)
@@ -568,12 +518,10 @@ def test_switch_same_branch():
     def after(x, y):
         return y * y
 
-    _check_opt(before, after,
-               lib.simplify_switch_idem)
+    _check_opt(before, after, lib.simplify_switch_idem)
 
 
 def test_combine_switch():
-
     def before(x, y):
         cond = x < 0
         a = switch(cond, x, y)
@@ -583,35 +531,30 @@ def test_combine_switch():
     def after(x, y):
         return switch(x < 0, x + y, y + x)
 
-    _check_opt(before, after,
-               lib.combine_switches)
+    _check_opt(before, after, lib.combine_switches)
 
 
 def test_float_tuple_getitem_through_switch():
-
     def before(x, y):
         return switch(x < 0, x, y)[0]
 
     def after(x, y):
         return switch(x < 0, x[0], y[0])
 
-    _check_opt(before, after,
-               lib.float_tuple_getitem_through_switch)
+    _check_opt(before, after, lib.float_tuple_getitem_through_switch)
 
 
 def test_float_env_getitem_through_switch():
-
     def before(x, y):
         return env_getitem(switch(x < 0, newenv, newenv), embed(y), 5)
 
     def after(x, y):
         key = embed(y)
-        return switch(x < 0,
-                      env_getitem(newenv, key, 5),
-                      env_getitem(newenv, key, 5))
+        return switch(
+            x < 0, env_getitem(newenv, key, 5), env_getitem(newenv, key, 5)
+        )
 
-    _check_opt(before, after,
-               lib.float_env_getitem_through_switch)
+    _check_opt(before, after, lib.float_env_getitem_through_switch)
 
 
 ############
@@ -620,7 +563,6 @@ def test_float_env_getitem_through_switch():
 
 
 def test_partials():
-
     def f(x, y):
         return x + y
 
@@ -630,8 +572,7 @@ def test_partials():
     def after(x, y):
         return f(x, y)
 
-    _check_opt(before, after,
-               lib.simplify_partial)
+    _check_opt(before, after, lib.simplify_partial)
 
 
 ############
@@ -640,7 +581,6 @@ def test_partials():
 
 
 def test_inline():
-
     def f(x, y):
         return x + y
 
@@ -650,12 +590,10 @@ def test_inline():
     def after(x, y, z):
         return x * y + y * z
 
-    _check_opt(before, after,
-               lib.inline)
+    _check_opt(before, after, lib.inline)
 
 
 def test_inline_successively():
-
     def one(x):
         return x + 1
 
@@ -671,36 +609,35 @@ def test_inline_successively():
     def after(x):
         return x + 3 + 2 + 1
 
-    _check_opt(before, after,
-               lib.inline)
+    _check_opt(before, after, lib.inline)
 
 
 def test_inline_closure():
-
     def before(x, y, z):
         c = z * z
 
         def f(x):
             return x + c
+
         return f(x * y)
 
     def after(x, y, z):
         c = z * z
         return x * y + c
 
-    _check_opt(before, after,
-               lib.inline)
+    _check_opt(before, after, lib.inline)
 
 
 def test_inline_deep_closure():
-
     def f(x):
         w = x * x
 
         def g():
             def h():
                 return w
+
             return h()
+
         return g
 
     def before(x, y):
@@ -711,18 +648,17 @@ def test_inline_deep_closure():
         w2 = y * y
         return w1 - w2
 
-    _check_opt(before, after,
-               lib.inline)
+    _check_opt(before, after, lib.inline)
 
 
 def test_inline_new_closure():
-
     def q(x):
         return x * x
 
     def f(x):
         def g():
             return q(x)
+
         return g
 
     def before(x):
@@ -731,10 +667,10 @@ def test_inline_new_closure():
     def after(x):
         def g():
             return x * x
+
         return g
 
-    _check_opt(before, after,
-               lib.inline)
+    _check_opt(before, after, lib.inline)
 
 
 def test_inline_recursive_direct():
@@ -749,23 +685,19 @@ def test_inline_recursive_direct():
     def before2(x):
         return helper2(x - 1)
 
-    _check_opt(before1, before1,
-               lib.inline)
+    _check_opt(before1, before1, lib.inline)
 
-    _check_opt(before2, before2,
-               lib.inline)
+    _check_opt(before2, before2, lib.inline)
 
 
 def test_inline_recursive():
-
     def before(x):
         if x <= 0:
             return x
         else:
             return before(x - 1)
 
-    _check_opt(before, before,
-               lib.inline)
+    _check_opt(before, before, lib.inline)
 
 
 def test_inline_criterion():
@@ -773,7 +705,7 @@ def test_inline_criterion():
     inline_binary = lib.make_inliner(
         lambda node, g, args: len(args) == 2,
         check_recursive=False,
-        name='inline_binary'
+        name="inline_binary",
     )
 
     def bin(x, y):
@@ -788,12 +720,10 @@ def test_inline_criterion():
     def after(x, y, z):
         return un(x) + y * z
 
-    _check_opt(before, after,
-               inline_binary)
+    _check_opt(before, after, inline_binary)
 
 
 def test_inline_trivial():
-
     def trivial(x):
         return x * x
 
@@ -806,17 +736,16 @@ def test_inline_trivial():
     def after(x):
         return x * x, nontrivial(x)
 
-    _check_opt(before, after,
-               lib.inline_trivial)
+    _check_opt(before, after, lib.inline_trivial)
 
 
 def test_inline_nontrivial_through_fv():
-
     def nontrivial(x):
         z = (x * x) * (x * x)
 
         def g():
             return z
+
         return g
 
     def before(x, y):
@@ -831,19 +760,17 @@ def test_inline_nontrivial_through_fv():
 
         def g2():
             return z2
+
         return g1, g2
 
     # Inlining everything bloats the graph
-    _check_opt(before, after_all_inline,
-               lib.inline)
+    _check_opt(before, after_all_inline, lib.inline)
 
     # inline_trivial should avoid this
-    _check_opt(before, before,
-               lib.inline_trivial)
+    _check_opt(before, before, lib.inline_trivial)
 
 
 def test_inline_unique_uses():
-
     def one(x):
         return x * x
 
@@ -856,12 +783,10 @@ def test_inline_unique_uses():
     def after(x):
         return x * x, two(x), two(x)
 
-    _check_opt(before, after,
-               lib.inline_unique_uses)
+    _check_opt(before, after, lib.inline_unique_uses)
 
 
 def test_inline_unique_uses_2():
-
     def f(x):
         return x * x
 
@@ -877,24 +802,20 @@ def test_inline_unique_uses_2():
     def after(x):
         return f(x) + f(x)
 
-    _check_opt(before, after,
-               lib.inline_unique_uses)
+    _check_opt(before, after, lib.inline_unique_uses)
 
 
 def test_inline_unique_uses_recursive():
-
     def helper(x):
         return before(x)
 
     def before(x):
         return helper(x)
 
-    _check_opt(before, before,
-               lib.inline_unique_uses)
+    _check_opt(before, before, lib.inline_unique_uses)
 
 
 def test_replace_applicator():
-
     def app1(x, y):
         return x + y
 
@@ -916,29 +837,26 @@ def test_replace_applicator():
     def after(x, y):
         return x + y
 
-    _check_opt(before1, after,
-               lib.replace_applicator)
+    _check_opt(before1, after, lib.replace_applicator)
 
-    _check_opt(before2, after,
-               lib.replace_applicator)
+    _check_opt(before2, after, lib.replace_applicator)
 
-    _check_opt(before3, before3,
-               lib.replace_applicator)
+    _check_opt(before3, before3, lib.replace_applicator)
 
 
 def test_replace_applicator_2():
-
     def before(x, y):
         def app(x, y):
             z = x * y
 
             def inner(x, y):
                 return z
+
             return inner(x, y)
+
         return app(x + 1, y + 1)
 
-    _check_opt(before, before,
-               lib.replace_applicator)
+    _check_opt(before, before, lib.replace_applicator)
 
 
 ##################
@@ -947,7 +865,6 @@ def test_replace_applicator_2():
 
 
 def test_specialize_on_graph_arguments():
-
     def square(x):
         return x * x
 
@@ -963,8 +880,7 @@ def test_specialize_on_graph_arguments():
 
         return helper(x, y)
 
-    _check_opt(before, after,
-               lib.specialize_on_graph_arguments)
+    _check_opt(before, after, lib.specialize_on_graph_arguments)
 
 
 #################
@@ -973,41 +889,48 @@ def test_specialize_on_graph_arguments():
 
 
 def test_incorporate_getitem():
-
     def before(x, y):
         def b_help(x, y):
             return x * y, x + y
+
         return b_help(x, y)[0]
 
     def after(x, y):
         def a_help(x, y):
             return x * y
+
         return a_help(x, y)
 
-    _check_opt(before, after,
-               lib.incorporate_getitem,
-               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.incorporate_getitem,
+        argspec=[to_abstract_test(f64), to_abstract_test(f64)],
+    )
 
 
 def test_incorporate_getitem_2():
-
     def before(x, y):
         def b_help(x, y):
             return x
+
         return b_help(x, y)[0]
 
     def after(x, y):
         def a_help(x, y):
             return x[0]
+
         return a_help(x, y)
 
-    _check_opt(before, after,
-               lib.incorporate_getitem,
-               argspec=[to_abstract_test((f64, f64)), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.incorporate_getitem,
+        argspec=[to_abstract_test((f64, f64)), to_abstract_test(f64)],
+    )
 
 
 def test_incorporate_getitem_through_switch():
-
     def before(x, y):
         def f1(x, y):
             return x, y
@@ -1026,52 +949,62 @@ def test_incorporate_getitem_through_switch():
 
         return switch(x < 0, f1, f2)(x, y)
 
-    _check_opt(before, after,
-               lib.incorporate_getitem_through_switch,
-               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.incorporate_getitem_through_switch,
+        argspec=[to_abstract_test(f64), to_abstract_test(f64)],
+    )
 
 
 def test_incorporate_env_getitem():
-
     def before(x, y):
         key = embed(x)
 
         def b_help(x, y):
             return env_setitem(newenv, key, x * y)
+
         return env_getitem(b_help(x, y), key, 0)
 
     def after(x, y):
         def a_help(x, y):
             return x * y
+
         return a_help(x, y)
 
-    _check_opt(before, after,
-               lib.incorporate_env_getitem,
-               lib.cancel_env_set_get,
-               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.incorporate_env_getitem,
+        lib.cancel_env_set_get,
+        argspec=[to_abstract_test(f64), to_abstract_test(f64)],
+    )
 
 
 @pytest.mark.xfail(reason="Inference seems to interfere.")
 def test_incorporate_env_getitem_2():
-
     def before(x, y):
         def b_help(x, y):
             return x
+
         return env_getitem(b_help(x, y), embed(y), 0)
 
     def after(x, y):
         def a_help(x, y):
             return env_getitem(x, embed(y), 0)
+
         return a_help(x, y)
 
-    _check_opt(before, after,
-               lib.incorporate_env_getitem,
-               lib.cancel_env_set_get,
-               argspec=[to_abstract_test(newenv), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.incorporate_env_getitem,
+        lib.cancel_env_set_get,
+        argspec=[to_abstract_test(newenv), to_abstract_test(f64)],
+    )
 
 
 def test_incorporate_env_getitem_through_switch():
-
     def before(x, y):
         key = embed(x)
 
@@ -1092,16 +1025,20 @@ def test_incorporate_env_getitem_through_switch():
 
         return switch(x < 0, f1, f2)(x, y)
 
-    _check_opt(before, after,
-               lib.incorporate_env_getitem_through_switch,
-               lib.cancel_env_set_get,
-               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.incorporate_env_getitem_through_switch,
+        lib.cancel_env_set_get,
+        argspec=[to_abstract_test(f64), to_abstract_test(f64)],
+    )
 
 
 def test_incorporate_call():
     def b_help(q):
         def subf(z):
             return q * z
+
         return subf
 
     def before(x, y):
@@ -1111,16 +1048,20 @@ def test_incorporate_call():
         def a_help(q, y):
             def subf(z):
                 return q * z
+
             return subf(y)
+
         return a_help(x, y)
 
-    _check_opt(before, after,
-               lib.incorporate_call,
-               argspec=[to_abstract_test(f64), to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.incorporate_call,
+        argspec=[to_abstract_test(f64), to_abstract_test(f64)],
+    )
 
 
 def test_incorporate_call_through_switch():
-
     def before_helper(x):
         if x < 0:
             return scalar_mul
@@ -1142,13 +1083,18 @@ def test_incorporate_call_through_switch():
 
         return after_helper(x, y, z)
 
-    _check_opt(before, after,
-               lib.elim_identity,
-               lib.incorporate_call,
-               lib.incorporate_call_through_switch,
-               argspec=[to_abstract_test(f64),
-                        to_abstract_test(f64),
-                        to_abstract_test(f64)])
+    _check_opt(
+        before,
+        after,
+        lib.elim_identity,
+        lib.incorporate_call,
+        lib.incorporate_call_through_switch,
+        argspec=[
+            to_abstract_test(f64),
+            to_abstract_test(f64),
+            to_abstract_test(f64),
+        ],
+    )
 
 
 ########
@@ -1157,5 +1103,7 @@ def test_incorporate_call_through_switch():
 
 
 def test_opt_repr():
-    assert (repr(lib.inline_trivial)
-            == f'<PatternSubstitutionOptimization inline_trivial>')
+    assert (
+        repr(lib.inline_trivial)
+        == f"<PatternSubstitutionOptimization inline_trivial>"
+    )

@@ -31,7 +31,7 @@ async def infer_scalar_cast(self, engine, scalar, typ: lib.AbstractType):
     """Infer the return type of primitive `scalar_cast`."""
     a = typ.element
     if not isinstance(a, AbstractScalar):
-        raise MyiaTypeError('scalar_cast must cast to a scalar type')
+        raise MyiaTypeError("scalar_cast must cast to a scalar type")
     t = a.xtype()
     engine.check(xtype.Number, t)
     engine.check(xtype.Number, await force_pending(scalar.xtype()))
@@ -46,18 +46,18 @@ def bprop_scalar_cast(x, t, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_cast',
-    'registered_name': 'scalar_cast',
-    'mapping': P.scalar_cast,
-    'python_implementation': pyimpl_scalar_cast,
+    "name": "scalar_cast",
+    "registered_name": "scalar_cast",
+    "mapping": P.scalar_cast,
+    "python_implementation": pyimpl_scalar_cast,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_cast',
-    'registered_name': 'scalar_cast',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_cast,
-    'inferrer_constructor': infer_scalar_cast,
-    'grad_transform': bprop_scalar_cast,
+    "name": "scalar_cast",
+    "registered_name": "scalar_cast",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_cast,
+    "inferrer_constructor": infer_scalar_cast,
+    "grad_transform": bprop_scalar_cast,
 }

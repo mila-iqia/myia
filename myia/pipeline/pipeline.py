@@ -38,7 +38,7 @@ class PipelineDefinition:
 
         """
         if isinstance(step, str):
-            if step.startswith('!'):
+            if step.startswith("!"):
                 return self.step_names.index(step[1:])
             else:
                 plus = 1 if upper_bound else 0
@@ -46,7 +46,7 @@ class PipelineDefinition:
         elif isinstance(step, int) or step is None:
             return step
         else:
-            raise TypeError('index should be a string or int')
+            raise TypeError("index should be a string or int")
 
     def getslice(self, item):
         """Transform an item or a string slice into a numeric slice.
@@ -61,8 +61,7 @@ class PipelineDefinition:
         """
         if isinstance(item, slice):
             assert item.step is None
-            return slice(self.index(item.start),
-                         self.index(item.stop, True))
+            return slice(self.index(item.start), self.index(item.stop, True))
         else:
             return slice(0, self.index(item, True))
 
@@ -90,7 +89,7 @@ class PipelineDefinition:
             steps.extend(new_steps.items())
         else:
             index = self.index(step)
-            steps[index + 1:index + 1] = new_steps.items()
+            steps[index + 1 : index + 1] = new_steps.items()
         return PipelineDefinition(**dict(steps))
 
     def configure(self, changes={}, **kwchanges):
@@ -114,15 +113,15 @@ class PipelineDefinition:
         new_data = dict(self.steps)
         changes = {**changes, **kwchanges}
         for path, delta in changes.items():
-            top, *parts = path.split('.')
+            top, *parts = path.split(".")
             if top not in new_data:
-                raise KeyError(f'There is no step named {top}')
+                raise KeyError(f"There is no step named {top}")
             for part in reversed(parts):
                 delta = {part: delta}
             if delta is False:
                 del new_data[top]
             else:
-                new_data[top] = merge(new_data[top], delta, mode='override')
+                new_data[top] = merge(new_data[top], delta, mode="override")
         return PipelineDefinition(**new_data)
 
     def select(self, *names):
@@ -131,9 +130,7 @@ class PipelineDefinition:
         The names don't have to be in the same order as the original
         definition, so pipeline steps can be reordered this way.
         """
-        return PipelineDefinition(
-            **{name: self.steps[name] for name in names}
-        )
+        return PipelineDefinition(**{name: self.steps[name] for name in names})
 
     def make(self):
         """Create a Pipeline from this definition."""
@@ -152,17 +149,17 @@ class PipelineDefinition:
             out_key: The name of the pipeline output to return.
 
         """
+
         def run(arg):
             res = self.run(**{in_key: arg})
             return res[out_key]
+
         return run
 
     def __getitem__(self, item):
         """Return a pipeline that only contains a subset of the steps."""
         steps = list(self.steps.items())
-        return PipelineDefinition(
-            **dict(steps[self.getslice(item)])
-        )
+        return PipelineDefinition(**dict(steps[self.getslice(item)]))
 
 
 class Pipeline:
@@ -212,41 +209,40 @@ class _PipelineSlice:
         Errors are put in the 'error' key of the result, and the step
         at which an error happened is put in the 'error_step' key.
         """
-        with tracer('compile'):
+        with tracer("compile"):
             steps = self.pipeline._seq[self.slice]
             step_names = self.pipeline._step_names[self.slice]
             for name, step in zip(step_names, steps):
-                if 'error' in args:
+                if "error" in args:
                     break
                 if isinstance(step, (FunctionType, Partial)):
                     fn = step
                 else:
                     fn = step.__call__
-                with tracer(f'step_{name}', step=step, **args) as tr:
+                with tracer(f"step_{name}", step=step, **args) as tr:
                     _fn = fn.func if isinstance(fn, Partial) else fn
                     valid_args, rest = partition_keywords(_fn, args)
                     try:
                         results = fn(**valid_args)
-                        if (not isinstance(results, dict) and
-                                len(valid_args) == 1):
-                            field_name, = valid_args.keys()
+                        if (
+                            not isinstance(results, dict)
+                            and len(valid_args) == 1
+                        ):
+                            (field_name,) = valid_args.keys()
                             results = {field_name: results}
                         args = {**args, **results}
                         tr.set_results(**args)
                     except Exception as e:
                         tracer().emit_error(error=e)
-                        args['error'] = e
-                        args['error_step'] = step
+                        args["error"] = e
+                        args["error_step"] = step
             return args
 
     def __call__(self, **args):
         results = self.run_and_catch(**args)
-        if 'error' in results:
-            raise results['error']
+        if "error" in results:
+            raise results["error"]
         return results
 
 
-__all__ = [
-    'Pipeline',
-    'PipelineDefinition',
-]
+__all__ = ["Pipeline", "PipelineDefinition"]

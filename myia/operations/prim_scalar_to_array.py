@@ -21,8 +21,9 @@ def pyimpl_scalar_to_array(x, t):
 
 
 @standard_prim(P.scalar_to_array)
-async def infer_scalar_to_array(self, engine,
-                                a: AbstractScalar, t: AbstractType):
+async def infer_scalar_to_array(
+    self, engine, a: AbstractScalar, t: AbstractType
+):
     """Infer the return type of primitive `scalar_to_array`."""
     tp = t.element
     assert isinstance(tp, AbstractArray)
@@ -36,18 +37,18 @@ def bprop_scalar_to_array(x, t, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_to_array',
-    'registered_name': 'scalar_to_array',
-    'mapping': P.scalar_to_array,
-    'python_implementation': pyimpl_scalar_to_array,
+    "name": "scalar_to_array",
+    "registered_name": "scalar_to_array",
+    "mapping": P.scalar_to_array,
+    "python_implementation": pyimpl_scalar_to_array,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_to_array',
-    'registered_name': 'scalar_to_array',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_to_array,
-    'inferrer_constructor': infer_scalar_to_array,
-    'grad_transform': bprop_scalar_to_array,
+    "name": "scalar_to_array",
+    "registered_name": "scalar_to_array",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_to_array,
+    "inferrer_constructor": infer_scalar_to_array,
+    "grad_transform": bprop_scalar_to_array,
 }

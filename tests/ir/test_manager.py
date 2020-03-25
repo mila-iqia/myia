@@ -1,4 +1,3 @@
-
 from collections import Counter
 
 import pytest
@@ -9,11 +8,11 @@ from myia.operations import Primitive
 from myia.pipeline import scalar_parse as parse
 from myia.utils import OrderedSet
 
-swap1 = Primitive('swap1')
-swap2 = Primitive('swap2')
-swap3 = Primitive('swap3')
-swap4 = Primitive('swap4')
-swap5 = Primitive('swap5')
+swap1 = Primitive("swap1")
+swap2 = Primitive("swap2")
+swap3 = Primitive("swap3")
+swap4 = Primitive("swap4")
+swap5 = Primitive("swap5")
 swap = swap1
 
 
@@ -21,7 +20,6 @@ swaps = [swap1, swap2, swap3, swap4, swap5]
 
 
 class NestingSpecs:
-
     def __init__(self, stage, specs):
         self.expected = self._parse_specs(specs)
         self.stage = stage
@@ -30,17 +28,17 @@ class NestingSpecs:
         if specs is None:
             return None
         expected = {}
-        for spec in specs.split(';'):
+        for spec in specs.split(";"):
             spec = spec.strip()
             if not spec:
                 continue
-            if '->' in spec:
-                key, value = spec.split('->')
+            if "->" in spec:
+                key, value = spec.split("->")
                 if value:
                     expected[key] = value
-            elif ':' in spec:
-                key, values = spec.split(':')
-                values = set(values.split(',')) - {''}
+            elif ":" in spec:
+                key, values = spec.split(":")
+                values = set(values.split(",")) - {""}
                 if values:
                     expected[key] = values
             else:
@@ -77,20 +75,22 @@ class NestingSpecs:
 class Stage:
     def __init__(self, **specs):
         def _lengthen(k):
-            k = k.replace('fv', 'free_variable')
-            k = k.replace('deps', 'dependencies')
+            k = k.replace("fv", "free_variable")
+            k = k.replace("deps", "dependencies")
             return k
-        self.specs = {_lengthen(k): NestingSpecs(self, v)
-                      for k, v in specs.items()}
+
+        self.specs = {
+            _lengthen(k): NestingSpecs(self, v) for k, v in specs.items()
+        }
         self.subs = None
 
     def check(self, manager):
         for key, specs in self.specs.items():
-            print(f'Verifying field: {key}')
+            print(f"Verifying field: {key}")
             results = getattr(manager, key)
             results = {g: results[g] for g in manager.graphs}
             specs.check(results)
-            print(f'OK for: {key}')
+            print(f"OK for: {key}")
 
 
 def clone(g):
@@ -109,13 +109,13 @@ def _check_uses(manager):
 
 def check_manager(*stages, **specs):
     if specs and stages:
-        raise Exception('Bad call to check_manager')
+        raise Exception("Bad call to check_manager")
 
     if specs:
         stages = [Stage(**specs)]
 
     def check(fn):
-        subs = {fn.__name__: 'X'}
+        subs = {fn.__name__: "X"}
         for stage in stages:
             stage.subs = subs
 
@@ -160,90 +160,114 @@ def check_manager(*stages, **specs):
 ################################
 
 
-@check_manager(nodes='X:x', parents='', fvs_direct='')
+@check_manager(nodes="X:x", parents="", fvs_direct="")
 def test_flat(x):
     """Sanity check."""
     return x
 
 
-@check_manager(nodes='X:x', parents='g->X', fvs_direct='g:x')
+@check_manager(nodes="X:x", parents="g->X", fvs_direct="g:x")
 def test_nested(x):
     """g is nested in X."""
+
     def g():
         return x
+
     return g
 
 
-@check_manager(parents='')
+@check_manager(parents="")
 def test_fake_nested(x):
     """g is not really nested in X because it does not have free variables."""
+
     def g(x):
         return x
+
     return g
 
 
-@check_manager(parents='g->X',
-               fvs_direct='g:x',
-               fvs_total='g:x,g',
-               graphs_used='X:g; g:g',
-               graphs_reachable='X:g; g:g',
-               recursive='g')
+@check_manager(
+    parents="g->X",
+    fvs_direct="g:x",
+    fvs_total="g:x,g",
+    graphs_used="X:g; g:g",
+    graphs_reachable="X:g; g:g",
+    recursive="g",
+)
 def test_recurse(x):
     """Test that recursion doesn't break the algorithm."""
+
     def g():
         return g() + x
+
     return g
 
 
-@check_manager(parents='')
+@check_manager(parents="")
 def test_recurse2(x):
     """Recursion with top level, no free variables."""
+
     def g():
         return test_recurse2()
+
     return g
 
 
-@check_manager(parents='g->X', fvs_direct='g:x')
+@check_manager(parents="g->X", fvs_direct="g:x")
 def test_recurse3(x):
     """Recursion with top level, free variables."""
+
     def g():
         return test_recurse3() + x
+
     return g
 
 
-@check_manager(parents='g->X; h->g; i->h',
-               fvs_direct='i:x,y,z',
-               fvs_total='g:x; h:x,y; i:x,y,z')
+@check_manager(
+    parents="g->X; h->g; i->h",
+    fvs_direct="i:x,y,z",
+    fvs_total="g:x; h:x,y; i:x,y,z",
+)
 def test_deep_nest(x):
     """Chain of closures."""
+
     def g(y):
         def h(z):
             def i(w):
                 return x + y + z + w
+
             return i
+
         return h
+
     return g(2)
 
 
-@check_manager(parents='g->X; h->X; i->X',
-               fvs_direct='i:x',
-               fvs_total='g:h; h:i; i:x')
+@check_manager(
+    parents="g->X; h->X; i->X", fvs_direct="i:x", fvs_total="g:h; h:i; i:x"
+)
 def test_fake_deep_nest(x):
     """i is not nested in g,h because it does not use fvs from them."""
+
     def g():
         def h():
             def i():
                 return x
+
             return i
+
         return h
+
     return g()
 
 
-@check_manager(parents='g->X; h->X',
-               children='X:g,h',
-               scopes='X:X,g,h; g:g; h:h',
-               fvs_direct='h:a',
-               fvs_total='h:a; g:h')
+@check_manager(
+    parents="g->X; h->X",
+    children="X:g,h",
+    scopes="X:X,g,h; g:g; h:h",
+    fvs_direct="h:a",
+    fvs_total="h:a; g:h",
+)
 def test_calls(x):
     """g has the same nesting as h, h nested in X"""
     a = x + x
@@ -253,10 +277,11 @@ def test_calls(x):
 
     def g():
         return h()
+
     return g()
 
 
-@check_manager(parents='')
+@check_manager(parents="")
 def test_calls2(x):
     """g has the same nesting as h, h not nested in X"""
 
@@ -265,16 +290,19 @@ def test_calls2(x):
 
     def g():
         return h(3)
+
     return g()
 
 
-@check_manager(parents='f->X; g->X; h->X; i->X; j->i',
-               children='X:f,g,h,i; i:j',
-               scopes='X:X,f,g,h,i,j; f:f; g:g; h:h; i:i,j; j:j',
-               graphs_used='X:h,i; h:f,g; i:j',
-               graph_users='f:h; g:h; h:X; i:X; j:i',
-               fvs_direct='f:a,b; g:b; h:b,c; j:a,w',
-               fvs_total='f:a,b; g:b; h:b,c,f,g; i:a; j:a,w')
+@check_manager(
+    parents="f->X; g->X; h->X; i->X; j->i",
+    children="X:f,g,h,i; i:j",
+    scopes="X:X,f,g,h,i,j; f:f; g:g; h:h; i:i,j; j:j",
+    graphs_used="X:h,i; h:f,g; i:j",
+    graph_users="f:h; g:h; h:X; i:X; j:i",
+    fvs_direct="f:a,b; g:b; h:b,c; j:a,w",
+    fvs_total="f:a,b; g:b; h:b,c,f,g; i:a; j:a,w",
+)
 def test_fvs(x):
     """Test listing of free variables."""
     a = x + 1
@@ -293,27 +321,36 @@ def test_fvs(x):
     def i(w):
         def j(y):
             return w + y + a
+
         return j
+
     return h(3) + i(4)
 
 
-@check_manager(parents='f->X; g->f; h->g',
-               fvs_direct='f:x; h:y,z',
-               fvs_total='f:x; g:y; h:y,z')
+@check_manager(
+    parents="f->X; g->f; h->g",
+    fvs_direct="f:x; h:y,z",
+    fvs_total="f:x; g:y; h:y,z",
+)
 def test_deep2(x):
     def f(y):
         def g(z):
             def h():
                 return y + z
+
             return h
+
         return g(x)
+
     return f(x + 1)
 
 
-@check_manager(parents='g->f; h->g',
-               nodes='X:_x; f:x; g:y',
-               fvs_direct='h:y; g:x',
-               fvs_total='h:y; g:x')
+@check_manager(
+    parents="g->f; h->g",
+    nodes="X:_x; f:x; g:y",
+    fvs_direct="h:y; g:x",
+    fvs_total="h:y; g:x",
+)
 def test_nested_double_reference(_x):
     def f(x):
         def g():
@@ -321,14 +358,19 @@ def test_nested_double_reference(_x):
 
             def h():
                 return f(y)
+
             return h()
+
         return g()
+
     return f(_x)
 
 
-@check_manager(parents='f->X; g->f; h->f',
-               fvs_direct='f:a; g:a,b; h:b',
-               fvs_total='f:a; g:a,b; h:b')
+@check_manager(
+    parents="f->X; g->f; h->f",
+    fvs_direct="f:a; g:a,b; h:b",
+    fvs_total="f:a; g:a,b; h:b",
+)
 def test_previously_mishandled(x):
     """This covers a case that the old NestingAnalyzer was mishandling."""
     a = x * x
@@ -343,14 +385,17 @@ def test_previously_mishandled(x):
         def h():
             d = b * b
             return d
+
         return g() + h() + b
 
     return f()
 
 
-@check_manager(parents='f1->X; f2->f1; f3->f2; f4->f3; f5->f4',
-               fvs_direct='f1:a; f2:a,b; f3:a,b,c; f4:a,b,c,d; f5:d,e',
-               fvs_total='f1:a; f2:a,b; f3:a,b,c; f4:a,b,c,d; f5:d,e')
+@check_manager(
+    parents="f1->X; f2->f1; f3->f2; f4->f3; f5->f4",
+    fvs_direct="f1:a; f2:a,b; f3:a,b,c; f4:a,b,c,d; f5:d,e",
+    fvs_total="f1:a; f2:a,b; f3:a,b,c; f4:a,b,c,d; f5:d,e",
+)
 def test_deepest(x):
     a = x * x
 
@@ -371,20 +416,26 @@ def test_deepest(x):
                         return f
 
                     return f5()
+
                 return f4()
+
             return f3()
+
         return f2()
+
     return f1()
 
 
-@check_manager(nodes='X:x,y')
+@check_manager(nodes="X:x,y")
 def test_unused_parameter(x, y):
     return x * x
 
 
-@check_manager(graphs_used='X:j; g:f; h:g; j:h,i',
-               graphs_reachable='X:f,g,h,i,j; g:f; h:f,g; j:f,g,h,i',
-               recursive='')
+@check_manager(
+    graphs_used="X:j; g:f; h:g; j:h,i",
+    graphs_reachable="X:f,g,h,i,j; g:f; h:f,g; j:f,g,h,i",
+    recursive="",
+)
 def test_reachable(x, y):
     def f(x):
         return x * x
@@ -425,76 +476,86 @@ def test_reachable(x, y):
 
 
 @check_manager(
-    Stage(parents='f->X', fvs_direct='f:x'),
-    Stage(parents='',     fvs_direct=''),
+    Stage(parents="f->X", fvs_direct="f:x"), Stage(parents="", fvs_direct="")
 )
 def test_mut_nested_to_global(x, y):
     def f(z):
         return swap(x, 1) * z
+
     return f(3)
 
 
 @check_manager(
-    Stage(parents='',     fvs_direct=''),
-    Stage(parents='f->X', fvs_direct='f:x'),
+    Stage(parents="", fvs_direct=""), Stage(parents="f->X", fvs_direct="f:x")
 )
 def test_mut_global_to_nested(x, y):
     def f(z):
         return swap(1, x) * z
+
     return f(3)
 
 
 @check_manager(
-    Stage(parents='f->X',
-          children='X:f',
-          scopes='X:X,f; f:f',
-          graph_deps_total='f:X',
-          fvs_direct='f:x',
-          fvs_total='f:x'),
-    Stage(parents='f->X',
-          children='X:f',
-          scopes='X:X,f; f:f',
-          graph_deps_total='f:X',
-          fvs_direct='f:x',
-          fvs_total='f:x'),
+    Stage(
+        parents="f->X",
+        children="X:f",
+        scopes="X:X,f; f:f",
+        graph_deps_total="f:X",
+        fvs_direct="f:x",
+        fvs_total="f:x",
+    ),
+    Stage(
+        parents="f->X",
+        children="X:f",
+        scopes="X:X,f; f:f",
+        graph_deps_total="f:X",
+        fvs_direct="f:x",
+        fvs_total="f:x",
+    ),
 )
 def test_mut_multiple_uses(x, y):
     """Test removing one occurrence of a fv when a second remains."""
+
     def f():
         return swap(x, 1) * x
+
     return f()
 
 
 @check_manager(
-    Stage(parents='g->X',
-          children='X:g',
-          scopes='X:X,g; f:f; g:g; h:h',
-          graphs_used='X:f,g,h; h:f',
-          graph_users='f:X,h; g:X; h:X',
-          graph_deps_direct='g:X',
-          graph_deps_total='g:X',
-          fvs_direct='g:x',
-          fvs_total='g:x'),
-
-    Stage(parents='g->X; h->X',
-          children='X:g,h',
-          scopes='X:X,g,h; f:f; g:g; h:h',
-          graphs_used='X:f,g,h; h:g',
-          graph_users='f:X; g:X,h; h:X',
-          graph_deps_direct='g:X',
-          graph_deps_total='g:X; h:X',
-          fvs_direct='g:x',
-          fvs_total='g:x; h:g'),
-
-    Stage(parents='',
-          children='',
-          scopes='X:X; f:f; g:g; h:h',
-          graphs_used='X:f,g,h; h:g',
-          graph_users='f:X; g:X,h; h:X',
-          graph_deps_direct='',
-          graph_deps_total='',
-          fvs_direct='',
-          fvs_total=''),
+    Stage(
+        parents="g->X",
+        children="X:g",
+        scopes="X:X,g; f:f; g:g; h:h",
+        graphs_used="X:f,g,h; h:f",
+        graph_users="f:X,h; g:X; h:X",
+        graph_deps_direct="g:X",
+        graph_deps_total="g:X",
+        fvs_direct="g:x",
+        fvs_total="g:x",
+    ),
+    Stage(
+        parents="g->X; h->X",
+        children="X:g,h",
+        scopes="X:X,g,h; f:f; g:g; h:h",
+        graphs_used="X:f,g,h; h:g",
+        graph_users="f:X; g:X,h; h:X",
+        graph_deps_direct="g:X",
+        graph_deps_total="g:X; h:X",
+        fvs_direct="g:x",
+        fvs_total="g:x; h:g",
+    ),
+    Stage(
+        parents="",
+        children="",
+        scopes="X:X; f:f; g:g; h:h",
+        graphs_used="X:f,g,h; h:g",
+        graph_users="f:X; g:X,h; h:X",
+        graph_deps_direct="",
+        graph_deps_total="",
+        fvs_direct="",
+        fvs_total="",
+    ),
 )
 def test_mut_closure(x, y):
     def f(q):
@@ -505,12 +566,12 @@ def test_mut_closure(x, y):
 
     def h(w):
         return swap1(f, g)(w)
+
     return f(1) + g(2) + h(3)
 
 
 @check_manager(
-    Stage(scopes='X:X; c:c; f1:f1; f2:f2'),
-    Stage(scopes='X:X; c:c; g:g')
+    Stage(scopes="X:X; c:c; f1:f1; f2:f2"), Stage(scopes="X:X; c:c; g:g")
 )
 def test_remove_unused_graphs(x, y):
     def c(p):
@@ -529,77 +590,92 @@ def test_remove_unused_graphs(x, y):
 
 
 @check_manager(
-    Stage(parents='f->X', fvs_direct='f:x',   fvs_total='f:x'),
-    Stage(parents='f->X', fvs_direct='f:x,y', fvs_total='f:x,y'),
-    Stage(parents='f->X', fvs_direct='f:y',   fvs_total='f:y'),
+    Stage(parents="f->X", fvs_direct="f:x", fvs_total="f:x"),
+    Stage(parents="f->X", fvs_direct="f:x,y", fvs_total="f:x,y"),
+    Stage(parents="f->X", fvs_direct="f:y", fvs_total="f:y"),
 )
 def test_mut_update_total(x, y):
     def f():
         return swap1(1, y) + swap2(x, 2)
+
     return f()
 
 
 @check_manager(
-    Stage(parents='f->X; g->f; h->g',
-          fvs_direct='h:a,b,x',
-          fvs_total='f:x; g:a,x; h:a,b,x'),
-
-    Stage(parents='f->X; g->f; h->g',
-          fvs_direct='h:a,b,x,y',
-          fvs_total='f:x,y; g:a,x,y; h:a,b,x,y'),
-
-    Stage(parents='f->X; g->f; h->g',
-          fvs_direct='h:a,b,y',
-          fvs_total='f:y; g:a,y; h:a,b,y'),
+    Stage(
+        parents="f->X; g->f; h->g",
+        fvs_direct="h:a,b,x",
+        fvs_total="f:x; g:a,x; h:a,b,x",
+    ),
+    Stage(
+        parents="f->X; g->f; h->g",
+        fvs_direct="h:a,b,x,y",
+        fvs_total="f:x,y; g:a,x,y; h:a,b,x,y",
+    ),
+    Stage(
+        parents="f->X; g->f; h->g",
+        fvs_direct="h:a,b,y",
+        fvs_total="f:y; g:a,y; h:a,b,y",
+    ),
 )
 def test_mut_update_total_nest(x, y):
     def f(a):
         def g(b):
             def h():
                 return a + b + swap1(1, y) + swap2(x, 2)
+
             return h
+
         return g
+
     return f(123)
 
 
 @check_manager(
-    Stage(parents='f->X; g->f; h->g',
-          children='X:f; f:g; g:h',
-          scopes='X:X,f,g,h; f:f,g,h; g:g,h; h:h',
-          graph_deps_direct='h:X,f,g; f:X',
-          graph_deps_total='h:X,f,g; g:X,f; f:X',
-          fvs_direct='f:x; h:a,b,x',
-          fvs_total='f:x; g:a,x; h:a,b,x'),
-
-    Stage(parents='f->X; g->f; h->g',
-          children='X:f; f:g; g:h',
-          scopes='X:X,f,g,h; f:f,g,h; g:g,h; h:h',
-          graph_deps_direct='h:X,f,g; f:X',
-          graph_deps_total='h:X,f,g; g:X,f; f:X',
-          fvs_direct='f:x; h:a,b,x,y',
-          fvs_total='f:x,y; g:a,x,y; h:a,b,x,y'),
-
-    Stage(parents='f->X; g->f; h->g',
-          children='X:f; f:g; g:h',
-          scopes='X:X,f,g,h; f:f,g,h; g:g,h; h:h',
-          graph_deps_direct='h:X,f,g; f:X',
-          graph_deps_total='h:X,f,g; g:X,f; f:X',
-          fvs_direct='f:x; h:a,b,y',
-          fvs_total='f:x,y; g:a,y; h:a,b,y'),
+    Stage(
+        parents="f->X; g->f; h->g",
+        children="X:f; f:g; g:h",
+        scopes="X:X,f,g,h; f:f,g,h; g:g,h; h:h",
+        graph_deps_direct="h:X,f,g; f:X",
+        graph_deps_total="h:X,f,g; g:X,f; f:X",
+        fvs_direct="f:x; h:a,b,x",
+        fvs_total="f:x; g:a,x; h:a,b,x",
+    ),
+    Stage(
+        parents="f->X; g->f; h->g",
+        children="X:f; f:g; g:h",
+        scopes="X:X,f,g,h; f:f,g,h; g:g,h; h:h",
+        graph_deps_direct="h:X,f,g; f:X",
+        graph_deps_total="h:X,f,g; g:X,f; f:X",
+        fvs_direct="f:x; h:a,b,x,y",
+        fvs_total="f:x,y; g:a,x,y; h:a,b,x,y",
+    ),
+    Stage(
+        parents="f->X; g->f; h->g",
+        children="X:f; f:g; g:h",
+        scopes="X:X,f,g,h; f:f,g,h; g:g,h; h:h",
+        graph_deps_direct="h:X,f,g; f:X",
+        graph_deps_total="h:X,f,g; g:X,f; f:X",
+        fvs_direct="f:x; h:a,b,y",
+        fvs_total="f:x,y; g:a,y; h:a,b,y",
+    ),
 )
 def test_mut_multiple_uses_deep(x, y):
     def f(a):
         def g(b):
             def h():
                 return a + b + swap1(1, y) + swap2(x, 2)
+
             return h
+
         return g(x)
+
     return f(123)
 
 
 @check_manager(
-    Stage(parents='f->X; g->X', fvs_direct='f:x,y', fvs_total='f:x,y; g:f'),
-    Stage(parents='f->X; g->X', fvs_direct='f:x,y', fvs_total='f:x,y; g:f'),
+    Stage(parents="f->X; g->X", fvs_direct="f:x,y", fvs_total="f:x,y; g:f"),
+    Stage(parents="f->X; g->X", fvs_direct="f:x,y", fvs_total="f:x,y; g:f"),
 )
 def test_mut_multiple_uses_closure(x, y):
     def f(a):
@@ -612,8 +688,8 @@ def test_mut_multiple_uses_closure(x, y):
 
 
 @check_manager(
-    Stage(parents='f->X', fvs_direct='f:a', fvs_total='f:a'),
-    Stage(parents='f->X', fvs_direct='f:b', fvs_total='f:b'),
+    Stage(parents="f->X", fvs_direct="f:a", fvs_total="f:a"),
+    Stage(parents="f->X", fvs_direct="f:b", fvs_total="f:b"),
 )
 def test_mut_uses(x, y):
     a = x * x
@@ -621,19 +697,18 @@ def test_mut_uses(x, y):
 
     def f():
         return swap(a, b)
+
     return f()
 
 
-@check_manager(
-    Stage(parents=''),
-    Stage(parents=''),
-)
+@check_manager(Stage(parents=""), Stage(parents=""))
 def test_mut_use_global(x, y):
     def f():
         return 1
 
     def g():
         return 2
+
     return swap(f, g)
 
 
@@ -666,7 +741,6 @@ def test_manager_exclusivity():
 
 
 def test_weak_manager():
-
     @clone
     @parse
     def f(x, y):
@@ -690,7 +764,6 @@ def test_weak_manager():
 
 
 def test_drop_root():
-
     @parse
     def f(x, y):
         return x * y
@@ -702,7 +775,6 @@ def test_drop_root():
 
 
 def test_keep_roots():
-
     @clone
     @parse
     def f(x, y):
@@ -727,7 +799,6 @@ def test_keep_roots():
 
 
 def test_keep_roots_recursion():
-
     def nonrec():
         return 123
 
@@ -755,7 +826,6 @@ def test_keep_roots_recursion():
 
 
 def test_add_parameter():
-
     @parse
     def f(x, y):
         return x * y
@@ -769,7 +839,6 @@ def test_add_parameter():
 
 
 def test_set_output():
-
     @parse
     def f(x, y):
         return x * y
@@ -782,7 +851,6 @@ def test_set_output():
 
 
 def test_graph_properties():
-
     @clone
     @parse
     def test(x):
@@ -790,8 +858,11 @@ def test_graph_properties():
             def g(z):
                 def h():
                     return y + z
+
                 return h
+
             return g(x)
+
         return f(x + 1)
 
     with pytest.raises(Exception):

@@ -12,11 +12,9 @@ def get_fields(instance: object):
     if is_dataclass(instance):
         return dataclass_fields(instance)
     else:
-        msg = f'Expected dataclass'
+        msg = f"Expected dataclass"
         raise TypeError(msg)
 
 
 __consolidate__ = True
-__all__ = [
-    'get_fields',
-]
+__all__ = ["get_fields"]

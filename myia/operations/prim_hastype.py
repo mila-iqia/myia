@@ -16,25 +16,22 @@ from . import primitives as P
 async def infer_hastype(self, engine, value, model: lib.AbstractType):
     """Infer the return type of primitive `hastype`."""
     a = type_to_abstract(model.element)
-    return AbstractScalar({
-        VALUE: hastype_helper(value, a),
-        TYPE: xtype.Bool,
-    })
+    return AbstractScalar({VALUE: hastype_helper(value, a), TYPE: xtype.Bool})
 
 
 __operation_defaults__ = {
-    'name': 'hastype',
-    'registered_name': 'hastype',
-    'mapping': P.hastype,
-    'python_implementation': None,
+    "name": "hastype",
+    "registered_name": "hastype",
+    "mapping": P.hastype,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'hastype',
-    'registered_name': 'hastype',
-    'type': 'inference',
-    'python_implementation': None,
-    'inferrer_constructor': infer_hastype,
-    'grad_transform': None,
+    "name": "hastype",
+    "registered_name": "hastype",
+    "type": "inference",
+    "python_implementation": None,
+    "inferrer_constructor": infer_hastype,
+    "grad_transform": None,
 }

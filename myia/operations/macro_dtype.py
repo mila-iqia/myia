@@ -10,8 +10,8 @@ async def dtype(info, arr: AbstractArray):
 
 
 __operation_defaults__ = {
-    'name': 'dtype',
-    'registered_name': 'dtype',
-    'mapping': dtype,
-    'python_implementation': None,
+    "name": "dtype",
+    "registered_name": "dtype",
+    "mapping": dtype,
+    "python_implementation": None,
 }

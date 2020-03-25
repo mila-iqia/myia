@@ -17,10 +17,10 @@ def _dead_handle(id):
 
 
 def _delete_remote(id, channel):
-    channel._send_msg('dead_handle', id)
+    channel._send_msg("dead_handle", id)
 
 
-@serializable('channel-lhandle', scalar=True)
+@serializable("channel-lhandle", scalar=True)
 class LocalHandle:
     """Part of the handle that lives in the local process.
 
@@ -47,7 +47,7 @@ class LocalHandle:
         return res
 
 
-@serializable('channel-rhandle', scalar=True)
+@serializable("channel-rhandle", scalar=True)
 class RemoteHandle:
     """Remote part of a LocalHandle.
 
@@ -106,14 +106,14 @@ class RPCProcess:
         breakpoints trigger a remote debugger.
         """
         env = os.environ.copy()
-        env.update(dict(REMOTE_PDB='1',
-                        PYTHONBREAKPOINT='rpdb.set_trace'))
+        env.update(dict(REMOTE_PDB="1", PYTHONBREAKPOINT="rpdb.set_trace"))
         self.proc = subprocess.Popen(
-            [interpreter, '-m', 'myia.compile.channel'],
+            [interpreter, "-m", "myia.compile.channel"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             bufsize=0,
-            env=env)
+            env=env,
+        )
         self.dumper = MyiaDumper(self.proc.stdin.fileno())
         self.loader = MyiaLoader(self.proc.stdout.fileno())
         self.dumper.open()
@@ -123,7 +123,7 @@ class RPCProcess:
         except Exception:
             os.waitpid(-1, 0)
             raise
-        assert resp == 'ready'
+        assert resp == "ready"
 
     def call_method(self, name, *args, **kwargs):
         """Call a method on the remote object."""
@@ -132,7 +132,7 @@ class RPCProcess:
 
     def call_handle(self, handle, args, kwargs):
         """Call the object associated with a handle."""
-        self._send_msg('handle_call', (handle, args, kwargs))
+        self._send_msg("handle_call", (handle, args, kwargs))
         return self._read_msg()
 
     def _send_msg(self, msg, args):

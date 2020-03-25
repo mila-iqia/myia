@@ -29,8 +29,8 @@ def group_nodes(root, manager):
             elif node.is_parameter():
                 h = hash(node)
             else:
-                raise TypeError(f'Unknown node type: {node}') \
-                    # pragma: no cover
+                raise TypeError(f"Unknown node type: {node}")
+                # pragma: no cover
 
             hashes[node] = h
             groups[h, node.graph].append(node)
@@ -51,16 +51,19 @@ def cse(root, manager):
             assert main.graph is other.graph
 
             if main.is_constant() and other.is_constant():
-                repl = (main.abstract == other.abstract
-                        and main.value == other.value)
+                repl = (
+                    main.abstract == other.abstract
+                    and main.value == other.value
+                )
 
             elif main.is_apply() and other.is_apply():
                 # The inputs to both should have been merged beforehand
                 # because groups is topologically sorted
                 in1 = main.inputs
                 in2 = other.inputs
-                repl = len(in1) == len(in2) \
-                    and all(i1 is i2 for i1, i2 in zip(in1, in2))
+                repl = len(in1) == len(in2) and all(
+                    i1 is i2 for i1, i2 in zip(in1, in2)
+                )
 
             if repl:
                 changes = True
@@ -76,17 +79,14 @@ class CSE(Partializable):
         """Initialize CSE."""
         self.resources = resources
         self.report_changes = report_changes
-        self.name = 'cse'
+        self.name = "cse"
 
     def __call__(self, root):
         """Apply CSE on root."""
         args = dict(
-            opt=self,
-            node=None,
-            manager=self.resources.manager,
-            profile=False,
+            opt=self, node=None, manager=self.resources.manager, profile=False
         )
-        with tracer('opt', **args) as tr:
+        with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
             chg = cse(root, self.resources.manager)
             if chg:
@@ -94,7 +94,4 @@ class CSE(Partializable):
             return chg and self.report_changes
 
 
-__all__ = [
-    'CSE',
-    'cse',
-]
+__all__ = ["CSE", "cse"]

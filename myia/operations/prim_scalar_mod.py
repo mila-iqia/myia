@@ -12,25 +12,23 @@ def pyimpl_scalar_mod(x: Number, y: Number) -> Number:
 
 
 infer_scalar_mod = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_mod,
-    impl=pyimpl_scalar_mod,
-    infer_value=False
+    prim=P.scalar_mod, impl=pyimpl_scalar_mod, infer_value=False
 )
 
 
 __operation_defaults__ = {
-    'name': 'scalar_mod',
-    'registered_name': 'scalar_mod',
-    'mapping': P.scalar_mod,
-    'python_implementation': pyimpl_scalar_mod,
+    "name": "scalar_mod",
+    "registered_name": "scalar_mod",
+    "mapping": P.scalar_mod,
+    "python_implementation": pyimpl_scalar_mod,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_mod',
-    'registered_name': 'scalar_mod',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_mod,
-    'inferrer_constructor': infer_scalar_mod,
-    'grad_transform': None,
+    "name": "scalar_mod",
+    "registered_name": "scalar_mod",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_mod,
+    "inferrer_constructor": infer_scalar_mod,
+    "grad_transform": None,
 }

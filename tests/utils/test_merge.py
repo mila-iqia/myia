@@ -1,4 +1,3 @@
-
 from myia.utils import (
     DELETE,
     Merge,
@@ -51,32 +50,30 @@ def test_merge_subclass():
 
 def test_merge_modes():
 
-    for x, y in [({1, 2}, {3, 4}),
-                 ([1, 2], [3, 4]),
-                 ((1, 2), (3, 4))]:
+    for x, y in [({1, 2}, {3, 4}), ([1, 2], [3, 4]), ((1, 2), (3, 4))]:
 
-        assert merge(x, y, mode='reset') == y
+        assert merge(x, y, mode="reset") == y
         assert merge(x, Reset(y)) == y
-        assert merge(x, Reset(y), mode='merge') == y
+        assert merge(x, Reset(y), mode="merge") == y
 
-        assert merge(x, y, mode='override') == y
+        assert merge(x, y, mode="override") == y
         assert merge(x, Override(y)) == y
-        assert merge(x, Override(y), mode='merge') == y
+        assert merge(x, Override(y), mode="merge") == y
 
-    a = {'a': 1}
-    b = {'b': 2}
-    c = {'a': 1, 'b': 2}
+    a = {"a": 1}
+    b = {"b": 2}
+    c = {"a": 1, "b": 2}
 
-    assert merge(a, b, mode='reset') == b
-    assert merge(a, b, mode='override') == c
+    assert merge(a, b, mode="reset") == b
+    assert merge(a, b, mode="override") == c
 
-    a = {'a': [1, 2], 'b': [3, 4]}
-    b = {'a': [5, 6], 'b': Override([7, 8])}
-    c = {'a': [1, 2, 5, 6], 'b': [7, 8]}
-    d = {'a': [5, 6], 'b': [7, 8]}
+    a = {"a": [1, 2], "b": [3, 4]}
+    b = {"a": [5, 6], "b": Override([7, 8])}
+    c = {"a": [1, 2, 5, 6], "b": [7, 8]}
+    d = {"a": [5, 6], "b": [7, 8]}
 
     assert merge(a, b) == c
-    assert merge(a, b, mode='override') == d
+    assert merge(a, b, mode="override") == d
 
 
 def test_cleanup():

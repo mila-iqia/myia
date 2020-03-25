@@ -45,8 +45,7 @@ class OrderedSet:
         self._d.clear()
 
     def __eq__(self, other):
-        return (type(self) == type(other) and
-                self._d == other._d)
+        return type(self) == type(other) and self._d == other._d
 
     def pop(self):
         """Remove and return an element.
@@ -150,6 +149,4 @@ class OrderedSet:
 
 
 __consolidate__ = True
-__all__ = [
-    'OrderedSet',
-]
+__all__ = ["OrderedSet"]

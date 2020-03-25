@@ -9,26 +9,28 @@ try:  # pragma: no cover
     try:
         from ruamel.yaml import (
             CSafeLoader as SafeLoader,
-            CSafeDumper as SafeDumper
+            CSafeDumper as SafeDumper,
         )
     except ImportError:
         try:
             from ruamel_yaml import (
                 CSafeLoader as SafeLoader,
-                CSafeDumper as SafeDumper
+                CSafeDumper as SafeDumper,
             )
         except ImportError:
             from yaml import (
                 CSafeLoader as SafeLoader,
-                CSafeDumper as SafeDumper
+                CSafeDumper as SafeDumper,
             )
 except ImportError as e:  # pragma: no cover
-    raise RuntimeError("""
+    raise RuntimeError(
+        """
 Couldn't find a C-backed version of yaml.
 
 Please install either ruamel.yaml or PyYAML with the C extension. The python
  versions are just too slow to work properly.
-""") from e
+"""
+    ) from e
 
 import codecs
 import os
@@ -42,8 +44,8 @@ class MyiaDumper(SafeDumper):
 
     def __init__(self, fd):
         """Record stream, even for C."""
-        stream = os.fdopen(fd, 'wb', buffering=0, closefd=False)
-        super().__init__(stream, encoding='utf-8', explicit_end=True)
+        stream = os.fdopen(fd, "wb", buffering=0, closefd=False)
+        super().__init__(stream, encoding="utf-8", explicit_end=True)
         self.stream = stream
 
     def represent(self, data):
@@ -57,7 +59,7 @@ class MyiaLoader(SafeLoader):
 
     def __init__(self, fd):
         """Make sure reads don't block."""
-        stream = os.fdopen(fd, 'rb', buffering=0, closefd=False)
+        stream = os.fdopen(fd, "rb", buffering=0, closefd=False)
         super().__init__(stream)
 
     def determine_encoding(self):  # pragma: no cover
@@ -68,7 +70,7 @@ class MyiaLoader(SafeLoader):
         figure it out here instead.
         """
         self.raw_decode = codecs.utf_8_decode
-        self.encoding = 'utf-8'
+        self.encoding = "utf-8"
         self.raw_buffer = b""
 
     def construct_document(self, node):
@@ -103,20 +105,20 @@ class LoadedError(Exception):
 def __serialize__(self, dumper):
     data = self._serialize()
     assert isinstance(data, dict)
-    return dumper.represent_mapping(getattr(self, '@SERIAL_TAG'), data)
+    return dumper.represent_mapping(getattr(self, "@SERIAL_TAG"), data)
 
 
 def __serialize_seq__(self, dumper):
     seq = self._serialize()
     assert isinstance(seq, (tuple, list))
-    return dumper.represent_sequence(getattr(self, '@SERIAL_TAG'), seq)
+    return dumper.represent_sequence(getattr(self, "@SERIAL_TAG"), seq)
 
 
 def __serialize_scal__(self, dumper):
     scal = self._serialize()
     assert scal is not None
     assert isinstance(scal, str)
-    return dumper.represent_scalar(getattr(self, '@SERIAL_TAG'), scal)
+    return dumper.represent_scalar(getattr(self, "@SERIAL_TAG"), scal)
 
 
 def _serialize(dumper, self):
@@ -133,7 +135,9 @@ def _make_construct(cls, sequence, scalar):
         except StopIteration as e:
             if e.value is not None:
                 loader.add_finalizer(e.value)
+
     if sequence:
+
         def _construct(loader, node):  # noqa: F811
             it = cls._construct()
             yield next(it)
@@ -142,10 +146,13 @@ def _make_construct(cls, sequence, scalar):
                 it.send(data)
             except StopIteration as e:
                 return e.value
+
     if scalar:
+
         def _construct(loader, node):  # noqa: F811
             data = loader.construct_scalar(node)
             return cls._construct(data)
+
     return _construct
 
 
@@ -159,25 +166,27 @@ def serializable(tag, *, sequence=False, scalar=False, construct=True):
         construct: register the deserialization function or not
 
     """
+
     def wrapper(cls):
-        setattr(cls, '@SERIAL_TAG', tag)
-        if not hasattr(cls, '__serialize__'):
+        setattr(cls, "@SERIAL_TAG", tag)
+        if not hasattr(cls, "__serialize__"):
             method = __serialize__
             if sequence:
                 method = __serialize_seq__
             if scalar:
                 method = __serialize_scal__
-            setattr(cls, '__serialize__', method)
+            setattr(cls, "__serialize__", method)
         MyiaDumper.add_representer(cls, _serialize)
         if construct:
             _construct = _make_construct(cls, sequence, scalar)
             MyiaLoader.add_constructor(tag, _construct)
         return cls
+
     return wrapper
 
 
 def _serialize_tuple(dumper, data):
-    return dumper.represent_sequence('tuple', data)
+    return dumper.represent_sequence("tuple", data)
 
 
 def _construct_tuple(loader, node):
@@ -185,27 +194,29 @@ def _construct_tuple(loader, node):
 
 
 MyiaDumper.add_representer(tuple, _serialize_tuple)
-MyiaLoader.add_constructor('tuple', _construct_tuple)
+MyiaLoader.add_constructor("tuple", _construct_tuple)
 
 
 def _serialize_ndarray(dumper, data):
     return dumper.represent_mapping(
-        'arraydata', {'dtype': data.dtype.str, 'shape': data.shape,
-                      'data': data.tobytes()})
+        "arraydata",
+        {"dtype": data.dtype.str, "shape": data.shape, "data": data.tobytes()},
+    )
 
 
 def _construct_ndarray(loader, node):
     data = loader.construct_mapping(node)
-    res = np.frombuffer(data['data'], dtype=data['dtype'])
-    return res.reshape(data['shape'])
+    res = np.frombuffer(data["data"], dtype=data["dtype"])
+    return res.reshape(data["shape"])
 
 
 MyiaDumper.add_representer(np.ndarray, _serialize_ndarray)
-MyiaLoader.add_constructor('arraydata', _construct_ndarray)
+MyiaLoader.add_constructor("arraydata", _construct_ndarray)
 
 
 def register_npscalar(tag, cls):
     """Regsiter serialization functions for numpy scalars."""
+
     def _serialize(dumper, data):
         return dumper.represent_scalar(tag, repr(data))
 
@@ -216,21 +227,21 @@ def register_npscalar(tag, cls):
     MyiaLoader.add_constructor(tag, _construct)
 
 
-register_npscalar('float16', np.float16)
-register_npscalar('float32', np.float32)
-register_npscalar('float64', np.float64)
-register_npscalar('float128', np.float128)
+register_npscalar("float16", np.float16)
+register_npscalar("float32", np.float32)
+register_npscalar("float64", np.float64)
+register_npscalar("float128", np.float128)
 
-register_npscalar('int8', np.int8)
-register_npscalar('int16', np.int16)
-register_npscalar('int32', np.int32)
-register_npscalar('int64', np.int64)
+register_npscalar("int8", np.int8)
+register_npscalar("int16", np.int16)
+register_npscalar("int32", np.int32)
+register_npscalar("int64", np.int64)
 
-register_npscalar('uint8', np.uint8)
-register_npscalar('uint16', np.uint16)
-register_npscalar('uint32', np.uint32)
-register_npscalar('uint64', np.uint64)
-register_npscalar('bool_', np.bool_)
+register_npscalar("uint8", np.uint8)
+register_npscalar("uint16", np.uint16)
+register_npscalar("uint32", np.uint32)
+register_npscalar("uint64", np.uint64)
+register_npscalar("bool_", np.bool_)
 
 
 _OBJ_MAP = {}
@@ -242,17 +253,21 @@ def _serialize_unique(dumper, obj):
     if tag is None:
         if isinstance(obj, Exception):
             return dumper.represent_scalar(
-                'error',
-                '\n'.join(traceback.format_exception(type(obj), obj,
-                                                     obj.__traceback__)))
+                "error",
+                "\n".join(
+                    traceback.format_exception(
+                        type(obj), obj, obj.__traceback__
+                    )
+                ),
+            )
         else:
             return dumper.represent_undefined(obj)
     else:
-        return dumper.represent_scalar(tag, '')
+        return dumper.represent_scalar(tag, "")
 
 
 def _construct_unique(loader, node):
-    if node.tag == 'error':
+    if node.tag == "error":
         data = loader.construct_scalar(node)
         return LoadedError(data)
     obj = _TAG_MAP.get(node.tag, None)
@@ -300,12 +315,12 @@ def load(fd):
 
 __consolidate__ = True
 __all__ = [
-    'LoadedError',
-    'MyiaDumper',
-    'MyiaLoader',
-    'dump',
-    'load',
-    'register_npscalar',
-    'register_serialize',
-    'serializable',
+    "LoadedError",
+    "MyiaDumper",
+    "MyiaLoader",
+    "dump",
+    "load",
+    "register_npscalar",
+    "register_serialize",
+    "serializable",
 ]

@@ -17,12 +17,16 @@ def int_floordiv(x, y):
 
 
 @to_opdef
-@core(static_inline='inner')
+@core(static_inline="inner")
 def int_truediv(x, y):
     """Implementation of `int_truediv`."""
     if hastype(x, typeof(y)):
-        if (hastype(x, i8) or hastype(x, u8) or
-                hastype(x, i16) or hastype(x, u16)):
+        if (
+            hastype(x, i8)
+            or hastype(x, u8)
+            or hastype(x, i16)
+            or hastype(x, u16)
+        ):
             return scalar_div(scalar_cast(x, f32), scalar_cast(y, f32))
         return scalar_div(scalar_cast(x, f64), scalar_cast(y, f64))
     else:

@@ -1,4 +1,3 @@
-
 import typing
 from dataclasses import dataclass
 
@@ -27,11 +26,11 @@ MD = MD * 0.1
 #############
 
 
-def ones(*shp, dtype='float64'):
+def ones(*shp, dtype="float64"):
     return _ones(shp, dtype=dtype)
 
 
-def zeros(*shp, dtype='float64'):
+def zeros(*shp, dtype="float64"):
     return _zeros(shp, dtype=dtype)
 
 
@@ -69,7 +68,7 @@ class Model:
 #########
 
 
-def make_model(dtype='float64'):
+def make_model(dtype="float64"):
     return Model(
         layers=(
             TanhLayer(MA(6, 9, dtype=dtype), zeros(1, 9, dtype=dtype)),
@@ -80,25 +79,22 @@ def make_model(dtype='float64'):
 
 
 Model_t = from_value(make_model(), broaden=True)
-Model_t_f32 = from_value(make_model('float32'), broaden=True)
+Model_t_f32 = from_value(make_model("float32"), broaden=True)
 
 
 def cost(model, x, y):
     yy = model.apply(x)
-    diff = (yy - y)
+    diff = yy - y
     return (array_reduce(scalar_add, diff ** 2, ())).item()
 
 
 @mt(
-    infer_standard(make_model(), MC(3, 6),
-                   result=af64_of(3, 8)),
-    infer_standard(make_model('float32'), MC(3, 6),
-                   result=InferenceError),
-    infer_standard(make_model('float32'), MC(3, 6, dtype='float32'),
-                   result=af32_of(3, 8)),
-    infer_standard(make_model(), MC(3, 9),
-                   result=InferenceError),
-
+    infer_standard(make_model(), MC(3, 6), result=af64_of(3, 8)),
+    infer_standard(make_model("float32"), MC(3, 6), result=InferenceError),
+    infer_standard(
+        make_model("float32"), MC(3, 6, dtype="float32"), result=af32_of(3, 8)
+    ),
+    infer_standard(make_model(), MC(3, 9), result=InferenceError),
     run(make_model(), MC(3, 6)),
 )
 def test_forward(model, x):
@@ -106,23 +102,24 @@ def test_forward(model, x):
 
 
 @mt(
-    infer_standard(make_model(), MC(3, 6), MC(3, 8),
-                   result=make_model()),
-    infer_standard(make_model(), MC(3, 6), MC(3, 9),
-                   result=InferenceError),
-    infer_standard(make_model('float32'), MC(3, 6), MC(3, 8),
-                   result=InferenceError),
-    infer_standard(make_model('float32'),
-                   MC(3, 6, dtype='float32'),
-                   MC(3, 8, dtype='float32'),
-                   result=make_model('float32')),
+    infer_standard(make_model(), MC(3, 6), MC(3, 8), result=make_model()),
+    infer_standard(make_model(), MC(3, 6), MC(3, 9), result=InferenceError),
+    infer_standard(
+        make_model("float32"), MC(3, 6), MC(3, 8), result=InferenceError
+    ),
+    infer_standard(
+        make_model("float32"),
+        MC(3, 6, dtype="float32"),
+        MC(3, 8, dtype="float32"),
+        result=make_model("float32"),
+    ),
 )
 def test_backward_infer(model, x, y):
     return grad(cost)(model, x, y)
 
 
-@gradient(make_model(), MC(3, 6), MD(3, 8),
-          pipeline=standard_pipeline,
-          rel_error=1e-1)
+@gradient(
+    make_model(), MC(3, 6), MD(3, 8), pipeline=standard_pipeline, rel_error=1e-1
+)
 def test_backward_specialize(model, x, y):
     return cost(model, x, y)

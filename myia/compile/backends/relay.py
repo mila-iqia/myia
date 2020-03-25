@@ -65,7 +65,6 @@ SIMPLE_MAP = {
     P.scalar_trunc: relay.op.trunc,
     P.scalar_sign: relay.sign,
     P.scalar_abs: relay.abs,
-
     P.scalar_eq: relay.op.equal,
     P.scalar_lt: relay.op.less,
     P.scalar_gt: relay.op.greater,
@@ -82,10 +81,8 @@ SIMPLE_MAP = {
     P.bool_or: relay.op.logical_or,
     P.bool_eq: relay.op.equal,
     P.bool_not: relay.op.logical_not,
-
     P.array_to_scalar: lambda x: x,
     P.dot: lambda x, y: relay.op.nn.dense(x, relay.op.transpose(y)),
-
     P.make_tuple: lambda *args: relay.Tuple(args),
     P.switch: relay.If,
     P.take: lambda w, i: relay.take(w, i, 0),
@@ -119,7 +116,7 @@ def relay_reshape(c, v, shp):
         shp = shp.value
     res = relay.op.reshape(nv, newshape=shp)
     if trim:
-        res = relay.op.take(res, relay.const(0), mode='fast')
+        res = relay.op.take(res, relay.const(0), mode="fast")
     return res
 
 
@@ -163,7 +160,8 @@ def relay_array_reduce(c, fn, array, shape):
             res = relay.op.prod(ary)
         else:
             raise NotImplementedError(
-                'We currently support only full product on an array.')
+                "We currently support only full product on an array."
+            )
         return res
     else:
         raise NotImplementedError(f"reduce with {fn}")
@@ -189,11 +187,12 @@ def relay_tuple_setitem(c, t, idx, val):
     new_value = c.ref(val)
     value_idx = idx.value
     return relay.expr.Tuple(
-        [relay.expr.TupleGetItem(tuple_value, i)
-         for i in range(value_idx)]
+        [relay.expr.TupleGetItem(tuple_value, i) for i in range(value_idx)]
         + [new_value]
-        + [relay.expr.TupleGetItem(tuple_value, i)
-           for i in range(value_idx + 1, len_tuple)]
+        + [
+            relay.expr.TupleGetItem(tuple_value, i)
+            for i in range(value_idx + 1, len_tuple)
+        ]
     )
 
 
@@ -210,8 +209,9 @@ def relay_hastag(c, x, tag):
     """Implementation of hastag for Relay."""
     assert tag.is_constant(int)
     rtag = get_union_ctr(tag.value, x.abstract.options.get(tag.value))
-    t_clause = adt.Clause(adt.PatternConstructor(
-        rtag, [adt.PatternWildcard()]), relay.const(True))
+    t_clause = adt.Clause(
+        adt.PatternConstructor(rtag, [adt.PatternWildcard()]), relay.const(True)
+    )
     f_clause = adt.Clause(adt.PatternWildcard(), relay.const(False))
     return adt.Match(c.ref(x), [t_clause, f_clause])
 
@@ -245,15 +245,16 @@ def relay_array_getitem(c, a, start, stop, strides):
     assert start.is_constant(tuple)
     assert stop.is_constant(tuple)
     assert strides.is_constant(tuple)
-    return relay.op.transform.strided_slice(c.ref(a), start.value, stop.value,
-                                            strides.value)
+    return relay.op.transform.strided_slice(
+        c.ref(a), start.value, stop.value, strides.value
+    )
 
 
 def relay_argmax(c, v, dims):
     """Implementation of argmax for Relay."""
     v = c.ref(v)
     assert dims.is_constant(tuple)
-    return relay.cast(relay.argmax(v, axis=dims.value), 'int64')
+    return relay.cast(relay.argmax(v, axis=dims.value), "int64")
 
 
 def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
@@ -264,8 +265,13 @@ def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
     assert ceil_mode.is_constant(bool)
     assert dil.value == (1, 1)
 
-    return relay.nn.max_pool2d(c.ref(img), psize.value, stride.value,
-                               pad.value, ceil_mode=ceil_mode.value)
+    return relay.nn.max_pool2d(
+        c.ref(img),
+        psize.value,
+        stride.value,
+        pad.value,
+        ceil_mode=ceil_mode.value,
+    )
 
 
 def relay_max_pool2d_grad(c, img, psize, stride, pad, dil, ceil_mode, dout):
@@ -276,9 +282,14 @@ def relay_max_pool2d_grad(c, img, psize, stride, pad, dil, ceil_mode, dout):
     assert ceil_mode.is_constant(bool)
     assert dil.value == (1, 1)
 
-    return relay.nn.max_pool2d_grad(c.ref(dout), c.ref(img), psize.value,
-                                    stride.value, pad.value,
-                                    ceil_mode=ceil_mode.value)
+    return relay.nn.max_pool2d_grad(
+        c.ref(dout),
+        c.ref(img),
+        psize.value,
+        stride.value,
+        pad.value,
+        ceil_mode=ceil_mode.value,
+    )
 
 
 def relay_array_max(c, a, dim):
@@ -292,9 +303,14 @@ def relay_conv2d(c, img, w, stride, pad, dil, groups):
     assert dil.is_constant(tuple)
     assert groups.is_constant(int)
 
-    return relay.nn.conv2d(c.ref(img), c.ref(w), strides=stride.value,
-                           padding=pad.value, dilation=dil.value,
-                           groups=groups.value)
+    return relay.nn.conv2d(
+        c.ref(img),
+        c.ref(w),
+        strides=stride.value,
+        padding=pad.value,
+        dilation=dil.value,
+        groups=groups.value,
+    )
 
 
 def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
@@ -319,33 +335,52 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
     fpad_bottom = fpad_h - fpad_top
     fpad_right = fpad_w - fpad_left
 
-    padded_weight_grad_h = ((in_h - (grad_h - 1) * stride.value[0] - 1 +
-                             fpad_top + fpad_bottom) // dil.value[0] + 1)
-    padded_weight_grad_w = ((in_w - (grad_w - 1) * stride.value[1] - 1 +
-                             fpad_left + fpad_right) // dil.value[1] + 1)
+    padded_weight_grad_h = (
+        in_h - (grad_h - 1) * stride.value[0] - 1 + fpad_top + fpad_bottom
+    ) // dil.value[0] + 1
+    padded_weight_grad_w = (
+        in_w - (grad_w - 1) * stride.value[1] - 1 + fpad_left + fpad_right
+    ) // dil.value[1] + 1
 
     dout = relay.tile(dout, [1, in_channel // groups.value, 1, 1])
     dout = relay.reshape(dout, [-1, 1, 0, 0])
     data = relay.reshape(data, [1, -1, 0, 0])
 
-    d = relay.nn.conv2d(data, dout, strides=dil.value, padding=pad.value,
-                        dilation=stride.value, groups=batch * in_channel)
-    d = relay.reshape(d, [batch, in_channel // groups.value, out_channel,
-                          padded_weight_grad_h, padded_weight_grad_w])
+    d = relay.nn.conv2d(
+        data,
+        dout,
+        strides=dil.value,
+        padding=pad.value,
+        dilation=stride.value,
+        groups=batch * in_channel,
+    )
+    d = relay.reshape(
+        d,
+        [
+            batch,
+            in_channel // groups.value,
+            out_channel,
+            padded_weight_grad_h,
+            padded_weight_grad_w,
+        ],
+    )
     d = relay.sum(d, axis=0)
     d = relay.transpose(d, [1, 0, 2, 3])
     if padded_weight_grad_h > filter_h or padded_weight_grad_w > filter_w:
-        d = relay.strided_slice(d, begin=[0, 0, 0, 0],
-                                end=[None, None, filter_h, filter_w])
+        d = relay.strided_slice(
+            d, begin=[0, 0, 0, 0], end=[None, None, filter_h, filter_w]
+        )
     return d
 
 
-def relay_conv_transpose2d(c, input, weight, bias, stride, padding,
-                           output_padding, groups, dilation):
+def relay_conv_transpose2d(
+    c, input, weight, bias, stride, padding, output_padding, groups, dilation
+):
 
     if not bias.is_constant(type(None)):
-        raise NotImplementedError('conv_transpose2d: bias not yet supported '
-                                  'in relay backend.')
+        raise NotImplementedError(
+            "conv_transpose2d: bias not yet supported " "in relay backend."
+        )
 
     assert stride.is_constant(tuple)
     assert padding.is_constant(tuple)
@@ -359,22 +394,26 @@ def relay_conv_transpose2d(c, input, weight, bias, stride, padding,
     _, w_c, filter_h, filter_w = weight_shape
     _i = c.ref(input)
     _w = c.ref(weight)
-    return relay.nn.conv2d_transpose(_i, _w,
-                                     strides=stride.value,
-                                     padding=padding.value,
-                                     dilation=dilation.value,
-                                     groups=groups.value,
-                                     output_padding=output_padding.value,
-                                     kernel_size=(filter_h, filter_w),
-                                     channels=in_channels)
+    return relay.nn.conv2d_transpose(
+        _i,
+        _w,
+        strides=stride.value,
+        padding=padding.value,
+        dilation=dilation.value,
+        groups=groups.value,
+        output_padding=output_padding.value,
+        kernel_size=(filter_h, filter_w),
+        channels=in_channels,
+    )
 
 
 def relay_concat(c, x, dim):
     assert dim.is_constant(int)
 
     xr = c.ref(x)
-    inputs = [relay.expr.TupleGetItem(xr, i)
-              for i in range(len(x.abstract.elements))]
+    inputs = [
+        relay.expr.TupleGetItem(xr, i) for i in range(len(x.abstract.elements))
+    ]
     return relay.concatenate(inputs, dim.value)
 
 
@@ -402,8 +441,9 @@ def relay_universe_getitem(c, u, h):
 def relay_take_grad_inp(c, _nb_indices, _indices, _values):
     assert _nb_indices.is_constant(int)
     values = c.ref(_values)
-    r_indices = relay.reshape(c.ref(_indices),
-                              tuple(_indices.abstract.xshape()) + (1,))
+    r_indices = relay.reshape(
+        c.ref(_indices), tuple(_indices.abstract.xshape()) + (1,)
+    )
     n_rows = _nb_indices.value
     n_cols = _values.abstract.xshape()[-1]
     outputs = []
@@ -428,8 +468,8 @@ def relay_random_initialize(c, ref_seed):
     """
     assert ref_seed.is_constant(type(None)) or ref_seed.is_constant(int)
     seed = ref_seed.value
-    key = relay.const(seed, 'uint32')
-    counter = relay.const(0, 'uint32')
+    key = relay.const(seed, "uint32")
+    counter = relay.const(0, "uint32")
     rstate = relay.Tuple((key, counter))
     return rstate
 
@@ -455,10 +495,11 @@ def relay_random_uint32(c, ref_rstate, ref_shape):
         random = relay.op.reshape(random, shape)
     else:
         # Convert 1-element vector to scalar
-        random = relay.op.take(random, relay.const(0), mode='fast')
+        random = relay.op.take(random, relay.const(0), mode="fast")
     # Generate next state: same key, counter + 1
-    next_rstate = relay.Tuple((
-        key, relay.add(counter, relay.const(1, 'uint32'))))
+    next_rstate = relay.Tuple(
+        (key, relay.add(counter, relay.const(1, "uint32")))
+    )
     # Return next state and random tensor.
     return relay.Tuple((next_rstate, random))
 
@@ -518,8 +559,7 @@ class RelayMapper:
     def register_simple(self, map):
         """Register simple conversions (1:1 map to relay ops)."""
         for k, v in map.items():
-            self.register(k, lambda c, *args, v=v: v(*[c.ref(a)
-                                                       for a in args]))
+            self.register(k, lambda c, *args, v=v: v(*[c.ref(a) for a in args]))
 
     def register_complex(self, map):
         """Register complex conversions."""
@@ -561,27 +601,31 @@ class NodeVisitor:
             fn = node.inputs[0]
             if fn.is_constant(Primitive):
                 prim = fn.value
-                visit = getattr(self, f'_visit_{prim}', None)
+                visit = getattr(self, f"_visit_{prim}", None)
                 if visit is None:
                     return node.inputs[1:]
                 return visit(node)
             else:
                 return node.inputs
         elif node.is_constant_graph():
-            return [fv if not isinstance(fv, Graph) else
-                    list(fv.manager.graph_constants[fv])[0]
-                    for fv in node.value.free_variables_total]
+            return [
+                fv
+                if not isinstance(fv, Graph)
+                else list(fv.manager.graph_constants[fv])[0]
+                for fv in node.value.free_variables_total
+            ]
         return []
 
 
 def in_graph(g):
     def filter(node):
         if node.graph is None:
-            return 'follow'
+            return "follow"
         elif node.graph is g:
-            return 'follow'
+            return "follow"
         else:
-            return 'exclude'
+            return "exclude"
+
     return filter
 
 
@@ -618,8 +662,7 @@ class RelayConstantConverter(Converter):
         return self.types.build_default_env_val()
 
     def convert_tuple(self, v, t):
-        return relay.Tuple([self(e, et) for e, et in
-                            zip(v, t.elements)])
+        return relay.Tuple([self(e, et) for e, et in zip(v, t.elements)])
 
     def convert_tagged(self, v, t):
         real_t = t.options.get(v.tag)
@@ -674,8 +717,9 @@ class CompileGraph:
 
         add_functions(self.module, function_map)
 
-        vm = relay.create_executor(mod=self.module, ctx=context,
-                                   target=target, kind=exec_kind)
+        vm = relay.create_executor(
+            mod=self.module, ctx=context, target=target, kind=exec_kind
+        )
         res = vm.evaluate()
 
         fill_reverse_tag_map()
@@ -684,13 +728,14 @@ class CompileGraph:
 
         def f(*args):
             return wrap_result(res(*args))
+
         return f
 
     def on_parameter(self, node):
         """Convert a parameter node."""
         return relay.var(
-            node.debug.debug_name,
-            type_annotation=to_relay_type(node.abstract))
+            node.debug.debug_name, type_annotation=to_relay_type(node.abstract)
+        )
 
     def on_apply(self, node):
         """Convert an Apply node."""
@@ -699,14 +744,16 @@ class CompileGraph:
             conv = MAP.get(fn)
             if conv is not None:
                 return conv(self, *node.inputs[1:])
-        return relay.Call(self.ref(node.inputs[0]),
-                          [self.ref(i) for i in node.inputs[1:]])
+        return relay.Call(
+            self.ref(node.inputs[0]), [self.ref(i) for i in node.inputs[1:]]
+        )
 
     def on_constant(self, node):
         """Convert a constant node."""
         if node.is_constant(Primitive):
             return self.convert_func(
-                get_prim_graph({}, node.value, node.abstract))
+                get_prim_graph({}, node.value, node.abstract)
+            )
         return self.make_const(node.value, node.abstract)
 
     def ref(self, node):
@@ -727,7 +774,7 @@ class CompileGraph:
             elif node.is_constant_graph() and node.value.parent is None:
                 self.node_map[node] = self.graph_map[node.value]
             else:
-                self.node_map[node] = relay.var(f'seq.{self.i}')
+                self.node_map[node] = relay.var(f"seq.{self.i}")
                 self.i += 1
                 seq.append(node)
 
@@ -749,8 +796,9 @@ class CompileGraph:
                 raise AssertionError(f"Bad node for sequence: {op}")
             out = relay.Let(var, val, out)
 
-        return relay.Function(params, out,
-                              ret_type=to_relay_type(graph.output.abstract))
+        return relay.Function(
+            params, out, ret_type=to_relay_type(graph.output.abstract)
+        )
 
 
 compiler = CompileGraph()
@@ -772,8 +820,9 @@ class RelayInputConverter(Converter):
 
     def convert_scalar(self, v, t):
         """Convert the scalar to a TVM array."""
-        return tvm.runtime.ndarray.array(getattr(np, type_to_np_dtype(t))(v),
-                                         self.context)
+        return tvm.runtime.ndarray.array(
+            getattr(np, type_to_np_dtype(t))(v), self.context
+        )
 
     def convert_bool(self, v, t):
         """Convert the scalar to a TVM array."""
@@ -798,8 +847,9 @@ class RelayInputConverter(Converter):
         self.th.initialize(mod, None)
         cst = self.cst_conv.convert_tagged(v, t)
         mod["main"] = relay.Function([], cst)
-        vm = relay.create_executor(ctx=self.context, mod=mod,
-                                   kind=self.exec_kind)
+        vm = relay.create_executor(
+            ctx=self.context, mod=mod, kind=self.exec_kind
+        )
         return vm.evaluate()()
 
     def convert_type(self, v, t):
@@ -831,8 +881,7 @@ class RelayOutputConverter(Converter):
 
     def convert_tuple(self, v, t):
         """Convert the value to a tuple."""
-        return tuple(self(v, t)
-                     for v, t in zip(v, t.elements))
+        return tuple(self(v, t) for v, t in zip(v, t.elements))
 
     def convert_handle(self, v, t):
         return HandleInstance(self(v.value, t.element))
@@ -864,24 +913,28 @@ class RelayBackend(Backend):
         """Create a Relay backend for the given device."""
         device_id = int(device_id)
         self.context = tvm.runtime.ndarray.context(target, device_id)
-        if target == 'cpu':
-            target = 'llvm'
+        if target == "cpu":
+            target = "llvm"
         self.target = target
         if not self.context.exist:
-            raise RuntimeError("No hardware to support selected target "
-                               f"'{target}' on device {device_id}")
-        if exec_kind not in ('vm', 'debug'):
+            raise RuntimeError(
+                "No hardware to support selected target "
+                f"'{target}' on device {device_id}"
+            )
+        if exec_kind not in ("vm", "debug"):
             raise ValueError(f"Invalid exec_kind: {exec_kind}")
         self.exec_kind = exec_kind
         self.compiler = compiler
-        self.to_backend_value = RelayInputConverter(self.context,
-                                                    self.exec_kind)
+        self.to_backend_value = RelayInputConverter(
+            self.context, self.exec_kind
+        )
         self.from_backend_value = RelayOutputConverter()
 
     def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
-        return self.compiler.run(graph, self.context, self.target,
-                                 self.exec_kind)
+        return self.compiler.run(
+            graph, self.context, self.target, self.exec_kind
+        )
 
 
 def RelayBackendR(target, device_id, exec_kind):
@@ -889,7 +942,4 @@ def RelayBackendR(target, device_id, exec_kind):
     return HandleBackend(RelayBackend(target, device_id, exec_kind))
 
 
-__all__ = [
-    'RelayBackend',
-    'RelayBackendR',
-]
+__all__ = ["RelayBackend", "RelayBackendR"]

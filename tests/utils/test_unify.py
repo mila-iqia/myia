@@ -39,8 +39,8 @@ def test_Var():
     assert v1.matches(v2)
     assert v1.matches(object())
     assert str(v1) == v1.tag
-    v3 = Var('name')
-    assert repr(v3) == 'Var(name)'
+    v3 = Var("name")
+    assert repr(v3) == "Var(name)"
     repr(v2)
     assert v1.tag != v2.tag
 
@@ -68,11 +68,10 @@ def test_RestrictedVar():
     assert v3.intersection(v2) is v2
     assert v4.intersection(v5) is False
     assert v5.intersection(var()) is NotImplemented
-    assert repr(v1) == f'RestrictedVar({v1.tag}, (2, 3))'
+    assert repr(v1) == f"RestrictedVar({v1.tag}, (2, 3))"
 
 
 def test_FilterVar():
-
     def floats(v):
         return isinstance(v, float)
 
@@ -112,12 +111,12 @@ def test_FilterVar():
     assert v4.intersection(v4) is v4
     assert v4.intersection(var()) is NotImplemented
     assert str(v1) == v1.tag
-    assert repr(v1) == f'FilterVar({v1.tag}, {floats.__name__})'
+    assert repr(v1) == f"FilterVar({v1.tag}, {floats.__name__})"
 
 
 def test_Seq():
     s = Seq((1, 2, 3))
-    assert repr(s) == 'Seq(1, 2, 3)'
+    assert repr(s) == "Seq(1, 2, 3)"
 
 
 def test_SVar():
@@ -126,8 +125,8 @@ def test_SVar():
     assert not sv.matches((1, 2))
     assert sv.matches(Seq((1,)))
     ssv = str(sv)
-    assert ssv == f'*{sv.tag}'
-    assert repr(sv) == f'SVar({sv.tag})'
+    assert ssv == f"*{sv.tag}"
+    assert repr(sv) == f"SVar({sv.tag})"
     sv2 = SVar(var(filter=(True, False, 0, 1)))
     assert sv.matches(sv2)
     assert sv2.matches(Seq((True, False, 1)))
@@ -141,7 +140,7 @@ def test_UnionVar():
         uv.matches(None)
 
     ruv = repr(uv)
-    assert ruv == f'UnionVar({uv.tag}, {{[1], (1,)}})'
+    assert ruv == f"UnionVar({uv.tag}, {{[1], (1,)}})"
 
 
 def test_expandlist():
@@ -152,6 +151,7 @@ def test_expandlist():
 def test_noseq():
     def f(x):
         return x
+
     assert noseq(f, 1) == 1
 
     with pytest.raises(TypeError):
@@ -394,8 +394,9 @@ def test_unify_svar():
     sv1 = svar()
     sv2 = svar()
 
-    d = TU.unify_raw(L([v1, (sv1,), (v1, sv1)]), L([v2, v3, (v2, sv2)]),
-                     {v3: (1, 2, 3)})
+    d = TU.unify_raw(
+        L([v1, (sv1,), (v1, sv1)]), L([v2, v3, (v2, sv2)]), {v3: (1, 2, 3)}
+    )
     assert d[sv2] == (1, 2, 3)
 
 
@@ -438,7 +439,6 @@ def test_unify_restrictedvars():
 
 
 def test_unify_filtervars():
-
     def floats(v):
         return isinstance(v, float)
 
@@ -480,15 +480,9 @@ def test_data():
     v1 = var()
     v2 = var()
 
-    a = {
-        'x': v1,
-        'y': [1, v1, 2, 101],
-    }
+    a = {"x": v1, "y": [1, v1, 2, 101]}
 
-    b = {
-        'y': [1, 100, 2, v2],
-        'x': 100,
-    }
+    b = {"y": [1, 100, 2, v2], "x": 100}
 
     u = TU.unify(a, b)
     assert u == {v1: 100, v2: 101}

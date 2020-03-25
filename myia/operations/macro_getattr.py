@@ -26,7 +26,7 @@ async def _resolve_case(resources, data, data_t, item_v):
         mro = data_t.mro()
 
     if is_cls and item_v in data.attributes:
-        return ('field', item_v)
+        return ("field", item_v)
 
     for t in mro:
         if t in mmap:
@@ -34,34 +34,33 @@ async def _resolve_case(resources, data, data_t, item_v):
             if item_v in mmap_t:
                 method = mmap_t[item_v]
                 if method is ABSENT:
-                    return ('no method',)
-                return ('method', method)
+                    return ("no method",)
+                return ("method", method)
 
         if item_v in vars(t):
-            return ('method', getattr(data_t, item_v))
+            return ("method", getattr(data_t, item_v))
 
     if is_cls:
-        return ('no_method',)
+        return ("no_method",)
     else:
-        return ('static',)
+        return ("static",)
 
 
 async def _attr_case(info, data, attr_v):
     data_t = data.xtype()
     if attr_v is ANYTHING:
         raise InferenceError(
-            'The value of the attribute could not be inferred.'
+            "The value of the attribute could not be inferred."
         )
     elif not isinstance(attr_v, str):  # pragma: no cover
         raise MyiaTypeError(
-            f'Argument to getattr must be a string, not {attr_v}.'
+            f"Argument to getattr must be a string, not {attr_v}."
         )
 
     resources = info.engine.resources
     if isinstance(data_t, Pending):
         return await lib.find_coherent_result(
-            data_t,
-            lambda t: _resolve_case(resources, data, t, attr_v)
+            data_t, lambda t: _resolve_case(resources, data, t, attr_v)
         )
     else:
         return await _resolve_case(resources, data, data_t, attr_v)
@@ -78,7 +77,7 @@ async def _union_make(info, op):
     currg = info.graph
     opts = await lib.force_pending(data.options)
     for i, opt in enumerate(opts):
-        last = (i == len(opts) - 1)
+        last = i == len(opts) - 1
         if last:
             falseg = None
             cast = currg.apply(P.unsafe_static_cast, r_data.node, opt)
@@ -113,18 +112,18 @@ async def getattr_(info, r_data, r_attr):
     attr_v = build_value(attr, default=ANYTHING)
     case, *args = await _attr_case(info, data, attr_v)
 
-    if case == 'field':
+    if case == "field":
         # Get field from Class
         return g.apply(P.record_getitem, r_data.node, attr_v)
 
-    elif case == 'method':
-        method, = args
+    elif case == "method":
+        (method,) = args
         if isinstance(method, property):
             return g.apply(method.fget, r_data.node)
         else:
             return g.apply(P.partial, method, r_data.node)
 
-    elif case == 'no_method':
+    elif case == "no_method":
         msg = f"object of type {data} has no attribute '{attr_v}'"
         raise MyiaAttributeError(msg)
 
@@ -141,13 +140,13 @@ async def getattr_(info, r_data, r_attr):
         except AttributeError as e:
             raise MyiaAttributeError(str(e))
         except Exception as e:  # pragma: no cover
-            raise InferenceError(f'Unexpected error in getter: {e!r}')
+            raise InferenceError(f"Unexpected error in getter: {e!r}")
         return Constant(raw)
 
 
 __operation_defaults__ = {
-    'name': 'getattr',
-    'registered_name': 'getattr',
-    'mapping': getattr_,
-    'python_implementation': getattr,
+    "name": "getattr",
+    "registered_name": "getattr",
+    "mapping": getattr_,
+    "python_implementation": getattr,
 }

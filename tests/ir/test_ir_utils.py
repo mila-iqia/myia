@@ -1,4 +1,3 @@
-
 from myia.debug.label import short_labeler
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
@@ -70,7 +69,7 @@ def _name_nodes(nodes):
     def name(node):
         return short_labeler.label(node, fn_label=False)
 
-    return set(map(name, nodes)) - {'·'}
+    return set(map(name, nodes)) - {"·"}
 
 
 def test_dfs_variants():
@@ -79,29 +78,30 @@ def test_dfs_variants():
 
         def g(y):
             return y + z
+
         w = z + 3
         q = g(w)
         return q
 
     graph = parse(f)
-    inner_graph_ct, = [x for x in dfs(graph.return_) if x.is_constant_graph()]
+    (inner_graph_ct,) = [x for x in dfs(graph.return_) if x.is_constant_graph()]
     inner_graph = inner_graph_ct.value
 
     inner_ret = inner_graph.return_
 
     deep = _name_nodes(_dfs(inner_ret, succ_deep))
-    assert deep == set('return scalar_add y z scalar_mul x'.split())
+    assert deep == set("return scalar_add y z scalar_mul x".split())
 
     deeper = _name_nodes(_dfs(inner_ret, succ_deeper))
-    assert deeper == set('return scalar_add y z scalar_mul x w 3 q g'.split())
+    assert deeper == set("return scalar_add y z scalar_mul x w 3 q g".split())
 
     _bound_fv = freevars_boundary(inner_graph, True)
     bound_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _bound_fv))
-    assert bound_fv == set('return scalar_add y z'.split())
+    assert bound_fv == set("return scalar_add y z".split())
 
     _no_fv = freevars_boundary(inner_graph, False)
     no_fv = _name_nodes(_dfs(inner_ret, succ_deeper, _no_fv))
-    assert no_fv == set('return scalar_add y'.split())
+    assert no_fv == set("return scalar_add y".split())
 
     _excl_root = exclude_from_set([inner_ret])
     excl_root = _name_nodes(_dfs(inner_ret, succ_deeper, _excl_root))
@@ -142,18 +142,21 @@ def test_isomorphic_closures():
     def f1(x):
         def inner1(y):
             return x * y
+
         return inner1(10)
 
     @parse
     def f2(a):
         def inner2(b):
             return a * b
+
         return inner2(10)
 
     @parse
     def f3(a):
         def inner3(b):
             return a + b
+
         return inner3(10)
 
     _check_isomorphic(f1, f2, True)
@@ -165,7 +168,7 @@ def test_isomorphic_closures():
     # inner1 and inner2 are not considered isomorphic because their free
     # variables are not matched together. They are matched together when we
     # check from f1 and f2, but not when we start from the closures directly.
-    _check_isomorphic(idx1['inner1'], idx2['inner2'], False)
+    _check_isomorphic(idx1["inner1"], idx2["inner2"], False)
 
 
 def test_isomorphic_globals():
@@ -200,7 +203,6 @@ def test_isomorphic_globals():
 
 
 def test_isomorphic_recursion():
-
     def f1(x):
         if x < 0:
             return x
@@ -253,18 +255,21 @@ def test_helpers():
 
 def test_print_graph():
     g = Graph()
-    g.debug.name = 'testfn'
+    g.debug.name = "testfn"
     p = g.add_parameter()
-    p.debug.name = 'a'
+    p.debug.name = "a"
     p2 = g.add_parameter()
-    p2.debug.name = 'b'
+    p2.debug.name = "b"
     c = g.constant(1)
     g.output = g.apply(g, c, p2)
-    g.output.debug.name = '_apply0'
+    g.output.debug.name = "_apply0"
 
     s = print_graph(g)
-    assert s == """graph testfn(%a, %b) {
+    assert (
+        s
+        == """graph testfn(%a, %b) {
   %_apply0 = @testfn(1, %b)
   return %_apply0
 }
 """
+    )

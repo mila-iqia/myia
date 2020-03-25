@@ -17,8 +17,9 @@ def debugvm_tuple_getitem(vm, data, item):
 
 
 @standard_prim(P.tuple_getitem)
-async def infer_tuple_getitem(self, engine,
-                              arg: lib.AbstractTuple, idx: xtype.Int[64]):
+async def infer_tuple_getitem(
+    self, engine, arg: lib.AbstractTuple, idx: xtype.Int[64]
+):
     """Infer the return type of primitive `tuple_getitem`."""
     nelems = len(arg.elements)
     idx_v = self.require_constant(idx, argnum=2, range=range(-nelems, nelems))
@@ -28,24 +29,23 @@ async def infer_tuple_getitem(self, engine,
 @bprop_to_grad_transform(P.tuple_getitem, ignore_values=False)
 def bprop_tuple_getitem(data, idx, out, dout):
     """Backpropagator for primitive `tuple_getitem`."""
-    return (tuple_setitem(zeros_like(data), idx, dout),
-            zeros_like(idx))
+    return (tuple_setitem(zeros_like(data), idx, dout), zeros_like(idx))
 
 
 __operation_defaults__ = {
-    'name': 'tuple_getitem',
-    'registered_name': 'tuple_getitem',
-    'mapping': P.tuple_getitem,
-    'python_implementation': pyimpl_tuple_getitem,
+    "name": "tuple_getitem",
+    "registered_name": "tuple_getitem",
+    "mapping": P.tuple_getitem,
+    "python_implementation": pyimpl_tuple_getitem,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'tuple_getitem',
-    'registered_name': 'tuple_getitem',
-    'type': 'backend',
-    'python_implementation': pyimpl_tuple_getitem,
-    'debugvm_implementation': debugvm_tuple_getitem,
-    'inferrer_constructor': infer_tuple_getitem,
-    'grad_transform': bprop_tuple_getitem,
+    "name": "tuple_getitem",
+    "registered_name": "tuple_getitem",
+    "type": "backend",
+    "python_implementation": pyimpl_tuple_getitem,
+    "debugvm_implementation": debugvm_tuple_getitem,
+    "inferrer_constructor": infer_tuple_getitem,
+    "grad_transform": bprop_tuple_getitem,
 }

@@ -14,25 +14,23 @@ def pyimpl_scalar_cos(x: Number) -> Number:
 
 
 infer_scalar_cos = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_cos,
-    impl=pyimpl_scalar_cos,
-    infer_value=False
+    prim=P.scalar_cos, impl=pyimpl_scalar_cos, infer_value=False
 )
 
 
 __operation_defaults__ = {
-    'name': 'scalar_cos',
-    'registered_name': 'scalar_cos',
-    'mapping': P.scalar_cos,
-    'python_implementation': pyimpl_scalar_cos,
+    "name": "scalar_cos",
+    "registered_name": "scalar_cos",
+    "mapping": P.scalar_cos,
+    "python_implementation": pyimpl_scalar_cos,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_cos',
-    'registered_name': 'scalar_cos',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_cos,
-    'inferrer_constructor': infer_scalar_cos,
-    'grad_transform': None,
+    "name": "scalar_cos",
+    "registered_name": "scalar_cos",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_cos,
+    "inferrer_constructor": infer_scalar_cos,
+    "grad_transform": None,
 }

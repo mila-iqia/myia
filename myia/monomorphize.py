@@ -79,7 +79,7 @@ def type_fixer(finder, monomorphizer=None):
             g = monomorphizer.results[ctx]
             return VirtualFunction(
                 tuple(self(p.abstract) for p in g.parameters),
-                self(g.return_.abstract)
+                self(g.return_.abstract),
             )
         else:
             return DummyFunction()
@@ -88,14 +88,13 @@ def type_fixer(finder, monomorphizer=None):
     def _fix_type(self, a: PartialApplication):
         vfn = self(a.fn)
         if isinstance(vfn, VirtualFunction):
-            vfn = VirtualFunction(vfn.args[len(a.args):], vfn.output)
+            vfn = VirtualFunction(vfn.args[len(a.args) :], vfn.output)
         return vfn
 
     @fn.register  # noqa: F811
     def _fix_type(self, a: VirtualFunction):
         return (yield VirtualFunction)(
-            tuple(self(arg) for arg in a.args),
-            self(a.output)
+            tuple(self(arg) for arg in a.args), self(a.output)
         )
 
     @fn.register  # noqa: F811
@@ -103,8 +102,9 @@ def type_fixer(finder, monomorphizer=None):
         def _jtag(x):
             if isinstance(x, AbstractFunction):
                 v = x.get_sync()
-                rval = AbstractFunction(*[self(JTransformedFunction(poss))
-                                        for poss in v])
+                rval = AbstractFunction(
+                    *[self(JTransformedFunction(poss)) for poss in v]
+                )
             else:
                 rval = AbstractJTagged(self(x))
             return rval
@@ -120,7 +120,7 @@ def type_fixer(finder, monomorphizer=None):
     def _fix_type(self, a: AbstractFunction):
         vfns = self(a.get_sync())
         if len(vfns) == 1:
-            vfn, = vfns
+            (vfn,) = vfns
         else:
             vfns = [v for v in vfns if not isinstance(v, DummyFunction)]
             assert vfns and all(isinstance(v, VirtualFunction) for v in vfns)
@@ -133,9 +133,7 @@ def type_fixer(finder, monomorphizer=None):
     @fn.register  # noqa: F811
     def _fix_type(self, a: PrimitiveFunction):
         try:
-            return self(
-                finder.analyze_function(None, a, None)[0]
-            )
+            return self(finder.analyze_function(None, a, None)[0])
         except Unspecializable:
             return DummyFunction()
 
@@ -147,24 +145,19 @@ def type_fixer(finder, monomorphizer=None):
 
     @fn.register  # noqa: F811
     def _fix_type(self, a: TypedPrimitive):
-        return VirtualFunction(tuple(self(ar) for ar in a.args),
-                               self(a.output))
+        return VirtualFunction(tuple(self(ar) for ar in a.args), self(a.output))
 
     return fn
 
 
-@abstract_check.variant(
-    initial_state=lambda: CheckState({}, '_no_track')
-)
+@abstract_check.variant(initial_state=lambda: CheckState({}, "_no_track"))
 def _check_no_tracking_id(self, x: GraphFunction):
     return x.tracking_id is None
 
 
 @concretize_abstract.variant(
     initial_state=lambda: CloneState(
-        cache={},
-        prop='_no_track',
-        check=_check_no_tracking_id,
+        cache={}, prop="_no_track", check=_check_no_tracking_id
     )
 )
 def _no_tracking_id(self, x: GraphFunction):
@@ -174,19 +167,13 @@ def _no_tracking_id(self, x: GraphFunction):
 @overload(bootstrap=True)
 def _refmap(self, fn, x: Context):
     return Context(
-        self(fn, x.parent),
-        x.graph,
-        tuple(fn(arg) for arg in x.argkey)
+        self(fn, x.parent), x.graph, tuple(fn(arg) for arg in x.argkey)
     )
 
 
 @overload  # noqa: F811
 def _refmap(self, fn, x: Reference):
-    return Reference(
-        x.engine,
-        x.node,
-        self(fn, x.context),
-    )
+    return Reference(x.engine, x.node, self(fn, x.context))
 
 
 @overload  # noqa: F811
@@ -331,7 +318,7 @@ class TypeFinder:
             argvals = tuple(broaden(v) for v in argvals)
             choices.add(argvals)
         if len(choices) == 1:
-            choice, = choices
+            (choice,) = choices
             argrefs = [VirtualReference(v) for v in choice]
             try:
                 res = self.engine.run_coroutine(
@@ -352,7 +339,7 @@ class TypeFinder:
             broad_argvals = tuple(broaden(v) for v in argvals)
             if argvals != broad_argvals:
                 currinf = inf
-                while hasattr(currinf, 'subinf'):
+                while hasattr(currinf, "subinf"):
                     currinf = currinf.subinf
                 try:
                     res = self._find_unique_argvals_helper(
@@ -370,8 +357,10 @@ class TypeFinder:
                         except InferenceError:
                             return res
                         except Exception as e:  # pragma: no cover
-                            warn(f'{currinf} failed with a {type(e)}, but it'
-                                 f' should only fail with an InferenceError.')
+                            warn(
+                                f"{currinf} failed with a {type(e)}, but it"
+                                f" should only fail with an InferenceError."
+                            )
                             return res
                         else:
                             ctx = currinf.make_context(eng, broad_argvals)
@@ -383,8 +372,7 @@ class TypeFinder:
                     pass
         return self._find_unique_argvals_helper(a, inf, argvals, True)
 
-    def _find_unique_argvals_helper(self, a, inf, argvals,
-                                    try_generalize=True):
+    def _find_unique_argvals_helper(self, a, inf, argvals, try_generalize=True):
         if argvals in inf.cache:
             # We do this first because it's inexpensive
             return argvals, inf.cache[argvals]
@@ -400,7 +388,7 @@ class TypeFinder:
         elif len(choices) == 0:
             assert not isinstance(inf, VirtualInferrer)
             currinf = inf
-            while hasattr(currinf, 'subinf'):
+            while hasattr(currinf, "subinf"):
                 currinf = currinf.subinf
             if currinf is not inf:
                 return self._find_unique_argvals_helper(
@@ -487,8 +475,9 @@ class Monomorphizer:
         resume inference, this is reflected in self.replacements.
         """
         root = root_context.graph
-        todo = [_TodoEntry(self.engine.ref(root.return_, root_context),
-                           None, None)]
+        todo = [
+            _TodoEntry(self.engine.ref(root.return_, root_context), None, None)
+        ]
         seen = set()
 
         self.specializations[root_context] = root_context
@@ -503,7 +492,7 @@ class Monomorphizer:
             ref = self.engine.get_actual_ref(entry.ref)
             a = concretize_abstract(ref.get_resolved())
             if entry.link is not None:
-                with About(ref.node.debug, 'equiv'):
+                with About(ref.node.debug, "equiv"):
                     ct = _build(a)
                     if ct is not None:
                         ref = self.engine.ref(ct, ref.context)
@@ -512,48 +501,59 @@ class Monomorphizer:
 
             if ref.node.is_apply():
                 # Grab the argvals
-                irefs = [self.engine.ref(inp, entry.ref.context)
-                         for inp in ref.node.inputs]
+                irefs = [
+                    self.engine.ref(inp, entry.ref.context)
+                    for inp in ref.node.inputs
+                ]
                 absfn = concretize_abstract(irefs[0].get_resolved())
-                argvals = [concretize_abstract(iref.get_resolved())
-                           for iref in irefs[1:]]
+                argvals = [
+                    concretize_abstract(iref.get_resolved())
+                    for iref in irefs[1:]
+                ]
 
                 prim = absfn.get_prim()
                 method = None
                 if prim is not None:
-                    method = getattr(self, f'_special_{prim}', None)
+                    method = getattr(self, f"_special_{prim}", None)
 
                 if method is not None:
                     method(todo, ref, irefs, argvals)
                 else:
                     # Keep traversing the graph. Element 0 is special.
-                    todo.append(_TodoEntry(irefs[0], tuple(argvals),
-                                           (ref, 0)))
+                    todo.append(_TodoEntry(irefs[0], tuple(argvals), (ref, 0)))
                     # Iterate through the rest of the inputs
                     for i, iref in enumerate(irefs[1:]):
                         todo.append(_TodoEntry(iref, None, (ref, i + 1)))
 
-            elif ref.node.is_constant_graph() \
-                    or ref.node.is_constant(MetaGraph) \
-                    or ref.node.is_constant(Primitive):
+            elif (
+                ref.node.is_constant_graph()
+                or ref.node.is_constant(MetaGraph)
+                or ref.node.is_constant(Primitive)
+            ):
 
                 if ref.node.is_constant_graph():
                     ctabs = ref.node.value.abstract
                 else:
                     ctabs = ref.node.abstract
 
-                if (ctabs is None
-                        or not isinstance(ctabs.get_unique(),
-                                          VirtualFunction)):
+                if ctabs is None or not isinstance(
+                    ctabs.get_unique(), VirtualFunction
+                ):
                     fn = a.get_unique()
-                    with About(ref.node.debug, 'equiv'):
+                    with About(ref.node.debug, "equiv"):
                         try:
-                            _, new_node, ctx, norm_ctx = \
-                                self.finder.analyze_function(
-                                    a, fn, entry.argvals
-                                )
-                            if (norm_ctx
-                                    and norm_ctx not in self.specializations):
+                            (
+                                _,
+                                new_node,
+                                ctx,
+                                norm_ctx,
+                            ) = self.finder.analyze_function(
+                                a, fn, entry.argvals
+                            )
+                            if (
+                                norm_ctx
+                                and norm_ctx not in self.specializations
+                            ):
                                 self.specializations[norm_ctx] = ctx
                         except Unspecializable as e:
                             aerr = AbstractError(e.problem, e.data)
@@ -572,7 +572,7 @@ class Monomorphizer:
 
             if new_node is not entry.ref.node:
                 if entry.link is None:
-                    raise AssertionError('Cannot replace a return node.')
+                    raise AssertionError("Cannot replace a return node.")
                 else:
                     ref, _ = entry.link
                     nctx = _normalize_context(ref.context)
@@ -626,9 +626,11 @@ class Monomorphizer:
         """
         for entry in self.tasks:
             ctx, orig_ctx = entry
-            if (self.reuse_existing
-                    and self.last[ctx.graph] is ctx
-                    and not ctx.graph.has_flags('reference')):
+            if (
+                self.reuse_existing
+                and self.last[ctx.graph] is ctx
+                and not ctx.graph.has_flags("reference")
+            ):
                 newgraph = ctx.graph
             else:
                 newgraph = ctx.graph.make_new(relation=next(_count))
@@ -692,9 +694,8 @@ class Monomorphizer:
                 clone_constants=True,
                 graph_repl={ctx.graph: newgraph},
                 remapper_class=_MonoRemapper.partial(
-                    engine=self.engine,
-                    fv_function=fv_function,
-                )
+                    engine=self.engine, fv_function=fv_function
+                ),
             )
             assert cl[ctx.graph] is newgraph
             cloners[ctx] = cl
@@ -741,7 +742,7 @@ class Monomorphizer:
         for node in self.manager.all_nodes:
             old_ref = self.invmap.get(node, None)
             assert old_ref is not None
-            if getattr(old_ref.node, 'force_abstract', False):
+            if getattr(old_ref.node, "force_abstract", False):
                 assert old_ref.node.abstract is not None
                 node.abstract = old_ref.node.abstract
             elif old_ref in self.engine.cache.cache:
@@ -767,17 +768,19 @@ class _MonoRemapper(CloneRemapper):
 
     """
 
-    def __init__(self,
-                 graphs,
-                 inlines,
-                 manager,
-                 relation,
-                 graph_relation,
-                 clone_constants,
-                 engine,
-                 graph_repl,
-                 fv_function,
-                 quarantine):
+    def __init__(
+        self,
+        graphs,
+        inlines,
+        manager,
+        relation,
+        graph_relation,
+        clone_constants,
+        engine,
+        graph_repl,
+        fv_function,
+        quarantine,
+    ):
         """Initialize the _MonoRemapper."""
         super().__init__(
             graphs=graphs,
@@ -818,8 +821,8 @@ def monomorphize(engine, root_context, reuse_existing=True):
 
 
 __all__ = [
-    'Monomorphizer',
-    'Unspecializable',
-    'concretize_cache',
-    'monomorphize',
+    "Monomorphizer",
+    "Unspecializable",
+    "concretize_cache",
+    "monomorphize",
 ]

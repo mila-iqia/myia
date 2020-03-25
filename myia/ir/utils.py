@@ -72,6 +72,7 @@ def freevars_boundary(graph, include_boundary=True):
         include_boundary: Whether to yield the free variables or not.
 
     """
+
     def include(node):
         g = node.graph
         if g is None or g is graph:
@@ -126,8 +127,10 @@ def _same_node_shallow(n1, n2, equiv):
 def _same_node(n1, n2, equiv):
     # Works for Apply (when not seen previously) or other nodes
     if n1.is_apply():
-        return all(_same_node_shallow(i1, i2, equiv)
-                   for i1, i2 in zip(n1.inputs, n2.inputs))
+        return all(
+            _same_node_shallow(i1, i2, equiv)
+            for i1, i2 in zip(n1.inputs, n2.inputs)
+        )
     else:
         return _same_node_shallow(n1, n2, equiv)
 
@@ -190,7 +193,7 @@ def isomorphic(g1, g2, equiv=None):
         return False
 
     equiv.update(dict(zip(g1.parameters, g2.parameters)))
-    equiv[(g1, g2)] = 'PENDING'
+    equiv[(g1, g2)] = "PENDING"
     rval = _same_subgraph(g1.return_, g2.return_, equiv)
     equiv[(g1, g2)] = rval
 
@@ -221,11 +224,13 @@ def sexp_to_node(sexp, graph, multigraph=False, sub=None):
     """
     if isinstance(sexp, tuple):
         if multigraph and isinstance(graph, Var):
-            return Apply([sexp_to_node(x, Var('G'), True, sub)
-                          for x in sexp], graph)
+            return Apply(
+                [sexp_to_node(x, Var("G"), True, sub) for x in sexp], graph
+            )
         else:
-            return Apply([sexp_to_node(x, graph, multigraph, sub)
-                          for x in sexp], graph)
+            return Apply(
+                [sexp_to_node(x, graph, multigraph, sub) for x in sexp], graph
+            )
     elif sub and sexp in sub:
         return sub[sexp]
     elif isinstance(sexp, Var):
@@ -250,10 +255,14 @@ def sexp_to_graph(sexp):
 def print_graph(g):
     """Returns a textual representation of a graph."""
     import io
+
     buf = io.StringIO()
-    print(f"graph {g.debug.debug_name}(" +
-          ", ".join(f"%{p.debug.debug_name}" for p in g.parameters) +
-          ") {", file=buf)
+    print(
+        f"graph {g.debug.debug_name}("
+        + ", ".join(f"%{p.debug.debug_name}" for p in g.parameters)
+        + ") {",
+        file=buf,
+    )
 
     def repr_node(node):
         if node.is_constant_graph():
@@ -267,8 +276,11 @@ def print_graph(g):
         if node.is_apply():
             print(f"  %{node.debug.debug_name} = ", end="", file=buf)
             print(f"{repr_node(node.inputs[0])}(", end="", file=buf)
-            print(", ".join(repr_node(a) for a in node.inputs[1:]), end="",
-                  file=buf)
+            print(
+                ", ".join(repr_node(a) for a in node.inputs[1:]),
+                end="",
+                file=buf,
+            )
             print(")", file=buf)
         elif node.is_constant():
             pass
@@ -283,15 +295,15 @@ def print_graph(g):
 
 
 __all__ = [
-    'dfs',
-    'exclude_from_set',
-    'freevars_boundary',
-    'isomorphic',
-    'print_graph',
-    'sexp_to_graph',
-    'sexp_to_node',
-    'succ_deep',
-    'succ_deeper',
-    'succ_incoming',
-    'toposort',
+    "dfs",
+    "exclude_from_set",
+    "freevars_boundary",
+    "isomorphic",
+    "print_graph",
+    "sexp_to_graph",
+    "sexp_to_node",
+    "succ_deep",
+    "succ_deeper",
+    "succ_incoming",
+    "toposort",
 ]

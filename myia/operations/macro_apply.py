@@ -22,14 +22,14 @@ async def apply(info, fnref, *grouprefs):
                 expanded.append(g.apply(P.tuple_getitem, gref.node, i))
         else:
             raise MyiaTypeError(
-                'Can only expand tuple or dict in function application'
+                "Can only expand tuple or dict in function application"
             )
     return g.apply(fnref.node, *expanded)
 
 
 __operation_defaults__ = {
-    'name': 'apply',
-    'registered_name': 'apply',
-    'mapping': apply,
-    'python_implementation': None,
+    "name": "apply",
+    "registered_name": "apply",
+    "mapping": apply,
+    "python_implementation": None,
 }

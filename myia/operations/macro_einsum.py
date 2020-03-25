@@ -67,8 +67,7 @@ def _reduce_transpose(g, input_spec, output_spec, arg):
     reduce_axes = [i for i, c in enumerate(input_spec) if c not in out_idx]
     shp = arg[1]
 
-    target_shape = [s if i not in reduce_axes else 1
-                    for i, s in enumerate(shp)]
+    target_shape = [s if i not in reduce_axes else 1 for i, s in enumerate(shp)]
     res = g.apply(P.array_reduce, P.scalar_add, arg[0], tuple(target_shape))
 
     for i in reversed(reduce_axes):
@@ -91,7 +90,7 @@ def _simple_einsum(g, spec, idx_rm, args):
     doesn't handle, except for diagonals.
 
     """
-    input_spec, output_spec = spec.split('->')
+    input_spec, output_spec = spec.split("->")
 
     if len(input_spec) == len(set(input_spec)):
         # Pure reduce/transpose
@@ -99,8 +98,8 @@ def _simple_einsum(g, spec, idx_rm, args):
         arg = args[0]
         return _reduce_transpose(g, input_spec, output_spec, arg)
 
-    elif ',' in input_spec:
-        input_list = input_spec.split(',')
+    elif "," in input_spec:
+        input_list = input_spec.split(",")
         assert len(input_list) == 2
         a_spec = input_list[0]
         b_spec = input_list[1]
@@ -110,7 +109,7 @@ def _simple_einsum(g, spec, idx_rm, args):
         idx_rm = list(idx_rm)
 
         out_shape = []
-        out_spec = output_spec + ''.join(idx_rm)
+        out_spec = output_spec + "".join(idx_rm)
 
         for c in out_spec:
             p = a_spec.find(c)
@@ -123,16 +122,20 @@ def _simple_einsum(g, spec, idx_rm, args):
         if a_spec != out_spec:
             tt = tuple(a_spec.find(c) for c in out_spec if c in a_spec)
             av = g.apply(P.transpose, av, tt)
-            ts = tuple(out_shape[i] if c in a_spec else 1
-                       for i, c in enumerate(out_spec))
+            ts = tuple(
+                out_shape[i] if c in a_spec else 1
+                for i, c in enumerate(out_spec)
+            )
             av = g.apply(P.reshape, av, ts)
             av = g.apply(P.distribute, av, out_shape)
 
         if b_spec != out_spec:
             tt = tuple(b_spec.find(c) for c in out_spec if c in b_spec)
             bv = g.apply(P.transpose, bv, tt)
-            ts = tuple(out_shape[i] if c in b_spec else 1
-                       for i, c in enumerate(out_spec))
+            ts = tuple(
+                out_shape[i] if c in b_spec else 1
+                for i, c in enumerate(out_spec)
+            )
             bv = g.apply(P.reshape, bv, ts)
             bv = g.apply(P.distribute, bv, out_shape)
 
@@ -152,8 +155,9 @@ async def einsum(info, r_spec, *r_args):
     spec = await info.build(r_spec)
     shapes = tuple(a.xshape() for a in args)
     try:
-        path = contract_expression(spec, *shapes,
-                                   optimize='dynamic-programming')
+        path = contract_expression(
+            spec, *shapes, optimize="dynamic-programming"
+        )
     except ValueError as e:
         raise InferenceError(*e.args)
     g = info.graph
@@ -165,25 +169,28 @@ async def einsum(info, r_spec, *r_args):
 
         tmp_nodes = [nodes.pop(x) for x in inds]
         if blas_flag:
-            input_str, result_index = einsum_str.split('->')
-            input_left, input_right = input_str.split(',')
+            input_str, result_index = einsum_str.split("->")
+            input_left, input_right = input_str.split(",")
 
-            tensor_result = "".join(s for s in input_left + input_right
-                                    if s not in idx_rm)
+            tensor_result = "".join(
+                s for s in input_left + input_right if s not in idx_rm
+            )
 
             left_pos, right_pos = [], []
             for s in idx_rm:
                 left_pos.append(input_left.find(s))
                 right_pos.append(input_right.find(s))
 
-            new_node = _tensordot(g, *tmp_nodes,
-                                  axes=(tuple(left_pos), tuple(right_pos)))
+            new_node = _tensordot(
+                g, *tmp_nodes, axes=(tuple(left_pos), tuple(right_pos))
+            )
 
-            if (tensor_result != result_index):
+            if tensor_result != result_index:
                 transpose = tuple(map(tensor_result.index, result_index))
-                new_node = (g.apply(P.transpose, new_node[0],
-                                    tuple(transpose)),
-                            tuple(new_node[1][i] for i in transpose))
+                new_node = (
+                    g.apply(P.transpose, new_node[0], tuple(transpose)),
+                    tuple(new_node[1][i] for i in transpose),
+                )
 
         else:
             new_node = _simple_einsum(g, einsum_str, idx_rm, tmp_nodes)
@@ -194,8 +201,8 @@ async def einsum(info, r_spec, *r_args):
 
 
 __operation_defaults__ = {
-    'name': 'einsum',
-    'registered_name': 'einsum',
-    'mapping': einsum,
-    'python_implementation': contract,
+    "name": "einsum",
+    "registered_name": "einsum",
+    "mapping": einsum,
+    "python_implementation": contract,
 }

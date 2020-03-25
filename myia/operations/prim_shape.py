@@ -25,11 +25,7 @@ async def infer_shape(self, engine, a: AbstractArray):
     """Infer the return type of primitive `shape`."""
     shp = await force_pending(a.xshape())
     values = [
-        AbstractScalar({
-            VALUE: entry,
-            TYPE: xtype.UInt[64],
-        })
-        for entry in shp
+        AbstractScalar({VALUE: entry, TYPE: xtype.UInt[64]}) for entry in shp
     ]
     return AbstractTuple(values)
 
@@ -41,18 +37,18 @@ def bprop_shape(arr, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'shape',
-    'registered_name': 'shape',
-    'mapping': P.shape,
-    'python_implementation': pyimpl_shape,
+    "name": "shape",
+    "registered_name": "shape",
+    "mapping": P.shape,
+    "python_implementation": pyimpl_shape,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'shape',
-    'registered_name': 'shape',
-    'type': 'backend',
-    'python_implementation': pyimpl_shape,
-    'inferrer_constructor': infer_shape,
-    'grad_transform': bprop_shape,
+    "name": "shape",
+    "registered_name": "shape",
+    "type": "backend",
+    "python_implementation": pyimpl_shape,
+    "inferrer_constructor": infer_shape,
+    "grad_transform": bprop_shape,
 }

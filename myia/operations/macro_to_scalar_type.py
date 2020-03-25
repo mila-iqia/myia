@@ -40,7 +40,7 @@ def string_to_np_dtype(string):
         # - unsigned integers,
         # - floating values
         # - complex values.
-        if np_dtype.kind in 'biufc':
+        if np_dtype.kind in "biufc":
             return np_dtype.type
     return None
 
@@ -77,16 +77,16 @@ async def to_scalar_type(info, data):
             if np_dtype:
                 myia_type = pytype_to_myiatype(np_dtype)
                 return Constant(
-                    AbstractScalar({VALUE: ANYTHING, TYPE: myia_type}))
+                    AbstractScalar({VALUE: ANYTHING, TYPE: myia_type})
+                )
 
     # In any other case, we raise an exception.
-    raise MyiaTypeError(
-        'Unable to convert data to scalar type: %s' % sync_data)
+    raise MyiaTypeError("Unable to convert data to scalar type: %s" % sync_data)
 
 
 __operation_defaults__ = {
-    'name': 'to_scalar_type',
-    'registered_name': 'to_scalar_type',
-    'mapping': to_scalar_type,
-    'python_implementation': None,
+    "name": "to_scalar_type",
+    "registered_name": "to_scalar_type",
+    "mapping": to_scalar_type,
+    "python_implementation": None,
 }

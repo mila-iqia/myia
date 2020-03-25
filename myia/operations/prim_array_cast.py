@@ -22,13 +22,13 @@ def pyimpl_array_cast(x, t):
 
 
 @standard_prim(P.array_cast)
-async def infer_array_cast(self, engine,
-                           a: lib.AbstractArray,
-                           typ: lib.AbstractType):
+async def infer_array_cast(
+    self, engine, a: lib.AbstractArray, typ: lib.AbstractType
+):
     """Infer the return type of primitive `array_cast`."""
     scal = typ.element
     if not isinstance(scal, lib.AbstractScalar):
-        raise MyiaTypeError('array_cast must cast to a scalar dtype')
+        raise MyiaTypeError("array_cast must cast to a scalar dtype")
     t = scal.xtype()
     engine.check(xtype.Number, t)
     e_values = {**a.element.values, lib.TYPE: t}
@@ -45,18 +45,18 @@ def bprop_array_cast(x, t, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'array_cast',
-    'registered_name': 'array_cast',
-    'mapping': P.array_cast,
-    'python_implementation': pyimpl_array_cast,
+    "name": "array_cast",
+    "registered_name": "array_cast",
+    "mapping": P.array_cast,
+    "python_implementation": pyimpl_array_cast,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'array_cast',
-    'registered_name': 'array_cast',
-    'type': 'backend',
-    'python_implementation': pyimpl_array_cast,
-    'inferrer_constructor': infer_array_cast,
-    'grad_transform': bprop_array_cast,
+    "name": "array_cast",
+    "registered_name": "array_cast",
+    "type": "backend",
+    "python_implementation": pyimpl_array_cast,
+    "inferrer_constructor": infer_array_cast,
+    "grad_transform": bprop_array_cast,
 }

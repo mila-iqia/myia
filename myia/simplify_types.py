@@ -94,8 +94,9 @@ def _reabs(self, a: AbstractDict):
 
 @overload  # noqa: F811
 def _reabs(self, a: AbstractArray):
-    return (yield AbstractArray)(self(a.element),
-                                 {**self(a.values), TYPE: NDArray})
+    return (yield AbstractArray)(
+        self(a.element), {**self(a.values), TYPE: NDArray}
+    )
 
 
 @overload  # noqa: F811
@@ -147,10 +148,7 @@ def simplify_types(root, manager):
 
         def _mkct(idx):
             idx_c = Constant(idx)
-            idx_c.abstract = AbstractScalar({
-                VALUE: idx,
-                TYPE: Int[64],
-            })
+            idx_c.abstract = AbstractScalar({VALUE: idx, TYPE: Int[64]})
             return idx_c
 
         def _record_makeindex(dt, attr):
@@ -231,8 +229,9 @@ def simplify_types(root, manager):
                 new_node = node.graph.apply(P.tagged, x, _mkct(tag))
 
         elif node.is_apply(P.string_eq):
-            new_node = node.graph.apply(P.scalar_eq,
-                                        node.inputs[1], node.inputs[2])
+            new_node = node.graph.apply(
+                P.scalar_eq, node.inputs[1], node.inputs[2]
+            )
 
         elif node.is_apply(P.make_kwarg):
             new_node = node.inputs[2]
@@ -256,10 +255,13 @@ def simplify_types(root, manager):
         graph._user_graph = None
 
     for node in manager.all_nodes:
-        if (node.is_constant()
+        if (
+            node.is_constant()
             and node.abstract
-            and not isinstance(node.abstract, (AbstractFunction,
-                                               AbstractExternal))):
+            and not isinstance(
+                node.abstract, (AbstractFunction, AbstractExternal)
+            )
+        ):
             node.value = to_canonical(node.value, node.abstract, coerce=True)
         node.abstract = _reabs(node.abstract)
 
@@ -287,24 +289,24 @@ def to_canonical(fn, self, arg, orig_t, coerce=False):
             raise MyiaInputTypeError("Bad type for backend value.")
         return arg
     if fn is None:
-        raise AssertionError(f'to_canonical not defined for {orig_t}')
+        raise AssertionError(f"to_canonical not defined for {orig_t}")
     return fn(self, arg, orig_t, coerce)
 
 
 @overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
     if not isinstance(arg, tuple):
-        raise MyiaInputTypeError('Expected tuple')
+        raise MyiaInputTypeError("Expected tuple")
     oe = orig_t.elements
     if len(arg) != len(oe):
-        raise MyiaInputTypeError(f'Expected {len(oe)} elements')
+        raise MyiaInputTypeError(f"Expected {len(oe)} elements")
     return tuple(self(x, o, coerce) for x, o in zip(arg, oe))
 
 
 @overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractDict, coerce):
     if not isinstance(arg, dict):
-        raise MyiaInputTypeError('Expected dict')
+        raise MyiaInputTypeError("Expected dict")
     types = orig_t.entries
     if len(arg) != len(types):
         raise MyiaInputTypeError(
@@ -319,14 +321,14 @@ def to_canonical(self, arg, orig_t: AbstractDict, coerce):
 def to_canonical(self, arg, orig_t: AbstractClassBase, coerce):
     if orig_t.tag is Empty:
         if arg != []:
-            raise MyiaInputTypeError(f'Expected empty list')
+            raise MyiaInputTypeError(f"Expected empty list")
         return ()
     elif orig_t.tag is Cons:
         if arg == []:
-            raise MyiaInputTypeError(f'Expected non-empty list')
+            raise MyiaInputTypeError(f"Expected non-empty list")
         if not isinstance(arg, list):
-            raise MyiaInputTypeError(f'Expected list')
-        ot = orig_t.attributes['head']
+            raise MyiaInputTypeError(f"Expected list")
+        ot = orig_t.attributes["head"]
         li = list(self(x, ot, coerce) for x in arg)
         rval = TaggedValue(type_to_tag(empty), ())
         for elem in reversed(li):
@@ -334,7 +336,7 @@ def to_canonical(self, arg, orig_t: AbstractClassBase, coerce):
         return rval.value
     else:
         if not isinstance(arg, orig_t.tag):
-            raise MyiaInputTypeError(f'Expected {orig_t.tag.__qualname__}')
+            raise MyiaInputTypeError(f"Expected {orig_t.tag.__qualname__}")
         arg = tuple(getattr(arg, attr) for attr in orig_t.attributes)
         oe = list(orig_t.attributes.values())
         res = tuple(self(x, o, coerce) for x, o in zip(arg, oe))
@@ -354,7 +356,7 @@ def to_canonical(self, arg, orig_t: AbstractArray, coerce):
             f"Expected array of type {et}, but got {arg_dtype}."
         )
     shp = orig_t.xshape()
-    if (shp is not ANYTHING and arg.shape != shp):
+    if shp is not ANYTHING and arg.shape != shp:
         raise MyiaInputTypeError(
             f"Expected array with shape {shp}, but got {arg.shape}."
         )
@@ -372,13 +374,13 @@ def to_canonical(self, arg, orig_t: AbstractUnion, coerce):
         return TaggedValue(tag, value)
     else:
         opts = ", ".join(map(str, orig_t.options))
-        raise MyiaInputTypeError(f'Expected one of {opts}, not {arg}')
+        raise MyiaInputTypeError(f"Expected one of {opts}, not {arg}")
 
 
 @overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractHandle, coerce):
     if not isinstance(arg, HandleInstance):
-        raise MyiaInputTypeError(f'Expected handle')
+        raise MyiaInputTypeError(f"Expected handle")
     arg.state = self(arg.state, orig_t.element, coerce)
     return arg
 
@@ -393,7 +395,7 @@ def to_canonical(self, arg, orig_t: AbstractScalar, coerce):
             return arg
         else:
             raise MyiaInputTypeError(
-                f'Scalar has wrong type: expected {orig_t}, got {arg}'
+                f"Scalar has wrong type: expected {orig_t}, got {arg}"
             )
     if issubclass(orig_t.xtype(), xtype.String):
         arg = str_to_tag(arg)
@@ -425,7 +427,7 @@ def from_canonical(self, res, orig_t: AbstractClassBase):
     if orig_t.tag in (Empty, Cons):
         rval = []
         while res:
-            value = self(res[0], orig_t.attributes['head'])
+            value = self(res[0], orig_t.attributes["head"])
             rval.append(value)
             res = res[1].value
         return rval
@@ -474,14 +476,14 @@ def from_canonical(self, arg, orig_t: AbstractUnion):
         if tag == arg.tag:
             return self(arg.value, typ)
     else:
-        raise AssertionError(f'Badly formed TaggedValue')
+        raise AssertionError(f"Badly formed TaggedValue")
 
 
 __consolidate__ = True
 __all__ = [
-    'from_canonical',
-    'simplify_types',
-    'str_to_tag',
-    'to_canonical',
-    'type_to_tag',
+    "from_canonical",
+    "simplify_types",
+    "str_to_tag",
+    "to_canonical",
+    "type_to_tag",
 ]

@@ -19,8 +19,8 @@ async def make_list(info, *elems):
 
 
 __operation_defaults__ = {
-    'name': 'make_list',
-    'registered_name': 'make_list',
-    'mapping': make_list,
-    'python_implementation': None,
+    "name": "make_list",
+    "registered_name": "make_list",
+    "mapping": make_list,
+    "python_implementation": None,
 }

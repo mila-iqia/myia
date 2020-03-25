@@ -12,8 +12,8 @@ async def embed(info, x):
 
 
 __operation_defaults__ = {
-    'name': 'embed',
-    'registered_name': 'embed',
-    'mapping': embed,
-    'python_implementation': None,
+    "name": "embed",
+    "registered_name": "embed",
+    "mapping": embed,
+    "python_implementation": None,
 }

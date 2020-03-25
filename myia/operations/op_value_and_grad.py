@@ -11,8 +11,8 @@ def value_and_grad(*args, **kwargs):
 
 
 __operation_defaults__ = {
-    'name': 'value_and_grad',
-    'registered_name': 'value_and_grad',
-    'mapping': value_and_grad,
-    'python_implementation': None,
+    "name": "value_and_grad",
+    "registered_name": "value_and_grad",
+    "mapping": value_and_grad,
+    "python_implementation": None,
 }

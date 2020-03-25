@@ -26,18 +26,18 @@ def bprop_stop_gradient(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'stop_gradient',
-    'registered_name': 'stop_gradient',
-    'mapping': P.stop_gradient,
-    'python_implementation': pyimpl_stop_gradient,
+    "name": "stop_gradient",
+    "registered_name": "stop_gradient",
+    "mapping": P.stop_gradient,
+    "python_implementation": pyimpl_stop_gradient,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'stop_gradient',
-    'registered_name': 'stop_gradient',
-    'type': 'placeholder',
-    'python_implementation': pyimpl_stop_gradient,
-    'inferrer_constructor': infer_stop_gradient,
-    'grad_transform': bprop_stop_gradient,
+    "name": "stop_gradient",
+    "registered_name": "stop_gradient",
+    "type": "placeholder",
+    "python_implementation": pyimpl_stop_gradient,
+    "inferrer_constructor": infer_stop_gradient,
+    "grad_transform": bprop_stop_gradient,
 }

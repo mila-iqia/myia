@@ -17,9 +17,7 @@ def pyimpl_scalar_abs(x: Number) -> Number:
 
 
 infer_scalar_abs = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_abs,
-    impl=pyimpl_scalar_abs,
-    infer_value=False
+    prim=P.scalar_abs, impl=pyimpl_scalar_abs, infer_value=False
 )
 
 
@@ -30,18 +28,18 @@ def bprop_scalar_abs(x, out, dout):  # pragma: no cover
 
 
 __operation_defaults__ = {
-    'name': 'scalar_abs',
-    'registered_name': 'scalar_abs',
-    'mapping': P.scalar_abs,
-    'python_implementation': pyimpl_scalar_abs,
+    "name": "scalar_abs",
+    "registered_name": "scalar_abs",
+    "mapping": P.scalar_abs,
+    "python_implementation": pyimpl_scalar_abs,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_abs',
-    'registered_name': 'scalar_abs',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_abs,
-    'inferrer_constructor': infer_scalar_abs,
-    'grad_transform': bprop_scalar_abs,
+    "name": "scalar_abs",
+    "registered_name": "scalar_abs",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_abs,
+    "inferrer_constructor": infer_scalar_abs,
+    "grad_transform": bprop_scalar_abs,
 }

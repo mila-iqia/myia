@@ -13,25 +13,23 @@ def pyimpl_bool_or(x: Bool, y: Bool) -> Bool:
 
 
 infer_bool_or = UniformPrimitiveInferrer.partial(
-    prim=P.bool_or,
-    impl=pyimpl_bool_or,
-    infer_value=True
+    prim=P.bool_or, impl=pyimpl_bool_or, infer_value=True
 )
 
 
 __operation_defaults__ = {
-    'name': 'bool_or',
-    'registered_name': 'bool_or',
-    'mapping': P.bool_or,
-    'python_implementation': pyimpl_bool_or,
+    "name": "bool_or",
+    "registered_name": "bool_or",
+    "mapping": P.bool_or,
+    "python_implementation": pyimpl_bool_or,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'bool_or',
-    'registered_name': 'bool_or',
-    'type': 'backend',
-    'python_implementation': pyimpl_bool_or,
-    'inferrer_constructor': infer_bool_or,
-    'grad_transform': False,
+    "name": "bool_or",
+    "registered_name": "bool_or",
+    "type": "backend",
+    "python_implementation": pyimpl_bool_or,
+    "inferrer_constructor": infer_bool_or,
+    "grad_transform": False,
 }

@@ -20,6 +20,7 @@ class PyTorchTensor(Object):
     def to_numpy(self, x):
         """Convert torch Tensor x to numpy."""
         import torch
+
         if not isinstance(x, torch.Tensor):
             raise MyiaInputTypeError(f"Expected torch.Tensor but got {x}.")
         return x.detach().cpu().numpy()
@@ -28,6 +29,7 @@ class PyTorchTensor(Object):
     def from_numpy(self, x):
         """Convert numpy array x to a torch Tensor."""
         import torch
+
         return torch.from_numpy(x)
 
 
@@ -54,6 +56,7 @@ class AbstractModule(AbstractClassBase):
 def pytorch_dtype_to_type(dtype):
     """Map a pytorch dtype to a myia type."""
     import torch
+
     _type_map = {
         torch.int8: Int[8],
         torch.int16: Int[16],
@@ -72,18 +75,14 @@ def pytorch_dtype_to_type(dtype):
 
 APT = AbstractArray(
     AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING}),
-    {SHAPE: ANYTHING, TYPE: PyTorchTensor}
+    {SHAPE: ANYTHING, TYPE: PyTorchTensor},
 )
 
 
 APT_bool = AbstractArray(
     AbstractScalar({TYPE: Bool, VALUE: ANYTHING}),
-    {SHAPE: ANYTHING, TYPE: PyTorchTensor}
+    {SHAPE: ANYTHING, TYPE: PyTorchTensor},
 )
 
 
-__all__ = [
-    'AbstractModule',
-    'PyTorchTensor',
-    'pytorch_dtype_to_type',
-]
+__all__ = ["AbstractModule", "PyTorchTensor", "pytorch_dtype_to_type"]

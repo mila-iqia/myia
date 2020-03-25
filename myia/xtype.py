@@ -32,18 +32,17 @@ class TypeMeta(type):
     def __init__(cls, name, bases, dict):
         """Initialize a new Type."""
         super().__init__(name, bases, dict)
-        if not hasattr(cls, '_params'):
+        if not hasattr(cls, "_params"):
             cls._params = None
-        ann = getattr(cls, '__annotations__', {})
-        cls._fields = [k for k in ann.keys()
-                       if not k.startswith('_')]
+        ann = getattr(cls, "__annotations__", {})
+        cls._fields = [k for k in ann.keys() if not k.startswith("_")]
 
     def parameterize(cls, *args):  # pragma: no cover
         """Parameterize this generic to get a concrete type.
 
         This is called by __getitem__.
         """
-        raise TypeError('Cannot parameterize type.')
+        raise TypeError("Cannot parameterize type.")
         # # The following generic implementation may be uncommented if needed.
         # fields = cls._fields
         # if len(fields) != len(args):
@@ -59,16 +58,16 @@ class TypeMeta(type):
         """
         fields = cls._fields
         if not fields:
-            raise TypeError(f'{cls} cannot be parameterized.')
+            raise TypeError(f"{cls} cannot be parameterized.")
         elif cls._params is not None:
-            raise TypeError(f'{cls} is already instantiated')
+            raise TypeError(f"{cls} is already instantiated")
         elif list(params.keys()) != fields:
-            raise TypeError('Invalid type parameterization')
+            raise TypeError("Invalid type parameterization")
         else:
             key = (cls, as_frozen(params))
             if key in _type_cache:
                 return _type_cache[key]
-            rval = type(cls.__qualname__, (cls,), {'_params': params})
+            rval = type(cls.__qualname__, (cls,), {"_params": params})
             for k, v in params.items():
                 setattr(rval, k, v)
             _type_cache[key] = rval
@@ -77,15 +76,15 @@ class TypeMeta(type):
     def __getitem__(cls, args):
         """Parameterize this generic type."""
         if not isinstance(args, tuple):
-            args = args,
+            args = (args,)
         return cls.parameterize(*args)
 
     def __repr__(cls):
         if cls._params is None:
-            args = ''
+            args = ""
         else:
             args = f'[{", ".join([repr(a) for a in cls._params.values()])}]'
-        return f'{cls.__qualname__}{args}'
+        return f"{cls.__qualname__}{args}"
 
 
 class Type(metaclass=TypeMeta):
@@ -93,7 +92,7 @@ class Type(metaclass=TypeMeta):
 
     def __init__(self, *args, **kwargs):
         """Type cannot be initialized."""
-        raise RuntimeError(f'Cannot instantiate Myia type {type(self)}.')
+        raise RuntimeError(f"Cannot instantiate Myia type {type(self)}.")
 
 
 class Object(Type):
@@ -229,39 +228,39 @@ f32 = Float[32]
 f64 = Float[64]
 
 
-register_serialize(Bool, 'bool')
-register_serialize(Nil, 'nil')
-register_serialize(SymbolicKeyType, 'symbolic_key_type')
-register_serialize(EnvType, 'env_type')
-register_serialize(Tuple, 'tuple_type')
-register_serialize(NDArray, 'ndarray_type')
-register_serialize(i8, 'i8')
-register_serialize(i16, 'i16')
-register_serialize(i32, 'i32')
-register_serialize(i64, 'i64')
-register_serialize(u8, 'u8')
-register_serialize(u16, 'u16')
-register_serialize(u32, 'u32')
-register_serialize(u64, 'u64')
-register_serialize(f16, 'f16')
-register_serialize(f32, 'f32')
-register_serialize(f64, 'f64')
-register_serialize(UniverseType, 'universe_type')
+register_serialize(Bool, "bool")
+register_serialize(Nil, "nil")
+register_serialize(SymbolicKeyType, "symbolic_key_type")
+register_serialize(EnvType, "env_type")
+register_serialize(Tuple, "tuple_type")
+register_serialize(NDArray, "ndarray_type")
+register_serialize(i8, "i8")
+register_serialize(i16, "i16")
+register_serialize(i32, "i32")
+register_serialize(i64, "i64")
+register_serialize(u8, "u8")
+register_serialize(u16, "u16")
+register_serialize(u32, "u32")
+register_serialize(u64, "u64")
+register_serialize(f16, "f16")
+register_serialize(f32, "f32")
+register_serialize(f64, "f64")
+register_serialize(UniverseType, "universe_type")
 
-register_serialize(numpy.bool, 'numpy_bool')
-register_serialize(numpy.int, 'numpy_int')
-register_serialize(numpy.float, 'numpy_float')
-register_serialize(numpy.int8, 'numpy_int8')
-register_serialize(numpy.int16, 'numpy_int16')
-register_serialize(numpy.int32, 'numpy_int32')
-register_serialize(numpy.int64, 'numpy_int64')
-register_serialize(numpy.uint8, 'numpy_uint8')
-register_serialize(numpy.uint16, 'numpy_uint16')
-register_serialize(numpy.uint32, 'numpy_uint32')
-register_serialize(numpy.uint64, 'numpy_uint64')
-register_serialize(numpy.float16, 'numpy_float16')
-register_serialize(numpy.float32, 'numpy_float32')
-register_serialize(numpy.float64, 'numpy_float64')
+register_serialize(numpy.bool, "numpy_bool")
+register_serialize(numpy.int, "numpy_int")
+register_serialize(numpy.float, "numpy_float")
+register_serialize(numpy.int8, "numpy_int8")
+register_serialize(numpy.int16, "numpy_int16")
+register_serialize(numpy.int32, "numpy_int32")
+register_serialize(numpy.int64, "numpy_int64")
+register_serialize(numpy.uint8, "numpy_uint8")
+register_serialize(numpy.uint16, "numpy_uint16")
+register_serialize(numpy.uint32, "numpy_uint32")
+register_serialize(numpy.uint64, "numpy_uint64")
+register_serialize(numpy.float16, "numpy_float16")
+register_serialize(numpy.float32, "numpy_float32")
+register_serialize(numpy.float64, "numpy_float64")
 
 DTYPE_TO_MTYPE = dict(
     int8=Int[8],
@@ -335,7 +334,7 @@ def pytype_to_myiatype(pytype):
 #############################################
 
 
-T = typing.TypeVar('T')
+T = typing.TypeVar("T")
 
 
 Array = typing._GenericAlias(numpy.ndarray, T)
@@ -348,36 +347,36 @@ class External(typing.Generic[T]):
 
 
 __all__ = [
-    'Bool',
-    'Dict',
-    'EnvType',
-    'ExceptionType',
-    'External',
-    'Float',
-    'Int',
-    'NDArray',
-    'Nil',
-    'NotImplementedType',
-    'Number',
-    'Object',
-    'String',
-    'SymbolicKeyType',
-    'Tuple',
-    'Type',
-    'TypeMeta',
-    'UInt',
-    'f16',
-    'f32',
-    'f64',
-    'i16',
-    'i32',
-    'i64',
-    'i8',
-    'np_dtype_to_type',
-    'pytype_to_myiatype',
-    'type_to_np_dtype',
-    'u16',
-    'u32',
-    'u64',
-    'u8',
+    "Bool",
+    "Dict",
+    "EnvType",
+    "ExceptionType",
+    "External",
+    "Float",
+    "Int",
+    "NDArray",
+    "Nil",
+    "NotImplementedType",
+    "Number",
+    "Object",
+    "String",
+    "SymbolicKeyType",
+    "Tuple",
+    "Type",
+    "TypeMeta",
+    "UInt",
+    "f16",
+    "f32",
+    "f64",
+    "i16",
+    "i32",
+    "i64",
+    "i8",
+    "np_dtype_to_type",
+    "pytype_to_myiatype",
+    "type_to_np_dtype",
+    "u16",
+    "u32",
+    "u64",
+    "u8",
 ]

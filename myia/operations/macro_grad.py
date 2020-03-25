@@ -42,9 +42,7 @@ async def grad(info, fn, *args):
     fn, *argtypes = await info.abstracts()
     wrt = []
 
-    flags = {
-        'return_value': False,
-    }
+    flags = {"return_value": False}
 
     for arg in argtypes:
         if isinstance(arg, lib.AbstractKeywordArgument):
@@ -53,13 +51,13 @@ async def grad(info, fn, *args):
                     arg.argument, default=lib.ANYTHING
                 )
             else:
-                raise MyiaTypeError(f'grad takes no argument named {arg.key}')
+                raise MyiaTypeError(f"grad takes no argument named {arg.key}")
         else:
             val = lib.build_value(arg, default=lib.ANYTHING)
             if isinstance(val, (int, str)):
                 wrt.append(val)
             else:
-                raise MyiaTypeError(f'Invalid argument to grad, {arg}')
+                raise MyiaTypeError(f"Invalid argument to grad, {arg}")
 
     if not isinstance(fn, lib.AbstractFunction):
         raise MyiaTypeError(
@@ -84,7 +82,7 @@ async def grad(info, fn, *args):
     return Constant(GradOperation(arg, wrt, **flags))
 
 
-_cast_helper = MultitypeGraph('cast_helper')
+_cast_helper = MultitypeGraph("cast_helper")
 
 
 @_cast_helper.register(Number, Number)
@@ -102,7 +100,7 @@ def _scalar_to_array_cast_helper(x, model):
     return P.scalar_to_array(cast, t)
 
 
-ROOT = Named('ROOT')
+ROOT = Named("ROOT")
 
 
 class GradOperation(MetaGraph):
@@ -111,16 +109,18 @@ class GradOperation(MetaGraph):
     This MetaGraph is returned by a call to `grad`.
     """
 
-    def __init__(self,
-                 fn,
-                 wrt,
-                 *,
-                 return_value=False,
-                 always_return_tuple=False,
-                 dout_parameter=False,
-                 sum_aliases=True):
+    def __init__(
+        self,
+        fn,
+        wrt,
+        *,
+        return_value=False,
+        always_return_tuple=False,
+        dout_parameter=False,
+        sum_aliases=True,
+    ):
         """Initialize GradOperation."""
-        super().__init__('grad')
+        super().__init__("grad")
         self.fn = fn
         self.wrt = wrt
         self.return_value = return_value
@@ -145,19 +145,20 @@ class GradOperation(MetaGraph):
                         aliases[aid].append((i, getter))
         aliases = tuple(sorted((k, tuple(v)) for k, v in aliases.items()))
 
-        if (len(args) > 0
-                and isinstance(args[-1], lib.AbstractKeywordArgument)
-                and args[-1].key == 'dout'):
-            dout = 'kw'
+        if (
+            len(args) > 0
+            and isinstance(args[-1], lib.AbstractKeywordArgument)
+            and args[-1].key == "dout"
+        ):
+            dout = "kw"
         else:
             dout = self.dout_parameter
         if dout:
             args = args[:-1]
-        if any(isinstance(arg, lib.AbstractKeywordArgument)
-               for arg in args):
+        if any(isinstance(arg, lib.AbstractKeywordArgument) for arg in args):
             raise MyiaTypeError(
                 f"Only 'dout' is valid as a keyword argument in a"
-                ' grad-transformed function.'
+                " grad-transformed function."
             )
         if isinstance(self.fn, (Graph, MetaGraph)):
             sig = self.fn.make_signature(args)
@@ -186,7 +187,7 @@ class GradOperation(MetaGraph):
         else:
             g = self.fn
             dbg = NamedDebugInfo()
-            nargs, = gsig
+            (nargs,) = gsig
             orig_parameters = [Parameter(None) for _ in range(nargs)]
             orig_parameter_names = None
 
@@ -197,9 +198,7 @@ class GradOperation(MetaGraph):
                 try:
                     return orig_parameter_names.index(wrt)
                 except ValueError:
-                    raise MyiaTypeError(
-                        f"{g} has no argument named '{wrt}'"
-                    )
+                    raise MyiaTypeError(f"{g} has no argument named '{wrt}'")
             elif 0 <= wrt < nargs:
                 return wrt
             else:
@@ -208,7 +207,7 @@ class GradOperation(MetaGraph):
                     f" for {g} because it is out of range."
                 )
 
-        if self.wrt == ['*']:
+        if self.wrt == ["*"]:
             wrt = list(range(nargs))
         else:
             wrt = list(map(_getindex, self.wrt))
@@ -217,15 +216,15 @@ class GradOperation(MetaGraph):
             elif wrt == []:
                 wrt = 0
 
-        with About(dbg, 'grad'):
+        with About(dbg, "grad"):
             df = Graph()
-            df.set_flags('core', 'reference')
+            df.set_flags("core", "reference")
 
         jf = df.apply(P.J, g)
 
         params = []
         for orig_p in orig_parameters:
-            with About(orig_p.debug, 'grad'):
+            with About(orig_p.debug, "grad"):
                 params.append(df.add_parameter())
 
         jparams = [df.apply(P.J, p) for p in params]
@@ -235,9 +234,9 @@ class GradOperation(MetaGraph):
 
         if dout:
             bprop_arg = df.add_parameter()
-            bprop_arg.debug.name = 'dout'
-            if dout == 'kw':
-                bprop_arg = df.apply(P.extract_kwarg, 'dout', bprop_arg)
+            bprop_arg.debug.name = "dout"
+            if dout == "kw":
+                bprop_arg = df.apply(P.extract_kwarg, "dout", bprop_arg)
         else:
             bprop_arg = df.apply(_cast_helper, 1, out)
 
@@ -248,8 +247,9 @@ class GradOperation(MetaGraph):
             direct_return = False
 
         bapp = df.apply(bprop, bprop_arg)
-        all_results = [df.apply(P.tuple_getitem, bapp, idx + 1)
-                       for idx in range(nargs)]
+        all_results = [
+            df.apply(P.tuple_getitem, bapp, idx + 1) for idx in range(nargs)
+        ]
 
         adjusted = {i: all_results[i] for i in range(nargs)}
         for aid, equivs in aliases:
@@ -258,8 +258,7 @@ class GradOperation(MetaGraph):
                 node = sexp_to_node(entry, df, sub={ROOT: all_results[i]})
                 contribs.append(node)
             combined = reduce(
-                lambda x, y: df.apply(operations.gadd, x, y),
-                contribs
+                lambda x, y: df.apply(operations.gadd, x, y), contribs
             )
 
             for i, entry in equivs:
@@ -279,8 +278,8 @@ class GradOperation(MetaGraph):
 
 
 __operation_defaults__ = {
-    'name': 'grad',
-    'registered_name': 'grad',
-    'mapping': grad,
-    'python_implementation': None,
+    "name": "grad",
+    "registered_name": "grad",
+    "mapping": grad,
+    "python_implementation": None,
 }

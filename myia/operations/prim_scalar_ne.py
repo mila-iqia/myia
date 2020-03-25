@@ -17,9 +17,7 @@ def pyimpl_scalar_ne(x: Number, y: Number) -> Bool:
 
 
 infer_scalar_ne = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_ne,
-    impl=pyimpl_scalar_ne,
-    infer_value=True
+    prim=P.scalar_ne, impl=pyimpl_scalar_ne, infer_value=True
 )
 
 
@@ -30,18 +28,18 @@ def bprop_scalar_ne(x, y, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_ne',
-    'registered_name': 'scalar_ne',
-    'mapping': P.scalar_ne,
-    'python_implementation': pyimpl_scalar_ne,
+    "name": "scalar_ne",
+    "registered_name": "scalar_ne",
+    "mapping": P.scalar_ne,
+    "python_implementation": pyimpl_scalar_ne,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_ne',
-    'registered_name': 'scalar_ne',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_ne,
-    'inferrer_constructor': infer_scalar_ne,
-    'grad_transform': bprop_scalar_ne,
+    "name": "scalar_ne",
+    "registered_name": "scalar_ne",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_ne,
+    "inferrer_constructor": infer_scalar_ne,
+    "grad_transform": bprop_scalar_ne,
 }

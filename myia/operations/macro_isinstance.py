@@ -16,19 +16,18 @@ async def isinstance_(info, r_data, r_type):
     for t in ts:
         if not isinstance(t, lib.AbstractValue):
             raise MyiaTypeError(
-                'isinstance expects a Python type'
-                ' or a tuple of Python types'
+                "isinstance expects a Python type" " or a tuple of Python types"
             )
-    hastypes = [info.graph.apply(P.hastype, r_data.node,
-                                 Constant(type_to_abstract(t)))
-                for t in ts]
-    return reduce(lambda x, y: info.graph.apply(P.bool_or, x, y),
-                  hastypes)
+    hastypes = [
+        info.graph.apply(P.hastype, r_data.node, Constant(type_to_abstract(t)))
+        for t in ts
+    ]
+    return reduce(lambda x, y: info.graph.apply(P.bool_or, x, y), hastypes)
 
 
 __operation_defaults__ = {
-    'name': 'isinstance',
-    'registered_name': 'isinstance',
-    'mapping': isinstance_,
-    'python_implementation': isinstance,
+    "name": "isinstance",
+    "registered_name": "isinstance",
+    "mapping": isinstance_,
+    "python_implementation": isinstance,
 }

@@ -12,14 +12,15 @@ def _get_int_tuple(at: AbstractTuple):
 
 @macro
 async def conv2d_grad_input(
-        info,
-        r_input_size,
-        r_weight,
-        r_grad_output,
-        r_stride,
-        r_padding,
-        r_dilation,
-        r_groups):
+    info,
+    r_input_size,
+    r_weight,
+    r_grad_output,
+    r_stride,
+    r_padding,
+    r_dilation,
+    r_groups,
+):
     """Return a new Apply calling conv_transpose2d with right arguments."""
     _input_size = await r_input_size.get()  # type: AbstractTuple
     _weight = await r_weight.get()  # type: AbstractArray
@@ -49,8 +50,11 @@ async def conv2d_grad_input(
     min_sizes = []
     for d in range(k):
         min_sizes.append(
-            (grad_output_shape[d + 2] - 1) * stride[d] - 2 * padding[d] +
-            (kernel_size[d] - 1) * dilation[d] + 1)
+            (grad_output_shape[d + 2] - 1) * stride[d]
+            - 2 * padding[d]
+            + (kernel_size[d] - 1) * dilation[d]
+            + 1
+        )
 
     # Let's avoid checking minimum and maximum size here.
     # Backends should check it when relevant.
@@ -59,20 +63,22 @@ async def conv2d_grad_input(
     # End computing.
 
     g = info.graph
-    return g.apply(P.conv_transpose2d,
-                   r_grad_output.node,
-                   r_weight.node,
-                   Constant(None),
-                   r_stride.node,
-                   r_padding.node,
-                   Constant(grad_input_padding),
-                   r_groups.node,
-                   r_dilation.node)
+    return g.apply(
+        P.conv_transpose2d,
+        r_grad_output.node,
+        r_weight.node,
+        Constant(None),
+        r_stride.node,
+        r_padding.node,
+        Constant(grad_input_padding),
+        r_groups.node,
+        r_dilation.node,
+    )
 
 
 __operation_defaults__ = {
-    'name': 'conv2d_grad_input',
-    'registered_name': 'conv2d_grad_input',
-    'mapping': conv2d_grad_input,
-    'python_implementation': None,
+    "name": "conv2d_grad_input",
+    "registered_name": "conv2d_grad_input",
+    "mapping": conv2d_grad_input,
+    "python_implementation": None,
 }

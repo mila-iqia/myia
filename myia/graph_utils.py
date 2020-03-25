@@ -6,12 +6,12 @@ the notion of successor.
 
 from typing import Any, Callable, Dict, Iterable, List, Set, TypeVar
 
-FOLLOW = 'follow'
-NOFOLLOW = 'nofollow'
-EXCLUDE = 'exclude'
+FOLLOW = "follow"
+NOFOLLOW = "nofollow"
+EXCLUDE = "exclude"
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def always_include(node: Any) -> str:
@@ -19,9 +19,11 @@ def always_include(node: Any) -> str:
     return FOLLOW
 
 
-def dfs(root: T,
-        succ: Callable[[T], Iterable[T]],
-        include: Callable[[T], str] = always_include) -> Iterable[T]:
+def dfs(
+    root: T,
+    succ: Callable[[T], Iterable[T]],
+    include: Callable[[T], str] = always_include,
+) -> Iterable[T]:
     """Perform a depth-first search.
 
     Arguments:
@@ -51,13 +53,17 @@ def dfs(root: T,
         elif incl == EXCLUDE:
             pass
         else:
-            raise ValueError('include(node) must return one of: '
-                             '"follow", "nofollow", "exclude"')
+            raise ValueError(
+                "include(node) must return one of: "
+                '"follow", "nofollow", "exclude"'
+            )
 
 
-def toposort(root: T,
-             succ: Callable[[T], Iterable[T]],
-             include: Callable[[T], str] = always_include) -> Iterable[T]:
+def toposort(
+    root: T,
+    succ: Callable[[T], Iterable[T]],
+    include: Callable[[T], str] = always_include,
+) -> Iterable[T]:
     """Yield the nodes in the tree starting at root in topological order.
 
     Arguments:
@@ -81,7 +87,7 @@ def toposort(root: T,
             todo.pop()
             continue
         if node in rank and rank[node] != len(todo):
-            raise ValueError('cycle')
+            raise ValueError("cycle")
         rank[node] = len(todo)
         cont = False
 
@@ -98,8 +104,10 @@ def toposort(root: T,
             todo.pop()
             continue
         else:
-            raise ValueError('include(node) must return one of: '
-                             '"follow", "nofollow", "exclude"')
+            raise ValueError(
+                "include(node) must return one of: "
+                '"follow", "nofollow", "exclude"'
+            )
 
         if cont:
             continue
@@ -109,8 +117,4 @@ def toposort(root: T,
 
 
 __consolidate__ = True
-__all__ = [
-    'always_include',
-    'dfs',
-    'toposort',
-]
+__all__ = ["always_include", "dfs", "toposort"]

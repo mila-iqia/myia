@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 from types import FunctionType
 
@@ -53,13 +52,12 @@ class Point:
 
 
 def grad_wrap(graph, argspec):
-    mg = GradOperation(graph,
-                       wrt=['*'],
-                       dout_parameter=True,
-                       always_return_tuple=True)
+    mg = GradOperation(
+        graph, wrt=["*"], dout_parameter=True, always_return_tuple=True
+    )
     sig = mg.make_signature(argspec)
     g = mg.generate_graph(sig)
-    return {'graph': g}
+    return {"graph": g}
 
 
 grad_pipeline = PipelineDefinition(
@@ -75,7 +73,6 @@ grad_pipeline = PipelineDefinition(
 
 
 def test_GradTester():
-
     def f(x, y):
         return x / y
 
@@ -84,52 +81,49 @@ def test_GradTester():
 
     arglist = (
         (7.3, 4.2),
-        (np.array([[4.3, 2.0], [5.1, 7.7], [3.4, 8.2]]),
-         np.array([[1.2, 5.0], [3.3, 2.7], [6.9, 7.2]])),
+        (
+            np.array([[4.3, 2.0], [5.1, 7.7], [3.4, 8.2]]),
+            np.array([[1.2, 5.0], [3.3, 2.7], [6.9, 7.2]]),
+        ),
     )
 
     for args in arglist:
         gtest = GradTester(
-            fn=f,
-            gfn=df,
-            args=args,
-            argnames=['x', 'y'],
-            outnames=['out']
+            fn=f, gfn=df, args=args, argnames=["x", "y"], outnames=["out"]
         )
 
         gtest.assert_match()
 
 
 def test_GradTester_outtup():
-
     def f(x, y):
         return x * y, x / y
 
     def df(x, y, dz):
         dz1, dz2 = dz
-        return (dz1 * y + dz2 / y,
-                dz1 * x + -dz2 * x / (y * y))
+        return (dz1 * y + dz2 / y, dz1 * x + -dz2 * x / (y * y))
 
     gtest = GradTester(
-        fn=f,
-        gfn=df,
-        args=(7.3, 4.2),
-        argnames=['x', 'y'],
-        outnames=None
+        fn=f, gfn=df, args=(7.3, 4.2), argnames=["x", "y"], outnames=None
     )
 
     gtest.assert_match()
 
 
-def _grad_test(fn, obj, args,
-               sens_type=f64,
-               pipeline=grad_pipeline,
-               rel_error=1e-3,
-               argspec=None):
-    pipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
+def _grad_test(
+    fn,
+    obj,
+    args,
+    sens_type=f64,
+    pipeline=grad_pipeline,
+    rel_error=1e-3,
+    argspec=None,
+):
+    pipeline = pipeline.insert_after("parse", grad_wrap=grad_wrap)
     if argspec is None:
-        argspec = tuple(from_value(arg, broaden=True)
-                        for arg in clean_args(args))
+        argspec = tuple(
+            from_value(arg, broaden=True) for arg in clean_args(args)
+        )
     else:
         argspec = tuple(to_abstract_test(x) for x in argspec)
     sens_type = to_abstract_test(sens_type)
@@ -140,19 +134,25 @@ def _grad_test(fn, obj, args,
         res = pip.run(graph=obj, argspec=[*argspec, sens_type])
     gtest = GradTester(
         fn=fn,
-        gfn=res['output'],
+        gfn=res["output"],
         args=args,
-        argnames=[f'in{i}' for i in range(len(args))],
+        argnames=[f"in{i}" for i in range(len(args))],
         outnames=None,
-        rel_error=rel_error
+        rel_error=rel_error,
     )
     gtest.assert_match()
 
 
-@myia_function_test(marks=[pytest.mark.grad], id='grad')
-def gradient(self, fn, args, abstract=None,
-             rel_error=1e-3, pipeline=grad_pipeline,
-             backend=False):
+@myia_function_test(marks=[pytest.mark.grad], id="grad")
+def gradient(
+    self,
+    fn,
+    args,
+    abstract=None,
+    rel_error=1e-3,
+    pipeline=grad_pipeline,
+    backend=False,
+):
     """Test the gradient of a Myia function using finite_differences.
 
     Arguments:
@@ -168,15 +168,16 @@ def gradient(self, fn, args, abstract=None,
         backend_name = backend[0]
         backend_options = backend[1]
 
-        pipeline = pipeline.configure({
-            'resources.backend.name': backend_name,
-            'resources.backend.options': backend_options
-        })
+        pipeline = pipeline.configure(
+            {
+                "resources.backend.name": backend_name,
+                "resources.backend.options": backend_options,
+            }
+        )
 
-    _grad_test(fn, fn, args,
-               pipeline=pipeline,
-               rel_error=rel_error,
-               argspec=abstract)
+    _grad_test(
+        fn, fn, args, pipeline=pipeline, rel_error=rel_error, argspec=abstract
+    )
 
 
 prim_tests = {
@@ -194,7 +195,7 @@ prim_tests = {
 }
 
 
-@pytest.mark.parametrize('prim,cases', prim_tests.items())
+@pytest.mark.parametrize("prim,cases", prim_tests.items())
 def test_prim_grads(prim, cases):
     for case in cases:
         _grad_test(pyi[prim], prim, case)
@@ -206,17 +207,14 @@ def test_null(x, y):
     return 10.0 + 28.0 / 43.0
 
 
-@mt(
-    gradient(1.0, 4.0),
-    gradient(5.0, -13.0),
-)
+@mt(gradient(1.0, 4.0), gradient(5.0, -13.0))
 def test_grad_add(x, y):
     return x + y
 
 
 @gradient(3.0, 4.0)
 def test_grad_expr(x, y):
-    return x**3.0 * y**4.0
+    return x ** 3.0 * y ** 4.0
 
 
 @gradient(3.0)
@@ -236,8 +234,10 @@ def test_dup_args_in_call(x):
 def test_quadruple_args_in_call(x):
     """Test that duplicated arguments still cause no problem even if
     there are four of them."""
+
     def g(a, b, c, d):
         return a * b * c * d
+
     return g(x, x, x, x)
 
 
@@ -261,6 +261,7 @@ def test_dataclass_2(pt):
 @gradient(4.0, 5.0)
 def test_hof(a, b):
     """Test higher order functions."""
+
     def f(g, x):
         return g(x) * g(x + 10.0)
 
@@ -276,6 +277,7 @@ def test_hof(a, b):
 @gradient(4.0, 5.0)
 def test_hof_tup(a, b):
     """Test higher order functions."""
+
     def f(gh, x, y):
         g, h = gh
         # return g(x, y) * h(x, y)
@@ -287,31 +289,32 @@ def test_hof_tup(a, b):
 @gradient(4.0, 5.0)
 def test_simple_closure(a, b):
     """Test some trivial closures."""
+
     def f():
         return a + 1.0
 
     def g():
         return b + 2.0
+
     return f() * g()
 
 
 @gradient(4.0)
 def test_closure(a):
     """This is the closure test in the paper."""
-    def x1(b):
 
+    def x1(b):
         def x4(c):
             return b
+
         return x4
+
     x2 = x1(a)
     x3 = x2(1.0)
     return x3
 
 
-@mt(
-    gradient(4.0, 5.0),
-    gradient(6.4, -7.8),
-)
+@mt(gradient(4.0, 5.0), gradient(6.4, -7.8))
 def test_if(a, b):
     # This is max, but what this is really testing is the most basic
     # if statement, so I prefer to name the test 'test_if'
@@ -321,10 +324,7 @@ def test_if(a, b):
         return b
 
 
-@mt(
-    gradient(4.0, 5.0),
-    gradient(6.4, -7.8),
-)
+@mt(gradient(4.0, 5.0), gradient(6.4, -7.8))
 def test_if2(a, b):
     if a > b:
         return a * a
@@ -339,6 +339,7 @@ def test_fact_opt(x):
             return 1
         else:
             return n * fact(n=n - 1)
+
     return fact()
 
 
@@ -360,8 +361,10 @@ def test_while_2(x, y, z):
     return rval
 
 
-@gradient([1.0, 2.0, 3.0, 4.0],
-          pipeline=standard_debug_pipeline.configure(validate=False))
+@gradient(
+    [1.0, 2.0, 3.0, 4.0],
+    pipeline=standard_debug_pipeline.configure(validate=False),
+)
 def test_list_while(xs):
     y = 1.0
     index = 0
@@ -371,8 +374,7 @@ def test_list_while(xs):
     return y
 
 
-@gradient([1.0, 2.0, 3.0, 4.0], pipeline=standard_pipeline,
-          backend=backend_all)
+@gradient([1.0, 2.0, 3.0, 4.0], pipeline=standard_pipeline, backend=backend_all)
 def test_list_for(xs):
     y = 1
     for x in xs:
@@ -392,7 +394,9 @@ def test_nested_closure(x):
 
         def h():
             return a * b
+
         return g if x < 0 else h
+
     return f()()
 
 
@@ -467,8 +471,7 @@ def test_transpose(x, y):
 
 @gradient(MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0))
 def test_transpose2(x, y, axis1, axis2):
-    perm = (scalar_cast(axis1, u64),
-            scalar_cast(axis2, u64))
+    perm = (scalar_cast(axis1, u64), scalar_cast(axis2, u64))
     xt = transpose(x, perm)
     yt = transpose(y, perm)
     d = dot(xt, yt)
@@ -481,7 +484,7 @@ def test_transpose2(x, y, axis1, axis2):
     gradient((5.5, 1.3)),
     pipeline=standard_pipeline,
     backend=backend_all,
-    abstract=(U(f64, (f64, f64)),)
+    abstract=(U(f64, (f64, f64)),),
 )
 def test_union(x):
     if isinstance(x, float):
@@ -494,17 +497,17 @@ def test_union(x):
 def _runwith(f, *args):
     argspec = tuple(from_value(arg, broaden=True) for arg in args)
     res = grad_pipeline.run(input=f, argspec=argspec)
-    return res['output'](*args)
+    return res["output"](*args)
 
 
 @pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freevar_outside_grad():
-
     def f(x, y):
         a = x * x
 
         def mula(z):
             return a * z
+
         _, bprop = J(mula)(J(y))
         return bprop(1)[1]
 
@@ -513,13 +516,13 @@ def test_freevar_outside_grad():
 
 @pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freegraph_outside_grad():
-
     def f(x, y):
         def sqx():
             return x * x
 
         def mulsqx(z):
             return sqx() * z
+
         _, bprop = J(mulsqx)(J(y))
         return bprop(1)[1]
 
@@ -551,12 +554,12 @@ def test_grad_interface():
     @myia
     def grads(x, y):
         return (
-            grad(f, 'x')(x, y),
-            grad(f, 'x')(x, y, dout=2),
+            grad(f, "x")(x, y),
+            grad(f, "x")(x, y, dout=2),
             grad(f, 0)(x, y),
-            grad(f, 'y')(x, y),
-            grad(f, 'x', 'y')(x, y),
-            grad(f, '*')(x, y),
+            grad(f, "y")(x, y),
+            grad(f, "x", "y")(x, y),
+            grad(f, "*")(x, y),
             grad(f, return_value=True)(x, y),
         )
 
@@ -566,7 +569,7 @@ def test_grad_interface():
 
     @myia
     def gradbad2(x, y):
-        return grad(f, 'z')(x, y)
+        return grad(f, "z")(x, y)
 
     @myia
     def gradbad3(x, y, z):
@@ -582,7 +585,7 @@ def test_grad_interface():
 
     @myia
     def gradbad6(x, y, z):
-        return grad(f, 0, '*')(x, y)
+        return grad(f, 0, "*")(x, y)
 
     @myia
     def gradbad7(x, y, z):
@@ -592,6 +595,7 @@ def test_grad_interface():
     def gradbad8(x, y):
         def klojure(q):
             return q + y
+
         return grad(klojure)(x)
 
     @myia
@@ -618,7 +622,7 @@ def test_grad_interface():
         dy,
         (dx, dy),
         (dx, dy),
-        (f(x, y), dx)
+        (f(x, y), dx),
     )
 
     with pytest.raises(InferenceError):
@@ -656,7 +660,6 @@ def test_grad_interface():
 
 
 def test_aliasing():
-
     def _chk(x, y):
         x1, x2, (x3, x4) = x
         y1, y2, (y3, y4) = y
@@ -693,10 +696,11 @@ def test_aliasing():
 
 def test_aliasing_list():
     from myia.compile.backends import LoadingError, load_backend
+
     try:
-        load_backend('pytorch')
+        load_backend("pytorch")
     except LoadingError:
-        pytest.skip('PyTorch not available')
+        pytest.skip("PyTorch not available")
 
     def g(xs, y):
         res = 0
@@ -704,7 +708,7 @@ def test_aliasing_list():
             res = res + x
         return sum(res)
 
-    @myia(backend='pytorch', alias_tracker=ndarray_aliasable)
+    @myia(backend="pytorch", alias_tracker=ndarray_aliasable)
     def f(xs, y):
         return grad(g)(xs, y)
 
@@ -728,16 +732,15 @@ def test_aliasing_list():
 
 
 def test_aliasing_other():
-
     def _chk(x, y):
-        np.testing.assert_allclose(x['a'], y['a'])
-        np.testing.assert_allclose(x['b'].x, y['b'].x)
-        np.testing.assert_allclose(x['b'].y, y['b'].y)
-        np.testing.assert_allclose(x['b'].z, y['b'].z)
+        np.testing.assert_allclose(x["a"], y["a"])
+        np.testing.assert_allclose(x["b"].x, y["b"].x)
+        np.testing.assert_allclose(x["b"].y, y["b"].y)
+        np.testing.assert_allclose(x["b"].z, y["b"].z)
 
     def g(x, y):
-        a = x['a']
-        pt = x['b']
+        a = x["a"]
+        pt = x["b"]
         return sum(a + pt.x + pt.y + pt.z + y)
 
     @myia(alias_tracker=ndarray_aliasable)
@@ -752,11 +755,11 @@ def test_aliasing_other():
     d = o * 6
     e = o * 7
 
-    res1 = f({'a': a, 'b': Point3D(b, c, d)}, e)
-    _chk(res1, {'a': o, 'b': Point3D(o, o, o)})
+    res1 = f({"a": a, "b": Point3D(b, c, d)}, e)
+    _chk(res1, {"a": o, "b": Point3D(o, o, o)})
 
-    res2 = f({'a': a, 'b': Point3D(b, a, d)}, e)
-    _chk(res2, {'a': o * 2, 'b': Point3D(o, o * 2, o)})
+    res2 = f({"a": a, "b": Point3D(b, a, d)}, e)
+    _chk(res2, {"a": o * 2, "b": Point3D(o, o * 2, o)})
 
 
 def test_bad_bprop_def():
@@ -765,7 +768,8 @@ def test_bad_bprop_def():
     from myia.utils import InternalInferenceError
 
     with pytest.raises(InternalInferenceError):
-        @bprop_to_grad_transform(Primitive('nonsense'))
+
+        @bprop_to_grad_transform(Primitive("nonsense"))
         def _bprop_nonsense(x, y, dout):
             return dout + x + y
 

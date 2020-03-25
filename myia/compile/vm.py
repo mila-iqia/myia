@@ -53,8 +53,9 @@ class FinalVM:
 
         This is used to implement tailcalls.
         """
-        self.stack[self.sp - height:self.sp - (height - nitems)] = \
-            self.stack[self.sp - nitems:self.sp]
+        self.stack[self.sp - height : self.sp - (height - nitems)] = self.stack[
+            self.sp - nitems : self.sp
+        ]
         self._pop(height - nitems)
 
     def _ref(self, i):
@@ -87,6 +88,7 @@ class FinalVM:
     def __call__(self, *args):
         """Shortcut to eval()."""
         from .transform import wrap_result
+
         return wrap_result(self.eval(args))
 
     def eval(self, args):
@@ -105,9 +107,9 @@ class FinalVM:
         # Main runtime loop
         while self.pc >= 0:
             instr = self.code[self.pc]
-            impl = getattr(self, f'inst_{instr[0]}', None)
+            impl = getattr(self, f"inst_{instr[0]}", None)
             if impl is None:
-                raise AssertionError(f'Unknown instruction {instr[0]}')
+                raise AssertionError(f"Unknown instruction {instr[0]}")
             self.pc += 1
             impl(*instr[1:])
 
@@ -179,9 +181,10 @@ class FinalVM:
 
         """
         fn = self._ref(fn_)
-        assert not isinstance(fn, struct_partial), \
-            ("You found a nested partial case, please report it "
-             "so we can add it to the tests")
+        assert not isinstance(fn, struct_partial), (
+            "You found a nested partial case, please report it "
+            "so we can add it to the tests"
+        )
         args = tuple(self._ref(a) for a in args_)
         self._push(struct_partial(fn, args))
 
@@ -247,7 +250,7 @@ class FinalVM:
         t = self._ref(t)
         idx = self.backend.to_scalar(self._ref(idx))
         v = self._ref(v)
-        self._push(t[:idx] + (v,) + t[idx + 1:])
+        self._push(t[:idx] + (v,) + t[idx + 1 :])
 
     def inst_tagged(self, x, tag):
         """Create a TaggedValue.
@@ -308,7 +311,7 @@ class FinalVM:
         """Set an item in a grad environment."""
         env = self._ref(env)
         before = env[:idx] + (None,) * (idx - len(env))
-        after = env[idx + 1:]
+        after = env[idx + 1 :]
         self._push(before + (self._ref(val),) + after)
 
     def inst_push(self, v):
@@ -367,6 +370,4 @@ class FinalVM:
             self._push(o)
 
 
-__all__ = [
-    'FinalVM',
-]
+__all__ = ["FinalVM"]

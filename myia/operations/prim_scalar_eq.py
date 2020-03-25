@@ -17,9 +17,7 @@ def pyimpl_scalar_eq(x: Number, y: Number) -> Bool:
 
 
 infer_scalar_eq = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_eq,
-    impl=pyimpl_scalar_eq,
-    infer_value=True
+    prim=P.scalar_eq, impl=pyimpl_scalar_eq, infer_value=True
 )
 
 
@@ -30,18 +28,18 @@ def bprop_scalar_eq(x, y, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_eq',
-    'registered_name': 'scalar_eq',
-    'mapping': P.scalar_eq,
-    'python_implementation': pyimpl_scalar_eq,
+    "name": "scalar_eq",
+    "registered_name": "scalar_eq",
+    "mapping": P.scalar_eq,
+    "python_implementation": pyimpl_scalar_eq,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_eq',
-    'registered_name': 'scalar_eq',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_eq,
-    'inferrer_constructor': infer_scalar_eq,
-    'grad_transform': bprop_scalar_eq,
+    "name": "scalar_eq",
+    "registered_name": "scalar_eq",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_eq,
+    "inferrer_constructor": infer_scalar_eq,
+    "grad_transform": bprop_scalar_eq,
 }

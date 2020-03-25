@@ -33,7 +33,7 @@ class ValidationError(Exception):
 @abstract_check.variant
 def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
     """Validate a type."""
-    raise ValidationError(f'Illegal type in the graph: {a}', type=a)
+    raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
 @overload  # noqa: F811
@@ -46,25 +46,31 @@ def validate_abstract(self, a: AbstractError, uses):
     else:  # pragma: no cover
         # As it turns out, the inferrer now catches this error before we get to
         # validation.
-        raise ValidationError(f'Illegal type in the graph: {a}', type=a)
+        raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
 @overload  # noqa: F811
 def validate_abstract(self, a: AbstractScalar, uses):
-    if not issubclass(a.xtype(),
-                      (xtype.Number, xtype.Bool, xtype.Nil,
-                       xtype.EnvType, xtype.SymbolicKeyType,
-                       xtype.UniverseType)):
+    if not issubclass(
+        a.xtype(),
+        (
+            xtype.Number,
+            xtype.Bool,
+            xtype.Nil,
+            xtype.EnvType,
+            xtype.SymbolicKeyType,
+            xtype.UniverseType,
+        ),
+    ):
         raise ValidationError(
-            f'Illegal type in the graph: {a}',
-            type=a
-        )   # pragma: no cover
+            f"Illegal type in the graph: {a}", type=a
+        )  # pragma: no cover
     return True
 
 
 @overload  # noqa: F811
 def validate_abstract(self, a: (type(None), AbstractExternal), uses):
-    raise ValidationError(f'Illegal type in the graph: {a}', type=a)
+    raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
 @overload  # noqa: F811
@@ -76,13 +82,11 @@ def validate_abstract(self, a: AbstractType, uses):
 def validate_abstract(self, a: AbstractFunction, uses):
     fns = a.get_sync()
     if len(fns) != 1:
-        raise ValidationError(
-            f'Only one function type should be here: {a}'
-        )
-    fn, = fns
+        raise ValidationError(f"Only one function type should be here: {a}")
+    (fn,) = fns
     if not isinstance(fn, (VirtualFunction, DummyFunction)):
         raise ValidationError(
-            f'All function types should be VirtualFunction, not {fn}'
+            f"All function types should be VirtualFunction, not {fn}"
         )
 
 
@@ -109,13 +113,13 @@ class NodeValidator:
             self._test(node)
 
         def stringify(err):
-            return f'* {err.node} -- {err.args[0]}'
+            return f"* {err.node} -- {err.args[0]}"
 
         self.errors.trigger(stringify=stringify)
 
     def test_node(self, node):
         """Test whether the node is valid or not."""
-        raise NotImplementedError('Override in subclass')
+        raise NotImplementedError("Override in subclass")
 
 
 class AbstractValidator(NodeValidator):
@@ -133,11 +137,12 @@ class OperatorValidator(NodeValidator):
         """Test that the node's operator is valid."""
         if node.is_constant(Primitive):
             if not node.is_constant(BackendPrimitive):
-                raise ValidationError(f'Illegal primitive: {node.value}')
+                raise ValidationError(f"Illegal primitive: {node.value}")
 
 
 class CallValidator(NodeValidator):  # pragma: no cover
     """Test that every operation has a valid type."""
+
     # This validator works for most tests, but it still has a few issues to
     # work out.
 
@@ -148,10 +153,11 @@ class CallValidator(NodeValidator):  # pragma: no cover
         """Test that the operation for this call has a valid type."""
         if node.is_apply():
             from .abstract import broaden
+
             fn, *args = node.inputs
             if any(node.abstract is None for node in node.inputs):
                 if self.check_none:
-                    raise ValidationError(f'None in call')
+                    raise ValidationError(f"None in call")
                 else:
                     return
             vfn = fn.abstract.get_unique()
@@ -159,13 +165,13 @@ class CallValidator(NodeValidator):  # pragma: no cover
             argt = [broaden(arg.abstract) for arg in args]
             if argv != argt:
                 raise ValidationError(
-                    f'Inconsistent call arguments: {vfn.args}',
+                    f"Inconsistent call arguments: {vfn.args}",
                     expected=argv,
                     got=argt,
                 )
             if broaden(vfn.output) != broaden(node.abstract):
                 raise ValidationError(
-                    f'Inconsistent call output: {vfn.output}',
+                    f"Inconsistent call output: {vfn.output}",
                     expected=broaden(vfn.output),
                     got=broaden(node.abstract),
                 )
@@ -206,11 +212,11 @@ def validate(root):
 
 
 __all__ = [
-    'AbstractValidator',
-    'MultiValidator',
-    'NodeValidator',
-    'OperatorValidator',
-    'ValidationError',
-    'validate',
-    'validate_abstract',
+    "AbstractValidator",
+    "MultiValidator",
+    "NodeValidator",
+    "OperatorValidator",
+    "ValidationError",
+    "validate",
+    "validate_abstract",
 ]

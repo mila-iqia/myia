@@ -1,4 +1,3 @@
-
 import pytest
 
 from myia.debug.utils import GraphIndex
@@ -55,19 +54,20 @@ def test_clone_closure():
             a = x + y
             b = a + z
             return b
+
         c = j(3)
         return c
 
     parsed_f = parse(f)
     idx = GraphIndex(parsed_f)
-    g = idx['j']
+    g = idx["j"]
 
     cl = GraphCloner(g, clone_constants=True)
     idx2 = GraphIndex(cl[g], succ=succ_incoming)
 
-    for name in 'xy':
+    for name in "xy":
         assert idx[name] is idx2[name]
-    for name in 'zabj':
+    for name in "zabj":
         assert idx[name] is not idx2[name]
 
 
@@ -84,6 +84,7 @@ def test_clone_scoping():
         def i(q):
             # Depends on f, therefore cloned
             return g() * q
+
         return g() + h(x) + i(y)
 
     g = parse(f)
@@ -95,9 +96,9 @@ def test_clone_scoping():
     idx1 = GraphIndex(g)
     idx2 = GraphIndex(g2)
 
-    for name in 'fgi':
+    for name in "fgi":
         assert idx1[name] is not idx2[name]
-    for name in 'h':
+    for name in "h":
         assert idx1[name] is idx2[name]
 
 
@@ -113,13 +114,13 @@ def test_clone_total():
 
     cl1 = GraphCloner(g, clone_constants=True, total=True)
     idx1 = GraphIndex(cl1[g])
-    assert idx1['f2'] is not idx0['f2']
-    assert idx1['f1'] is not idx0['f1']
+    assert idx1["f2"] is not idx0["f2"]
+    assert idx1["f1"] is not idx0["f1"]
 
     cl2 = GraphCloner(g, clone_constants=True, total=False)
     idx2 = GraphIndex(cl2[g])
-    assert idx2['f2'] is not idx0['f2']
-    assert idx2['f1'] is idx0['f1']
+    assert idx2["f2"] is not idx0["f2"]
+    assert idx2["f1"] is idx0["f1"]
 
 
 ONE = Constant(1)
@@ -129,7 +130,7 @@ THREE = Constant(3)
 
 def _graph_for_inline():
     target = Graph()
-    target.debug.name = 'target'
+    target.debug.name = "target"
     target.output = THREE
     return target
 
@@ -148,9 +149,11 @@ def _successful_inlining(cl, orig, new_params, target):
         assert p in new_nodes
 
     # Clones of orig's nodes should belong to target
-    assert all(cl[node].graph in {target, None}
-               for node in orig_nodes
-               if node.graph is orig)
+    assert all(
+        cl[node].graph in {target, None}
+        for node in orig_nodes
+        if node.graph is orig
+    )
 
     # Clone did not change target
     assert target.output is THREE
@@ -205,9 +208,9 @@ def test_clone_recursive():
     target = _graph_for_inline()
     new_params = [ONE, TWO]
     with pytest.raises(Exception):
-        cl2 = GraphCloner(inline=(g, target, new_params),
-                          total=True,
-                          clone_constants=True)
+        cl2 = GraphCloner(
+            inline=(g, target, new_params), total=True, clone_constants=True
+        )
 
 
 def test_clone_unused_parameters():
