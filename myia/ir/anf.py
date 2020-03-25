@@ -725,12 +725,11 @@ class Special(ANFNode):
         """Return whether self is a Special, with value of given cls."""
         return isinstance(self.special, cls)
 
-    def __str__(self) -> str:
-        return str(self.special)  # pragma: no cover
+    def __str__(self) -> str:  # pragma: no cover
+        return str(self.special)
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover
         return repr_(self, name=self.debug.debug_name, special=self.special)
-        # pragma: no cover
 
 
 class VarNode(Special):

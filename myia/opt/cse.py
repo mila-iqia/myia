@@ -28,9 +28,8 @@ def group_nodes(root, manager):
                 h = hash(tuple(hashes[inp] for inp in node.inputs))
             elif node.is_parameter():
                 h = hash(node)
-            else:
+            else:  # pragma: no cover
                 raise TypeError(f"Unknown node type: {node}")
-                # pragma: no cover
 
             hashes[node] = h
             groups[h, node.graph].append(node)

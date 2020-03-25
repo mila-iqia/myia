@@ -190,9 +190,8 @@ class About:
 
     def __init__(self, debug: DebugInfo, relation: str, *args) -> None:
         """Initialize an About."""
-        if not isinstance(debug, DebugInfo):
+        if not isinstance(debug, DebugInfo):  # pragma: no cover
             raise TypeError("debug argument to About must be a DebugInfo.")
-            # pragma: no cover
         self.debug = debug
         self.relation = relation
         self.args = args
