@@ -63,8 +63,9 @@ def resolve(ref, default_modules=[], always_wrap=True, split=True):
         return force_sequence(x, always_wrap)
 
     def do_all(rs, split=True):
-        parts = [resolve(r, default_modules, always_wrap, split=split)
-                 for r in rs]
+        parts = [
+            resolve(r, default_modules, always_wrap, split=split) for r in rs
+        ]
         return reduce(operator.add, parts, [])
 
     if isinstance(ref, (list, tuple)):
@@ -77,26 +78,26 @@ def resolve(ref, default_modules=[], always_wrap=True, split=True):
 
     if not split:
         refs = [ref]
-    elif ';' in ref:
-        refs = ref.split(';')
+    elif ";" in ref:
+        refs = ref.split(";")
     else:
-        refs = ref.split(',')
+        refs = ref.split(",")
 
     refs = [r for r in refs if r]
 
     if len(refs) > 1:
         return do_all(refs, split=False)
     else:
-        ref, = refs
+        (ref,) = refs
 
-    if ref.startswith('-'):
+    if ref.startswith("-"):
         ref = ref[1:]
         neg = True
 
-    ref = ref.replace('!', '_bang_')
+    ref = ref.replace("!", "_bang_")
 
-    if ':' in ref:
-        module, field = ref.split(':')
+    if ":" in ref:
+        module, field = ref.split(":")
         m = imp(module)
         return fsq(getattr(m, field))
 
@@ -112,37 +113,34 @@ def resolve(ref, default_modules=[], always_wrap=True, split=True):
 
 def process_options(options, rest_target):
     if rest_target:
-        options[rest_target] += options['<rest>']
-        del options['<rest>']
+        options[rest_target] += options["<rest>"]
+        del options["<rest>"]
 
-    command, = resolve(options['<command>'],
-                       default_modules=[cmd, cfg])
+    (command,) = resolve(options["<command>"], default_modules=[cmd, cfg])
 
-    fns = resolve(options['--fn'],
-                  always_wrap=False)
-    args = resolve(options['--args'], [typ])
-    optim = resolve(options['--opt'],
-                    default_modules=[optlib, cfg],
-                    always_wrap=False)
-    pip = resolve(options['--pipeline'],
-                  default_modules=[steps, cfg],
-                  always_wrap=False)
+    fns = resolve(options["--fn"], always_wrap=False)
+    args = resolve(options["--args"], [typ])
+    optim = resolve(
+        options["--opt"], default_modules=[optlib, cfg], always_wrap=False
+    )
+    pip = resolve(
+        options["--pipeline"], default_modules=[steps, cfg], always_wrap=False
+    )
     return {
         **options,
-        'command': command,
-        'fns': fns,
-        'args': args,
-        'opts': optim,
-        'pipeline': pip,
-        'grad': options['-g'],
-        'options': options,
+        "command": command,
+        "fns": fns,
+        "args": args,
+        "opts": optim,
+        "pipeline": pip,
+        "grad": options["-g"],
+        "options": options,
     }
 
 
-def resolve_options(*option_dicts,
-                    read_argv=True,
-                    read_config=True,
-                    rest_target='--fn'):
+def resolve_options(
+    *option_dicts, read_argv=True, read_config=True, rest_target="--fn"
+):
     options = {}
     for o in option_dicts:
         options = merge(options, o)
@@ -152,10 +150,10 @@ def resolve_options(*option_dicts,
 
     if read_config:
         while True:
-            configs = resolve(options['--config'],
-                              default_modules=[cfg],
-                              always_wrap=False)
-            options['--config'] = []
+            configs = resolve(
+                options["--config"], default_modules=[cfg], always_wrap=False
+            )
+            options["--config"] = []
             if not configs:
                 break
             for config in configs:
@@ -169,28 +167,24 @@ code_globals = globals()
 
 def _run(command, options, interactive=None):
     if interactive is None:
-        interactive = options['--interactive']
+        interactive = options["--interactive"]
 
     if interactive:
-        code_globals['options'] = options
+        code_globals["options"] = options
         repl = Repl(
             buche,
             reader,
             code_globals=code_globals,
             address="/repl",
-            log_address="/"
+            log_address="/",
         )
         buche.command_template(content=str(hrepr(repl)))
 
-    buche.master.send({
-        "command": "redirect",
-        "from": "/stdout",
-        "to": "/"
-    })
+    buche.master.send({"command": "redirect", "from": "/stdout", "to": "/"})
 
     try:
         res = command(Options(options))
-        code_globals['res'] = res
+        code_globals["res"] = res
     except InferenceError as e:
         print_inference_error(e)
     except Exception as e:
@@ -200,10 +194,12 @@ def _run(command, options, interactive=None):
         repl.start(nodisplay=True)
 
 
-def main(*option_dicts, read_argv=True, read_config=True, rest_target='--fn'):
-    options = resolve_options(*option_dicts,
-                              read_argv=read_argv,
-                              read_config=read_config,
-                              rest_target=rest_target)
+def main(*option_dicts, read_argv=True, read_config=True, rest_target="--fn"):
+    options = resolve_options(
+        *option_dicts,
+        read_argv=read_argv,
+        read_config=read_config,
+        rest_target=rest_target
+    )
     options = process_options(options, rest_target)
-    _run(options['command'], options)
+    _run(options["command"], options)

@@ -1,4 +1,3 @@
-
 import os
 from io import StringIO
 
@@ -9,7 +8,7 @@ from myia.info import DebugInherit
 from myia.parser import MyiaSyntaxError
 from myia.utils import InferenceError, MultiTrace, Profiler, resolve_tracers
 
-if os.environ.get('BUCHE'):
+if os.environ.get("BUCHE"):
     from debug import do_inject  # noqa
     from debug.butest import *  # noqa
 
@@ -18,22 +17,47 @@ _context_managers = []
 
 
 def pytest_addoption(parser):
-    parser.addoption('--gpu', action='store_true', dest="gpu",
-                     default=False, help="Enable GPU tests")
-    parser.addoption('-T', action='append', dest="tracer",
-                     default=None, help="Set a Myia tracer")
-    parser.addoption('--mprof', action='store_true', dest="mprof",
-                     default=False, help="Use the Myia profiler")
-    parser.addoption('--trace-nodes', action='store_true', dest="trace_nodes",
-                     default=False, help="Save trace when creating Myia nodes")
-    parser.addoption('-D', action='store_true', dest="do_inject",
-                     default=False, help="Import Myia debug functions")
+    parser.addoption(
+        "--gpu",
+        action="store_true",
+        dest="gpu",
+        default=False,
+        help="Enable GPU tests",
+    )
+    parser.addoption(
+        "-T",
+        action="append",
+        dest="tracer",
+        default=None,
+        help="Set a Myia tracer",
+    )
+    parser.addoption(
+        "--mprof",
+        action="store_true",
+        dest="mprof",
+        default=False,
+        help="Use the Myia profiler",
+    )
+    parser.addoption(
+        "--trace-nodes",
+        action="store_true",
+        dest="trace_nodes",
+        default=False,
+        help="Save trace when creating Myia nodes",
+    )
+    parser.addoption(
+        "-D",
+        action="store_true",
+        dest="do_inject",
+        default=False,
+        help="Import Myia debug functions",
+    )
 
 
 def pytest_configure(config):
     listener_pairs = []
     if config.option.usepdb:
-        os.environ['MYIA_PYTEST_USE_PDB'] = "1"
+        os.environ["MYIA_PYTEST_USE_PDB"] = "1"
     if config.option.do_inject:
         from debug import do_inject  # noqa
     if config.option.tracer:
@@ -77,13 +101,13 @@ def pytest_collection_modifyitems(config, items):
     # any more time to waste with pytest's nonsense.
     for item in items:
         typ = type(item)
-        if not hasattr(typ, '_repr_failure'):
+        if not hasattr(typ, "_repr_failure"):
             typ._repr_failure = typ.repr_failure
             typ.repr_failure = myia_repr_failure
 
 
 # That hook may have been defined in debug.butest
-_prev = globals().get('pytest_runtest_setup', None)
+_prev = globals().get("pytest_runtest_setup", None)
 
 
 def pytest_runtest_setup(item):
@@ -100,6 +124,6 @@ def pytest_runtest_setup(item):
 
 
 def pytest_runtest_teardown(item):
-    if hasattr(item, '_ctxms'):
+    if hasattr(item, "_ctxms"):
         for cm in item._ctxms:
             cm.__exit__(None, None, None)

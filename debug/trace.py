@@ -66,14 +66,14 @@ class Time:
     @classmethod
     def statistics(cls, tdata):
         data = [t.t for t in tdata]
-        print(f'  Min:', Time(min(data)))
-        print(f'  Avg:', Time(sum(data) / len(data)))
-        print(f'  Max:', Time(max(data)))
+        print(f"  Min:", Time(min(data)))
+        print(f"  Avg:", Time(sum(data) / len(data)))
+        print(f"  Max:", Time(max(data)))
 
     def __str__(self):
         d = Decimal(self.t)
-        unit = 's'
-        units = ['ms', 'us', 'ns']
+        unit = "s"
+        units = ["ms", "us", "ns"]
         for other_unit in units:
             if d >= 1:
                 break
@@ -81,7 +81,7 @@ class Time:
                 d *= 1000
                 unit = other_unit
         d = round(d, 3)
-        return f'{d}{unit}'
+        return f"{d}{unit}"
 
 
 def _color(color, text):
@@ -89,27 +89,29 @@ def _color(color, text):
 
     If Buche is active, the color is not applied.
     """
-    if os.environ.get('BUCHE'):
+    if os.environ.get("BUCHE"):
         return text
     else:
-        return f'{color}{text}{Fore.RESET}'
+        return f"{color}{text}{Fore.RESET}"
 
 
 def _pgraph(path):
     """Print a graph using Buche."""
+
     def _p(graph, **_):
         bucheg(graph)
+
     return lambda: DoTrace({path: _p})
 
 
 class Getters(dict):
     def __init__(self, fields, kwfields):
         for field in fields:
-            if field == 'help':
+            if field == "help":
                 self[field] = lambda **kwargs: ", ".join(kwargs)
-            elif field.startswith('+'):
+            elif field.startswith("+"):
                 field = field[1:]
-                self[field] = globals()[f'_rule_{field}']
+                self[field] = globals()[f"_rule_{field}"]
             else:
                 self[field] = self._get_by_name(field)
         for name, getter in kwfields.items():
@@ -117,12 +119,12 @@ class Getters(dict):
 
     def _get_by_name(self, field):
         def _get(**kwargs):
-            return kwargs.get(field, f'<{field} NOT FOUND>')
+            return kwargs.get(field, f"<{field} NOT FOUND>")
+
         return _get
 
     def __call__(self, kwargs):
-        results = {name: getter(**kwargs)
-                   for name, getter in self.items()}
+        results = {name: getter(**kwargs) for name, getter in self.items()}
         return results
 
 
@@ -136,22 +138,22 @@ def _display(curpath, results, word=None, brk=True):
     else:
         print(w, _color(Fore.LIGHTBLACK_EX, curpath))
         for name, value in results.items():
-            print(f'  {name}: {value}')
+            print(f"  {name}: {value}")
     if brk:
         _brk(w)
 
 
 def _brk(w):
     if breakword.after():
-        print('Breaking on:', w)
-        breakpoint(skip=['debug.*', 'myia.utils.trace'])
+        print("Breaking on:", w)
+        breakpoint(skip=["debug.*", "myia.utils.trace"])
 
 
-def _resolve_path(p, variant=''):
+def _resolve_path(p, variant=""):
     if not p:
-        rval = '**'
-    elif p.startswith('+'):
-        rval = globals()[f'_path{variant}_{p[1:]}']
+        rval = "**"
+    elif p.startswith("+"):
+        rval = globals()[f"_path{variant}_{p[1:]}"]
     else:
         rval = p
     if isinstance(rval, str):
@@ -165,15 +167,15 @@ def _resolve_path(p, variant=''):
 
 
 # Print the final graph
-graph = _pgraph('step_validate/enter')
+graph = _pgraph("step_validate/enter")
 
 
 # Print the graph after monomorphization
-graph_mono = _pgraph('step_specialize/exit')
+graph_mono = _pgraph("step_specialize/exit")
 
 
 # Print the graph after parsing
-graph_parse = _pgraph('step_parse/exit')
+graph_parse = _pgraph("step_parse/exit")
 
 
 def log(path=None, *fields, **kwfields):
@@ -190,7 +192,7 @@ def log(path=None, *fields, **kwfields):
     getters = Getters(fields, kwfields)
 
     def _p(**kwargs):
-        _curpath = kwargs['_curpath']
+        _curpath = kwargs["_curpath"]
         results = getters(kwargs)
         _display(_curpath, results)
 
@@ -199,7 +201,7 @@ def log(path=None, *fields, **kwfields):
 
 def opts():
     """Log the optimizations applied during the opt phase."""
-    return log('step_opt/**/opt/success', opt=lambda opt, **_: opt.name)
+    return log("step_opt/**/opt/success", opt=lambda opt, **_: opt.name)
 
 
 def compare(path=None, *fields, **kwfields):
@@ -214,14 +216,14 @@ def compare(path=None, *fields, **kwfields):
             if diff == 0:
                 return old
             c = Fore.LIGHTGREEN_EX if diff > 0 else Fore.LIGHTRED_EX
-            diff = f'+{diff}' if diff > 0 else str(diff)
-            return f'{old} -> {new} ({_color(c, diff)})'
-        elif hasattr(old, 'compare'):
+            diff = f"+{diff}" if diff > 0 else str(diff)
+            return f"{old} -> {new} ({_color(c, diff)})"
+        elif hasattr(old, "compare"):
             return old.compare(new)
         elif old == new:
             return old
         else:
-            return f'{old} -> {new}'
+            return f"{old} -> {new}"
 
     def _enter(_curpath, **kwargs):
         _path = _curpath[:-6]
@@ -230,18 +232,15 @@ def compare(path=None, *fields, **kwfields):
         _brk(w)
 
     def _exit(_curpath, **kwargs):
-        if 'success' in kwargs and not kwargs['success']:
+        if "success" in kwargs and not kwargs["success"]:
             return
         _path = _curpath[:-5]
         w, old = store[_path]
         new = getters(kwargs)
         _display(_path, _compare(old, new), word=w, brk=False)
 
-    path = _resolve_path(path, variant='cmp')
-    return DoTrace({
-        f'{path}/enter': _enter,
-        f'{path}/exit': _exit,
-    })
+    path = _resolve_path(path, variant="cmp")
+    return DoTrace({f"{path}/enter": _enter, f"{path}/exit": _exit,})
 
 
 class StatAccumulator(TraceListener):
@@ -253,7 +252,7 @@ class StatAccumulator(TraceListener):
 
     def install(self, tracer):
         """Install the StatAccumulator."""
-        patt = self.path or '**'
+        patt = self.path or "**"
         tracer.on(patt, self._do)
 
     def _do(self, **kwargs):
@@ -262,16 +261,16 @@ class StatAccumulator(TraceListener):
 
     def post(self):
         for (name, typ), data in self.accum.items():
-            print(f'{name}:')
+            print(f"{name}:")
             if not data:
-                print('  No data.')
+                print("  No data.")
 
             if issubclass(typ, (int, float)):
-                print(f'  Min:', min(data))
-                print(f'  Avg:', sum(data) / len(data))
-                print(f'  Max:', max(data))
+                print(f"  Min:", min(data))
+                print(f"  Avg:", sum(data) / len(data))
+                print(f"  Max:", max(data))
 
-            elif hasattr(typ, 'statistics'):
+            elif hasattr(typ, "statistics"):
                 typ.statistics(data)
 
             else:
@@ -279,7 +278,7 @@ class StatAccumulator(TraceListener):
                 align = max(len(str(obj)) for obj in counts)
                 counts = sorted(counts.items(), key=lambda k: -k[1])
                 for obj, count in counts:
-                    print(f'  {str(obj).ljust(align)} -> {count}')
+                    print(f"  {str(obj).ljust(align)} -> {count}")
 
 
 def stat(path=None, *fields, **kwfields):
@@ -296,8 +295,8 @@ def stat(path=None, *fields, **kwfields):
 #########
 
 
-_path_opt = ['step_opt/**/opt/success', 'step_opt2/**/opt/success']
-_pathcmp_opt = ['step_opt/**/opt', 'step_opt2/**/opt']
+_path_opt = ["step_opt/**/opt/success", "step_opt2/**/opt/success"]
+_pathcmp_opt = ["step_opt/**/opt", "step_opt2/**/opt"]
 
 
 #########
@@ -307,25 +306,25 @@ _pathcmp_opt = ['step_opt/**/opt', 'step_opt2/**/opt']
 
 def _rule_optname(opt=None, **kwargs):
     if opt is None:
-        return '<NOT FOUND>'
+        return "<NOT FOUND>"
     return opt.name
 
 
 def _rule_optparam(node=None, **kwargs):
     if node is None:
-        return '<NOT FOUND>'
+        return "<NOT FOUND>"
     try:
         return str(node.inputs[1])
     except Exception:
-        return '<???>'
+        return "<???>"
 
 
 def _rule_countnodes(graph=None, manager=None, **kwargs):
     if manager is None:
         if graph is None:
-            return '<NOT FOUND>'
+            return "<NOT FOUND>"
         if graph._manager is None:
-            return '<NO MANAGER>'
+            return "<NO MANAGER>"
         manager = graph.manager
     return len(manager.all_nodes)
 
@@ -333,9 +332,9 @@ def _rule_countnodes(graph=None, manager=None, **kwargs):
 def _rule_countgraphs(graph=None, manager=None, **kwargs):
     if manager is None:
         if graph is None:
-            return '<NOT FOUND>'
+            return "<NOT FOUND>"
         if graph._manager is None:
-            return '<NO MANAGER>'
+            return "<NO MANAGER>"
         manager = graph.manager
     return len(manager.graphs)
 
