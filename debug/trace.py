@@ -240,7 +240,7 @@ def compare(path=None, *fields, **kwfields):
         _display(_path, _compare(old, new), word=w, brk=False)
 
     path = _resolve_path(path, variant="cmp")
-    return DoTrace({f"{path}/enter": _enter, f"{path}/exit": _exit,})
+    return DoTrace({f"{path}/enter": _enter, f"{path}/exit": _exit})
 
 
 class StatAccumulator(TraceListener):
