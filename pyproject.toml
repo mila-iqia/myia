@@ -7,3 +7,27 @@ known_third_party = "torch,tvm,hrepr,buche,breakword,docopt"
 multi_line_output = 3
 include_trailing_comma = true
 combine_as_imports = true
+
+[tool.coverage.run]
+omit = [
+    "conftest.py",
+    "setup.py",
+    "tests/*",
+    "debug/*",
+    "myia/debug/*",
+    "examples/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "@pyoverload",
+    "@abstractmethod",
+    "@compile",
+    "@core",
+    "@wrap_grad_transform",
+    "@bprop_to_grad_transform",
+    "pragma: no cover",
+    "AssertionError",
+    "NotImplementedError",
+    "untested_legacy",
+]
