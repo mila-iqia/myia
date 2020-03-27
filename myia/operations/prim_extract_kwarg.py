@@ -17,18 +17,18 @@ class _ExtractKwArgInferrer(Inferrer):
 
 
 __operation_defaults__ = {
-    'name': 'extract_kwarg',
-    'registered_name': 'extract_kwarg',
-    'mapping': P.extract_kwarg,
-    'python_implementation': None,
+    "name": "extract_kwarg",
+    "registered_name": "extract_kwarg",
+    "mapping": P.extract_kwarg,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'extract_kwarg',
-    'registered_name': 'extract_kwarg',
-    'type': 'inference',
-    'python_implementation': None,
-    'inferrer_constructor': _ExtractKwArgInferrer,
-    'grad_transform': None,
+    "name": "extract_kwarg",
+    "registered_name": "extract_kwarg",
+    "type": "inference",
+    "python_implementation": None,
+    "inferrer_constructor": _ExtractKwArgInferrer,
+    "grad_transform": None,
 }

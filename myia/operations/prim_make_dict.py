@@ -13,23 +13,24 @@ async def infer_make_dict(self, engine, _dct: lib.AbstractType, *values):
     for t, elem in zip(dct.entries.values(), values):
         assert typecheck(t, elem)
 
-    return AbstractDict(dict((key, val) for key, val in
-                             zip(dct.entries.keys(), values)))
+    return AbstractDict(
+        dict((key, val) for key, val in zip(dct.entries.keys(), values))
+    )
 
 
 __operation_defaults__ = {
-    'name': 'make_dict',
-    'registered_name': 'make_dict',
-    'mapping': P.make_dict,
-    'python_implementation': None,
+    "name": "make_dict",
+    "registered_name": "make_dict",
+    "mapping": P.make_dict,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'make_dict',
-    'registered_name': 'make_dict',
-    'type': 'inference',
-    'python_implementation': None,
-    'inferrer_constructor': infer_make_dict,
-    'grad_transform': None,
+    "name": "make_dict",
+    "registered_name": "make_dict",
+    "type": "inference",
+    "python_implementation": None,
+    "inferrer_constructor": infer_make_dict,
+    "grad_transform": None,
 }

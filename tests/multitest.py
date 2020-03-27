@@ -1,4 +1,3 @@
-
 from itertools import product
 from types import FunctionType
 
@@ -16,13 +15,13 @@ ParameterSet = type(pytest.param(1234))
 
 @overload
 def eqtest(t1: tuple, t2, **kwargs):
-    return (isinstance(t2, tuple)
-            and all(eqtest(x1, x2, **kwargs) for x1, x2 in zip(t1, t2)))
+    return isinstance(t2, tuple) and all(
+        eqtest(x1, x2, **kwargs) for x1, x2 in zip(t1, t2)
+    )
 
 
 @overload  # noqa: F811
-def eqtest(a1: (np.ndarray, int, float), a2,
-           rtol=1e-5, atol=1e-8, **kwargs):
+def eqtest(a1: (np.ndarray, int, float), a2, rtol=1e-5, atol=1e-8, **kwargs):
     try:
         return np.allclose(a1, a2, rtol=rtol, atol=atol)
     except TypeError:
@@ -42,9 +41,7 @@ def eqtest(x: object, y, **kwargs):
     return x == y
 
 
-infer_pipeline = standard_pipeline.select(
-    'resources', 'parse', 'infer'
-)
+infer_pipeline = standard_pipeline.select("resources", "parse", "infer")
 
 
 class Multiple:
@@ -52,9 +49,7 @@ class Multiple:
         self.options = []
         for i, param in enumerate(params):
             assert isinstance(param, ParameterSet)
-            self.options.append(
-                (self, param.id, param.marks, param.values[0])
-            )
+            self.options.append((self, param.id, param.marks, param.values[0]))
         self.options += [(self, id, [], v) for id, v in options.items()]
 
 
@@ -64,15 +59,18 @@ def mt(*tests, **kwargs):
     All MyiaFunctionTest instances in the list of tests will be run on the same
     function. If kwargs are provided, they will be given to all the tests.
     """
+
     def deco(fn):
         def runtest(test):
             test.run(fn)
+
         pytests = []
         for test in tests:
             test = test.configure(**kwargs)
             pytests += test.generate_params()
-        runtest = pytest.mark.parametrize('test', pytests)(runtest)
+        runtest = pytest.mark.parametrize("test", pytests)(runtest)
         return runtest
+
     return deco
 
 
@@ -91,10 +89,7 @@ class MyiaFunctionTest:
 
     def configure(self, **spec):
         """Configure this test with new kwargs."""
-        return MyiaFunctionTest(
-            self.runtest,
-            spec={**self.spec, **spec},
-        )
+        return MyiaFunctionTest(self.runtest, spec={**self.spec, **spec})
 
     def check(self, run, args, expected):
         """Check the result of run() against expected.
@@ -121,14 +116,10 @@ class MyiaFunctionTest:
             res = run(args)
             if isinstance(expected, FunctionType):
                 if not expected(args, res):
-                    raise Exception(
-                        f'Failed the result check function'
-                    )
+                    raise Exception(f"Failed the result check function")
 
             elif not eqtest(res, expected):
-                raise Exception(
-                    f'Mismatch: expected {expected}, got {res}'
-                )
+                raise Exception(f"Mismatch: expected {expected}, got {res}")
 
     def generate_params(self):
         """Generate pytest parameters.
@@ -137,15 +128,16 @@ class MyiaFunctionTest:
         for each possible value it can take. If there are multiple Multiples,
         we will test a cartesian product of them.
         """
-        marks = self.spec.get('marks', [])
-        id = self.spec.get('id', 'test')
+        marks = self.spec.get("marks", [])
+        id = self.spec.get("id", "test")
         spec = dict(self.spec)
-        for key in ('marks', 'id'):
+        for key in ("marks", "id"):
             if key in spec:
                 del spec[key]
 
-        multis = [(k, v) for k, v in self.spec.items()
-                  if isinstance(v, Multiple)]
+        multis = [
+            (k, v) for k, v in self.spec.items() if isinstance(v, Multiple)
+        ]
         options = list(product(*[v.options for _, v in multis]))
         params = []
         for option in options:
@@ -158,8 +150,11 @@ class MyiaFunctionTest:
                 curr_ids.append(opt_id)
                 curr_marks += opt_marks
             curr_ids.append(id)
-            p = pytest.param(MyiaFunctionTest(self.runtest, curr_spec),
-                             marks=curr_marks, id="-".join(curr_ids))
+            p = pytest.param(
+                MyiaFunctionTest(self.runtest, curr_spec),
+                marks=curr_marks,
+                id="-".join(curr_ids),
+            )
             params.append(p)
 
         return params
@@ -201,7 +196,7 @@ class MyiaFunctionTestFactory:
     def __call__(self, *args, **kwargs):
         """Create a MyiaFunctionTest."""
         kwargs = merge(self.spec, kwargs)
-        kwargs['args'] = args
+        kwargs["args"] = args
         return MyiaFunctionTest(self.runtest, kwargs)
 
 
@@ -211,7 +206,7 @@ def myia_function_test(fn, **kwargs):
     return MyiaFunctionTestFactory(fn, kwargs)
 
 
-@myia_function_test(marks=[pytest.mark.infer], id='infer')
+@myia_function_test(marks=[pytest.mark.infer], id="infer")
 def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     """Inference test.
 
@@ -225,16 +220,25 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     def out(args):
         pip = pipeline.make()
         res = pip(input=fn, argspec=args)
-        rval = res['outspec']
+        rval = res["outspec"]
         rval = concretize_abstract(rval)
         return rval
 
     self.check(out, args, to_abstract_test(result))
 
 
-@myia_function_test(marks=[pytest.mark.run], id='run')
-def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
-         validate=True, pipeline=standard_pipeline, backend=None):
+@myia_function_test(marks=[pytest.mark.run], id="run")
+def _run(
+    self,
+    fn,
+    args,
+    result=None,
+    abstract=None,
+    broad_specs=None,
+    validate=True,
+    pipeline=standard_pipeline,
+    backend=None,
+):
     """Test a Myia function.
 
     Arguments:
@@ -255,16 +259,19 @@ def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
         backend_name = backend[0]
         backend_options = backend[1]
 
-        pipeline = pipeline.configure({
-            'resources.backend.name': backend_name,
-            'resources.backend.options': backend_options
-        })
+        pipeline = pipeline.configure(
+            {
+                "resources.backend.name": backend_name,
+                "resources.backend.options": backend_options,
+            }
+        )
 
     if abstract is None:
         if broad_specs is None:
             broad_specs = (True,) * len(args)
-        argspec = tuple(from_value(arg, broaden=bs)
-                        for bs, arg in zip(broad_specs, args))
+        argspec = tuple(
+            from_value(arg, broaden=bs) for bs, arg in zip(broad_specs, args)
+        )
     else:
         argspec = tuple(to_abstract_test(a) for a in abstract)
 
@@ -274,7 +281,7 @@ def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
     def out(args):
         pip = pipeline.make()
         mfn = pip(input=fn, argspec=argspec)
-        rval = mfn['output'](*args)
+        rval = mfn["output"](*args)
         return rval
 
     if result is None:
@@ -284,37 +291,58 @@ def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
 
 
 backend_gpu = Multiple(
-    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}),
-                 id='relay-cpu',
-                 marks=pytest.mark.relay),
-    pytest.param(('relay', {'target': 'cuda', 'device_id': 0}),
-                 id='relay-cuda',
-                 marks=[pytest.mark.relay, pytest.mark.gpu]),
-    pytest.param(('pytorch', {'device': 'cpu'}),
-                 id='pytorch-cpu',
-                 marks=pytest.mark.pytorch),
-    pytest.param(('pytorch', {'device': 'cuda'}),
-                 id='pytorch-cuda',
-                 marks=[pytest.mark.pytorch, pytest.mark.gpu])
+    pytest.param(
+        ("relay", {"target": "cpu", "device_id": 0}),
+        id="relay-cpu",
+        marks=pytest.mark.relay,
+    ),
+    pytest.param(
+        ("relay", {"target": "cuda", "device_id": 0}),
+        id="relay-cuda",
+        marks=[pytest.mark.relay, pytest.mark.gpu],
+    ),
+    pytest.param(
+        ("pytorch", {"device": "cpu"}),
+        id="pytorch-cpu",
+        marks=pytest.mark.pytorch,
+    ),
+    pytest.param(
+        ("pytorch", {"device": "cuda"}),
+        id="pytorch-cuda",
+        marks=[pytest.mark.pytorch, pytest.mark.gpu],
+    ),
 )
 backend_all = Multiple(
-    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}),
-                 id='relay-cpu',
-                 marks=pytest.mark.relay),
-    pytest.param(('pytorch', {'device': 'cpu'}),
-                 id='pytorch-cpu',
-                 marks=pytest.mark.pytorch),
+    pytest.param(
+        ("relay", {"target": "cpu", "device_id": 0}),
+        id="relay-cpu",
+        marks=pytest.mark.relay,
+    ),
+    pytest.param(
+        ("pytorch", {"device": "cpu"}),
+        id="pytorch-cpu",
+        marks=pytest.mark.pytorch,
+    ),
 )
 backend_no_relay = Multiple(
-    pytest.param(('pytorch', {'device': 'cpu'}),
-                 id='pytorch-cpu',
-                 marks=pytest.mark.pytorch),
+    pytest.param(
+        ("pytorch", {"device": "cpu"}),
+        id="pytorch-cpu",
+        marks=pytest.mark.pytorch,
+    )
 )
 run = _run.configure(backend=backend_all)
-run_relay_debug = _run.configure(backend=Multiple(
-    pytest.param(('relay', {'exec_kind': 'debug'}),
-                 id='relay-cpu-debug', marks=pytest.mark.relay)))
+run_relay_debug = _run.configure(
+    backend=Multiple(
+        pytest.param(
+            ("relay", {"exec_kind": "debug"}),
+            id="relay-cpu-debug",
+            marks=pytest.mark.relay,
+        )
+    )
+)
 run_gpu = _run.configure(backend=backend_gpu)
 run_no_relay = _run.configure(backend=backend_no_relay)
-run_debug = run.configure(pipeline=standard_debug_pipeline, validate=False,
-                          backend=False)
+run_debug = run.configure(
+    pipeline=standard_debug_pipeline, validate=False, backend=False
+)

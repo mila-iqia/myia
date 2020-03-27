@@ -15,21 +15,23 @@ from . import primitives as P
 
 
 @standard_prim(P.argmax)
-async def infer_argmax(self, engine,
-                       input: lib.AbstractArray,
-                       dim: lib.u64tup_typecheck):
+async def infer_argmax(
+    self, engine, input: lib.AbstractArray, dim: lib.u64tup_typecheck
+):
     """Infer the return type of primitive `argmax`."""
     shp = ()
     shp_inp = input.xshape()
-    dim = tuple(self.require_constant(e, argnum=f'"1:dim[{edx}]"')
-                for edx, e in enumerate(dim.elements))
+    dim = tuple(
+        self.require_constant(e, argnum=f'"1:dim[{edx}]"')
+        for edx, e in enumerate(dim.elements)
+    )
     shp = list(shp_inp)
     for d in dim:
         shp[d] = 1
     shp = tuple(shp)
     return type(input)(
         AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]}),
-        {SHAPE: shp, TYPE: input.xtype()}
+        {SHAPE: shp, TYPE: input.xtype()},
     )
 
 
@@ -40,18 +42,18 @@ def bprop_argmax(x, axis, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'argmax',
-    'registered_name': 'argmax',
-    'mapping': P.argmax,
-    'python_implementation': None,
+    "name": "argmax",
+    "registered_name": "argmax",
+    "mapping": P.argmax,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'argmax',
-    'registered_name': 'argmax',
-    'type': 'backend',
-    'python_implementation': None,
-    'inferrer_constructor': infer_argmax,
-    'grad_transform': bprop_argmax,
+    "name": "argmax",
+    "registered_name": "argmax",
+    "type": "backend",
+    "python_implementation": None,
+    "inferrer_constructor": infer_argmax,
+    "grad_transform": bprop_argmax,
 }

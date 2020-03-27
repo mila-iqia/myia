@@ -33,12 +33,13 @@ class MakeTupleGradient(MetaGraph):
         b = Graph()
         b.debug.name = f'{syms["grad_bprop"]}make_tuple_{len(args)}'
         dout = b.add_parameter()
-        grads = [b.apply(P.tuple_getitem, dout, i)
-                 for i, p in enumerate(params)]
+        grads = [
+            b.apply(P.tuple_getitem, dout, i) for i, p in enumerate(params)
+        ]
         b.output = b.apply(P.make_tuple, newenv, *grads)
 
         g.output = g.apply(P.make_tuple, out, b)
-        g.transforms['primal'] = P.make_tuple
+        g.transforms["primal"] = P.make_tuple
 
         b.flags.update(default_grad_flags)
         g.flags.update(default_grad_flags)
@@ -47,18 +48,18 @@ class MakeTupleGradient(MetaGraph):
 
 
 __operation_defaults__ = {
-    'name': 'make_tuple',
-    'registered_name': 'make_tuple',
-    'mapping': P.make_tuple,
-    'python_implementation': pyimpl_make_tuple,
+    "name": "make_tuple",
+    "registered_name": "make_tuple",
+    "mapping": P.make_tuple,
+    "python_implementation": pyimpl_make_tuple,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'make_tuple',
-    'registered_name': 'make_tuple',
-    'type': 'backend',
-    'python_implementation': pyimpl_make_tuple,
-    'inferrer_constructor': infer_make_tuple,
-    'grad_transform': MakeTupleGradient(name='make_tuple_gradient'),
+    "name": "make_tuple",
+    "registered_name": "make_tuple",
+    "type": "backend",
+    "python_implementation": pyimpl_make_tuple,
+    "inferrer_constructor": infer_make_tuple,
+    "grad_transform": MakeTupleGradient(name="make_tuple_gradient"),
 }

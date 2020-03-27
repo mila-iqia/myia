@@ -53,15 +53,15 @@ def default_convert(env, seq: (tuple, list)):
 @overload  # noqa: F811
 def default_convert(env, x: Operation):
     dflt = x.defaults()
-    if 'mapping' in dflt:
-        return default_convert(env, dflt['mapping'])
+    if "mapping" in dflt:
+        return default_convert(env, dflt["mapping"])
     else:
         raise MyiaConversionError(f"Cannot convert '{x}'")
 
 
 @overload  # noqa: F811
 def default_convert(env, x: object):
-    if hasattr(x, '__to_myia__'):
+    if hasattr(x, "__to_myia__"):
         return x.__to_myia__()
     else:
         return x
@@ -99,7 +99,7 @@ class ConverterResource(Partializable):
             while v in object_map:
                 idv = id(v)
                 if idv in seen:  # pragma: no cover
-                    raise Exception(f'Operation {v} maps to itself.')
+                    raise Exception(f"Operation {v} maps to itself.")
                 seen.add(idv)
                 v = object_map[v]
             self.object_map[k] = _Unconverted(v)
@@ -161,8 +161,7 @@ class InferenceResource(Partializable):
             max_stack_depth=self.max_stack_depth,
         )
         self.live = LiveInferenceEngine(
-            resources,
-            constructors=self.constructors,
+            resources, constructors=self.constructors
         )
 
     def infer_incremental(self):
@@ -173,22 +172,26 @@ class InferenceResource(Partializable):
         mng = self.manager
         todo = tracker.todo
         while todo:
-            nodes = [node for node in todo
-                     if node.abstract is None and node in mng.all_nodes]
+            nodes = [
+                node
+                for node in todo
+                if node.abstract is None and node in mng.all_nodes
+            ]
             todo.clear()
             self.live.run(nodes)
 
     def infer(self, graph, argspec, outspec=None):
         """Perform inference."""
-        with tracer('infer',
-                    graph=graph,
-                    argspec=argspec,
-                    outspec=outspec) as tr:
-            with tracer('engine', profile=False) as tr:
+        with tracer(
+            "infer", graph=graph, argspec=argspec, outspec=outspec
+        ) as tr:
+            with tracer("engine", profile=False) as tr:
                 rval = self.engine.run(
                     graph,
-                    argspec=tuple(arg['abstract'] if isinstance(arg, dict)
-                                  else arg for arg in argspec),
+                    argspec=tuple(
+                        arg["abstract"] if isinstance(arg, dict) else arg
+                        for arg in argspec
+                    ),
                     outspec=outspec,
                 )
             tr.set_results(output=rval)
@@ -196,9 +199,7 @@ class InferenceResource(Partializable):
 
     def monomorphize(self, context):
         """Perform monomorphization."""
-        with tracer('monomorphize',
-                    engine=self.engine,
-                    context=context) as tr:
+        with tracer("monomorphize", engine=self.engine, context=context) as tr:
             rval = monomorphize(self.engine, context, reuse_existing=True)
             tr.set_results(output=rval)
             return rval
@@ -244,10 +245,12 @@ class DebugVMResource(Partializable):
 
     def __init__(self, resources, implementations):
         """Initialize a DebugVMResource."""
-        self.vm = VM(resources.convert,
-                     resources.manager,
-                     resources.py_implementations,
-                     implementations)
+        self.vm = VM(
+            resources.convert,
+            resources.manager,
+            resources.py_implementations,
+            implementations,
+        )
 
 
 class Resources(Partializable):
@@ -273,11 +276,11 @@ class Resources(Partializable):
             self._inst[attr] = inst
             return inst
 
-        raise AttributeError(f'No resource named {attr}.')
+        raise AttributeError(f"No resource named {attr}.")
 
     def __call__(self):
         """Run the Resources as a pipeline step."""
-        return {'resources': self}
+        return {"resources": self}
 
     def copy(self):
         """Copy the resources object."""
@@ -286,12 +289,12 @@ class Resources(Partializable):
 
 __consolidate__ = True
 __all__ = [
-    'BackendResource',
-    'ConverterResource',
-    'DebugVMResource',
-    'InferenceResource',
-    'NumpyChecker',
-    'Resources',
-    'Tracker',
-    'default_convert',
+    "BackendResource",
+    "ConverterResource",
+    "DebugVMResource",
+    "InferenceResource",
+    "NumpyChecker",
+    "Resources",
+    "Tracker",
+    "default_convert",
 ]

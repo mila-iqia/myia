@@ -30,18 +30,18 @@ def bprop_make_exception(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'make_exception',
-    'registered_name': 'make_exception',
-    'mapping': P.make_exception,
-    'python_implementation': pyimpl_make_exception,
+    "name": "make_exception",
+    "registered_name": "make_exception",
+    "mapping": P.make_exception,
+    "python_implementation": pyimpl_make_exception,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'make_exception',
-    'registered_name': 'make_exception',
-    'type': 'backend',
-    'python_implementation': pyimpl_make_exception,
-    'inferrer_constructor': infer_make_exception,
-    'grad_transform': bprop_make_exception,
+    "name": "make_exception",
+    "registered_name": "make_exception",
+    "type": "backend",
+    "python_implementation": pyimpl_make_exception,
+    "inferrer_constructor": infer_make_exception,
+    "grad_transform": bprop_make_exception,
 }

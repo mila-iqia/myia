@@ -21,32 +21,32 @@ def pyimpl_scalar_div(x: Number, y: Number) -> Number:
 
 
 infer_scalar_div = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_div,
-    impl=pyimpl_scalar_div,
-    infer_value=False
+    prim=P.scalar_div, impl=pyimpl_scalar_div, infer_value=False
 )
 
 
 @bprop_to_grad_transform(P.scalar_div)
 def bprop_scalar_div(x, y, out, dout):
     """Backpropagator for `scalar_div`."""
-    return (P.scalar_div(dout, y),
-            P.scalar_mul(P.scalar_usub(dout), P.scalar_div(out, y)))
+    return (
+        P.scalar_div(dout, y),
+        P.scalar_mul(P.scalar_usub(dout), P.scalar_div(out, y)),
+    )
 
 
 __operation_defaults__ = {
-    'name': 'scalar_div',
-    'registered_name': 'scalar_div',
-    'mapping': P.scalar_div,
-    'python_implementation': pyimpl_scalar_div,
+    "name": "scalar_div",
+    "registered_name": "scalar_div",
+    "mapping": P.scalar_div,
+    "python_implementation": pyimpl_scalar_div,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_div',
-    'registered_name': 'scalar_div',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_div,
-    'inferrer_constructor': infer_scalar_div,
-    'grad_transform': bprop_scalar_div,
+    "name": "scalar_div",
+    "registered_name": "scalar_div",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_div,
+    "inferrer_constructor": infer_scalar_div,
+    "grad_transform": bprop_scalar_div,
 }

@@ -16,9 +16,7 @@ def pyimpl_scalar_add(x: Number, y: Number) -> Number:
 
 
 infer_scalar_add = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_add,
-    impl=pyimpl_scalar_add,
-    infer_value=False
+    prim=P.scalar_add, impl=pyimpl_scalar_add, infer_value=False
 )
 
 
@@ -29,18 +27,18 @@ def bprop_scalar_add(x, y, out, dout):  # pragma: no cover
 
 
 __operation_defaults__ = {
-    'name': 'scalar_add',
-    'registered_name': 'scalar_add',
-    'mapping': P.scalar_add,
-    'python_implementation': pyimpl_scalar_add,
+    "name": "scalar_add",
+    "registered_name": "scalar_add",
+    "mapping": P.scalar_add,
+    "python_implementation": pyimpl_scalar_add,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_add',
-    'registered_name': 'scalar_add',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_add,
-    'inferrer_constructor': infer_scalar_add,
-    'grad_transform': bprop_scalar_add,
+    "name": "scalar_add",
+    "registered_name": "scalar_add",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_add,
+    "inferrer_constructor": infer_scalar_add,
+    "grad_transform": bprop_scalar_add,
 }

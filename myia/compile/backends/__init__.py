@@ -28,31 +28,37 @@ def channel_loader(pkg, name):
     object from its namespace and return that.
 
     """
+
     def loader(init_args):
         proc = RPCProcess(pkg, name, init_args)
         return ChannelBackend(proc)
+
     return loader
 
 
-def relay_defaults(target='cpu', device_id=0, exec_kind='vm'):
+def relay_defaults(target="cpu", device_id=0, exec_kind="vm"):
     """Format options for relay."""
     return dict(target=target, device_id=device_id, exec_kind=exec_kind)
 
 
-def pytorch_default(device='cpu:0'):
+def pytorch_default(device="cpu:0"):
     """Format options for pytorch."""
-    if device == 'cuda':
-        device = 'cuda:0'
-    if device == 'cpu':
-        device = 'cpu:0'
+    if device == "cuda":
+        device = "cuda:0"
+    if device == "cpu":
+        device = "cpu:0"
     return dict(device=device)
 
 
 _backends = {
-    'relay': (channel_loader('myia.compile.backends.relay', 'RelayBackendR'),
-              relay_defaults),
-    'pytorch': (channel_loader('myia.compile.backends.pytorch',
-                               'PyTorchBackendR'), pytorch_default)
+    "relay": (
+        channel_loader("myia.compile.backends.relay", "RelayBackendR"),
+        relay_defaults,
+    ),
+    "pytorch": (
+        channel_loader("myia.compile.backends.pytorch", "PyTorchBackendR"),
+        pytorch_default,
+    ),
 }
 
 _active_backends = weakref.WeakValueDictionary()
@@ -86,11 +92,15 @@ def parse_default():
     Returns name and options from the environement or builtin default.
     See the documentation of get_default() for the backend string syntax.
     """
-    backend_spec = os.environ.get('MYIA_BACKEND', 'pytorch')
-    backend, *opts = backend_spec.split('?', maxsplit=1)
+    backend_spec = os.environ.get("MYIA_BACKEND", "pytorch")
+    backend, *opts = backend_spec.split("?", maxsplit=1)
     if len(opts) == 1:
-        opts = urllib.parse.parse_qs(opts[0], keep_blank_values=True,
-                                     strict_parsing=True, errors='strict')
+        opts = urllib.parse.parse_qs(
+            opts[0],
+            keep_blank_values=True,
+            strict_parsing=True,
+            errors="strict",
+        )
         for k in opts:
             assert len(opts[k]) == 1
             opts[k] = opts[k][0]
@@ -163,15 +173,15 @@ class Backend:
         `graph` with a manager and must return a callable that accepts
         arguments of the same type and number as the root graph.
         """
-        raise NotImplementedError('compile')
+        raise NotImplementedError("compile")
 
     def from_backend_value(self, v, t):
         """Convert a backend value to an intermediate value."""
-        raise NotImplementedError('from_backend_value')
+        raise NotImplementedError("from_backend_value")
 
     def to_backend_value(self, v, t):
         """Convert an intermediate value to a backend value."""
-        raise NotImplementedError('to_backend_value')
+        raise NotImplementedError("to_backend_value")
 
 
 class Converter:
@@ -245,7 +255,7 @@ class Converter:
             elif issubclass(t.xtype(), xtype.UniverseType):
                 return self.convert_universe(v, t.xtype())
             else:
-                raise NotImplementedError(f'convert for scalar {t.xtype()}')
+                raise NotImplementedError(f"convert for scalar {t.xtype()}")
         elif isinstance(t, abstract.AbstractTuple):
             return self.convert_tuple(v, t)
         elif isinstance(t, abstract.AbstractTaggedUnion):
@@ -255,7 +265,7 @@ class Converter:
         elif isinstance(t, abstract.AbstractHandle):
             return self.convert_handle(v, t)
         else:
-            raise NotImplementedError(f'convert for {t}')
+            raise NotImplementedError(f"convert for {t}")
 
 
 def _close_and_wait(stream):
@@ -274,15 +284,15 @@ class ChannelBackend(Backend):
     def compile(self, graph, argspec, outspec):
         """Remote."""
         graph = convert_grad(graph)
-        return self.proc.call_method('compile', graph, argspec, outspec)
+        return self.proc.call_method("compile", graph, argspec, outspec)
 
     def from_backend_value(self, v, t):
         """Remote."""
-        return self.proc.call_method('from_backend_value', v, t)
+        return self.proc.call_method("from_backend_value", v, t)
 
     def to_backend_value(self, v, t):
         """Remote."""
-        return self.proc.call_method('to_backend_value', v, t)
+        return self.proc.call_method("to_backend_value", v, t)
 
 
 class HandleBackend(Backend):

@@ -1,4 +1,3 @@
-
 import os
 import sys
 
@@ -15,12 +14,11 @@ Or if npm is installed, you can run the command:
     npm install buche -g
 """
 
-if __name__ == '__main__':
-    os.environ['PYTHONBREAKPOINT'] = 'buche.breakpoint'
-    cmd = 'from debug.run import main; main()'
+if __name__ == "__main__":
+    os.environ["PYTHONBREAKPOINT"] = "buche.breakpoint"
+    cmd = "from debug.run import main; main()"
     try:
-        os.execvp('buche', ['buche', 'python3', '-u', '-c', cmd]
-                  + sys.argv[1:])
+        os.execvp("buche", ["buche", "python3", "-u", "-c", cmd] + sys.argv[1:])
     except FileNotFoundError:
         print(errmsg, file=sys.stderr)
         sys.exit(1)

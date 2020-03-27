@@ -17,9 +17,7 @@ def pyimpl_scalar_lt(x: Number, y: Number) -> Bool:
 
 
 infer_scalar_lt = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_lt,
-    impl=pyimpl_scalar_lt,
-    infer_value=True
+    prim=P.scalar_lt, impl=pyimpl_scalar_lt, infer_value=True
 )
 
 
@@ -30,18 +28,18 @@ def bprop_scalar_lt(x, y, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_lt',
-    'registered_name': 'scalar_lt',
-    'mapping': P.scalar_lt,
-    'python_implementation': pyimpl_scalar_lt,
+    "name": "scalar_lt",
+    "registered_name": "scalar_lt",
+    "mapping": P.scalar_lt,
+    "python_implementation": pyimpl_scalar_lt,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_lt',
-    'registered_name': 'scalar_lt',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_lt,
-    'inferrer_constructor': infer_scalar_lt,
-    'grad_transform': bprop_scalar_lt,
+    "name": "scalar_lt",
+    "registered_name": "scalar_lt",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_lt,
+    "inferrer_constructor": infer_scalar_lt,
+    "grad_transform": bprop_scalar_lt,
 }

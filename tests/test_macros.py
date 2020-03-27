@@ -1,4 +1,3 @@
-
 import pytest
 
 from myia import myia
@@ -12,7 +11,7 @@ async def mackerel(info):
 
 
 def test_repr():
-    assert repr(mackerel) == '<Macro mackerel>'
+    assert repr(mackerel) == "<Macro mackerel>"
 
 
 def test_bad_macro():
@@ -22,9 +21,9 @@ def test_bad_macro():
     @macro
     async def bad(info, x):
         badg = Graph()
-        badg.debug.name = 'badg'
+        badg.debug.name = "badg"
         p = badg.add_parameter()
-        p.debug.name = 'parameter'
+        p.debug.name = "parameter"
         badg.output = badg.apply(P.scalar_add, p, p)
         # The return value of the macro can't directly refer to badg.output
         # because that node can only be accessed from the scope of a call to

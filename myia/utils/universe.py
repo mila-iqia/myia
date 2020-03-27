@@ -2,7 +2,7 @@
 from . import serializable
 
 
-@serializable('Universe')
+@serializable("Universe")
 class UniverseInstance:
     """Universe mapping references to values.
 
@@ -41,7 +41,7 @@ class UniverseInstance:
             handle.state = value
 
 
-@serializable('Handle')
+@serializable("Handle")
 class HandleInstance:
     """Key to use in an Universe."""
 
@@ -50,20 +50,16 @@ class HandleInstance:
         self.state = state
 
     def _serialize(self):
-        return {'state': self.state}
+        return {"state": self.state}
 
     @classmethod
     def _construct(cls):
         res = cls(None)
         data = yield res
-        res.state = data['state']
+        res.state = data["state"]
 
 
 new_universe = UniverseInstance()
 
 
-__all__ = [
-    "UniverseInstance",
-    "HandleInstance",
-    "new_universe",
-]
+__all__ = ["UniverseInstance", "HandleInstance", "new_universe"]

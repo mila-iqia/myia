@@ -21,12 +21,11 @@ async def infer_J(self, engine, x):
         if len(v) == 1:
             # If applied to a VirtualFunction (after infer/monomorphize)
             # we return another VirtualFunction
-            vfn, = v
+            (vfn,) = v
             if isinstance(vfn, VirtualFunction):
                 vfn = type_fixer(None)(JTransformedFunction(vfn))
                 return AbstractFunction(vfn)
-        return AbstractFunction(*[JTransformedFunction(poss)
-                                  for poss in v])
+        return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
     return AbstractJTagged(x)
 
 
@@ -37,18 +36,18 @@ def bprop_J(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'J',
-    'registered_name': 'J',
-    'mapping': P.J,
-    'python_implementation': None,
+    "name": "J",
+    "registered_name": "J",
+    "mapping": P.J,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'J',
-    'registered_name': 'J',
-    'type': 'placeholder',
-    'python_implementation': None,
-    'inferrer_constructor': infer_J,
-    'grad_transform': bprop_J,
+    "name": "J",
+    "registered_name": "J",
+    "type": "placeholder",
+    "python_implementation": None,
+    "inferrer_constructor": infer_J,
+    "grad_transform": bprop_J,
 }

@@ -20,14 +20,14 @@ def import_mod(pkg):
 
     This will return a callable that will load a module.
     """
+
     def loader():
         importlib.import_module(pkg)
+
     return loader
 
 
-_frontends = {
-    'pytorch': import_mod('myia.frontends.pytorch'),
-}
+_frontends = {"pytorch": import_mod("myia.frontends.pytorch")}
 
 
 def activate_frontend(name):

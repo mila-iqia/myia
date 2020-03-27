@@ -67,35 +67,22 @@ from ..multitest import mt, run_debug
 from ..test_lang import run_lang
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_add(x, y):
     return x + y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_sub(x, y):
     return x - y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_mul(x, y):
     return x * y
 
 
-@mt(
-    run_debug(2.0, 7.0),
-    run_debug(4.0, -6.0),
-    run_debug(-11, 2),
-)
+@mt(run_debug(2.0, 7.0), run_debug(4.0, -6.0), run_debug(-11, 2))
 def test_prim_truediv(x, y):
     return x / y
 
@@ -111,183 +98,112 @@ def test_prim_floordiv(x, y):
     return x // y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_mod(x, y):
     return x % y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_pow(x, y):
     return x ** y
 
 
-@mt(
-    run_debug(-2),
-    run_debug(2.3),
-    run_debug(-0.6),
-)
+@mt(run_debug(-2), run_debug(2.3), run_debug(-0.6))
 def test_prim_floor(x):
     return math.floor(x)
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6.0),
-    run_lang(0, -1),
-    run_lang(-3.2, 0.0),
-)
+@mt(run_lang(2, 7), run_lang(4, -6.0), run_lang(0, -1), run_lang(-3.2, 0.0))
 def test_prim_max(x, y):
     return scalar_max(x, y)
 
 
-@mt(
-    run_lang(-2),
-    run_lang(2.3),
-    run_lang(-0.6),
-)
+@mt(run_lang(-2), run_lang(2.3), run_lang(-0.6))
 def test_prim_trunc(x):
     return math_trunc(x)
 
 
-@mt(
-    run_lang(2),
-    run_lang(-6),
-)
+@mt(run_lang(2), run_lang(-6))
 def test_prim_uadd(x):
     return +x
 
 
-@mt(
-    run_lang(2),
-    run_lang(-6),
-)
+@mt(run_lang(2), run_lang(-6))
 def test_prim_usub(x):
     return -x
 
 
-@mt(
-    run_lang(13),
-    run_lang(0),
-    run_lang(-3),
-)
+@mt(run_lang(13), run_lang(0), run_lang(-3))
 def test_prim_exp(x):
     return math_exp(x)
 
 
-@mt(
-    run_lang(13),
-    run_lang(1),
-)
+@mt(run_lang(13), run_lang(1))
 def test_prim_log(x):
     return math_log(x)
 
 
-@mt(
-    run_lang(13),
-    run_lang(-3),
-)
+@mt(run_lang(13), run_lang(-3))
 def test_prim_sin(x):
     return math_sin(x)
 
 
-@mt(
-    run_lang(13),
-    run_lang(-3),
-)
+@mt(run_lang(13), run_lang(-3))
 def test_prim_cos(x):
     return math_cos(x)
 
 
-@mt(
-    run_lang(13),
-    run_lang(-3),
-)
+@mt(run_lang(13), run_lang(-3))
 def test_prim_tan(x):
     return math_tan(x)
 
 
-@mt(
-    run_lang(-0.1),
-    run_lang(0.3),
-)
+@mt(run_lang(-0.1), run_lang(0.3))
 def test_prim_tanh(x):
     return math_tanh(x)
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_eq(x, y):
     return x == y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_lt(x, y):
     return x < y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_gt(x, y):
     return x > y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_ne(x, y):
     return x != y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_le(x, y):
     return x <= y
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_ge(x, y):
     return x >= y
 
 
-@mt(
-    run_lang(True),
-    run_lang(False),
-)
+@mt(run_lang(True), run_lang(False))
 def test_prim_not_(x):
     return not x
 
 
-@mt(
-    run_lang(2, 7),
-    run_lang(4, -6),
-)
+@mt(run_lang(2, 7), run_lang(4, -6))
 def test_prim_tuple(x, y):
     return x, y
 
 
-@mt(
-    run_lang((1, 2, 3), 0),
-    run_lang((4, -6, 7), 2),
-)
+@mt(run_lang((1, 2, 3), 0), run_lang((4, -6, 7), 2))
 def test_prim_tuple_getitem(data, item):
     return tuple_getitem(data, item)
 
@@ -379,7 +295,7 @@ def test_prim_array_reduce():
             if isinstance(value, type) and isinstance(e, value):
                 continue
             else:
-                print(f'Expected {value}, but got {e}')
+                print(f"Expected {value}, but got {e}")
                 raise
 
         assert res.shape == outshp
@@ -410,9 +326,9 @@ def test_prim_dot():
 
 
 def test_op_full():
-    ref = np.full((4, 9), -4, 'float16')
+    ref = np.full((4, 9), -4, "float16")
     res = full((4, 9), -4, np.float16)
-    assert res.dtype == 'float16'
+    assert res.dtype == "float16"
     assert np.allclose(ref, res, rtol=0, atol=0)
 
 
@@ -431,9 +347,11 @@ def test_prim_take_grad_inp():
     broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
     ref = np.zeros(weights.shape, dtype=dout.dtype)
     for i in range(weights.shape[0]):
-        ref[i] = (((broadcastable_indices == i) * dout)
-                  .reshape((-1, weights.shape[1]))
-                  .sum(axis=0))
+        ref[i] = (
+            ((broadcastable_indices == i) * dout)
+            .reshape((-1, weights.shape[1]))
+            .sum(axis=0)
+        )
     res = take_grad_inp(weights.shape[0], indices, dout)
     assert np.allclose(ref, res, rtol=0, atol=0)
 
@@ -551,7 +469,7 @@ def test_broadcast_shape():
             if isinstance(result, type) and isinstance(e, result):
                 continue
             else:
-                print(f'Expected {result}, got {e}')
+                print(f"Expected {result}, got {e}")
                 raise
         assert shp == result
 
@@ -562,14 +480,18 @@ def test_scalar_cast():
 
 
 def test_array_cast():
-    assert isinstance(array_cast(np.array([1.5, 1.7]),
-                                 type_to_abstract(i64)), np.ndarray)
-    assert (array_cast(np.array([1.5, 1.7]),
-                       type_to_abstract(i64))).dtype == np.dtype(np.int64)
-    assert isinstance(array_cast(np.array([1.5, 1.7]),
-                                 type_to_abstract(f16)), np.ndarray)
-    assert (array_cast(np.array([1.5, 1.]),
-                       type_to_abstract(f16))).dtype == np.dtype(np.float16)
+    assert isinstance(
+        array_cast(np.array([1.5, 1.7]), type_to_abstract(i64)), np.ndarray
+    )
+    assert (
+        array_cast(np.array([1.5, 1.7]), type_to_abstract(i64))
+    ).dtype == np.dtype(np.int64)
+    assert isinstance(
+        array_cast(np.array([1.5, 1.7]), type_to_abstract(f16)), np.ndarray
+    )
+    assert (
+        array_cast(np.array([1.5, 1.0]), type_to_abstract(f16))
+    ).dtype == np.dtype(np.float16)
 
 
 def test_prim_concat():
@@ -583,7 +505,7 @@ def test_prim_concat():
 
 
 def test_prim_split():
-    a = np.array([0., 1., 2., 3.])
+    a = np.array([0.0, 1.0, 2.0, 3.0])
 
     ref = np.split(a, (1, 2), 0)
     res = split(a, (1, 1, 2), 0)
@@ -592,20 +514,12 @@ def test_prim_split():
         assert (_res == _ref).all()
 
 
-@mt(
-    run_lang(7),
-    run_lang(-6),
-    run_lang(0),
-)
+@mt(run_lang(7), run_lang(-6), run_lang(0))
 def test_prim_scalar_abs(x):
     return scalar_abs(x)
 
 
-@mt(
-    run_lang(7),
-    run_lang(-6),
-    run_lang(0),
-)
+@mt(run_lang(7), run_lang(-6), run_lang(0))
 def test_prim_scalar_sign(x):
     return scalar_sign(x)
 
@@ -615,7 +529,6 @@ def test_prim_unsafe_static_cast():
 
 
 def test_env():
-
     def f(x, y):
         e1 = env_setitem(newenv, embed(x), 100)
 
@@ -631,18 +544,17 @@ def test_env():
         return (a, b, c)
 
     res = scalar_debug_pipeline.run(
-        input=f,
-        argspec=(to_abstract_test(i64),
-                 to_abstract_test(i64))
-    )['output'](3, 4)
+        input=f, argspec=(to_abstract_test(i64), to_abstract_test(i64))
+    )["output"](3, 4)
     assert res == (110, 20, 0)
 
 
 def test_call_operation():
     from myia.operations import Operation, scalar_pow
+
     assert scalar_pow(2, 10) == 1024
 
-    bad_op = Operation('bad_op')
+    bad_op = Operation("bad_op")
     with pytest.raises(RuntimeError):
         bad_op(123)
 
@@ -656,8 +568,8 @@ def test_random():
     assert isinstance(r1, np.random.RandomState)
     assert isinstance(v0, np.ndarray)
     assert isinstance(v1, np.ndarray)
-    assert v0.dtype == 'uint32'
-    assert v1.dtype == 'uint32'
+    assert v0.dtype == "uint32"
+    assert v1.dtype == "uint32"
     assert v0.shape == (2, 3)
     assert v1.shape == (2, 3)
     assert not np.allclose(v0, v1)

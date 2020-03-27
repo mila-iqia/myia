@@ -16,12 +16,12 @@ async def hasattr_(info, r_data, r_attr):
     attr_v = await info.build(r_attr)
     case, *_ = await _attr_case(info, data, attr_v)
 
-    return Constant(case == 'field' or case == 'method')
+    return Constant(case == "field" or case == "method")
 
 
 __operation_defaults__ = {
-    'name': 'hasattr',
-    'registered_name': 'hasattr',
-    'mapping': hasattr_,
-    'python_implementation': hasattr,
+    "name": "hasattr",
+    "registered_name": "hasattr",
+    "mapping": hasattr_,
+    "python_implementation": hasattr,
 }

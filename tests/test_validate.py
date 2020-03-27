@@ -1,4 +1,3 @@
-
 import pytest
 
 from myia.abstract import AbstractFunction, VirtualFunction
@@ -11,24 +10,25 @@ from .common import Point, f64, i64, to_abstract_test
 Point_a = Point(i64, i64)
 
 
-pip = scalar_pipeline \
-    .select('resources', 'parse', 'infer', 'specialize', 'validate')
+pip = scalar_pipeline.select(
+    "resources", "parse", "infer", "specialize", "validate"
+)
 
 
-pip_ec = scalar_pipeline \
-    .select('resources', 'parse', 'infer', 'specialize',
-            'simplify_types', 'validate')
+pip_ec = scalar_pipeline.select(
+    "resources", "parse", "infer", "specialize", "simplify_types", "validate"
+)
 
 
 def run(pip, fn, types):
-    res = pip.run(input=fn,
-                  argspec=[to_abstract_test(t) for t in types])
-    return res['graph']
+    res = pip.run(input=fn, argspec=[to_abstract_test(t) for t in types])
+    return res["graph"]
 
 
 def valid(*types):
     def deco(fn):
         run(pip, fn, types)
+
     return deco
 
 
@@ -36,6 +36,7 @@ def invalid(*types):
     def deco(fn):
         with pytest.raises(ValidationError):
             run(pip, fn, types)
+
     return deco
 
 
@@ -43,6 +44,7 @@ def valid_after_ec(*types):
     def deco(fn):
         invalid(*types)(fn)
         run(pip_ec, fn, types)
+
     return deco
 
 
@@ -96,7 +98,6 @@ def test_validate():
 
 
 def test_clean():
-
     @valid_after_ec(i64, i64)
     def f1(x, y):
         return P.make_record(Point, x, y)
@@ -109,18 +110,21 @@ def test_clean():
     def f3(xs):
         def f(pt):
             return pt.x + pt.y
+
         return f(xs[0]), f(xs[1])
 
     @valid_after_ec(i64, i64)
     def f4(x, y):
         def f():
             return partial(P.make_record, Point)
+
         return f()(x, y)
 
     @valid_after_ec(i64, i64)
     def f5(x, y):
         def f(x):
             return partial(P.make_record, Point, x)
+
         return f(x)(y)
 
 

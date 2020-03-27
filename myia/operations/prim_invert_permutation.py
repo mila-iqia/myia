@@ -22,32 +22,29 @@ def pyimpl_invert_permutation(perm):
 async def infer_invert_permutation(self, engine, perm: u64tup_typecheck):
     """Infer the return type of primitive `invert_permutation`."""
     v = [x.xvalue() for x in perm.elements]
-    return AbstractTuple([
-        AbstractScalar({
-            VALUE: v.index(i),
-            TYPE: xtype.UInt[64],
-        })
-        if i in v
-        else AbstractScalar({
-            VALUE: ANYTHING,
-            TYPE: xtype.UInt[64],
-        }) for i in range(len(v))
-    ])
+    return AbstractTuple(
+        [
+            AbstractScalar({VALUE: v.index(i), TYPE: xtype.UInt[64]})
+            if i in v
+            else AbstractScalar({VALUE: ANYTHING, TYPE: xtype.UInt[64]})
+            for i in range(len(v))
+        ]
+    )
 
 
 __operation_defaults__ = {
-    'name': 'invert_permutation',
-    'registered_name': 'invert_permutation',
-    'mapping': P.invert_permutation,
-    'python_implementation': pyimpl_invert_permutation,
+    "name": "invert_permutation",
+    "registered_name": "invert_permutation",
+    "mapping": P.invert_permutation,
+    "python_implementation": pyimpl_invert_permutation,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'invert_permutation',
-    'registered_name': 'invert_permutation',
-    'type': 'backend',
-    'python_implementation': pyimpl_invert_permutation,
-    'inferrer_constructor': infer_invert_permutation,
-    'grad_transform': None,
+    "name": "invert_permutation",
+    "registered_name": "invert_permutation",
+    "type": "backend",
+    "python_implementation": pyimpl_invert_permutation,
+    "inferrer_constructor": infer_invert_permutation,
+    "grad_transform": None,
 }

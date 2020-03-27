@@ -11,7 +11,6 @@ import numpy
 from numpy.random import RandomState
 
 from myia import ArithmeticData, myia, value_and_grad
-# The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 from myia.xtype import Array
 
@@ -20,8 +19,8 @@ from myia.xtype import Array
 ###########
 
 
-dtype = 'float32'
-device_type = 'cpu'
+dtype = "float32"
+device_type = "cpu"
 # device_type = 'cuda'  # Uncomment to run on the gpu
 
 
@@ -39,17 +38,22 @@ def param(R, *size):
     return numpy.array(R.rand(*size) * 2 - 1, dtype=dtype)
 
 
-def generate_data(n, batch_size, input_size, target_size, sequence_size,
-                  *, seed=91):
+def generate_data(
+    n, batch_size, input_size, target_size, sequence_size, *, seed=91
+):
     """Generate inputs and targets.
 
     Generates n batches of samples of size input_size, matched with
     a single target.
     """
     R = RandomState(seed=seed)
-    return [([param(R, batch_size, input_size) for i in range(sequence_size)],
-             param(R, batch_size, target_size))
-            for i in range(n)]
+    return [
+        (
+            [param(R, batch_size, input_size) for i in range(sequence_size)],
+            param(R, batch_size, target_size),
+        )
+        for i in range(n)
+    ]
 
 
 def lstm_parameters(*layer_sizes, batch_size, seed=6666):
@@ -75,12 +79,9 @@ def lstm_parameters(*layer_sizes, batch_size, seed=6666):
     s0 = numpy.zeros((1, h), dtype=dtype)
     c0 = numpy.zeros((1, h), dtype=dtype)
 
-    parameters = [(
-        W_i, W_f, W_c, W_o,
-        R_i, R_f, R_c, R_o,
-        b_i, b_f, b_c, b_o,
-        s0, c0
-    )]
+    parameters = [
+        (W_i, W_f, W_c, W_o, R_i, R_f, R_c, R_o, b_i, b_f, b_c, b_o, s0, c0)
+    ]
 
     for i, o in zip((h, *rest[:-1]), rest):
         W = param(R, i, o)
@@ -107,8 +108,8 @@ def sigmoid(x):
 class Linear(ArithmeticData):
     """Linear layer."""
 
-    W: 'Weights array'
-    b: 'Biases vector'
+    W: "Weights array"
+    b: "Biases vector"
 
     def apply(self, input):
         """Apply the layer."""
@@ -152,9 +153,7 @@ class LSTMLayer(ArithmeticData):
         f_t = sigmoid((x_t @ self.W_f) + (h_tm1 @ self.R_f) + self.b_f)
         o_t = sigmoid((x_t @ self.W_o) + (h_tm1 @ self.R_o) + self.b_o)
 
-        c_hat_t = numpy.tanh(
-            (x_t @ self.W_c) + (h_tm1 @ self.R_c) + self.b_c
-        )
+        c_hat_t = numpy.tanh((x_t @ self.W_c) + (h_tm1 @ self.R_c) + self.b_c)
 
         c_t = f_t * c_tm1 + i_t * c_hat_t
         h_t = o_t * numpy.tanh(c_t)
@@ -175,7 +174,7 @@ class LSTMLayer(ArithmeticData):
 class Sequential(ArithmeticData):
     """Sequential layer, applies all sub-layers in order."""
 
-    layers: 'Tuple of layers'
+    layers: "Tuple of layers"
 
     def apply(self, x):
         """Apply the layer."""
@@ -192,13 +191,13 @@ def cost(model, x, target):
 
 
 # @myia(backend_options={'target': device_type})
-@myia(backend='pytorch', backend_options={'device': device_type})
+@myia(backend="pytorch", backend_options={"device": device_type})
 def step(model, lr, x, y):
     """Returns the loss and parameter gradients."""
     # value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
     # The 'model' argument can be omitted: by default the derivative wrt
     # the first argument is returned.
-    _cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
+    _cost, dmodel = value_and_grad(cost, "model")(model, x, y)
     return _cost, model - (lr * dmodel)
 
 
@@ -233,7 +232,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
             costs.append(cost)
         c = sum(costs) / n
         t = time.time() - t0
-        print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
+        print(f"Cost: {c:15.10f}\tTime: {t:15.10f}")
 
 
 # We do not currently run this test in the test suite because it is too
@@ -254,5 +253,5 @@ def run():
     run_helper(100, 10, 5, (10, 7, 1))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()

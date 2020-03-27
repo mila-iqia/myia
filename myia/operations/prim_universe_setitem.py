@@ -11,31 +11,31 @@ def pyimpl_universe_setitem(universe, handle, value):
 
 
 @standard_prim(P.universe_setitem)
-async def infer_universe_setitem(self, engine,
-                                 universe: xtype.UniverseType,
-                                 handle: lib.AbstractHandle,
-                                 value):
+async def infer_universe_setitem(
+    self,
+    engine,
+    universe: xtype.UniverseType,
+    handle: lib.AbstractHandle,
+    value,
+):
     """Infer the return type of primitive `universe_setitem`."""
     engine.abstract_merge(handle.element, value)
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: xtype.UniverseType,
-    })
+    return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.UniverseType})
 
 
 __operation_defaults__ = {
-    'name': 'universe_setitem',
-    'registered_name': 'universe_setitem',
-    'mapping': P.universe_setitem,
-    'python_implementation': pyimpl_universe_setitem,
+    "name": "universe_setitem",
+    "registered_name": "universe_setitem",
+    "mapping": P.universe_setitem,
+    "python_implementation": pyimpl_universe_setitem,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'universe_setitem',
-    'registered_name': 'universe_setitem',
-    'type': 'backend',
-    'python_implementation': pyimpl_universe_setitem,
-    'inferrer_constructor': infer_universe_setitem,
-    'grad_transform': None,
+    "name": "universe_setitem",
+    "registered_name": "universe_setitem",
+    "type": "backend",
+    "python_implementation": pyimpl_universe_setitem,
+    "inferrer_constructor": infer_universe_setitem,
+    "grad_transform": None,
 }

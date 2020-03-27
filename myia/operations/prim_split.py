@@ -28,12 +28,14 @@ async def infer_split(self, engine, x, sections, dim):
 
     shp_r = ()
     for s in sections_v:
-        shp_r = shp_r + (x_shp_v[:dim_v] + (s,) + x_shp_v[dim_v + 1:],)
+        shp_r = shp_r + (x_shp_v[:dim_v] + (s,) + x_shp_v[dim_v + 1 :],)
 
-    return AbstractTuple([
-        type(x)(x.element, {SHAPE: out_shape, TYPE: x.xtype()})
-        for out_shape in shp_r
-    ])
+    return AbstractTuple(
+        [
+            type(x)(x.element, {SHAPE: out_shape, TYPE: x.xtype()})
+            for out_shape in shp_r
+        ]
+    )
 
 
 @bprop_to_grad_transform(P.split)
@@ -44,18 +46,18 @@ def bprop_split(x, sections, dim, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'split',
-    'registered_name': 'split',
-    'mapping': P.split,
-    'python_implementation': pyimpl_split,
+    "name": "split",
+    "registered_name": "split",
+    "mapping": P.split,
+    "python_implementation": pyimpl_split,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'split',
-    'registered_name': 'split',
-    'type': 'backend',
-    'python_implementation': pyimpl_split,
-    'inferrer_constructor': infer_split,
-    'grad_transform': bprop_split,
+    "name": "split",
+    "registered_name": "split",
+    "type": "backend",
+    "python_implementation": pyimpl_split,
+    "inferrer_constructor": infer_split,
+    "grad_transform": bprop_split,
 }

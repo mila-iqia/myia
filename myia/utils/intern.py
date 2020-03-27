@@ -43,9 +43,9 @@ class ItemEK(ElementsBase):
         """Initialize an ItemEK."""
         super().__init__(obj)
         self.keys = tuple(keys)
-        self.values = tuple(key if isinstance(key, EqKey)
-                            else obj[key]
-                            for key in keys)
+        self.values = tuple(
+            key if isinstance(key, EqKey) else obj[key] for key in keys
+        )
 
     def canonicalize(self):
         """Canonicalize the underlying object."""
@@ -62,9 +62,9 @@ class AttrEK(ElementsBase):
         """Initialize an AttrEK."""
         super().__init__(obj)
         self.keys = tuple(keys)
-        self.values = tuple(key if isinstance(key, EqKey)
-                            else getattr(obj, key)
-                            for key in keys)
+        self.values = tuple(
+            key if isinstance(key, EqKey) else getattr(obj, key) for key in keys
+        )
 
     def canonicalize(self):
         """Canonicalize the underlying object."""
@@ -78,7 +78,7 @@ class AttrEK(ElementsBase):
 
 def eqkey(x):
     """Return the equality key for x."""
-    if getattr(x, '_incomplete', False):
+    if getattr(x, "_incomplete", False):
         raise IncompleteException()
     elif isinstance(x, EqKey):
         return x
@@ -86,7 +86,7 @@ def eqkey(x):
         return ItemEK(x, range(len(x)))
     elif isinstance(x, dict):
         return ItemEK(x, x.keys())
-    elif hasattr(x, '__eqkey__'):
+    elif hasattr(x, "__eqkey__"):
         return x.__eqkey__()
     else:
         assert not isinstance(x, (set, frozenset))
@@ -103,9 +103,9 @@ class IncompleteException(Exception):
 
 def deep_eqkey(obj, path=frozenset()):
     """Return a key for equality tests for non-recursive structures."""
-    cachable = getattr(obj, '__cache_eqkey__', False)
+    cachable = getattr(obj, "__cache_eqkey__", False)
     if cachable:
-        cached = getattr(obj, '_eqkey_deepkey', None)
+        cached = getattr(obj, "_eqkey_deepkey", None)
         if cached is RecursionException:
             raise RecursionException()
         if cached is not None:
@@ -119,8 +119,9 @@ def deep_eqkey(obj, path=frozenset()):
 
     key = eqkey(obj)
     if isinstance(key, ElementsBase):
-        dk = key.type, type(key.values)(
-            deep_eqkey(x, path | {oid}) for x in key.values
+        dk = (
+            key.type,
+            type(key.values)(deep_eqkey(x, path | {oid}) for x in key.values),
         )
     else:
         assert isinstance(key, Atom)
@@ -272,7 +273,7 @@ class Interned(metaclass=InternedMC):
 
     def __eqkey__(self):
         """Generate a key for equality/hashing purposes."""
-        raise NotImplementedError('Implement in subclass')
+        raise NotImplementedError("Implement in subclass")
 
 
 class PossiblyRecursive:
@@ -312,13 +313,13 @@ def intern(inst):
 
 __consolidate__ = True
 __all__ = [
-    'Atom',
-    'AttrEK',
-    'EqKey',
-    'Interned',
-    'ItemEK',
-    'PossiblyRecursive',
-    'eqrec',
-    'hashrec',
-    'intern',
+    "Atom",
+    "AttrEK",
+    "EqKey",
+    "Interned",
+    "ItemEK",
+    "PossiblyRecursive",
+    "eqrec",
+    "hashrec",
+    "intern",
 ]

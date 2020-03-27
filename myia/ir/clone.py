@@ -52,14 +52,16 @@ class GraphRemapper(Partializable):
 
     """
 
-    def __init__(self,
-                 graphs,
-                 *,
-                 relation,
-                 remappers=None,
-                 manager=None,
-                 graph_repl=None,
-                 graph_relation=None):
+    def __init__(
+        self,
+        graphs,
+        *,
+        relation,
+        remappers=None,
+        manager=None,
+        graph_repl=None,
+        graph_relation=None,
+    ):
         """Initialize a GraphRemapper."""
         self.relation = relation
         self.graph_relation = graph_relation or relation
@@ -81,19 +83,19 @@ class GraphRemapper(Partializable):
 
     def gen_graph(self, graph):
         """Generate the corresponding new graph."""
-        raise NotImplementedError('Override gen_graph in subclass')
+        raise NotImplementedError("Override gen_graph in subclass")
 
     def gen_parameter(self, graph, new_graph, node):
         """Generate the corresponding new parameter."""
-        raise NotImplementedError('Override gen_parameter in subclass')
+        raise NotImplementedError("Override gen_parameter in subclass")
 
     def gen_apply(self, graph, new_graph, node):
         """Generate the corresponding new application."""
-        raise NotImplementedError('Override gen_apply in subclass')
+        raise NotImplementedError("Override gen_apply in subclass")
 
     def gen_constant(self, graph, new_graph, node):
         """Generate the corresponding new constant."""
-        raise NotImplementedError('Override gen_constant in subclass')
+        raise NotImplementedError("Override gen_constant in subclass")
 
     def gen_constant_graph(self, graph, new_graph, ct):
         """Generate the corresponding new constant graph."""
@@ -106,7 +108,7 @@ class GraphRemapper(Partializable):
 
     def gen_rogue_parameter(self, graph, new_graph, p):  # pragma: no cover
         """Generate something for a parameter not in the parameter list."""
-        raise Exception(f'Found a parameter not in the parameter list: {p}')
+        raise Exception(f"Found a parameter not in the parameter list: {p}")
 
     def remap_node(self, key, graph, node, new_graph, new_node, link=None):
         """Remap a node.
@@ -134,7 +136,7 @@ class GraphRemapper(Partializable):
                 graph=graph,
                 node=node,
                 new_graph=new_graph,
-                new_node=new_node
+                new_node=new_node,
             )
             self.to_link.append(work)
         return new_node
@@ -165,8 +167,7 @@ class GraphRemapper(Partializable):
                 if node.is_apply():
                     self.gen_apply(graph, target_graph, node)
                 elif node.is_parameter() and node not in graph.parameters:
-                    self.gen_rogue_parameter(
-                        graph, target_graph, node)
+                    self.gen_rogue_parameter(graph, target_graph, node)
 
             if self.gen_child is not NotImplemented:
                 for child in mng.children[graph]:
@@ -244,23 +245,25 @@ class BasicRemapper(GraphRemapper):
 class CloneRemapper(BasicRemapper):
     """Remapper for GraphCloner."""
 
-    def __init__(self,
-                 graphs,
-                 inlines,
-                 manager,
-                 relation,
-                 graph_repl,
-                 graph_relation,
-                 clone_constants,
-                 quarantine=None,
-                 set_abstract=True):
+    def __init__(
+        self,
+        graphs,
+        inlines,
+        manager,
+        relation,
+        graph_repl,
+        graph_relation,
+        clone_constants,
+        quarantine=None,
+        set_abstract=True,
+    ):
         """Initialize the GraphCloner."""
         super().__init__(
             graphs,
             manager=manager or manage(*graphs, *inlines, weak=True),
             relation=relation,
             graph_repl=graph_repl,
-            graph_relation=graph_relation
+            graph_relation=graph_relation,
         )
         self.inlines = inlines
         self.clone_constants = clone_constants
@@ -406,17 +409,19 @@ class GraphCloner:
 
     """
 
-    def __init__(self,
-                 *graphs,
-                 inline=[],
-                 total=False,
-                 relation='copy',
-                 clone_constants=False,
-                 clone_children=True,
-                 graph_relation=None,
-                 graph_repl=None,
-                 remapper_class=CloneRemapper,
-                 quarantine=None):
+    def __init__(
+        self,
+        *graphs,
+        inline=[],
+        total=False,
+        relation="copy",
+        clone_constants=False,
+        clone_children=True,
+        graph_relation=None,
+        graph_repl=None,
+        remapper_class=CloneRemapper,
+        quarantine=None,
+    ):
         """Initialize a GraphCloner."""
         self.total = total
         self.quarantine = quarantine
@@ -444,6 +449,7 @@ class GraphCloner:
         This set will include the scopes of the graphs if clone_constants
         is True, as well as any graphs they use if total is True.
         """
+
         def expand_clones(graph):
             if self.clone_children:
                 self.graphs.update(self.manager.scopes[graph] - {graph})
@@ -459,9 +465,9 @@ class GraphCloner:
             self.inlines[graph] = (target_graph, new_params)
             expand_clones(graph)
         if set(self.inlines) & self.graphs:
-            msg = 'Trying to clone and inline a graph at the same time.'
+            msg = "Trying to clone and inline a graph at the same time."
             if self.total:
-                msg += ' Try setting the `total` option to False.'
+                msg += " Try setting the `total` option to False."
             raise Exception(msg)
         self.graphs.update(self.inlines)
         if self.quarantine is not None:
@@ -475,22 +481,26 @@ class GraphCloner:
             return self.remapper.repl.get(x, x)
 
 
-def clone(g,
-          total=True,
-          relation='copy',
-          clone_constants=False,
-          graph_relation=None,
-          quarantine=None):
+def clone(
+    g,
+    total=True,
+    relation="copy",
+    clone_constants=False,
+    graph_relation=None,
+    quarantine=None,
+):
     """Return a clone of g."""
-    return GraphCloner(g,
-                       total=total,
-                       relation=relation,
-                       clone_constants=clone_constants,
-                       graph_relation=graph_relation,
-                       quarantine=quarantine)[g]
+    return GraphCloner(
+        g,
+        total=total,
+        relation=relation,
+        clone_constants=clone_constants,
+        graph_relation=graph_relation,
+        quarantine=quarantine,
+    )[g]
 
 
-def transformable_clone(graph, relation='transform'):
+def transformable_clone(graph, relation="transform"):
     """Return a clone of the graph that can be safely transformed.
 
     If the graph is recursive, recursive calls will point to the original
@@ -500,7 +510,7 @@ def transformable_clone(graph, relation='transform'):
     with About(graph.debug, relation):
         newg = Graph()
     for p in graph.parameters:
-        with About(p.debug, 'copy'):
+        with About(p.debug, "copy"):
             p2 = newg.add_parameter()
             p2.abstract = p.abstract
     cl = GraphCloner(inline=(graph, newg, newg.parameters))
@@ -510,12 +520,12 @@ def transformable_clone(graph, relation='transform'):
 
 __consolidate__ = True
 __all__ = [
-    'BasicRemapper',
-    'CloneRemapper',
-    'GraphCloner',
-    'GraphRemapper',
-    'Quarantined',
-    'RemapperSet',
-    'clone',
-    'transformable_clone',
+    "BasicRemapper",
+    "CloneRemapper",
+    "GraphCloner",
+    "GraphRemapper",
+    "Quarantined",
+    "RemapperSet",
+    "clone",
+    "transformable_clone",
 ]

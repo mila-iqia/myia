@@ -7,8 +7,10 @@ from .unify import SVar, Var, var
 
 def constvar(cls=object):
     """Return a variable matching a Constant of the given type."""
+
     def _is_c(n):
         return n.is_constant(cls)
+
     return var(_is_c)
 
 
@@ -17,14 +19,14 @@ def constvar(cls=object):
 #####################
 
 
-X = Var('X')
-Y = Var('Y')
-Z = Var('Z')
-X1 = Var('X1')
-X2 = Var('X2')
-X3 = Var('X3')
-X4 = Var('X4')
-X5 = Var('X5')
+X = Var("X")
+Y = Var("Y")
+Z = Var("Z")
+X1 = Var("X1")
+X2 = Var("X2")
+X3 = Var("X3")
+X4 = Var("X4")
+X5 = Var("X5")
 
 
 #############
@@ -53,24 +55,24 @@ Cs = SVar(constvar())
 
 
 __all__ = [
-    'X',
-    'Y',
-    'Z',
-    'X1',
-    'X2',
-    'X3',
-    'X4',
-    'X5',
-    'C',
-    'C1',
-    'C2',
-    'CNS',
-    'G',
-    'G1',
-    'G2',
-    'NIL',
-    'Xs',
-    'Ys',
-    'Cs',
-    'constvar',
+    "X",
+    "Y",
+    "Z",
+    "X1",
+    "X2",
+    "X3",
+    "X4",
+    "X5",
+    "C",
+    "C1",
+    "C2",
+    "CNS",
+    "G",
+    "G1",
+    "G2",
+    "NIL",
+    "Xs",
+    "Ys",
+    "Cs",
+    "constvar",
 ]

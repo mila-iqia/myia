@@ -51,7 +51,7 @@ def ndarray_aliasable(v, vseq, path):
     """
     if isinstance(v, np.ndarray):
         if any(isinstance(x, (list, ADT)) for x in vseq):
-            return 'X'
+            return "X"
         else:
             return True
     return False
@@ -85,7 +85,7 @@ def find_aliases(obj, aliasable=ndarray_aliasable):
     for v, vseq, path in _explore(obj, (), ()):
         al = aliasable(v, vseq, path)
         if al:
-            if al == 'X':
+            if al == "X":
                 bad[id(v)] = True
             paths[id(v)].append(path)
 
@@ -96,7 +96,7 @@ def find_aliases(obj, aliasable=ndarray_aliasable):
         if len(path) > 1:
             if bad.get(idv, False):
                 raise MyiaInputTypeError(
-                    'There is aliased data in non-aliasable data types'
+                    "There is aliased data in non-aliasable data types"
                 )
             id_to_aid[idv] = i
             aid_to_paths[i] = path
@@ -151,8 +151,8 @@ def setter_from_getter(getter, value):
 
 __consolidate__ = True
 __all__ = [
-    'find_aliases',
-    'generate_getters',
-    'ndarray_aliasable',
-    'setter_from_getter',
+    "find_aliases",
+    "generate_getters",
+    "ndarray_aliasable",
+    "setter_from_getter",
 ]

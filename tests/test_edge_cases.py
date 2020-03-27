@@ -42,7 +42,7 @@ def test_call_opdef():
 
 
 @dataclass(frozen=True)
-class Linear():
+class Linear:
     """Linear layer."""
 
     W: object

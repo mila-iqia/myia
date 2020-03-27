@@ -31,7 +31,7 @@ async def infer_Jinv(self, engine, x):
                 res = f.fn
             elif isinstance(f, GraphFunction):
                 g = f.graph
-                primal = g and g.transforms.get('primal', None)
+                primal = g and g.transforms.get("primal", None)
                 if primal:
                     if isinstance(primal, Graph):
                         if primal.parent:
@@ -52,26 +52,25 @@ async def infer_Jinv(self, engine, x):
                             # Not sure why this never happens either
                             res = primal
                             if isinstance(res, Primitive):
-                                tid = getattr(f, 'tracking_id', None)
+                                tid = getattr(f, "tracking_id", None)
                                 res = PrimitiveFunction(res, tracking_id=tid)
                 else:
-                    raise MyiaTypeError(f'Bad input type for {self.prim}: {f}')
+                    raise MyiaTypeError(f"Bad input type for {self.prim}: {f}")
             elif isinstance(f, VirtualFunction):
                 res = VirtualFunction(
-                    tuple([await self._infer(self, engine, arg)
-                           for arg in f.args]),
-                    await self._infer(self, engine, f.output.elements[0])
+                    tuple(
+                        [await self._infer(self, engine, arg) for arg in f.args]
+                    ),
+                    await self._infer(self, engine, f.output.elements[0]),
                 )
             else:
-                raise MyiaTypeError(
-                    f'Expected JTransformedFunction, not {f}'
-                )
+                raise MyiaTypeError(f"Expected JTransformedFunction, not {f}")
             results.append(res)
         return AbstractFunction(*results)
     if isinstance(x, AbstractJTagged):
         return x.element
     else:
-        raise MyiaTypeError('Expected JTagged')
+        raise MyiaTypeError("Expected JTagged")
 
 
 @bprop_to_grad_transform(P.Jinv)
@@ -81,18 +80,18 @@ def bprop_Jinv(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'Jinv',
-    'registered_name': 'Jinv',
-    'mapping': P.Jinv,
-    'python_implementation': None,
+    "name": "Jinv",
+    "registered_name": "Jinv",
+    "mapping": P.Jinv,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'Jinv',
-    'registered_name': 'Jinv',
-    'type': 'placeholder',
-    'python_implementation': None,
-    'inferrer_constructor': infer_Jinv,
-    'grad_transform': bprop_Jinv,
+    "name": "Jinv",
+    "registered_name": "Jinv",
+    "type": "placeholder",
+    "python_implementation": None,
+    "inferrer_constructor": infer_Jinv,
+    "grad_transform": bprop_Jinv,
 }

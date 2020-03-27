@@ -23,8 +23,9 @@ def pyimpl_distribute(v, shape):
 
 
 @standard_prim(P.distribute)
-async def infer_distribute(self, engine,
-                           a: AbstractArray, _shp: u64tup_typecheck):
+async def infer_distribute(
+    self, engine, a: AbstractArray, _shp: u64tup_typecheck
+):
     """Infer the return type of primitive `distribute`."""
     shp = tuple(x.xvalue() for x in _shp.elements)
     a_shp = await force_pending(a.xshape())
@@ -42,23 +43,22 @@ async def infer_distribute(self, engine,
 @bprop_to_grad_transform(P.distribute)
 def bprop_distribute(arr, shp, out, dout):
     """Backpropagator for primitive `distribute`."""
-    return (array_reduce(scalar_add, dout, shape(arr)),
-            zeros_like(shp))
+    return (array_reduce(scalar_add, dout, shape(arr)), zeros_like(shp))
 
 
 __operation_defaults__ = {
-    'name': 'distribute',
-    'registered_name': 'distribute',
-    'mapping': P.distribute,
-    'python_implementation': pyimpl_distribute,
+    "name": "distribute",
+    "registered_name": "distribute",
+    "mapping": P.distribute,
+    "python_implementation": pyimpl_distribute,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'distribute',
-    'registered_name': 'distribute',
-    'type': 'backend',
-    'python_implementation': pyimpl_distribute,
-    'inferrer_constructor': infer_distribute,
-    'grad_transform': bprop_distribute,
+    "name": "distribute",
+    "registered_name": "distribute",
+    "type": "backend",
+    "python_implementation": pyimpl_distribute,
+    "inferrer_constructor": infer_distribute,
+    "grad_transform": bprop_distribute,
 }

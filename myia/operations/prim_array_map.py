@@ -27,8 +27,10 @@ def pyimpl_array_map(fn, *arrays):
 
 def debugvm_array_map(vm, fn, *arrays):
     """Implement `array_map` for the debug VM."""
+
     def fn_(*args):
         return vm.call(fn, args)
+
     return pyimpl_array_map(fn_, *arrays)
 
 
@@ -36,7 +38,7 @@ def debugvm_array_map(vm, fn, *arrays):
 async def infer_array_map(self, engine, fn: AbstractFunction, *arrays):
     """Infer the return type of primitive `array_map`."""
     if len(arrays) < 1:
-        raise MyiaTypeError('array_map requires at least one array')
+        raise MyiaTypeError("array_map requires at least one array")
     for arr in arrays:
         await engine.check_immediate(AbstractArray, arr)
 
@@ -57,7 +59,7 @@ async def infer_array_map(self, engine, fn: AbstractFunction, *arrays):
             rshape.append(ANYTHING)
         elif len(entries) == 2:
             entries.remove(ANYTHING)
-            entry, = entries
+            (entry,) = entries
             rshape.append(entry)
         else:
             raise MyiaShapeError("Expect same shapes for array_map")
@@ -65,14 +67,12 @@ async def infer_array_map(self, engine, fn: AbstractFunction, *arrays):
     for arr in arrays:
         if arrays[0].xtype() != arr.xtype():
             raise MyiaTypeError(
-                f'Expect array of type {arrays[0].xtype()} '
-                f'to have same type as array of type {arr.xtype()}')
+                f"Expect array of type {arrays[0].xtype()} "
+                f"to have same type as array of type {arr.xtype()}"
+            )
 
     return type(arrays[0])(
-        result, {
-            SHAPE: tuple(rshape),
-            TYPE: arrays[0].xtype(),
-        }
+        result, {SHAPE: tuple(rshape), TYPE: arrays[0].xtype()}
     )
 
 
@@ -137,19 +137,19 @@ class ArrayMapGradient(MetaGraph):
 
 
 __operation_defaults__ = {
-    'name': 'array_map',
-    'registered_name': 'array_map',
-    'mapping': P.array_map,
-    'python_implementation': pyimpl_array_map,
+    "name": "array_map",
+    "registered_name": "array_map",
+    "mapping": P.array_map,
+    "python_implementation": pyimpl_array_map,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'array_map',
-    'registered_name': 'array_map',
-    'type': 'backend',
-    'python_implementation': pyimpl_array_map,
-    'debugvm_implementation': debugvm_array_map,
-    'inferrer_constructor': infer_array_map,
-    'grad_transform': ArrayMapGradient(name='array_map_gradient'),
+    "name": "array_map",
+    "registered_name": "array_map",
+    "type": "backend",
+    "python_implementation": pyimpl_array_map,
+    "debugvm_implementation": debugvm_array_map,
+    "inferrer_constructor": infer_array_map,
+    "grad_transform": ArrayMapGradient(name="array_map_gradient"),
 }

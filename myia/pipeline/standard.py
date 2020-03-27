@@ -23,10 +23,10 @@ from .resources import (
     Tracker,
 )
 
-py_registry = Registry(default_field='python_implementation')
-vm_registry = Registry(default_field='debugvm_implementation')
-grad_registry = Registry(default_field='grad_transform')
-inferrer_registry = Registry(default_field='inferrer_constructor')
+py_registry = Registry(default_field="python_implementation")
+vm_registry = Registry(default_field="debugvm_implementation")
+grad_registry = Registry(default_field="grad_transform")
+inferrer_registry = Registry(default_field="inferrer_constructor")
 
 
 python_operation_map = {
@@ -115,143 +115,147 @@ scalar_object_map = {
 }
 
 
-standard_object_map = {
-    **python_operation_map,
-}
+standard_object_map = {**python_operation_map}
 
 
 standard_method_map = {
     xtype.Nil: {
-        '__eq__': operations.nil_eq,
-        '__ne__': operations.nil_ne,
-        '__bool__': operations.nil_bool,
+        "__eq__": operations.nil_eq,
+        "__ne__": operations.nil_ne,
+        "__bool__": operations.nil_bool,
     },
     xtype.Bool: {
-        '__and__': operations.bool_and,
-        '__or__': operations.bool_or,
-        '__eq__': operations.bool_eq,
-        '__ne__': operations.bool_ne,
-        '__bool__': operations.identity,
+        "__and__": operations.bool_and,
+        "__or__": operations.bool_or,
+        "__eq__": operations.bool_eq,
+        "__ne__": operations.bool_ne,
+        "__bool__": operations.identity,
     },
     xtype.String: {
-        '__eq__': operations.string_eq,
-        '__ne__': operations.string_ne,
+        "__eq__": operations.string_eq,
+        "__ne__": operations.string_ne,
     },
     xtype.Number: {
-        '__add__': lop(operations.scalar_add, xtype.Number, '__add__'),
-        '__sub__': lop(operations.scalar_sub, xtype.Number, '__sub__'),
-        '__mul__': lop(operations.scalar_mul, xtype.Number, '__mul__'),
-        '__mod__': lop(operations.scalar_mod, xtype.Number, '__mod__'),
-        '__pow__': lop(operations.scalar_pow, xtype.Number, '__pow__'),
-        '__radd__': rop(operations.scalar_add, xtype.Number, '__radd__'),
-        '__rsub__': rop(operations.scalar_sub, xtype.Number, '__rsub__'),
-        '__rmul__': rop(operations.scalar_mul, xtype.Number, '__rmul__'),
-        '__rmod__': rop(operations.scalar_mod, xtype.Number, '__rmod__'),
-        '__rpow__': rop(operations.scalar_pow, xtype.Number, '__rpow__'),
-        '__pos__': operations.scalar_uadd,
-        '__neg__': operations.scalar_usub,
-        '__eq__': lop(operations.scalar_eq, xtype.Number, '__eq__'),
-        '__ne__': lop(operations.scalar_ne, xtype.Number, '__ne__'),
-        '__lt__': lop(operations.scalar_lt, xtype.Number, '__lt__'),
-        '__gt__': lop(operations.scalar_gt, xtype.Number, '__gt__'),
-        '__le__': lop(operations.scalar_le, xtype.Number, '__le__'),
-        '__ge__': lop(operations.scalar_ge, xtype.Number, '__ge__'),
+        "__add__": lop(operations.scalar_add, xtype.Number, "__add__"),
+        "__sub__": lop(operations.scalar_sub, xtype.Number, "__sub__"),
+        "__mul__": lop(operations.scalar_mul, xtype.Number, "__mul__"),
+        "__mod__": lop(operations.scalar_mod, xtype.Number, "__mod__"),
+        "__pow__": lop(operations.scalar_pow, xtype.Number, "__pow__"),
+        "__radd__": rop(operations.scalar_add, xtype.Number, "__radd__"),
+        "__rsub__": rop(operations.scalar_sub, xtype.Number, "__rsub__"),
+        "__rmul__": rop(operations.scalar_mul, xtype.Number, "__rmul__"),
+        "__rmod__": rop(operations.scalar_mod, xtype.Number, "__rmod__"),
+        "__rpow__": rop(operations.scalar_pow, xtype.Number, "__rpow__"),
+        "__pos__": operations.scalar_uadd,
+        "__neg__": operations.scalar_usub,
+        "__eq__": lop(operations.scalar_eq, xtype.Number, "__eq__"),
+        "__ne__": lop(operations.scalar_ne, xtype.Number, "__ne__"),
+        "__lt__": lop(operations.scalar_lt, xtype.Number, "__lt__"),
+        "__gt__": lop(operations.scalar_gt, xtype.Number, "__gt__"),
+        "__le__": lop(operations.scalar_le, xtype.Number, "__le__"),
+        "__ge__": lop(operations.scalar_ge, xtype.Number, "__ge__"),
     },
     xtype.Integral: {
-        '__and__': lop(operations.scalar_bit_and, xtype.Integral, '__and__'),
-        '__or__': lop(operations.scalar_bit_or, xtype.Integral, '__or__'),
-        '__xor__': lop(operations.scalar_bit_xor, xtype.Integral, '__xor__'),
-        '__lshift__': lop(
-            operations.scalar_bit_lshift, xtype.Integral, '__lshift__'),
-        '__rshift__': lop(
-            operations.scalar_bit_rshift, xtype.Integral, '__rshift__'),
-        '__invert__': operations.scalar_bit_not,
-        '__floordiv__': lop(operations.int_floordiv, xtype.Integral,
-                            '__floordiv__'),
-        '__truediv__': lop(operations.int_truediv, xtype.Integral,
-                           '__truediv__'),
-        '__rfloordiv__': rop(operations.int_floordiv, xtype.Integral,
-                             '__rfloordiv__'),
-        '__rtruediv__': rop(operations.int_truediv, xtype.Integral,
-                            '__rtruediv__'),
-        '__floor__': operations.identity,
-        '__trunc__': operations.identity,
-        '__bool__': operations.int_bool,
-        '__myia_to_array__': operations.scalar_to_array,
+        "__and__": lop(operations.scalar_bit_and, xtype.Integral, "__and__"),
+        "__or__": lop(operations.scalar_bit_or, xtype.Integral, "__or__"),
+        "__xor__": lop(operations.scalar_bit_xor, xtype.Integral, "__xor__"),
+        "__lshift__": lop(
+            operations.scalar_bit_lshift, xtype.Integral, "__lshift__"
+        ),
+        "__rshift__": lop(
+            operations.scalar_bit_rshift, xtype.Integral, "__rshift__"
+        ),
+        "__invert__": operations.scalar_bit_not,
+        "__floordiv__": lop(
+            operations.int_floordiv, xtype.Integral, "__floordiv__"
+        ),
+        "__truediv__": lop(
+            operations.int_truediv, xtype.Integral, "__truediv__"
+        ),
+        "__rfloordiv__": rop(
+            operations.int_floordiv, xtype.Integral, "__rfloordiv__"
+        ),
+        "__rtruediv__": rop(
+            operations.int_truediv, xtype.Integral, "__rtruediv__"
+        ),
+        "__floor__": operations.identity,
+        "__trunc__": operations.identity,
+        "__bool__": operations.int_bool,
+        "__myia_to_array__": operations.scalar_to_array,
     },
     xtype.Float: {
-        '__floordiv__': lop(operations.float_floordiv, xtype.Float,
-                            '__floordiv__'),
-        '__truediv__': lop(operations.scalar_div, xtype.Float,
-                           '__truediv__'),
-        '__rfloordiv__': rop(operations.float_floordiv, xtype.Float,
-                             '__rfloordiv__'),
-        '__rtruediv__': rop(operations.scalar_div, xtype.Float,
-                            '__rtruediv__'),
-        '__floor__': operations.scalar_floor,
-        '__trunc__': operations.scalar_trunc,
-        '__bool__': operations.float_bool,
-        '__myia_to_array__': operations.scalar_to_array,
+        "__floordiv__": lop(
+            operations.float_floordiv, xtype.Float, "__floordiv__"
+        ),
+        "__truediv__": lop(operations.scalar_div, xtype.Float, "__truediv__"),
+        "__rfloordiv__": rop(
+            operations.float_floordiv, xtype.Float, "__rfloordiv__"
+        ),
+        "__rtruediv__": rop(operations.scalar_div, xtype.Float, "__rtruediv__"),
+        "__floor__": operations.scalar_floor,
+        "__trunc__": operations.scalar_trunc,
+        "__bool__": operations.float_bool,
+        "__myia_to_array__": operations.scalar_to_array,
     },
     xtype.Tuple: {
-        '__len__': operations.tuple_len,
-        '__add__': operations.tuple_concat,
-        '__getitem__': operations.tuple_get,
-        '__setitem__': operations.tuple_setitem,
-        '__myia_iter__': operations.identity,
-        '__myia_next__': operations.tuple_next,
-        '__myia_hasnext__': operations.tuple_hasnext,
+        "__len__": operations.tuple_len,
+        "__add__": operations.tuple_concat,
+        "__getitem__": operations.tuple_get,
+        "__setitem__": operations.tuple_setitem,
+        "__myia_iter__": operations.identity,
+        "__myia_next__": operations.tuple_next,
+        "__myia_hasnext__": operations.tuple_hasnext,
     },
     xtype.Dict: {
-        '__getitem__': operations.dict_getitem,
-        'values': operations.dict_values,
+        "__getitem__": operations.dict_getitem,
+        "values": operations.dict_values,
     },
     xtype.NDArray: {
-        '__add__': operations.array_add,
-        '__sub__': operations.array_sub,
-        '__mul__': operations.array_mul,
-        '__truediv__': operations.array_truediv,
-        '__floordiv__': operations.array_floordiv,
-        '__mod__': operations.array_mod,
-        '__pow__': operations.array_pow,
-        '__floor__': operations.array_floor,
-        '__trunc__': operations.array_trunc,
-        '__radd__': reverse_binop(operations.array_add, '__radd__'),
-        '__rsub__': reverse_binop(operations.array_sub, '__rsub__'),
-        '__rmul__': reverse_binop(operations.array_mul, '__rmul__'),
-        '__rtruediv__': reverse_binop(operations.array_truediv,
-                                      '__rtruediv__'),
-        '__rfloordiv__': reverse_binop(operations.array_floordiv,
-                                       '__rfloordiv__'),
-        '__rmod__': reverse_binop(operations.array_mod, '__rmod__'),
-        '__rpow__': reverse_binop(operations.array_pow, '__rpow__'),
-        '__pos__': operations.array_uadd,
-        '__neg__': operations.array_usub,
-        '__eq__': operations.array_eq,
-        '__ne__': operations.array_ne,
-        '__lt__': operations.array_lt,
-        '__gt__': operations.array_gt,
-        '__le__': operations.array_le,
-        '__ge__': operations.array_ge,
-        '__matmul__': operations.dot,
-        '__len__': operations.array_len,
-        '__getitem__': operations.array_getitem_wrap,
-        '__myia_iter__': operations.array_iter,
-        '__myia_to_array__': operations.identity,
-        'item': operations.array_to_scalar,
-        'shape': property(operations.shape),
-        'T': property(operations.t),
-        'ndim': property(operations.ndim),
-        'dtype': property(operations.dtype),
+        "__add__": operations.array_add,
+        "__sub__": operations.array_sub,
+        "__mul__": operations.array_mul,
+        "__truediv__": operations.array_truediv,
+        "__floordiv__": operations.array_floordiv,
+        "__mod__": operations.array_mod,
+        "__pow__": operations.array_pow,
+        "__floor__": operations.array_floor,
+        "__trunc__": operations.array_trunc,
+        "__radd__": reverse_binop(operations.array_add, "__radd__"),
+        "__rsub__": reverse_binop(operations.array_sub, "__rsub__"),
+        "__rmul__": reverse_binop(operations.array_mul, "__rmul__"),
+        "__rtruediv__": reverse_binop(operations.array_truediv, "__rtruediv__"),
+        "__rfloordiv__": reverse_binop(
+            operations.array_floordiv, "__rfloordiv__"
+        ),
+        "__rmod__": reverse_binop(operations.array_mod, "__rmod__"),
+        "__rpow__": reverse_binop(operations.array_pow, "__rpow__"),
+        "__pos__": operations.array_uadd,
+        "__neg__": operations.array_usub,
+        "__eq__": operations.array_eq,
+        "__ne__": operations.array_ne,
+        "__lt__": operations.array_lt,
+        "__gt__": operations.array_gt,
+        "__le__": operations.array_le,
+        "__ge__": operations.array_ge,
+        "__matmul__": operations.dot,
+        "__len__": operations.array_len,
+        "__getitem__": operations.array_getitem_wrap,
+        "__myia_iter__": operations.array_iter,
+        "__myia_to_array__": operations.identity,
+        "item": operations.array_to_scalar,
+        "shape": property(operations.shape),
+        "T": property(operations.t),
+        "ndim": property(operations.ndim),
+        "dtype": property(operations.dtype),
     },
     object: {
-        '__eq__': ABSENT,
-        '__ne__': ABSENT,
-        '__lt__': ABSENT,
-        '__gt__': ABSENT,
-        '__le__': ABSENT,
-        '__ge__': ABSENT,
-    }
+        "__eq__": ABSENT,
+        "__ne__": ABSENT,
+        "__lt__": ABSENT,
+        "__gt__": ABSENT,
+        "__le__": ABSENT,
+        "__ge__": ABSENT,
+    },
 }
 
 
@@ -260,18 +264,13 @@ standard_resources = Resources.partial(
     py_implementations=py_registry,
     grad_implementations=grad_registry,
     method_map=standard_method_map,
-    convert=ConverterResource.partial(
-        object_map=standard_object_map,
-    ),
+    convert=ConverterResource.partial(object_map=standard_object_map),
     inferrer=InferenceResource.partial(
-        constructors=inferrer_registry,
-        max_stack_depth=50,
+        constructors=inferrer_registry, max_stack_depth=50
     ),
     tracker=Tracker.partial(),
     backend=BackendResource.partial(),
-    debug_vm=DebugVMResource.partial(
-        implementations=vm_registry,
-    ),
+    debug_vm=DebugVMResource.partial(implementations=vm_registry),
     return_backend=False,
     universal=False,
 )
@@ -297,9 +296,9 @@ standard_pipeline = PipelineDefinition(
 )
 
 
-scalar_pipeline = standard_pipeline.configure({
-    'resources.convert.object_map': scalar_object_map,
-})
+scalar_pipeline = standard_pipeline.configure(
+    {"resources.convert.object_map": scalar_object_map}
+)
 
 
 standard_debug_pipeline = PipelineDefinition(
@@ -314,14 +313,12 @@ standard_debug_pipeline = PipelineDefinition(
     validate=steps.step_validate,
     export=steps.step_debug_export,
     wrap=steps.step_wrap,
-).configure({
-    'resources.backend.name': False
-})
+).configure({"resources.backend.name": False})
 
 
-scalar_debug_pipeline = standard_debug_pipeline.configure({
-    'resources.convert.object_map': scalar_object_map
-})
+scalar_debug_pipeline = standard_debug_pipeline.configure(
+    {"resources.convert.object_map": scalar_object_map}
+)
 
 
 ######################
@@ -329,31 +326,31 @@ scalar_debug_pipeline = standard_debug_pipeline.configure({
 ######################
 
 
-standard_parse = standard_pipeline \
-    .select('resources', 'parse') \
-    .make_transformer('input', 'graph')
+standard_parse = standard_pipeline.select(
+    "resources", "parse"
+).make_transformer("input", "graph")
 
 
-scalar_parse = scalar_pipeline \
-    .select('resources', 'parse', 'resolve') \
-    .make_transformer('input', 'graph')
+scalar_parse = scalar_pipeline.select(
+    "resources", "parse", "resolve"
+).make_transformer("input", "graph")
 
 
-scalar_debug_compile = scalar_debug_pipeline \
-    .select('resources', 'parse', 'resolve', 'export') \
-    .make_transformer('input', 'output')
+scalar_debug_compile = scalar_debug_pipeline.select(
+    "resources", "parse", "resolve", "export"
+).make_transformer("input", "output")
 
 
 __consolidate__ = True
 __all__ = [
-    'py_registry',
-    'scalar_debug_compile',
-    'scalar_debug_pipeline',
-    'scalar_parse',
-    'scalar_pipeline',
-    'standard_debug_pipeline',
-    'standard_parse',
-    'standard_pipeline',
-    'standard_resources',
-    'vm_registry',
+    "py_registry",
+    "scalar_debug_compile",
+    "scalar_debug_pipeline",
+    "scalar_parse",
+    "scalar_pipeline",
+    "standard_debug_pipeline",
+    "standard_parse",
+    "standard_pipeline",
+    "standard_resources",
+    "vm_registry",
 ]

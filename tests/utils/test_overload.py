@@ -5,10 +5,10 @@ from myia.utils import Overload, TypeMap
 
 def test_typemap():
     tmap = TypeMap()
-    tmap.register(int)('int')
-    tmap.register(object)('obj')
-    assert tmap[int] == 'int'
-    assert tmap[str] == 'obj'
+    tmap.register(int)("int")
+    tmap.register(object)("obj")
+    assert tmap[int] == "int"
+    assert tmap[str] == "obj"
 
 
 def test_Overload():
@@ -16,32 +16,34 @@ def test_Overload():
 
     @o.register
     def f(x, y: int):
-        return 'int'
+        return "int"
 
     @o.register  # noqa: F811
     def f(x, y: float):
-        return 'float'
+        return "float"
 
-    assert f(1, 2) == 'int'
-    assert f(1, 2.0) == 'float'
+    assert f(1, 2) == "int"
+    assert f(1, 2.0) == "float"
 
     with pytest.raises(Exception):
+
         @o.register  # noqa: F811
         def f(x: object, y: object):
-            return 'too many annotations'
+            return "too many annotations"
 
     with pytest.raises(Exception):
+
         @o.register  # noqa: F811
         def f(x: object, y):
-            return 'wrong arg to annotate'
+            return "wrong arg to annotate"
 
     @o.register  # noqa: F811
-    def f(x, y: 'object'):
-        return 'object'
+    def f(x, y: "object"):
+        return "object"
 
-    assert f(1, 2) == 'int'
-    assert f(1, 2.0) == 'float'
-    assert f(1, 'hello') == 'object'
+    assert f(1, 2) == "int"
+    assert f(1, 2.0) == "float"
+    assert f(1, "hello") == "object"
 
 
 def test_Overload_mixins():
@@ -100,19 +102,19 @@ def test_Overload_bootstrap():
     # The new method in g is used
     assert g([1, 2, "xxx", [3, 4]]) == [2, 3, "B", [4, 5]]
 
-    @f.variant(postprocess=lambda x: {'result': x})
+    @f.variant(postprocess=lambda x: {"result": x})
     def h(self, x: object):
         return "C"
 
     # Only the end result is postprocessed
-    assert h([1, 2, "xxx", [3, 4]]) == {'result': [2, 3, "C", [4, 5]]}
+    assert h([1, 2, "xxx", [3, 4]]) == {"result": [2, 3, "C", [4, 5]]}
 
     @h.variant
     def i(self, x: object):
         return "D"
 
     # Postprocessor is kept
-    assert i([1, 2, "xxx", [3, 4]]) == {'result': [2, 3, "D", [4, 5]]}
+    assert i([1, 2, "xxx", [3, 4]]) == {"result": [2, 3, "D", [4, 5]]}
 
 
 def test_Overload_wrapper():
@@ -124,6 +126,7 @@ def test_Overload_wrapper():
         return [fn(x)]
 
     with pytest.raises(TypeError):
+
         @f.wrapper
         def f(fn, x):
             return [fn(x)]
@@ -213,7 +216,7 @@ def test_Overload_repr():
     def ignore_this_name(x: str):
         return x
 
-    assert humptydumpty.name.endswith('.humptydumpty')
+    assert humptydumpty.name.endswith(".humptydumpty")
     r = repr(humptydumpty)
-    assert r.startswith('<Overload ')
-    assert r.endswith('.humptydumpty>')
+    assert r.startswith("<Overload ")
+    assert r.endswith(".humptydumpty>")

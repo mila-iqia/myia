@@ -61,9 +61,10 @@ from .opt import (
 
 def M(mg):
     """Create a variable that matches a Metagraph."""
+
     def chk(x):
-        return (x.is_constant_graph()
-                and x.value.flags.get('metagraph') == mg)
+        return x.is_constant_graph() and x.value.flags.get("metagraph") == mg
+
     return var(chk)
 
 
@@ -140,18 +141,19 @@ def setitem_tuple_ct(resources, node, equiv):
     setitem((a, b, c, ...), 1, z) => (a, z, c, ...)
     ...
     """
+
     def _const(val, t):
         ct = Constant(val)
         ct.abstract = t
         return ct
+
     tup_node = equiv[C1]
     assert tup_node.abstract is not None
     tup = tup_node.value
     i = equiv[C2].value
     assert isinstance(tup, tuple)
     assert isinstance(i, int)
-    elems = [_const(t, typ)
-             for t, typ in zip(tup, tup_node.abstract.elements)]
+    elems = [_const(t, typ) for t, typ in zip(tup, tup_node.abstract.elements)]
     elems[i] = equiv[Z]
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
@@ -185,27 +187,19 @@ _zlk = M(zeros_like)
 
 
 gadd_zero_l = psub(
-    pattern=(_gadd, (_zlk, X), Y),
-    replacement=Y,
-    name='gadd_zero_l'
+    pattern=(_gadd, (_zlk, X), Y), replacement=Y, name="gadd_zero_l"
 )
 
 
 gadd_zero_r = psub(
-    pattern=(_gadd, Y, (_zlk, X)),
-    replacement=Y,
-    name='gadd_zero_r'
+    pattern=(_gadd, Y, (_zlk, X)), replacement=Y, name="gadd_zero_r"
 )
 
 
 gadd_switch = psub(
-    pattern=(_gadd,
-             (P.switch, Y, X1, X2),
-             (P.switch, Y, X3, X4)),
-    replacement=(P.switch, Y,
-                 (_gadd, X1, X3),
-                 (_gadd, X2, X4)),
-    name='gadd_switch'
+    pattern=(_gadd, (P.switch, Y, X1, X2), (P.switch, Y, X3, X4)),
+    replacement=(P.switch, Y, (_gadd, X1, X3), (_gadd, X2, X4)),
+    name="gadd_switch",
 )
 
 
@@ -214,8 +208,8 @@ gadd_switch = psub(
 ##############################
 
 
-_ArrayType = Var('ArrayType')
-_Shape = Var('Shape')
+_ArrayType = Var("ArrayType")
+_Shape = Var("Shape")
 
 
 @overload
@@ -231,8 +225,7 @@ def _transform(pattern: Var):
 
 @overload  # noqa: F811
 def _transform(pattern: (int, float)):
-    return (P.distribute, (P.scalar_to_array, pattern, _ArrayType),
-            _Shape)
+    return (P.distribute, (P.scalar_to_array, pattern, _ArrayType), _Shape)
 
 
 def on_array_map(orig):
@@ -249,110 +242,94 @@ def on_array_map(orig):
     return psub(
         pattern=_transform(orig.sexp),
         replacement=_transform(orig.sexp_replacement),
-        name=f'{orig.name}_map',
+        name=f"{orig.name}_map",
     )
 
 
 multiply_by_zero_l = psub(
-    pattern=(P.scalar_mul, 0, X),
-    replacement=0,
-    name='multiply_by_zero_l'
+    pattern=(P.scalar_mul, 0, X), replacement=0, name="multiply_by_zero_l"
 )
 
 multiply_by_zero_r = psub(
-    pattern=(P.scalar_mul, X, 0),
-    replacement=0,
-    name='multiply_by_zero_r'
+    pattern=(P.scalar_mul, X, 0), replacement=0, name="multiply_by_zero_r"
 )
 
 multiply_by_one_l = psub(
-    pattern=(P.scalar_mul, 1, X),
-    replacement=X,
-    name='multiply_by_one_l'
+    pattern=(P.scalar_mul, 1, X), replacement=X, name="multiply_by_one_l"
 )
 
 multiply_by_one_r = psub(
-    pattern=(P.scalar_mul, X, 1),
-    replacement=X,
-    name='multiply_by_one_r'
+    pattern=(P.scalar_mul, X, 1), replacement=X, name="multiply_by_one_r"
 )
 
 add_zero_l = psub(
-    pattern=(P.scalar_add, 0, X),
-    replacement=X,
-    name='add_zero_l'
+    pattern=(P.scalar_add, 0, X), replacement=X, name="add_zero_l"
 )
 
 add_zero_r = psub(
-    pattern=(P.scalar_add, X, 0),
-    replacement=X,
-    name='add_zero_r'
+    pattern=(P.scalar_add, X, 0), replacement=X, name="add_zero_r"
 )
 
 usub_cancel = psub(
     pattern=(P.scalar_usub, (P.scalar_usub, X)),
     replacement=X,
-    name='usub_cancel'
+    name="usub_cancel",
 )
 
 usub_sink_mul_l = psub(
     pattern=(P.scalar_mul, (P.scalar_usub, X), Y),
     replacement=(P.scalar_usub, (P.scalar_mul, X, Y)),
-    name='usub_sink_mul_l'
+    name="usub_sink_mul_l",
 )
 
 usub_sink_mul_r = psub(
     pattern=(P.scalar_mul, X, (P.scalar_usub, Y)),
     replacement=(P.scalar_usub, (P.scalar_mul, X, Y)),
-    name='usub_sink_mul_r'
+    name="usub_sink_mul_r",
 )
 
 usub_sink_div_l = psub(
     pattern=(P.scalar_div, (P.scalar_usub, X), Y),
     replacement=(P.scalar_usub, (P.scalar_div, X, Y)),
-    name='usub_sink_div_l'
+    name="usub_sink_div_l",
 )
 
 usub_sink_div_r = psub(
     pattern=(P.scalar_div, X, (P.scalar_usub, Y)),
     replacement=(P.scalar_usub, (P.scalar_div, X, Y)),
-    name='usub_sink_div_r'
+    name="usub_sink_div_r",
 )
 
 divdiv_to_mul = psub(
     pattern=(P.scalar_div, (P.scalar_div, X, Y), Z),
     replacement=(P.scalar_div, X, (P.scalar_mul, Y, Z)),
-    name='divdiv_to_mul'
+    name="divdiv_to_mul",
 )
 
 add_usub = psub(
     pattern=(P.scalar_add, X, (P.scalar_usub, Y)),
     replacement=(P.scalar_sub, X, Y),
-    name='add_usub'
+    name="add_usub",
 )
 
 sub_usub = psub(
     pattern=(P.scalar_sub, X, (P.scalar_usub, Y)),
     replacement=(P.scalar_add, X, Y),
-    name='sub_usub'
+    name="sub_usub",
 )
 
 elim_identity = psub(
-    pattern=(P.identity, X),
-    replacement=X,
-    name='elim_identity'
+    pattern=(P.identity, X), replacement=X, name="elim_identity"
 )
 
 elim_stop_gradient = psub(
-    pattern=(P.stop_gradient, X),
-    replacement=X,
-    name='elim_stop_gradient'
+    pattern=(P.stop_gradient, X), replacement=X, name="elim_stop_gradient"
 )
 
 not_eq = psub(
     pattern=(P.bool_not, (P.scalar_eq, X, Y)),
     replacement=(P.scalar_ne, X, Y),
-    name='not_eq'
+    name="not_eq",
 )
 
 multiply_by_zero_l_map = on_array_map(multiply_by_zero_l)
@@ -386,7 +363,7 @@ elim_distribute = psub(
     pattern=(P.distribute, X, C),
     replacement=X,
     condition=_elim_distribute_condition,
-    name='elim_distribute'
+    name="elim_distribute",
 )
 
 
@@ -395,7 +372,7 @@ elim_array_reduce = psub(
     pattern=(P.array_reduce, Y, X, C),
     replacement=X,
     condition=lambda equiv: equiv[X].shape == equiv[C].value,
-    name='elim_array_reduce'
+    name="elim_array_reduce",
 )
 
 
@@ -429,18 +406,20 @@ def unfuse_composite(resources, node, equiv):
     class UnfuseRemapper(BasicRemapper):
         def __init__(self, g, reference):
             super().__init__(
-                graphs=g.graphs_used.keys() | {g},
-                relation='unfused'
+                graphs=g.graphs_used.keys() | {g}, relation="unfused"
             )
             self.reference = reference
 
         def asarray(self, ng, i):
             if i.is_constant():
-                typ = (self.reference.abstract
-                       or ng.apply(typeof, self.reference))
-                return ng.apply(P.distribute,
-                                ng.apply(P.scalar_to_array, i, typ),
-                                ng.apply(P.shape, self.reference))
+                typ = self.reference.abstract or ng.apply(
+                    typeof, self.reference
+                )
+                return ng.apply(
+                    P.distribute,
+                    ng.apply(P.scalar_to_array, i, typ),
+                    ng.apply(P.shape, self.reference),
+                )
             else:
                 return i
 
@@ -449,8 +428,10 @@ def unfuse_composite(resources, node, equiv):
             node = link.node
             assert node.inputs[0].is_constant(Primitive)
             ni = [self.asarray(ng, self.repl[i]) for i in node.inputs[1:]]
-            link.new_node.inputs = \
-                [ng.constant(P.array_map), node.inputs[0]] + ni
+            link.new_node.inputs = [
+                ng.constant(P.array_map),
+                node.inputs[0],
+            ] + ni
 
         def finalize_graph(self, g, ng):
             # This fails if we set .return_ instead of .output, not sure why.
@@ -496,8 +477,7 @@ def simplify_array_map(resources, node, equiv):
         if x.is_parameter():
             idx = g.parameters.index(x)
             return xs[idx]
-        elif x.is_constant() \
-                and issubclass(x.abstract.xtype(), Number):
+        elif x.is_constant() and issubclass(x.abstract.xtype(), Number):
             shp = (P.shape, xs[0])
             typ = xs[0].abstract or (typeof, xs[0])
             sexp = (P.distribute, (P.scalar_to_array, x, typ), shp)
@@ -521,10 +501,10 @@ def simplify_array_map(resources, node, equiv):
             return node  # pragma: no cover
 
     except NotImplementedError:
-        if g.has_flags('inline_inside'):
+        if g.has_flags("inline_inside"):
             return node
         else:
-            g.set_flags('inline_inside')
+            g.set_flags("inline_inside")
             return True
 
 
@@ -555,7 +535,7 @@ getitem_newenv = psub(
     pattern=(P.env_getitem, C1, C2, Y),
     replacement=Y,
     condition=lambda equiv: len(equiv[C1].value) == 0,
-    name='getitem_newenv'
+    name="getitem_newenv",
 )
 
 
@@ -563,21 +543,21 @@ getitem_newenv = psub(
 #     => gadd(getitem(e1, key, default), getitem(e2, key, default))
 getitem_env_add = psub(
     pattern=(P.env_getitem, (P.env_add, X, Y), C, Z),
-    replacement=(gadd,
-                 # BUG: With the live infer, a metagraph like gadd cannot
-                 # be inserted directly in an optimization: the graph needs
-                 # to be generated/monomorphized using the existing types.
-                 (P.env_getitem, X, C, Z),
-                 (P.env_getitem, Y, C, Z)),
-    name='getitem_env_add'
+    replacement=(
+        gadd,
+        # BUG: With the live infer, a metagraph like gadd cannot
+        # be inserted directly in an optimization: the graph needs
+        # to be generated/monomorphized using the existing types.
+        (P.env_getitem, X, C, Z),
+        (P.env_getitem, Y, C, Z),
+    ),
+    name="getitem_env_add",
 )
 
 
 # setitem(e, key, DEAD) => e
 setitem_dead = psub(
-    pattern=(P.env_setitem, X, Y, DEAD),
-    replacement=X,
-    name='setitem_dead'
+    pattern=(P.env_setitem, X, Y, DEAD), replacement=X, name="setitem_dead"
 )
 
 
@@ -587,16 +567,12 @@ setitem_dead = psub(
 
 
 simplify_always_true = psub(
-    pattern=(P.switch, True, X, Y),
-    replacement=X,
-    name='simplify_always_true'
+    pattern=(P.switch, True, X, Y), replacement=X, name="simplify_always_true"
 )
 
 
 simplify_always_false = psub(
-    pattern=(P.switch, False, X, Y),
-    replacement=Y,
-    name='simplify_always_false'
+    pattern=(P.switch, False, X, Y), replacement=Y, name="simplify_always_false"
 )
 
 
@@ -604,7 +580,7 @@ simplify_always_false = psub(
 simplify_switch1 = psub(
     pattern=(P.switch, X1, (P.switch, X1, X2, X3), X4),
     replacement=(P.switch, X1, X2, X4),
-    name='simplify_switch1'
+    name="simplify_switch1",
 )
 
 
@@ -612,15 +588,13 @@ simplify_switch1 = psub(
 simplify_switch2 = psub(
     pattern=(P.switch, X1, X2, (P.switch, X1, X3, X4)),
     replacement=(P.switch, X1, X2, X4),
-    name='simplify_switch2'
+    name="simplify_switch2",
 )
 
 
 # Simplify switch when both branches are the same node
 simplify_switch_idem = psub(
-    pattern=(P.switch, X, Y, Y),
-    replacement=Y,
-    name='simplify_switch_idem'
+    pattern=(P.switch, X, Y, Y), replacement=Y, name="simplify_switch_idem"
 )
 
 
@@ -641,38 +615,49 @@ _PutInSwitch = primset_var(*_PutInSwitch_l)
 combine_switches = psub(
     pattern=(_PutInSwitch, (P.switch, X1, X2, X3), (P.switch, X1, X4, X5)),
     replacement=(P.switch, X1, (_PutInSwitch, X2, X4), (_PutInSwitch, X3, X5)),
-    name='combine_switches',
-    interest=_PutInSwitch_l
+    name="combine_switches",
+    interest=_PutInSwitch_l,
 )
 
 
 combine_switches_array = psub(
-    pattern=(P.array_map,
-             _PutInSwitch,
-             (P.switch, X1, X2, X3),
-             (P.switch, X1, X4, X5)),
-    replacement=(P.switch, X1,
-                 (P.array_map, _PutInSwitch, X2, X4),
-                 (P.array_map, _PutInSwitch, X3, X5)),
-    name='combine_switches_array'
+    pattern=(
+        P.array_map,
+        _PutInSwitch,
+        (P.switch, X1, X2, X3),
+        (P.switch, X1, X4, X5),
+    ),
+    replacement=(
+        P.switch,
+        X1,
+        (P.array_map, _PutInSwitch, X2, X4),
+        (P.array_map, _PutInSwitch, X3, X5),
+    ),
+    name="combine_switches_array",
 )
 
 
 float_tuple_getitem_through_switch = psub(
     pattern=(P.tuple_getitem, (P.switch, X1, X2, X3), C),
-    replacement=(P.switch, X1,
-                 (P.tuple_getitem, X2, C),
-                 (P.tuple_getitem, X3, C)),
-    name='float_tuple_getitem_through_switch'
+    replacement=(
+        P.switch,
+        X1,
+        (P.tuple_getitem, X2, C),
+        (P.tuple_getitem, X3, C),
+    ),
+    name="float_tuple_getitem_through_switch",
 )
 
 
 float_env_getitem_through_switch = psub(
     pattern=(P.env_getitem, (P.switch, X1, X2, X3), X4, X5),
-    replacement=(P.switch, X1,
-                 (P.env_getitem, X2, X4, X5),
-                 (P.env_getitem, X3, X4, X5)),
-    name='float_env_getitem_through_switch'
+    replacement=(
+        P.switch,
+        X1,
+        (P.env_getitem, X2, X4, X5),
+        (P.env_getitem, X3, X4, X5),
+    ),
+    name="float_env_getitem_through_switch",
 )
 
 
@@ -684,7 +669,7 @@ float_env_getitem_through_switch = psub(
 simplify_partial = psub(
     pattern=((P.partial, X, Xs), Ys),
     replacement=(X, Xs, Ys),
-    name='simplify_partial',
+    name="simplify_partial",
     interest=Apply,
 )
 
@@ -708,13 +693,16 @@ def resolve_globals(resources, node, equiv):
 #############
 
 
-@pattern_replacer('just', X, interest=None)
+@pattern_replacer("just", X, interest=None)
 def force_constants(resources, node, equiv):
     """Replace nodes with a constant value if the value is in its type."""
     node = equiv[X]
-    if (node.is_constant()
-            or node.is_parameter()
-            or node.graph and node is node.graph.return_):
+    if (
+        node.is_constant()
+        or node.is_parameter()
+        or node.graph
+        and node is node.graph.return_
+    ):
         return None
     try:
         val = build_value(node.abstract)
@@ -743,6 +731,7 @@ def make_inliner(inline_criterion, check_recursive, name):
         name: The name of the optimization.
 
     """
+
     @pattern_replacer(G, Xs, interest=Graph)
     def inline(resources, node, equiv):
         g = equiv[G].value
@@ -783,37 +772,42 @@ def is_unique_use(g, node, args):
 
 def is_core(g, node, args):
     """Inline graphs that are marked as part of the core."""
-    return g.has_flags('core')
+    return g.has_flags("core")
 
 
 def caller_is_marked(g, node, args):
     """Inline into graphs that are marked."""
-    return node.graph.has_flags('inline_inside')
+    return node.graph.has_flags("inline_inside")
 
 
-inline_trivial = make_inliner(inline_criterion=is_trivial_graph,
-                              check_recursive=True,
-                              name='inline_trivial')
+inline_trivial = make_inliner(
+    inline_criterion=is_trivial_graph,
+    check_recursive=True,
+    name="inline_trivial",
+)
 
-inline_unique_uses = make_inliner(inline_criterion=is_unique_use,
-                                  check_recursive=True,
-                                  name='inline_unique_uses')
+inline_unique_uses = make_inliner(
+    inline_criterion=is_unique_use,
+    check_recursive=True,
+    name="inline_unique_uses",
+)
 
-inline_core = make_inliner(inline_criterion=is_core,
-                           check_recursive=False,
-                           name='inline_core')
+inline_core = make_inliner(
+    inline_criterion=is_core, check_recursive=False, name="inline_core"
+)
 
-inline_inside_marked_caller = \
-    make_inliner(inline_criterion=caller_is_marked,
-                 check_recursive=False,
-                 name='inline_inside_marked_caller')
+inline_inside_marked_caller = make_inliner(
+    inline_criterion=caller_is_marked,
+    check_recursive=False,
+    name="inline_inside_marked_caller",
+)
 
-inline = make_inliner(inline_criterion=None,
-                      check_recursive=True,
-                      name='inline')
+inline = make_inliner(
+    inline_criterion=None, check_recursive=True, name="inline"
+)
 
 
-@pattern_replacer('just', G, interest=None)
+@pattern_replacer("just", G, interest=None)
 def replace_applicator(resources, node, equiv):
     """Replace a function that applies another by the other function.
 
@@ -830,8 +824,11 @@ def replace_applicator(resources, node, equiv):
         # NOTE: it is likely correct to use `inner.value.parent is not g` as
         # the condition instead of `is None`, the current code is just playing
         # it safe.
-        if inner.is_constant(Primitive) \
-                or inner.is_constant_graph() and inner.value.parent is None:
+        if (
+            inner.is_constant(Primitive)
+            or inner.is_constant_graph()
+            and inner.value.parent is None
+        ):
             return inner
     return node
 
@@ -854,13 +851,14 @@ def specialize_transform(graph, args):
     Parameters that are specialized on are removed.
     """
     mng = graph.manager
-    graph = transformable_clone(graph, relation=f'sp')
+    graph = transformable_clone(graph, relation=f"sp")
     mng.add_graph(graph)
     for p, arg in zip(graph.parameters, args):
         if arg is not None:
             mng.replace(p, Constant(arg))
-    new_parameters = [p for p, arg in zip(graph.parameters, args)
-                      if arg is None]
+    new_parameters = [
+        p for p, arg in zip(graph.parameters, args) if arg is None
+    ]
     mng.set_parameters(graph, new_parameters)
     return graph
 
@@ -873,8 +871,9 @@ def specialize_on_graph_arguments(resources, node, equiv):
     specialize = [x.is_constant((Graph, Primitive)) for x in xs]
     if not any(specialize):
         return node
-    specialize_map = tuple(x.value if s else None
-                           for x, s in zip(xs, specialize))
+    specialize_map = tuple(
+        x.value if s else None for x, s in zip(xs, specialize)
+    )
     new_xs = [x for x, s in zip(xs, specialize) if not s]
     g2 = specialize_transform(g, specialize_map)
     return node.graph.apply(g2, *new_xs)
@@ -888,9 +887,7 @@ def specialize_on_graph_arguments(resources, node, equiv):
 def _set_out_abstract(g, a):
     g.output.abstract = a
     g.return_.abstract = a
-    g.return_.inputs[0].abstract = AbstractFunction(
-        VirtualFunction([a], a)
-    )
+    g.return_.inputs[0].abstract = AbstractFunction(VirtualFunction([a], a))
 
 
 @GraphTransform
@@ -901,7 +898,7 @@ def getitem_transform(orig_graph, idx):
 
     (x -> (a, b, c)) => (x -> b)
     """
-    graph = transformable_clone(orig_graph, relation=f'[{idx}]')
+    graph = transformable_clone(orig_graph, relation=f"[{idx}]")
     if graph.output.is_apply(P.make_tuple):
         graph.output = graph.output.inputs[idx + 1]
     else:
@@ -953,8 +950,8 @@ def incorporate_getitem_through_switch(resources, node, equiv):
 @GraphTransform
 def env_getitem_transform(orig_graph, key, default):
     """Map to a graph that incorporates a call to env_getitem."""
-    rel = getattr(key, 'node', key)
-    graph = transformable_clone(orig_graph, relation=f'[{rel}]')
+    rel = getattr(key, "node", key)
+    graph = transformable_clone(orig_graph, relation=f"[{rel}]")
     out = graph.output
     while out.is_apply(P.env_setitem):
         _, out, key2, value = out.inputs
@@ -975,8 +972,7 @@ def incorporate_env_getitem(resources, node, equiv):
     key = equiv[C].value
     dflt = equiv[Y]
     if check_used_once(g):
-        return node.graph.apply(env_getitem_transform(g, key, dflt),
-                                *equiv[Xs])
+        return node.graph.apply(env_getitem_transform(g, key, dflt), *equiv[Xs])
 
 
 @pattern_replacer(P.env_getitem, ((P.switch, X, G1, G2), Xs), C, Y)
@@ -1002,7 +998,7 @@ def call_output_transform(orig_graph, abstracts):
 
     ((*args1) -> (*args2) -> f) => (*args1, *args2) -> f(*args2)
     """
-    graph = transformable_clone(orig_graph, relation='call')
+    graph = transformable_clone(orig_graph, relation="call")
     newp = []
     for a in abstracts:
         assert a is not None
@@ -1010,10 +1006,7 @@ def call_output_transform(orig_graph, abstracts):
         p.abstract = a
         newp.append(p)
     graph.output = graph.apply(graph.output, *newp)
-    _set_out_abstract(
-        graph,
-        orig_graph.return_.abstract.get_unique().output
-    )
+    _set_out_abstract(graph, orig_graph.return_.abstract.get_unique().output)
     return graph
 
 
@@ -1067,17 +1060,13 @@ def incorporate_call_through_switch(resources, node, equiv):
 
 # J(Jinv(x)) ==> x
 elim_j_jinv = psub(
-    pattern=(P.J, (P.Jinv, X)),
-    replacement=X,
-    name='elim_j_jinv'
+    pattern=(P.J, (P.Jinv, X)), replacement=X, name="elim_j_jinv"
 )
 
 
 # Jinv(J(x)) ==> x
 elim_jinv_j = psub(
-    pattern=(P.Jinv, (P.J, X)),
-    replacement=X,
-    name='elim_jinv_j'
+    pattern=(P.Jinv, (P.J, X)), replacement=X, name="elim_jinv_j"
 )
 
 
@@ -1086,7 +1075,7 @@ def replace_Jinv_on_graph(resources, node, equiv):
     """Replace J(graph) by the primal."""
     g = equiv[G].value
     assert isinstance(g, Graph)
-    ct = Constant(g.transforms['primal'])
+    ct = Constant(g.transforms["primal"])
     ct.abstract = node.abstract
     return ct
 
@@ -1100,11 +1089,11 @@ def expand_J(resources, node, equiv):
     from ..grad import Jimpl
 
     arg = equiv[C].value
-    assert getattr(arg, 'parent', None) is None
+    assert getattr(arg, "parent", None) is None
 
     prev_resources = resources
 
-    if not hasattr(prev_resources, 'grad_cache'):
+    if not hasattr(prev_resources, "grad_cache"):
         prev_resources.grad_cache = {}
 
     try:
@@ -1128,10 +1117,7 @@ def expand_J(resources, node, equiv):
         if not isinstance(newg, Graph):
             sig = newg.make_signature(argspec)
             newg = newg.generate_graph(sig)
-        newg = clone(
-            newg,
-            quarantine=lambda g: g.abstract is not None
-        )
+        newg = clone(newg, quarantine=lambda g: g.abstract is not None)
         resources.manager.add_graph(newg)
         empty = inf.engine.context_class.empty()
         context = empty.add(newg, tuple(argspec))
@@ -1148,7 +1134,7 @@ def expand_J(resources, node, equiv):
             g._manager = None
 
         if isinstance(arg, Graph):
-            arg.transforms['grad'] = newg
+            arg.transforms["grad"] = newg
 
         prev_resources.grad_cache[key] = newg
 
@@ -1164,7 +1150,7 @@ def _jelim_retype(self, j: AbstractJTagged):
 
 @abstract_clone.variant
 def _jelim_retype_helper(self, f: AbstractFunction):
-    raise TypeError('Function found')
+    raise TypeError("Function found")
 
 
 @abstract_check.variant
@@ -1178,17 +1164,13 @@ class JElim(Partializable):
     def __init__(self, resources):
         """Initialize JElim."""
         self.resources = resources
-        self.name = 'jelim'
+        self.name = "jelim"
 
     def __call__(self, root):
         """Apply JElim on root."""
         mng = self.resources.manager
-        args = dict(
-            opt=self,
-            node=None,
-            manager=self.resources.manager,
-        )
-        with tracer('opt', **args) as tr:
+        args = dict(opt=self, node=None, manager=self.resources.manager)
+        with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
             mng.keep_roots(root)
             nodes = []

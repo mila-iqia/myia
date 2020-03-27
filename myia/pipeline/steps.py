@@ -61,7 +61,7 @@ class Optimizer(Partializable):
             if isinstance(spec, list):
                 nmap = NodeMap()
                 for opt in spec:
-                    nmap.register(getattr(opt, 'interest', None), opt)
+                    nmap.register(getattr(opt, "interest", None), opt)
                 spec = LocalPassOptimizer(nmap, resources=resources)
             else:
                 spec = spec(resources=resources)
@@ -76,7 +76,7 @@ class Optimizer(Partializable):
         counter = count(1)
         changes = True
         while changes:
-            with tracer(f'lap{next(counter)}'):
+            with tracer(f"lap{next(counter)}"):
                 changes = False
                 nn = iter(names)
                 for opt in final_phases:
@@ -85,9 +85,9 @@ class Optimizer(Partializable):
                             changes = True
                 if run_only_once:
                     break
-        with tracer('keep_roots'):
+        with tracer("keep_roots"):
             resources.manager.keep_roots(graph)
-        res = {'graph': graph}
+        res = {"graph": graph}
         return res
 
 
@@ -114,7 +114,7 @@ def step_parse(resources, input, argspec=None):
     g = g.generate_graph(sig)
     g = resources.convert(g)
     assert type(g) is Graph
-    return {'graph': g}
+    return {"graph": g}
 
 
 ###########
@@ -124,10 +124,8 @@ def step_parse(resources, input, argspec=None):
 
 step_resolve = Optimizer.partial(
     run_only_once=True,
-    phases=dict(
-        resolve=[optlib.resolve_globals]
-    ),
-    use_tracker=False
+    phases=dict(resolve=[optlib.resolve_globals]),
+    use_tracker=False,
 )
 
 
@@ -153,16 +151,18 @@ def step_infer(resources, graph, argspec):
     outspec, context = resources.inferrer.infer(graph, argspec)
     if not nobottom(outspec):
         raise InferenceError(
-            'There is no condition in which the program succeeds'
+            "There is no condition in which the program succeeds"
         )
     orig_outspec = outspec
     if resources.universal:
         orig_outspec = outspec.elements[1]
-    return {'outspec': outspec,
-            'argspec': argspec,
-            'orig_argspec': orig_argspec,
-            'orig_outspec': orig_outspec,
-            'inference_context': context}
+    return {
+        "outspec": outspec,
+        "argspec": argspec,
+        "orig_argspec": orig_argspec,
+        "orig_outspec": orig_outspec,
+        "inference_context": context,
+    }
 
 
 ##############
@@ -181,7 +181,7 @@ def step_specialize(resources, graph, inference_context):
         graph: The specialized graph.
     """
     new_graph = resources.inferrer.monomorphize(inference_context)
-    return {'graph': new_graph}
+    return {"graph": new_graph}
 
 
 ####################
@@ -207,10 +207,12 @@ def step_simplify_types(resources, graph, argspec, outspec):
     new_argspec = tuple(p.abstract for p in graph.parameters)
     resources.inferrer.infer_incremental()
     new_outspec = graph.output.abstract
-    return {'graph': graph,
-            'argspec': new_argspec,
-            'outspec': new_outspec,
-            'simplify_types': True}
+    return {
+        "graph": graph,
+        "argspec": new_argspec,
+        "outspec": new_outspec,
+        "simplify_types": True,
+    }
 
 
 ############
@@ -225,20 +227,16 @@ step_debug_opt = Optimizer.partial(
             # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,
-
             # Safe inlining
             optlib.inline_core,
             optlib.simplify_partial,
             optlib.elim_identity,
-
             # Miscellaneous
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
             optlib.replace_Jinv_on_graph,
         ],
-        grad=[
-            optlib.expand_J,
-        ],
+        grad=[optlib.expand_J],
         cse=CSE.partial(report_changes=False),
         jelim=optlib.JElim.partial(),
     )
@@ -251,7 +249,6 @@ step_opt = Optimizer.partial(
         main=[
             # Force constants
             optlib.force_constants,
-
             # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,
@@ -260,7 +257,6 @@ step_opt = Optimizer.partial(
             optlib.simplify_switch_idem,
             optlib.combine_switches,
             optlib.combine_switches_array,
-
             # Safe inlining
             optlib.inline_trivial,
             optlib.inline_unique_uses,
@@ -268,10 +264,8 @@ step_opt = Optimizer.partial(
             optlib.inline_core,
             optlib.simplify_partial,
             optlib.replace_applicator,
-
             # # Specialization
             # optlib.specialize_on_graph_arguments,
-
             # Arithmetic simplifications
             optlib.multiply_by_one_l,
             optlib.multiply_by_one_r,
@@ -294,13 +288,11 @@ step_opt = Optimizer.partial(
             optlib.add_usub_map,
             optlib.sub_usub_map,
             optlib.not_eq_map,
-
             # Array simplifications
             optlib.elim_distribute,
             optlib.elim_array_reduce,
             optlib.merge_transposes,
             optlib.elim_transpose,
-
             # Miscellaneous
             optlib.elim_identity,
             optlib.getitem_tuple,
@@ -333,9 +325,7 @@ step_opt = Optimizer.partial(
             # optlib.incorporate_env_getitem_through_switch,
             # optlib.incorporate_call_through_switch,
         ],
-        grad=[
-            optlib.expand_J,
-        ],
+        grad=[optlib.expand_J],
         cse=CSE.partial(report_changes=False),
         jelim=optlib.JElim.partial(),
     )
@@ -389,7 +379,7 @@ def step_validate(resources, graph, outspec=None):
             "The output type of the graph changed during optimization."
         )
     validate(graph)
-    return {'graph': graph}
+    return {"graph": graph}
 
 
 ###############
@@ -409,7 +399,7 @@ def step_compile(resources, graph, argspec, outspec):
         output: a callable
     """
     out = resources.backend.compile(graph, argspec, outspec)
-    return {'output': out}
+    return {"output": out}
 
 
 #####################################
@@ -426,15 +416,17 @@ def _to_backend(arg, backend, vt):
         return backend.to_backend_value(arg, vt)
 
 
-def step_wrap(resources,
-              graph,
-              output,
-              argspec,
-              outspec,
-              orig_argspec=None,
-              orig_outspec=None,
-              aliasspec=None,
-              simplify_types=False):
+def step_wrap(
+    resources,
+    graph,
+    output,
+    argspec,
+    outspec,
+    orig_argspec=None,
+    orig_outspec=None,
+    aliasspec=None,
+    simplify_types=False,
+):
     """Pipeline step to export a callable.
 
     Convert args to vm format, and output from vm format.
@@ -453,7 +445,7 @@ def step_wrap(resources,
     """
     if not simplify_types:
         raise AssertionError(
-            'OutputWrapper step requires the simplify_types step'
+            "OutputWrapper step requires the simplify_types step"
         )
     fn = output
     orig_arg_t = argspec if orig_argspec is None else orig_argspec
@@ -469,23 +461,29 @@ def step_wrap(resources,
             alias_tracker, orig_aid_to_paths = aliasspec
             _, aid_to_paths = find_aliases(args, alias_tracker)
             if aid_to_paths != orig_aid_to_paths:
-                raise MyiaInputTypeError('Incompatible aliasing pattern.')
+                raise MyiaInputTypeError("Incompatible aliasing pattern.")
         backend = resources.backend.backend
         if len(args) != len(orig_arg_t):
-            raise MyiaInputTypeError('Wrong number of arguments.')
-        args = tuple(_to_backend(to_canonical(arg, ot), backend, vt)
-                     for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t))
+            raise MyiaInputTypeError("Wrong number of arguments.")
+        args = tuple(
+            _to_backend(to_canonical(arg, ot), backend, vt)
+            for arg, ot, vt in zip(args, orig_arg_t, vm_arg_t)
+        )
         if resources.universal:
             backend_universe = backend.to_backend_value(
-                to_canonical(new_universe, argspec[0]), vm_unv_in_t)
+                to_canonical(new_universe, argspec[0]), vm_unv_in_t
+            )
             _, res = fn(backend_universe, *args)
         else:
             res = fn(*args)
         if resources.return_backend:
             if isinstance(orig_out_t, AbstractTuple):
-                res = tuple(BackendValue(r, ot, vt, backend)
-                            for r, ot, vt in zip(res, orig_out_t.elements,
-                                                 vm_out_t.elements))
+                res = tuple(
+                    BackendValue(r, ot, vt, backend)
+                    for r, ot, vt in zip(
+                        res, orig_out_t.elements, vm_out_t.elements
+                    )
+                )
             else:
                 res = BackendValue(res, orig_out_t, vm_out_t, backend)
         else:
@@ -493,7 +491,7 @@ def step_wrap(resources,
             res = from_canonical(res, orig_out_t)
         return res
 
-    return {'output': wrapped}
+    return {"output": wrapped}
 
 
 ################
@@ -503,10 +501,8 @@ def step_wrap(resources,
 
 def step_debug_export(resources, graph):
     """Make a Python callable out of the graph."""
-    return {'output': resources.debug_vm.vm.export(graph)}
+    return {"output": resources.debug_vm.vm.export(graph)}
 
 
 __consolidate__ = True
-__all__ = [
-    'Optimizer',
-]
+__all__ = ["Optimizer"]

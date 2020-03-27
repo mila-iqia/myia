@@ -83,7 +83,7 @@ class GradRemapper(BasicRemapper):
         elif node in self.repl:
             return self.repl[node]
         else:
-            raise AssertionError(f'Unprocessed node: {node}')
+            raise AssertionError(f"Unprocessed node: {node}")
 
 
 class SlaveRemapper(GradRemapper):
@@ -101,19 +101,15 @@ class SlaveRemapper(GradRemapper):
 
     """
 
-    def __init__(self,
-                 graphs,
-                 master,
-                 *,
-                 relation,
-                 remappers=None,
-                 graph_relation=None):
+    def __init__(
+        self, graphs, master, *, relation, remappers=None, graph_relation=None
+    ):
         """Initialize a SlaveRemapper."""
         super().__init__(
             graphs,
             remappers=remappers,
             relation=relation,
-            graph_relation=graph_relation
+            graph_relation=graph_relation,
         )
         self._master_name = master
 
@@ -152,8 +148,10 @@ class FPropAppRemapper(SlaveRemapper):
 
         x = a(b, c) => A:x = (B:a)(B:b, B:c)
         """
-        new_inputs = [self.remappers['grad_fprop'].get(link.graph, inp)
-                      for inp in link.node.inputs]
+        new_inputs = [
+            self.remappers["grad_fprop"].get(link.graph, inp)
+            for inp in link.node.inputs
+        ]
         link.new_node.inputs = new_inputs
 
 
@@ -207,25 +205,24 @@ class FPropRemapper(GradRemapper):
         x = a(b, c) => B:x = (A:x)[0]
         """
         assert not link.node.is_parameter()
-        app = self.remappers['grad_fprop_app'].get(link.graph, link.node)
+        app = self.remappers["grad_fprop_app"].get(link.graph, link.node)
         link.new_node.inputs = sexp_to_node(
-            (P.tuple_getitem, app, 0),
-            link.new_graph
+            (P.tuple_getitem, app, 0), link.new_graph
         ).inputs
 
     def finalize_graph(self, g, ng):
         """We generate the pair (B:output, E:g)."""
-        g.transforms['grad'] = ng
-        ng.transforms['primal'] = g
-        g.set_flags('reference')
-        ng.set_flags('reference')
+        g.transforms["grad"] = ng
+        ng.transforms["primal"] = g
+        g.set_flags("reference")
+        ng.set_flags("reference")
         out = self.get(g, g.output)
-        bprop = self.remappers['grad_sens'].get_graph(g)
+        bprop = self.remappers["grad_sens"].get_graph(g)
         ng.output = ng.apply(P.make_tuple, out, bprop)
 
     def get_jinv(self, node):
         """Generate Jinv(B:node)."""
-        if (node, 'jinv') not in self.repl:
+        if (node, "jinv") not in self.repl:
             if isinstance(node, Graph):
                 if node not in self.graphs:  # pragma: no cover
                     # TODO: should be covered when supported for grad on
@@ -235,7 +232,7 @@ class FPropRemapper(GradRemapper):
                     assert node.parent is not None
                     ng = self.get_graph(node.parent)
                     ct = Constant(self.get_graph(node))
-                    with About(node.debug, 'equiv'):
+                    with About(node.debug, "equiv"):
                         new_node = ng.apply(P.Jinv, ct)
             else:
                 if node.graph not in self.graphs:  # pragma: no cover
@@ -245,10 +242,10 @@ class FPropRemapper(GradRemapper):
                 else:
                     ng = self.get_graph(node.graph)
                     node2 = self.get(None, node)
-                    with About(node.debug, 'equiv'):
+                    with About(node.debug, "equiv"):
                         new_node = ng.apply(P.Jinv, node2)
-            self.repl[node, 'jinv'] = new_node
-        return self.repl[node, 'jinv']
+            self.repl[node, "jinv"] = new_node
+        return self.repl[node, "jinv"]
 
 
 class BPropRemapper(SlaveRemapper):
@@ -264,10 +261,9 @@ class BPropRemapper(SlaveRemapper):
 
         x = a(b, c) => C:x = (A:x)[1]
         """
-        app = self.remappers['grad_fprop_app'].get(link.graph, link.node)
+        app = self.remappers["grad_fprop_app"].get(link.graph, link.node)
         link.new_node.inputs = sexp_to_node(
-            (P.tuple_getitem, app, 1),
-            link.new_graph
+            (P.tuple_getitem, app, 1), link.new_graph
         ).inputs
 
 
@@ -287,8 +283,8 @@ class BPropAppRemapper(SlaveRemapper):
         g = link.graph
         node = link.node
         assert not node.is_parameter()
-        fn = self.remappers['grad_bprop'].get(g, node)
-        arg = self.remappers['grad_sens'].get(g, node)
+        fn = self.remappers["grad_bprop"].get(g, node)
+        arg = self.remappers["grad_sens"].get(g, node)
         link.new_node.inputs = [fn, arg]
 
 
@@ -380,7 +376,7 @@ class SensRemapper(GradRemapper):
                     if len(ng.parameters) == 0:
                         # This will happen if the graph returns a free
                         # variable directly.
-                        with About(g.output.debug, 'grad_sens'):
+                        with About(g.output.debug, "grad_sens"):
                             ng.add_parameter()
                     # We need to call identity because we need to modify
                     # new_node's inputs at the end of the function, we can't
@@ -393,7 +389,7 @@ class SensRemapper(GradRemapper):
                     # If we are processing node f, x or y, we will respectively
                     # get element 0, 1 or 2 of that tuple and add that to our
                     # contribs list.
-                    src = self.remappers['grad_bprop_app'].get(g, user)
+                    src = self.remappers["grad_bprop_app"].get(g, user)
                     sexp = (P.tuple_getitem, src, key)
                     contribs.append(sexp)
 
@@ -409,18 +405,22 @@ class SensRemapper(GradRemapper):
         # These are all the graphs nested in g which have this node as a
         # free variable. Each of these graphs has a sensitivity node, and
         # we will extract contributions from them.
-        children = {g2 for g2 in self.graphs
-                    if g2.parent is g
-                    and node in g2.free_variables_total}
+        children = {
+            g2
+            for g2 in self.graphs
+            if g2.parent is g and node in g2.free_variables_total
+        }
 
         for child in children:
             assert (g, child) in self.repl
-            sexp = (P.env_getitem,
-                    self.get(g, child),
-                    # This represents the node's "key" into the env.
-                    (operations.embed, jinv),
-                    # This is the default, if there is no entry for this key.
-                    (zeros_like, jinv))
+            sexp = (
+                P.env_getitem,
+                self.get(g, child),
+                # This represents the node's "key" into the env.
+                (operations.embed, jinv),
+                # This is the default, if there is no entry for this key.
+                (zeros_like, jinv),
+            )
             contribs.append(sexp)
 
         n = len(contribs)
@@ -430,6 +430,7 @@ class SensRemapper(GradRemapper):
             # All contributions are added together with gadd.
             def mkadd(x, y):
                 return (gadd, x, y)
+
             sexp = reduce(mkadd, contribs)
 
         new_node.inputs = sexp_to_node(sexp, ng).inputs
@@ -441,7 +442,7 @@ class SensRemapper(GradRemapper):
         original node directly because the graph it belongs to is not available
         any more after the transform.
         """
-        return self.remappers['grad_fprop'].get_jinv(node)
+        return self.remappers["grad_fprop"].get_jinv(node)
 
     def finalize_graph(self, g, ng):
         """Generate the output of the backprop graph.
@@ -460,16 +461,14 @@ class SensRemapper(GradRemapper):
                 P.env_setitem,
                 fv_sens,
                 ng.apply(operations.embed, self.get_jinv(fv)),
-                sens
+                sens,
             )
         in_sens = [self.get(g, p) for p in g.parameters]
-        ng.output = ng.apply(P.make_tuple,
-                             fv_sens,
-                             *in_sens)
+        ng.output = ng.apply(P.make_tuple, fv_sens, *in_sens)
         if len(ng.parameters) == 0:
             # This can happen if the output is a constant. In that case we just
             # add a dummy parameter to satisfy the backpropagator protocol.
-            with About(g.output.debug, 'grad_sens'):
+            with About(g.output.debug, "grad_sens"):
                 ng.add_parameter()
 
 
@@ -479,21 +478,13 @@ def _grad(mng, root):
     remappers = RemapperSet(
         graphs,
         grad_fprop=FPropRemapper.partial(),
-        grad_fprop_app=FPropAppRemapper.partial(
-            master='grad_fprop'
-        ),
-        grad_bprop=BPropRemapper.partial(
-            master='grad_fprop'
-        ),
-        grad_sens=SensRemapper.partial(
-            graph_relation='grad_bprop'
-        ),
-        grad_bprop_app=BPropAppRemapper.partial(
-            master='grad_sens'
-        ),
+        grad_fprop_app=FPropAppRemapper.partial(master="grad_fprop"),
+        grad_bprop=BPropRemapper.partial(master="grad_fprop"),
+        grad_sens=SensRemapper.partial(graph_relation="grad_bprop"),
+        grad_bprop_app=BPropAppRemapper.partial(master="grad_sens"),
     )
     remappers.run()
-    return remappers['grad_fprop'].get_graph(root)
+    return remappers["grad_fprop"].get_graph(root)
 
 
 @overload
@@ -508,8 +499,7 @@ def Jimpl(prim: Primitive, resources, node):
         err = True
     if err:
         raise InternalInferenceError(
-            f"Missing a backpropagator for primitive '{prim}'",
-            refs=[node]
+            f"Missing a backpropagator for primitive '{prim}'", refs=[node]
         )
     return resources.convert(g, manage=False)
 
@@ -525,7 +515,7 @@ def Jimpl(graph: Graph, resources, node):
 def Jimpl(other: object, resources, node):
     """We do not implement J on non-functions here."""
     name = type(other).__qualname__
-    raise NotImplementedError(f'J(::{name}) not implemented')
+    raise NotImplementedError(f"J(::{name}) not implemented")
 
 
 ###############################
@@ -533,78 +523,69 @@ def Jimpl(other: object, resources, node):
 ###############################
 
 
-default_grad_flags = {
-    'ignore_values': True,
-    'core': True,
-    'reference': True,
-}
+default_grad_flags = {"ignore_values": True, "core": True, "reference": True}
 
 
-_is_mktuple = ((operations.resolve, operations_ns, 'make_tuple'), Xs)
+_is_mktuple = ((operations.resolve, operations_ns, "make_tuple"), Xs)
 _is_raise = (P.raise_, Xs)
 
 
 def _make_grad_transform(prim, fn, flags):
     """Given a function for the bprop, make the augmented function."""
     from .pipeline import standard_parse
+
     info = NamedDebugInfo(prim=prim, name=prim.name)
 
     bprop = clone(standard_parse(fn))
     bprop.flags.update(default_grad_flags)
     bprop.debug.name = None
-    bprop.debug.about = About(info, 'grad_bprop')  # type: ignore
+    bprop.debug.about = About(info, "grad_bprop")  # type: ignore
     if bprop.output.match(_is_raise):
         pass
     elif bprop.output.match(_is_mktuple):
         bprop.output = bprop.apply(
-            P.make_tuple,
-            newenv,
-            *bprop.output.inputs[1:]
+            P.make_tuple, newenv, *bprop.output.inputs[1:]
         )
     else:
         raise InternalInferenceError(
-            f'The backpropagator for {prim} is not defined properly. '
-            f'It should return a tuple literal.',
-            refs=[bprop.return_]
+            f"The backpropagator for {prim} is not defined properly. "
+            f"It should return a tuple literal.",
+            refs=[bprop.return_],
         )
 
     *args, out_param, dout = bprop.parameters
 
-    with About(info, 'grad_fprop'):
+    with About(info, "grad_fprop"):
         outer = Graph()
         outer.flags.update(default_grad_flags)
         outer.flags.update(flags)
-        outer.transforms['primal'] = prim
+        outer.transforms["primal"] = prim
         outer.output = Constant(None)
 
     mng = manage(bprop, outer)
 
     transf_args = []
     for p in args:
-        with About(p.debug, 'grad_fprop'):
+        with About(p.debug, "grad_fprop"):
             outer_p = outer.add_parameter()
-        with About(p.debug, 'equiv'):
+        with About(p.debug, "equiv"):
             transf_p = outer.apply(P.Jinv, outer_p)
         mng.replace(p, transf_p)
         transf_args.append(transf_p)
 
-    with About(out_param.debug, 'equiv'):
+    with About(out_param.debug, "equiv"):
         out_value = outer.apply(prim, *transf_args)
 
     mng.replace(out_param, out_value)
 
-    with About(out_param.debug, 'grad_sens'):
+    with About(out_param.debug, "grad_sens"):
         new_dout = bprop.add_parameter()
         mng.replace(dout, new_dout)
         # We remove all parameters except new_dout
         bprop.parameters = [new_dout]
 
     result = outer.apply(P.J, out_value)
-    outer.output = outer.apply(
-        P.make_tuple,
-        result,
-        bprop
-    )
+    outer.output = outer.apply(P.make_tuple, result, bprop)
     return clone(outer)
 
 
@@ -616,24 +597,23 @@ def wrap_grad_transform(prim):
         g = standard_parse(fn)
         for g2 in manage(g, weak=True).graphs:
             name = short_labeler.name(g2)
-            name = name.replace('__fprop__', syms['grad_fprop'])
-            g2.debug.name = name.replace('__bprop__', syms['grad_bprop'])
+            name = name.replace("__fprop__", syms["grad_fprop"])
+            g2.debug.name = name.replace("__bprop__", syms["grad_bprop"])
             g2.flags.update(default_grad_flags)
-        g.transforms['primal'] = prim
+        g.transforms["primal"] = prim
         return g
+
     return deco
 
 
 def bprop_to_grad_transform(prim, **flags):
     """Create the grad transform of a function from a bprop function."""
+
     def deco(fn):
         return _make_grad_transform(prim, fn, flags)
+
     return deco
 
 
 __consolidate__ = True
-__all__ = [
-    'Jimpl',
-    'bprop_to_grad_transform',
-    'wrap_grad_transform',
-]
+__all__ = ["Jimpl", "bprop_to_grad_transform", "wrap_grad_transform"]

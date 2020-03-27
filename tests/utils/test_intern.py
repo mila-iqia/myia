@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 
 import pytest
@@ -20,7 +19,7 @@ class Point(Interned):
     y: object
 
     def __eqkey__(self):
-        return AttrEK(self, ('x', 'y'))
+        return AttrEK(self, ("x", "y"))
 
 
 class Thingy(Interned):
@@ -35,7 +34,7 @@ class Thingy(Interned):
         self._incomplete = False
 
     def __eqkey__(self):
-        return AttrEK(self, ('value',))
+        return AttrEK(self, ("value",))
 
 
 def test_interned():

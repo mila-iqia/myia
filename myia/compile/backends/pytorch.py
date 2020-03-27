@@ -40,9 +40,11 @@ def pytorch_take_grad_inp(nb_indices, indices, values):
     broadcastable_indices = indices.reshape(tuple(indices.shape) + (1,))
     output = torch.zeros((nb_indices, row_size), dtype=values.dtype)
     for i in range(nb_indices):
-        output[i] = (((broadcastable_indices == i).to(values.dtype) * values)
-                     .reshape((-1, row_size))
-                     .sum(dim=(0,)))
+        output[i] = (
+            ((broadcastable_indices == i).to(values.dtype) * values)
+            .reshape((-1, row_size))
+            .sum(dim=(0,))
+        )
     return output
 
 
@@ -59,7 +61,7 @@ def pytorch_random_uint32(rstate, shape):
     rng = torch.Generator()
     rng.set_state(rstate)
     output = torch.zeros(shape, dtype=torch.int64)
-    output.random_(0, 2**32, generator=rng)
+    output.random_(0, 2 ** 32, generator=rng)
     return rng.get_state(), output
 
 
@@ -81,16 +83,13 @@ simple_mapping = {
     P.scalar_sin: np.sin,
     P.scalar_cos: np.cos,
     P.scalar_trunc: np.trunc,
-
     P.scalar_eq: lambda a, b: a == b,
     P.scalar_lt: lambda a, b: a < b,
     P.scalar_gt: lambda a, b: a > b,
     P.scalar_ne: lambda a, b: a != b,
     P.scalar_le: lambda a, b: a <= b,
     P.scalar_ge: lambda a, b: a >= b,
-
     P.scalar_sign: np.sign,
-
     P.scalar_bit_and: lambda a, b: a & b,
     P.scalar_bit_or: lambda a, b: a | b,
     P.scalar_bit_xor: lambda a, b: a ^ b,
@@ -101,14 +100,12 @@ simple_mapping = {
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: lambda a, b: a == b,
     P.bool_not: lambda a: ~a,
-
     P.distribute: lambda a, shp: a.expand(*shp) if shp != () else a,
     P.transpose: lambda a, perm: a.permute(*perm),
     P.reshape: lambda a, shp: a.reshape(shp),
     P.dot: torch.mm,
     P.take: lambda w, i: torch.nn.functional.embedding(i, w),
     P.take_grad_inp: pytorch_take_grad_inp,
-
     P.array_to_scalar: pytorch_array_to_scalar,
     P.random_initialize: pytorch_random_initialize,
     P.random_uint32: pytorch_random_uint32,
@@ -134,16 +131,13 @@ scalar_mapping = {
     P.scalar_sin: torch.sin,
     P.scalar_cos: torch.cos,
     P.scalar_trunc: torch.trunc,
-
     P.scalar_eq: torch.eq,
     P.scalar_lt: torch.lt,
     P.scalar_gt: torch.gt,
     P.scalar_ne: torch.ne,
     P.scalar_le: torch.le,
     P.scalar_ge: torch.ge,
-
     P.scalar_sign: torch.sign,
-
     P.scalar_bit_and: lambda a, b: a & b,
     P.scalar_bit_or: lambda a, b: a | b,
     P.scalar_bit_xor: lambda a, b: a ^ b,
@@ -154,7 +148,6 @@ scalar_mapping = {
     P.bool_or: lambda a, b: a | b,
     P.bool_eq: torch.eq,
     P.bool_not: lambda a: ~a,
-
     P.switch: torch.where,
 }
 
@@ -167,6 +160,7 @@ def pytorch_scalar_cast(op):
 
     def _impl(v):
         return (v.astype(dtype),)
+
     return _impl, (v,)
 
 
@@ -177,6 +171,7 @@ def pytorch_array_cast(op):
 
     def _impl(x):
         return (x.to(dtype=dt),)
+
     return _impl, op.inputs[1:2]
 
 
@@ -188,15 +183,17 @@ def pytorch_array_map(op):
     if fn in scalar_mapping:
         impl = scalar_mapping[fn]
     else:
-        raise NotImplementedError(f'array_map of {fn}')
+        raise NotImplementedError(f"array_map of {fn}")
 
     def _impl(*args):
         return (impl(*args),)
+
     return _impl, op.inputs[2:]
 
 
 def _pytorch_array_reduce_add(tshp):
     """Generate implementation for sum reduction based on given axes."""
+
     def _impl(array):
         ashp = array.shape
 
@@ -217,6 +214,7 @@ def _pytorch_array_reduce_add(tshp):
 
 def _pytorch_array_reduce_mul(tshp):
     """Generate implementation for product reduction based on given axes."""
+
     def _impl(array):
         ashp = array.shape
 
@@ -224,7 +222,8 @@ def _pytorch_array_reduce_mul(tshp):
             res = torch.prod(array)
         else:
             raise NotImplementedError(
-                'We currently only support full product on an array.')
+                "We currently only support full product on an array."
+            )
         return (res,)
 
     return _impl
@@ -251,24 +250,29 @@ def pytorch_array_reduce(op):
 
 def pytorch_array_getitem(op):
     """Implementation of array_getitem for pytorch."""
+
     def _impl(array, begin, end, strides):
         idx = tuple(slice(b, e, s) for b, e, s in zip(begin, end, strides))
         return (array[idx],)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_array_setitem(op):
     """Implementation of array_setitem for pytorch."""
+
     def _impl(array, begin, end, strides, value):
         idx = tuple(slice(b, e, s) for b, e, s in zip(begin, end, strides))
         ret = array.clone()
         ret[idx] = value
         return (ret,)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_argmax(op):
     """Implementation of argmax for pytorch."""
+
     def _impl(x, dim):
         dim = tuple(sorted(dim))
         n = ()
@@ -277,18 +281,20 @@ def pytorch_argmax(op):
                 n = n + (_s,)
         n = n + dim
         x = x.permute(n)
-        ns = x.shape[0:-len(dim)] + (-1,)
+        ns = x.shape[0 : -len(dim)] + (-1,)
         r = torch.argmax(x.reshape(ns), -1, keepdim=False)
         rl = list(r.shape)
         for _sd in dim:
             rl.insert(_sd, 1)
         rf = tuple(rl)
         return (torch.reshape(r, rf),)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_array_max(op):
     """Implementation of array_max for pytorch."""
+
     def _impl(x, dim):
         dim = tuple(sorted(dim))
         n = ()
@@ -297,114 +303,168 @@ def pytorch_array_max(op):
                 n = n + (_s,)
         n = n + dim
         x = x.permute(n)
-        ns = x.shape[0:-len(dim)] + (-1,)
+        ns = x.shape[0 : -len(dim)] + (-1,)
         r = torch.max(x.reshape(ns), -1, keepdim=False)[0]
         rl = list(r.shape)
         for _sd in dim:
             rl.insert(_sd, 1)
         rf = tuple(rl)
         return (torch.reshape(r, rf),)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_gather(op):
     """Implementation of gather for pytorch."""
+
     def _impl(x, dim, index):
         dim = dim.item()
         return (torch.gather(x, dim, index),)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_scatter(op):
     """Implementation of scatter for pytorch."""
+
     def _impl(x, dim, index, src):
         dim = dim.item()
         return (torch.scatter(x, dim, index, src),)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_scatter_add(op):
     """Implementation of scatter_add for pytorch."""
+
     def _impl(x, dim, index, src):
         dim = dim.item()
         return (torch.scatter_add(x, dim, index, src),)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_concat(op):
     """Implementation of concat for pytorch."""
+
     def _impl(x, dim):
         dim = dim.item()
         return (torch.cat(x, dim),)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_split(op):
     """Implementation of split for pytorch."""
+
     def _impl(x, sections, dim):
         dim = dim.item()
         return (torch.split(x, sections, dim),)
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_conv2d(op):
     """Implementation of conv2d for pytorch."""
+
     def _impl(input, weight, stride, padding, dilation, groups):
         groups = groups.item()
-        return (torch.nn.functional.conv2d(
-            input, weight, None, stride, padding, dilation, groups),)
+        return (
+            torch.nn.functional.conv2d(
+                input, weight, None, stride, padding, dilation, groups
+            ),
+        )
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_conv_transpose2d(op):
     """Implementation of conv_transpose2d."""
-    def _impl(input, weight, bias,
-              stride, padding, output_padding, groups, dilation):
+
+    def _impl(
+        input, weight, bias, stride, padding, output_padding, groups, dilation
+    ):
         stride = tuple(_x.item() for _x in stride)
         padding = tuple(_x.item() for _x in padding)
         output_padding = tuple(_x.item() for _x in output_padding)
         dilation = tuple(_x.item() for _x in dilation)
         groups = groups.item()
-        return torch.conv_transpose2d(input, weight, bias, stride, padding,
-                                      output_padding, groups, dilation)
+        return torch.conv_transpose2d(
+            input,
+            weight,
+            bias,
+            stride,
+            padding,
+            output_padding,
+            groups,
+            dilation,
+        )
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_conv2d_weight_grad(op):
     """Implementation of conv2d_weight_grad for pytorch."""
-    def _impl(input, weight_size, grad_output, stride, padding,
-              dilation, groups):
+
+    def _impl(
+        input, weight_size, grad_output, stride, padding, dilation, groups
+    ):
         weight_size = tuple(w.item() for w in weight_size)
         stride = tuple(_x.item() for _x in stride)
         padding = tuple(_x.item() for _x in padding)
         dilation = tuple(_x.item() for _x in dilation)
         groups = groups.item()
-        return (conv2d_weight(
-            input, weight_size, grad_output, stride,
-            padding, dilation, groups),)
+        return (
+            conv2d_weight(
+                input,
+                weight_size,
+                grad_output,
+                stride,
+                padding,
+                dilation,
+                groups,
+            ),
+        )
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_max_pool2d(op):
     """Implementation of max_pool2d for pytorch."""
+
     def _impl(input, kernel_size, stride, padding, dilation, ceil_mode):
-        return (torch.nn.functional.max_pool2d(
-            input, kernel_size, stride, padding, dilation,
-            ceil_mode.item(), False),)
+        return (
+            torch.nn.functional.max_pool2d(
+                input,
+                kernel_size,
+                stride,
+                padding,
+                dilation,
+                ceil_mode.item(),
+                False,
+            ),
+        )
+
     return _impl, op.inputs[1:]
 
 
 def pytorch_max_pool2d_grad(op):
     """Implementation of max_pool2d grad for pytorch."""
+
     def _impl(input, kernel_size, stride, padding, dilation, ceil_mode, dout):
         input.requires_grad_(requires_grad=True)
         output = torch.nn.functional.max_pool2d(
-            input, kernel_size, stride, padding, dilation,
-            ceil_mode.item(), False)
-        grads = torch.autograd.grad(
-            output, input, dout,
-            allow_unused=True)
+            input,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            ceil_mode.item(),
+            False,
+        )
+        grads = torch.autograd.grad(output, input, dout, allow_unused=True)
         return (grads[0],)
+
     return _impl, op.inputs[1:]
 
 
@@ -465,8 +525,9 @@ class PyTorchBackend(Backend):
     def __init__(self, device):
         """Create a PyTorch backend on the given device."""
         self.device = torch.device(device)
-        self.compiler = CompileGraphs(lambda lst: pytorch_convert(lst, self),
-                                      nonlinear_ops, self)
+        self.compiler = CompileGraphs(
+            lambda lst: pytorch_convert(lst, self), nonlinear_ops, self
+        )
 
     def compile(self, graph, *others):
         """Compile a graph."""
@@ -512,11 +573,13 @@ class PyTorchBackend(Backend):
                 output = output.astype(type_to_np_dtype(array_type))
             return output
         elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.from_backend_value(ve, te)
-                         for ve, te in zip(v, t.elements))
+            return tuple(
+                self.from_backend_value(ve, te) for ve, te in zip(v, t.elements)
+            )
         elif isinstance(t, abstract.AbstractTaggedUnion):
-            return TaggedValue(v.tag, self.from_backend_value(
-                v.value, t.options.get(v.tag)))
+            return TaggedValue(
+                v.tag, self.from_backend_value(v.value, t.options.get(v.tag))
+            )
         elif isinstance(t, abstract.AbstractRandomState):
             return RandomStateWrapper(self.to_numpy(v))
         else:
@@ -524,8 +587,7 @@ class PyTorchBackend(Backend):
 
     def to_backend_value(self, v, t):
         """Convert an intermediate value to a backend value."""
-        if (isinstance(t, abstract.AbstractError)
-                or v is abstract.DEAD):
+        if isinstance(t, abstract.AbstractError) or v is abstract.DEAD:
             return None
         elif isinstance(t, abstract.AbstractType):
             # Handle abstract types.
@@ -535,22 +597,24 @@ class PyTorchBackend(Backend):
         elif isinstance(t, abstract.AbstractArray):
             return self.from_numpy(v)
         elif isinstance(t, abstract.AbstractScalar):
-            if issubclass(t.values[abstract.TYPE],
-                          (xtype.Number, xtype.Bool, xtype.Nil)):
+            if issubclass(
+                t.values[abstract.TYPE], (xtype.Number, xtype.Bool, xtype.Nil)
+            ):
                 return self.from_scalar(v, t.values[abstract.TYPE])
             elif issubclass(t.values[abstract.TYPE], xtype.EnvType):
                 assert len(v._contents) == 0
                 return ()
             else:
-                raise NotImplementedError(f'to_backend_value for {t}')
+                raise NotImplementedError(f"to_backend_value for {t}")
         elif isinstance(t, abstract.AbstractTuple):
-            return tuple(self.to_backend_value(v, t)
-                         for v, t in zip(v, t.elements))
+            return tuple(
+                self.to_backend_value(v, t) for v, t in zip(v, t.elements)
+            )
         elif isinstance(t, abstract.AbstractTaggedUnion):
             real_t = t.options.get(v.tag)
             return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
         else:
-            raise NotImplementedError(f'to_backend_value for {t}')
+            raise NotImplementedError(f"to_backend_value for {t}")
 
 
 def PyTorchBackendR(device):
@@ -558,7 +622,4 @@ def PyTorchBackendR(device):
     return HandleBackend(PyTorchBackend(device))
 
 
-__all__ = [
-    'PyTorchBackend',
-    'PyTorchBackendR',
-]
+__all__ = ["PyTorchBackend", "PyTorchBackendR"]

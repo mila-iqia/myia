@@ -21,11 +21,10 @@ def skip_node(node):
 
 def _get_call(ref):
     ctx = ref.context
-    if not hasattr(ctx, 'graph'):
-        return '<unknown>', ()
+    if not hasattr(ctx, "graph"):
+        return "<unknown>", ()
     g = ctx.graph or ref.node.graph
-    while g and g.has_flags('auxiliary') \
-            and ctx.parent and ctx.parent.graph:
+    while g and g.has_flags("auxiliary") and ctx.parent and ctx.parent.graph:
         ctx = ctx.parent
         g = ctx.graph
     return g, ctx.argkey
@@ -34,20 +33,18 @@ def _get_call(ref):
 def _get_loc(node):
     if node.is_constant_graph():
         node = node.value
-    loc = node.debug.find('location')
+    loc = node.debug.find("location")
     genfn = None
     if loc is None:
-        tr = node.debug.find('trace', skip={'copy', 'equiv'})
+        tr = node.debug.find("trace", skip={"copy", "equiv"})
         if tr:
             idx = len(tr) - 3
             while idx >= 0:
                 fr = tr[idx]
-                if 'myia/myia/ir' in fr.filename:
+                if "myia/myia/ir" in fr.filename:
                     idx -= 1
                     continue
-                loc = Location(
-                    fr.filename, fr.lineno, 0, fr.lineno, 0, None
-                )
+                loc = Location(fr.filename, fr.lineno, 0, fr.lineno, 0, None)
                 genfn = fr.name
                 break
     return loc, genfn
@@ -57,12 +54,12 @@ def _get_info(x):
     skip = False
     if isinstance(x, Reference):
         g, args = _get_call(x)
-        loctype = 'direct'
+        loctype = "direct"
         loc, genfn = _get_loc(x.node)
     elif isinstance(x, ANFNode):
         g = x.graph
         args = None
-        loctype = 'direct'
+        loctype = "direct"
         loc, genfn = _get_loc(x)
     else:
         g, args = x
@@ -105,22 +102,31 @@ def _format_call(fn, args):
         args = []
     else:
         kwargs = {}
-    return format_abstract(_PBlock(label(fn), ' :: ', args, kwargs))
+    return format_abstract(_PBlock(label(fn), " :: ", args, kwargs))
 
 
-def _show_location(loc, label, mode=None, color='RED', file=sys.stderr):
-    with open(loc.filename, 'r') as contents:
-        lines = contents.read().split('\n')
-        _print_lines(lines, loc.line, loc.column,
-                     loc.line_end, loc.column_end,
-                     label, mode, color, file=file)
+def _show_location(loc, label, mode=None, color="RED", file=sys.stderr):
+    with open(loc.filename, "r") as contents:
+        lines = contents.read().split("\n")
+        _print_lines(
+            lines,
+            loc.line,
+            loc.column,
+            loc.line_end,
+            loc.column_end,
+            label,
+            mode,
+            color,
+            file=file,
+        )
 
 
-def _print_lines(lines, l1, c1, l2, c2, label='',
-                 mode=None, color='RED', file=sys.stderr):
+def _print_lines(
+    lines, l1, c1, l2, c2, label="", mode=None, color="RED", file=sys.stderr
+):
     if mode is None:
         if file.isatty():
-            mode = 'color'
+            mode = "color"
     for ln in range(l1, l2 + 1):
         line = lines[ln - 1]
         if ln == l1:
@@ -136,17 +142,19 @@ def _print_lines(lines, l1, c1, l2, c2, label='',
         else:
             end = len(trimmed)
 
-        if mode == 'color':
+        if mode == "color":
             prefix = trimmed[:start]
             hl = trimmed[start:end]
             rest = trimmed[end:]
-            print(f'{ln}: {prefix}{getattr(Fore, color)}{Style.BRIGHT}'
-                  f'{hl}{Style.RESET_ALL}{rest}',
-                  file=file)
+            print(
+                f"{ln}: {prefix}{getattr(Fore, color)}{Style.BRIGHT}"
+                f"{hl}{Style.RESET_ALL}{rest}",
+                file=file,
+            )
         else:
-            print(f'{ln}: {trimmed}', file=file)
-            prefix = ' ' * (start + 2 + len(str(ln)))
-            print(prefix + '^' * (end - start) + label, file=file)
+            print(f"{ln}: {trimmed}", file=file)
+            prefix = " " * (start + 2 + len(str(ln)))
+            print(prefix + "^" * (end - start) + label, file=file)
 
 
 def skip_ref(ref):
@@ -159,11 +167,11 @@ def print_ref(ref, file=sys.stderr):
     """Print a ref's location."""
     fn, args, loctype, loc, genfn, skip = _get_info(ref)
     if loc is not None:
-        print(f'{loc.filename}:{loc.line}', file=file)
-    gen = f'via code generated in {genfn}:' if genfn else ''
-    print('in', _format_call(fn, args), gen, file=file)
+        print(f"{loc.filename}:{loc.line}", file=file)
+    gen = f"via code generated in {genfn}:" if genfn else ""
+    print("in", _format_call(fn, args), gen, file=file)
     if loc is not None:
-        _show_location(loc, '', file=file)
+        _show_location(loc, "", file=file)
 
 
 def print_inference_error(error, file=sys.stderr):
@@ -171,25 +179,25 @@ def print_inference_error(error, file=sys.stderr):
     refs = [*error.traceback_refs.values()] + error.refs
     for ref in refs:
         if not skip_ref(ref):
-            print('=' * 80, file=file)
+            print("=" * 80, file=file)
             print_ref(ref, file=file)
-    print('~' * 80, file=file)
+    print("~" * 80, file=file)
     if error.pytb:
         print(error.pytb, file=file)
     else:
-        print(f'{type(error).__name__}: {error.message}', file=file)
+        print(f"{type(error).__name__}: {error.message}", file=file)
 
 
 def print_myia_syntax_error(error, file=sys.stderr):
     """Print MyiaSyntaxError's location."""
     loc = error.loc
-    print('=' * 80, file=file)
+    print("=" * 80, file=file)
     if loc is not None:
-        print(f'{loc.filename}:{loc.line}', file=file)
+        print(f"{loc.filename}:{loc.line}", file=file)
     if loc is not None:
-        _show_location(loc, '', file=file)
-    print('~' * 80, file=file)
-    print(f'{type(error).__name__}: {error}', file=file)
+        _show_location(loc, "", file=file)
+    print("~" * 80, file=file)
+    print(f"{type(error).__name__}: {error}", file=file)
 
 
 _previous_excepthook = sys.excepthook
@@ -212,13 +220,13 @@ def print_myia_warning(warning, file=sys.stderr):
     """Print Myia Warning's location."""
     msg = warning.args[0]
     loc = warning.loc
-    print('=' * 80, file=file)
+    print("=" * 80, file=file)
     if loc is not None:
-        print(f'{loc.filename}:{loc.line}', file=file)
+        print(f"{loc.filename}:{loc.line}", file=file)
     if loc is not None:
-        _show_location(loc, '', None, 'MAGENTA', file=file)
-    print('~' * 80, file=file)
-    print(f'{warning.__class__.__name__}: {msg}', file=file)
+        _show_location(loc, "", None, "MAGENTA", file=file)
+    print("~" * 80, file=file)
+    print(f"{warning.__class__.__name__}: {msg}", file=file)
 
 
 _previous_warning = warnings.showwarning
@@ -236,16 +244,16 @@ def myia_warning(message, category, filename, lineno, file, line):
 
 
 warnings.showwarning = myia_warning
-warnings.filterwarnings('always', category=MyiaDisconnectedCodeWarning)
+warnings.filterwarnings("always", category=MyiaDisconnectedCodeWarning)
 
 
 __all__ = [
-    'myia_excepthook',
-    'myia_warning',
-    'print_inference_error',
-    'print_myia_syntax_error',
-    'print_myia_warning',
-    'print_ref',
-    'skip_node',
-    'skip_ref',
+    "myia_excepthook",
+    "myia_warning",
+    "print_inference_error",
+    "print_myia_syntax_error",
+    "print_myia_warning",
+    "print_ref",
+    "skip_node",
+    "skip_ref",
 ]

@@ -1,4 +1,3 @@
-
 from myia.opt import lib
 
 tuple_opts = [

@@ -12,7 +12,6 @@ from numpy.random import RandomState
 
 from myia import ArithmeticData, myia, value_and_grad
 from myia.api import to_device
-# The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 
 ###########
@@ -20,17 +19,17 @@ from myia.debug import traceback  # noqa
 ###########
 
 
-dtype = 'float32'
+dtype = "float32"
 
-backend = 'pytorch'
+backend = "pytorch"
 # backend = 'relay'  # Uncomment to use relay backend
 
-device_type = 'cpu'
+device_type = "cpu"
 # device_type = 'cuda'  # Uncomment to run on the gpu
 
 backend_options_dict = {
-    'pytorch': {'device': device_type},
-    'relay': {'target': device_type, 'device_id': 0}
+    "pytorch": {"device": device_type},
+    "relay": {"target": device_type, "device_id": 0},
 }
 
 backend_options = backend_options_dict[backend]
@@ -65,9 +64,10 @@ def generate_data(n, batch_size, input_size, target_size, *, seed=87):
     a single target.
     """
     R = RandomState(seed=seed)
-    return [(param(R, batch_size, input_size),
-             param(R, batch_size, target_size))
-            for i in range(n)]
+    return [
+        (param(R, batch_size, input_size), param(R, batch_size, target_size))
+        for i in range(n)
+    ]
 
 
 def mlp_parameters(*layer_sizes, seed=90909):
@@ -94,8 +94,8 @@ def mlp_parameters(*layer_sizes, seed=90909):
 class Linear(ArithmeticData):
     """Linear layer."""
 
-    W: 'Weights array'
-    b: 'Biases vector'
+    W: "Weights array"
+    b: "Biases vector"
 
     def apply(self, input):
         """Apply the layer."""
@@ -115,7 +115,7 @@ class Tanh(ArithmeticData):
 class Sequential(ArithmeticData):
     """Sequential layer, applies all sub-layers in order."""
 
-    layers: 'Tuple of layers'
+    layers: "Tuple of layers"
 
     def apply(self, x):
         """Apply the layer."""
@@ -139,7 +139,7 @@ def step(model, x, y, lr):
     The 'model' argument can be omitted: by default the derivative wrt
     the first argument is returned.
     """
-    _cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
+    _cost, dmodel = value_and_grad(cost, "model")(model, x, y)
     return _cost, model - lr * dmodel
 
 
@@ -171,7 +171,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
         costs = [float(c.from_device()) for c in costs]
         c = sum(costs) / n
         t = time.time() - t0
-        print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
+        print(f"Cost: {c:15.10f}\tTime: {t:15.10f}")
 
 
 def test_run():
@@ -189,5 +189,5 @@ def run():
     run_helper(100, 10, 5, (10, 50, 1))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()

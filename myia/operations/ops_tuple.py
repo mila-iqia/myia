@@ -46,11 +46,13 @@ class TupleReorganizer(MetaGraph):
         rval = []
         for tup, param in zip(tups, params):
             if not isinstance(tup, AbstractTuple):
-                raise MyiaTypeError(f'Expected AbstractTuple, not {tup}')
-            rval.append([
-                g.apply(P.tuple_getitem, param, i)
-                for i, elem in enumerate(tup.elements)
-            ])
+                raise MyiaTypeError(f"Expected AbstractTuple, not {tup}")
+            rval.append(
+                [
+                    g.apply(P.tuple_getitem, param, i)
+                    for i, elem in enumerate(tup.elements)
+                ]
+            )
         return rval
 
     def generate_graph(self, args):
@@ -80,14 +82,14 @@ def tuple_concat(self, g, args):
 @tuple_reorganizer
 def tuple_getslice(self, g, args):
     """Metagraph for getting a slice from a tuple."""
-    tuparg, start, stop, step = check_nargs('tail', 4, args)
+    tuparg, start, stop, step = check_nargs("tail", 4, args)
     try:
         start = build_value(start)
         stop = build_value(stop)
         step = build_value(step)
     except ValueError:
-        raise MyiaTypeError('Slice start, stop and step must be static')
-    tup, = self.map_tuples(g, g.parameters[:1], [tuparg])
+        raise MyiaTypeError("Slice start, stop and step must be static")
+    (tup,) = self.map_tuples(g, g.parameters[:1], [tuparg])
     return g.apply(P.make_tuple, *tup[start:stop:step])
 
 

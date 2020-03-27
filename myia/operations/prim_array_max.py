@@ -24,14 +24,16 @@ from . import primitives as P
 
 
 @standard_prim(P.array_max)
-async def infer_array_max(self, engine,
-                          input: lib.AbstractArray,
-                          dim: lib.u64tup_typecheck):
+async def infer_array_max(
+    self, engine, input: lib.AbstractArray, dim: lib.u64tup_typecheck
+):
     """Infer the return type of primitive `array_max`."""
     shp = ()
     shp_inp = input.xshape()
-    dim = tuple(self.require_constant(e, argnum=f'"1:dim[{edx}]"')
-                for edx, e in enumerate(dim.elements))
+    dim = tuple(
+        self.require_constant(e, argnum=f'"1:dim[{edx}]"')
+        for edx, e in enumerate(dim.elements)
+    )
     shp = list(shp_inp)
     for d in dim:
         shp[d] = 1
@@ -95,18 +97,18 @@ def bprop_array_max(x, axis, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'array_max',
-    'registered_name': 'array_max',
-    'mapping': P.array_max,
-    'python_implementation': None,
+    "name": "array_max",
+    "registered_name": "array_max",
+    "mapping": P.array_max,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'array_max',
-    'registered_name': 'array_max',
-    'type': 'backend',
-    'python_implementation': None,
-    'inferrer_constructor': infer_array_max,
-    'grad_transform': bprop_array_max,
+    "name": "array_max",
+    "registered_name": "array_max",
+    "type": "backend",
+    "python_implementation": None,
+    "inferrer_constructor": infer_array_max,
+    "grad_transform": bprop_array_max,
 }

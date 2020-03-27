@@ -12,7 +12,7 @@ from . import _dead_handle
 def _rpc_server():
     # Try to prevent other libs from using stdout
     sys.stdout = sys.stderr
-    do_pm = os.environ.get('MYIA_PYTEST_USE_PDB', False)
+    do_pm = os.environ.get("MYIA_PYTEST_USE_PDB", False)
     dumper = MyiaDumper(1)
     dumper.open()
     loader = MyiaLoader(0)
@@ -21,10 +21,11 @@ def _rpc_server():
         mod = importlib.import_module(pkg)
         cls = getattr(mod, name)
         iface = cls(**init_args)
-        dumper.represent('ready')
+        dumper.represent("ready")
     except Exception as e:
         if do_pm:  # pragma: no cover
             import rpdb
+
             rpdb.post_mortem()
         dumper.represent(e)
         return 1
@@ -39,19 +40,21 @@ def _rpc_server():
             except Exception as e:  # pragma: no cover
                 if do_pm:  # pragma: no cover
                     import rpdb
+
                     rpdb.post_mortem()
                 res = e
             dumper.represent(res)
         elif isinstance(data, list):
             msg, arg = data
-            if msg == 'dead_handle':
+            if msg == "dead_handle":
                 _dead_handle(arg)
-            elif msg == 'handle_call':
+            elif msg == "handle_call":
                 try:
                     res = arg[0](*arg[1], **arg[2])
                 except Exception as e:  # pragma: no cover
                     if do_pm:  # pragma: no cover
                         import rpdb
+
                         rpdb.post_mortem()
                     res = e
                 dumper.represent(res)

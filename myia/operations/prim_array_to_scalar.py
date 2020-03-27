@@ -34,18 +34,18 @@ def bprop_array_to_scalar(x, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'array_to_scalar',
-    'registered_name': 'array_to_scalar',
-    'mapping': P.array_to_scalar,
-    'python_implementation': pyimpl_array_to_scalar,
+    "name": "array_to_scalar",
+    "registered_name": "array_to_scalar",
+    "mapping": P.array_to_scalar,
+    "python_implementation": pyimpl_array_to_scalar,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'array_to_scalar',
-    'registered_name': 'array_to_scalar',
-    'type': 'backend',
-    'python_implementation': pyimpl_array_to_scalar,
-    'inferrer_constructor': infer_array_to_scalar,
-    'grad_transform': bprop_array_to_scalar,
+    "name": "array_to_scalar",
+    "registered_name": "array_to_scalar",
+    "type": "backend",
+    "python_implementation": pyimpl_array_to_scalar,
+    "inferrer_constructor": infer_array_to_scalar,
+    "grad_transform": bprop_array_to_scalar,
 }

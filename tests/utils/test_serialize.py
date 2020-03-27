@@ -21,29 +21,27 @@ def dumpload(o):
     return load(f.fileno())
 
 
-@parametrize('v', [
-    'potato',
-    [],
-    4242,
-    (22,),
-])
+@parametrize("v", ["potato", [], 4242, (22,)])
 def test_roundtrip(v):
     v2 = dumpload(v)
     assert v is not v2
     assert v == v2
 
 
-@parametrize('v', [
-    None,
-    (),
-    22,
-    switch,
-    ANYTHING,
-    xtype.Bool,
-    xtype.i8,
-    xtype.u64,
-    xtype.f32,
-])
+@parametrize(
+    "v",
+    [
+        None,
+        (),
+        22,
+        switch,
+        ANYTHING,
+        xtype.Bool,
+        xtype.i8,
+        xtype.u64,
+        xtype.f32,
+    ],
+)
 def test_same(v):
     v2 = dumpload(v)
     assert v is v2
@@ -57,7 +55,7 @@ def test_dump_undefined():
 def test_exception():
     e2 = dumpload(Exception("this is bad"))
     assert str(e2) == "Exception: this is bad\n"
-    assert repr(e2) == 'LoadedException'
+    assert repr(e2) == "LoadedException"
 
 
 g = Graph()
@@ -75,11 +73,7 @@ g.return_.abstract = to_abstract_test(5)
 g.return_.inputs[0].abstract = None
 
 
-@parametrize('node', [
-    p1,
-    c,
-    mid,
-])
+@parametrize("node", [p1, c, mid])
 def test_anfnode(node):
     node2 = dumpload(node)
     assert type(node) is type(node2)

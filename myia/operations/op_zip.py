@@ -39,8 +39,8 @@ def zip_(seq1, seq2):
 
 
 __operation_defaults__ = {
-    'name': 'zip',
-    'registered_name': 'zip',
-    'mapping': zip_,
-    'python_implementation': zip,
+    "name": "zip",
+    "registered_name": "zip",
+    "mapping": zip_,
+    "python_implementation": zip,
 }

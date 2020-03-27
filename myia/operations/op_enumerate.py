@@ -10,8 +10,8 @@ def enumerate_(seq):
 
 
 __operation_defaults__ = {
-    'name': 'enumerate',
-    'registered_name': 'enumerate',
-    'mapping': enumerate_,
-    'python_implementation': enumerate,
+    "name": "enumerate",
+    "registered_name": "enumerate",
+    "mapping": enumerate_,
+    "python_implementation": enumerate,
 }

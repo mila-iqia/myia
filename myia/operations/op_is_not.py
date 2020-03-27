@@ -12,8 +12,8 @@ def is_not(x, y):
 
 
 __operation_defaults__ = {
-    'name': 'is_not',
-    'registered_name': 'is_not',
-    'mapping': is_not,
-    'python_implementation': operator.is_not,
+    "name": "is_not",
+    "registered_name": "is_not",
+    "mapping": is_not,
+    "python_implementation": operator.is_not,
 }

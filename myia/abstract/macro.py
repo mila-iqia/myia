@@ -26,14 +26,17 @@ class AnnotationBasedChecker:
         """Initialize an AnnotationBasedChecker."""
         self.name = name
         data = inspect.getfullargspec(fn)
-        if (data.varkw is not None
-                or data.defaults is not None
-                or data.kwonlyargs
-                or data.kwonlydefaults is not None
-                or data.varargs and not allow_varargs):
+        if (
+            data.varkw is not None
+            or data.defaults is not None
+            or data.kwonlyargs
+            or data.kwonlydefaults is not None
+            or data.varargs
+            and not allow_varargs
+        ):
             raise TypeError(
-                f'Function {fn} must only have positional arguments'
-                f' and no defaults.'
+                f"Function {fn} must only have positional arguments"
+                f" and no defaults."
             )
         self.data = data
         self.nargs = None if data.varargs else len(data.args) - nstdargs
@@ -41,7 +44,7 @@ class AnnotationBasedChecker:
         for i, arg in enumerate(data.args):
             if arg in data.annotations:
                 self.typemap[data.annotations[arg]].append(i - nstdargs)
-        self.outtype = data.annotations.get('return', None)
+        self.outtype = data.annotations.get("return", None)
 
     async def check(self, engine, argrefs, uniform=False):
         """Check that the argrefs match the function signature."""
@@ -66,12 +69,12 @@ class AnnotationBasedChecker:
                 elif isinstance(typ, type) and issubclass(typ, AbstractValue):
                     if not isinstance(arg, typ):
                         raise MyiaTypeError(
-                            f'Wrong type {arg} != {typ} for {self.name}'
+                            f"Wrong type {arg} != {typ} for {self.name}"
                         )
                 elif callable(typ):
                     await force_pending(engine.check(typ, arg))
                 else:
-                    raise AssertionError(f'Invalid annotation: {typ}')
+                    raise AssertionError(f"Invalid annotation: {typ}")
 
         return outtype
 
@@ -100,14 +103,15 @@ class MacroInfo:
     async def build(self, ref, ab=None):
         """Get a constant value from a reference."""
         from .utils import build_value
+
         if ab is None:
             ab = await ref.get()
         try:
             return build_value(ab)
         except ValueError:
             raise MyiaValueError(
-                'Arguments to a myia_static function must be constant',
-                refs=[ref]
+                "Arguments to a myia_static function must be constant",
+                refs=[ref],
             )
 
 
@@ -142,7 +146,7 @@ class Macro:
         return rval
 
     def __str__(self):
-        return f'<Macro {self.name}>'
+        return f"<Macro {self.name}>"
 
     __repr__ = __str__
 
@@ -179,10 +183,7 @@ class MacroError(InferenceError):
     def __init__(self, error):
         """Initialize a MacroError."""
         tb = traceback.format_exception(
-            type(error),
-            error,
-            error.__traceback__,
-            limit=7
+            type(error), error, error.__traceback__, limit=7
         )
         del tb[1]
         tb = "".join(tb)
@@ -229,12 +230,12 @@ def myia_static(fn, **kwargs):
 
 
 __all__ = [
-    'AnnotationBasedChecker',
-    'Macro',
-    'MacroError',
-    'MacroInfo',
-    'MyiaStatic',
-    'StandardMacro',
-    'macro',
-    'myia_static',
+    "AnnotationBasedChecker",
+    "Macro",
+    "MacroError",
+    "MacroInfo",
+    "MyiaStatic",
+    "StandardMacro",
+    "macro",
+    "myia_static",
 ]

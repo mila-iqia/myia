@@ -48,26 +48,29 @@ def __fprop__switch(jcond, jtb, jfb):
     def __bprop__switch(dout):
         tb = Jinv(jtb)
         fb = Jinv(jfb)
-        return (newenv,
-                zeros_like(cond),
-                operations.switch(cond, dout, zeros_like(fb)),
-                operations.switch(cond, zeros_like(tb), dout))
+        return (
+            newenv,
+            zeros_like(cond),
+            operations.switch(cond, dout, zeros_like(fb)),
+            operations.switch(cond, zeros_like(tb), dout),
+        )
+
     return rval, __bprop__switch
 
 
 __operation_defaults__ = {
-    'name': 'switch',
-    'registered_name': 'switch',
-    'mapping': P.switch,
-    'python_implementation': pyimpl_switch,
+    "name": "switch",
+    "registered_name": "switch",
+    "mapping": P.switch,
+    "python_implementation": pyimpl_switch,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'switch',
-    'registered_name': 'switch',
-    'type': 'backend',
-    'python_implementation': pyimpl_switch,
-    'inferrer_constructor': _SwitchInferrer,
-    'grad_transform': __fprop__switch,
+    "name": "switch",
+    "registered_name": "switch",
+    "type": "backend",
+    "python_implementation": pyimpl_switch,
+    "inferrer_constructor": _SwitchInferrer,
+    "grad_transform": __fprop__switch,
 }

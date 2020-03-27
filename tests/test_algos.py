@@ -1,4 +1,3 @@
-
 from myia.lib import from_value
 from myia.operations import scalar_mul, tagged
 from myia.pipeline import standard_pipeline
@@ -17,10 +16,8 @@ from .test_monomorphize import mono_scalar
 @mt(
     infer_scalar(i64, result=i64),
     infer_scalar(f64, result=f64),
-
     run(3),
     run(4.8),
-
     gradient(2.0),
 )
 def test_pow10(x):
@@ -38,12 +35,10 @@ def test_pow10(x):
 @mt(
     infer_scalar(i64, result=i64),
     infer_scalar(f64, result=f64),
-
     run_debug(0),
     run_debug(1),
     run_debug(4),
     run(10),
-
     gradient(4.1),
 )
 def test_fact(n):
@@ -52,13 +47,11 @@ def test_fact(n):
             return 1
         else:
             return n * fact(n - 1)
+
     return fact(n)
 
 
-@mt(
-    run(8),
-    mono_scalar(13),  # Covers an edge case in monomorphize
-)
+@mt(run(8), mono_scalar(13))  # Covers an edge case in monomorphize
 def test_fib(n):
     a = 1
     b = 1
@@ -77,10 +70,7 @@ def make_tree(depth, x):
         return tagged(x)
     else:
         return tagged(
-            Pair(
-                make_tree(depth - 1, x * 2),
-                make_tree(depth - 1, x * 2 + 1)
-            )
+            Pair(make_tree(depth - 1, x * 2), make_tree(depth - 1, x * 2 + 1))
         )
 
 
@@ -88,12 +78,7 @@ def countdown(n):
     if n == 0:
         return tagged(None)
     else:
-        return tagged(
-            Pair(
-                n,
-                countdown(n - 1)
-            )
-        )
+        return tagged(Pair(n, countdown(n - 1)))
 
 
 def sumtree(t):
@@ -111,12 +96,11 @@ def reducetree(fn, t, init):
     elif t is None:
         return init
     else:
-        return fn(reducetree(fn, t.left, init),
-                  reducetree(fn, t.right, init))
+        return fn(reducetree(fn, t.left, init), reducetree(fn, t.right, init))
 
 
 pair_t1 = from_value(Pair(Pair(1, 2), Pair(2, 3)))
-pair_t1_u = pair_t1.attributes['left']
+pair_t1_u = pair_t1.attributes["left"]
 
 
 @infer_scalar(i64, result=pair_t1_u)
@@ -125,7 +109,7 @@ def test_make_tree(depth):
 
 
 pair_t2 = from_value(Pair(1, Pair(2, Pair(3, None))))
-pair_t2_u = pair_t2.attributes['right']
+pair_t2_u = pair_t2.attributes["right"]
 
 
 @infer_scalar(i64, result=pair_t2_u)
@@ -136,12 +120,10 @@ def test_countdown(depth):
 @mt(
     run(make_tree(3, 1)),
     run(countdown(10)),
-
     gradient(make_tree(3, 1.0)),
     gradient(countdown(3.0)),
-
     pipeline=standard_pipeline,
-    backend=backend_all
+    backend=backend_all,
 )
 def test_sumtree(x):
     return sumtree(x)
@@ -150,12 +132,10 @@ def test_sumtree(x):
 @mt(
     run(make_tree(3, 1), 1),
     run(countdown(10), 1),
-
     gradient(make_tree(3, 1.0), 1.0),
     gradient(countdown(4.0), 1.0),
-
     pipeline=standard_pipeline,
-    backend=backend_all
+    backend=backend_all,
 )
 def test_reducetree(t, init):
     return reducetree(scalar_mul, t, init)

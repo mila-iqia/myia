@@ -17,15 +17,14 @@ def closure_convert(root):
     This is a destructive operation.
     """
     mng = manage(root)
-    fvs = {gg: list(g_fvs)
-           for gg, g_fvs in mng.free_variables_total.items()}
+    fvs = {gg: list(g_fvs) for gg, g_fvs in mng.free_variables_total.items()}
 
     with mng.transact() as tr:
         repl = defaultdict(dict)
         for g in mng.graphs:
             new_params = []
             for node in fvs.get(g, []):
-                with About(node.debug, 'fv'):
+                with About(node.debug, "fv"):
                     param = Parameter(g)
                     param.abstract = node.abstract
                     new_params.append(param)
@@ -67,6 +66,4 @@ def closure_convert(root):
 
 
 __consolidate__ = True
-__all__ = [
-    'closure_convert',
-]
+__all__ = ["closure_convert"]

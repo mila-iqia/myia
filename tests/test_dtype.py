@@ -1,4 +1,3 @@
-
 import pytest
 
 from myia.utils import EnvInstance, SymbolicKeyInstance
@@ -55,16 +54,16 @@ def test_make_subtype():
 
 def test_repr():
     t = UInt[16]
-    assert repr(t) == 'UInt[16]'
+    assert repr(t) == "UInt[16]"
 
 
 def test_type_conversions():
-    assert np_dtype_to_type('float32') is Float[32]
+    assert np_dtype_to_type("float32") is Float[32]
 
     with pytest.raises(TypeError):
-        np_dtype_to_type('float80')
+        np_dtype_to_type("float80")
 
-    assert type_to_np_dtype(Float[16]) == 'float16'
+    assert type_to_np_dtype(Float[16]) == "float16"
 
     with pytest.raises(TypeError):
         type_to_np_dtype(Object)

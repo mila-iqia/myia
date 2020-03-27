@@ -21,17 +21,18 @@ from . import primitives as P
 
 
 class _CastRemapper(CloneRemapper):
-
-    def __init__(self,
-                 graphs,
-                 inlines,
-                 manager,
-                 relation,
-                 graph_relation,
-                 clone_constants,
-                 graph_repl,
-                 quarantine,
-                 fv_replacements):
+    def __init__(
+        self,
+        graphs,
+        inlines,
+        manager,
+        relation,
+        graph_relation,
+        clone_constants,
+        graph_repl,
+        quarantine,
+        fv_replacements,
+    ):
         """Initialize the GraphCloner."""
         super().__init__(
             graphs=graphs,
@@ -79,6 +80,7 @@ async def make_trials(engine, ref, repl):
         set, for each occurrence of `node` in the subtree.
 
     """
+
     def prod(options, finalize):
         # This performs the cartesian product of the options. The nodes are
         # merged using the finalize function.
@@ -112,9 +114,9 @@ async def make_trials(engine, ref, repl):
     elif ref.node.is_apply():
         # Return the cartesian product of the entries for each argument.
         arg_results = [
-            (await make_trials(
-                engine, engine.ref(arg, ref.context), repl
-            )).items()
+            (
+                await make_trials(engine, engine.ref(arg, ref.context), repl)
+            ).items()
             for arg in ref.node.inputs
         ]
 
@@ -124,6 +126,7 @@ async def make_trials(engine, ref, repl):
                 return node
             else:
                 return g.apply(*nodes)
+
         return prod(arg_results, _finalize)
 
     elif ref.node.is_constant_graph():
@@ -158,7 +161,7 @@ async def make_trials(engine, ref, repl):
                     total=True,
                     remapper_class=_CastRemapper.partial(
                         fv_replacements=fv_repl
-                    )
+                    ),
                 )
                 engine.mng.add_graph(cl[g])
                 res[entry] = Constant(cl[g])
@@ -177,6 +180,7 @@ async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
     We want to evaluate tb in a context where x has type typ and fb
     in a context where it doesn't.
     """
+
     async def wrap(branch_ref, branch_types):
         # We transform branch_graph into a new graph which refers to a cast
         # version of x. We also transform all of the children of x's graph
@@ -185,7 +189,7 @@ async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
         branch_graph = branch_ref.node.value
         nomod = True
 
-        rval = branch_graph.make_new(relation='copy')
+        rval = branch_graph.make_new(relation="copy")
         children = set()
         fv_repl = {}
         for node, typ in branch_types.items():
@@ -203,9 +207,7 @@ async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
             *children,
             total=False,
             graph_repl={branch_graph: rval},
-            remapper_class=_CastRemapper.partial(
-                fv_replacements=fv_repl
-            )
+            remapper_class=_CastRemapper.partial(fv_replacements=fv_repl)
         )
         assert rval is cl[branch_graph]
         engine.mng.add_graph(rval)
@@ -214,10 +216,7 @@ async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
     cond = condref.node
     ctx = condref.context
 
-    groups = {
-        True: defaultdict(list),
-        False: defaultdict(list),
-    }
+    groups = {True: defaultdict(list), False: defaultdict(list)}
 
     replaceable_condition = True
     for keys, cond_trial in cond_trials.items():
@@ -235,8 +234,9 @@ async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
 
     typemap = {}
     for key, mapping in groups.items():
-        typemap[key] = {node: union_simplify(opts)
-                        for node, opts in mapping.items()}
+        typemap[key] = {
+            node: union_simplify(opts) for node, opts in mapping.items()
+        }
 
     if not groups[True]:
         return fbref
@@ -249,13 +249,12 @@ async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
             # condition.
             type_filter_parts = []
             for node, types in groups[True].items():
-                parts = [g.apply(P.hastype, node, t)
-                         for t in types]
-                new_cond = reduce(lambda x, y: g.apply(P.bool_or, x, y),
-                                  parts)
+                parts = [g.apply(P.hastype, node, t) for t in types]
+                new_cond = reduce(lambda x, y: g.apply(P.bool_or, x, y), parts)
                 type_filter_parts.append(new_cond)
-            type_filter = reduce(lambda x, y: g.apply(P.bool_and, x, y),
-                                 type_filter_parts)
+            type_filter = reduce(
+                lambda x, y: g.apply(P.bool_and, x, y), type_filter_parts
+            )
             new_cond = type_filter
         else:
             new_cond = cond
@@ -279,7 +278,7 @@ async def user_switch(info, condref, tbref, fbref):
     for branch_ref in [tbref, fbref]:
         if not branch_ref.node.is_constant_graph():
             raise MyiaTypeError(
-                'Both branches of user_switch must be constant graphs.'
+                "Both branches of user_switch must be constant graphs."
             )
 
     orig_cond = cond = condref.node
@@ -302,8 +301,8 @@ async def user_switch(info, condref, tbref, fbref):
 
 
 __operation_defaults__ = {
-    'name': 'user_switch',
-    'registered_name': 'user_switch',
-    'mapping': user_switch,
-    'python_implementation': None,
+    "name": "user_switch",
+    "registered_name": "user_switch",
+    "mapping": user_switch,
+    "python_implementation": None,
 }

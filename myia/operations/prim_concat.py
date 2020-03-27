@@ -29,10 +29,11 @@ async def infer_concat(self, engine, x, dim):
         if d != dim_v:
             assert all(e.xshape()[d] == shp_0[d] for e in x.elements)
 
-    shp_f = shp_0[:dim_v] + (new_dim_len,) + shp_0[dim_v + 1:]
+    shp_f = shp_0[:dim_v] + (new_dim_len,) + shp_0[dim_v + 1 :]
 
-    return type(x.elements[0])(x.elements[0].element,
-                               {SHAPE: shp_f, TYPE: x.elements[0].xtype()})
+    return type(x.elements[0])(
+        x.elements[0].element, {SHAPE: shp_f, TYPE: x.elements[0].xtype()}
+    )
 
 
 @macro
@@ -55,18 +56,18 @@ def bprop_concat(x, dim, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'concat',
-    'registered_name': 'concat',
-    'mapping': P.concat,
-    'python_implementation': pyimpl_concat,
+    "name": "concat",
+    "registered_name": "concat",
+    "mapping": P.concat,
+    "python_implementation": pyimpl_concat,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'concat',
-    'registered_name': 'concat',
-    'type': 'backend',
-    'python_implementation': pyimpl_concat,
-    'inferrer_constructor': infer_concat,
-    'grad_transform': bprop_concat,
+    "name": "concat",
+    "registered_name": "concat",
+    "type": "backend",
+    "python_implementation": pyimpl_concat,
+    "inferrer_constructor": infer_concat,
+    "grad_transform": bprop_concat,
 }

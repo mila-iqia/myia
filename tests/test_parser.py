@@ -16,6 +16,7 @@ from myia.pipeline import scalar_parse as parse, scalar_pipeline
 def test_undefined():
     def f():
         return c  # noqa
+
     with pytest.raises(NameError):
         parse(f)
 
@@ -23,6 +24,7 @@ def test_undefined():
 def test_defined_later():
     def f():
         return c  # noqa
+
     with pytest.raises(UnboundLocalError):
         parse(f)
     c = 3
@@ -31,6 +33,7 @@ def test_defined_later():
 def test_no_return():
     def f():
         """Hello, there is nothing here!"""
+
     with pytest.raises(MyiaSyntaxError):
         parse(f)
 
@@ -44,7 +47,9 @@ def test_no_return_while():
                 x = x + 1
             while y < 10:
                 y = y + 1
+
         return g()
+
     with pytest.raises(MyiaSyntaxError):
         parse(f)
 
@@ -54,6 +59,7 @@ def test_maybe():
         while True:
             x = 2
         return x
+
     with pytest.raises(Exception):
         # This shouldn't resolve
         parse(f)
@@ -62,6 +68,7 @@ def test_maybe():
 def test_unsupported():
     def f():
         assert False
+
     with pytest.raises(MyiaSyntaxError):
         parse(f)
 
@@ -71,6 +78,7 @@ def test_expression_statements():
         """Foo."""
         print(x)
         return x
+
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(f)
 
@@ -83,6 +91,7 @@ def test_global_nested():
     def g():
         def h():
             return _global_f()
+
         return h()
 
     parse(g)
@@ -93,9 +102,9 @@ def test_forward_reference():
         return h()
 
     # No resolve
-    parse2 = scalar_pipeline \
-        .select('resources', 'parse') \
-        .make_transformer('input', 'graph')
+    parse2 = scalar_pipeline.select("resources", "parse").make_transformer(
+        "input", "graph"
+    )
 
     parse2(g)
 
@@ -127,11 +136,11 @@ def test_parametric():
     def j(**kwargs):
         return kwargs
 
-    assert raw_parse(f).defaults == ['y']
-    assert raw_parse(g).vararg == 'args'
-    assert raw_parse(h).vararg == 'args'
+    assert raw_parse(f).defaults == ["y"]
+    assert raw_parse(g).vararg == "args"
+    assert raw_parse(h).vararg == "args"
     assert raw_parse(i).kwonly == 1
-    assert raw_parse(j).kwarg == 'kwargs'
+    assert raw_parse(j).kwarg == "kwargs"
 
 
 def test_fn_param_same_name():
@@ -145,7 +154,9 @@ def test_fn_param_same_name():
 def test_unsupported_AST__error():
     def a1():
         import builtins  # noqa: F401
+
         return None
+
     with pytest.raises(MyiaSyntaxError):
         parse(a1)
 
@@ -154,6 +165,7 @@ def test_disconnected_from_output__warning():
     def a0():
         print(1)
         return 1
+
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(a0)
 
@@ -163,14 +175,17 @@ def test_disconnected_from_output__warning():
             x = x + 1
         print(1)
         return 1
+
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(a1)
 
     def a2():
         def b2():
             return 1
+
         b2()
         return 1
+
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(a2)
 
@@ -179,6 +194,7 @@ def test_disconnected_from_output__warning():
         """Comment: Blah Blah Blah
         """
         return 1
+
     with pytest.warns(None) as record:
         parse(a3)
     assert len(record) == 0
@@ -186,6 +202,7 @@ def test_disconnected_from_output__warning():
     def a4():
         x = 1  # noqa: F841
         return 1
+
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(a4)
 
@@ -194,8 +211,11 @@ def test_disconnected_from_output__warning():
             def c5():
                 x = 1  # noqa: F841
                 return 1
+
             return c5()
+
         return b5
+
     with pytest.warns(MyiaDisconnectedCodeWarning):
         parse(a5)
 
@@ -211,16 +231,18 @@ def test_no_return__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): def f\(\):\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):     pass\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaSyntaxError: Function doesn't return a value"
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): def f\(\):\n"
+        + r"(.+?)  \^\^\^\^\^\^\^\^\n"
+        + r"(.+?):     pass\n"
+        + r"(.+?)  \^\^\^\^\^\^\^\^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaSyntaxError: Function doesn't return a value"
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
@@ -237,7 +259,9 @@ def test_no_return_while__format(capsys):
                 x = x + 1
             while y < 10:
                 y = y + 1
+
         return g()
+
     try:
         parse(f)
     except MyiaSyntaxError:
@@ -245,26 +269,28 @@ def test_no_return_while__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): def g\(\):\n" + \
-        r"     \^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):     y = 0\n" + \
-        r"     \^\^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):     x = 0\n" + \
-        r"     \^\^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):     while x < 10:\n" + \
-        r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):         x = x \+ 1\n" + \
-        r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):     while y < 10:\n" + \
-        r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n" + \
-        r"(.+?):         y = y \+ 1\n" + \
-        r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaSyntaxError: Function doesn't return a value in all cases"
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): def g\(\):\n"
+        + r"     \^\^\^\^\^\^\^\^\n"
+        + r"(.+?):     y = 0\n"
+        + r"     \^\^\^\^\^\^\^\^\^\n"
+        + r"(.+?):     x = 0\n"
+        + r"     \^\^\^\^\^\^\^\^\^\n"
+        + r"(.+?):     while x < 10:\n"
+        + r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n"
+        + r"(.+?):         x = x \+ 1\n"
+        + r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n"
+        + r"(.+?):     while y < 10:\n"
+        + r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n"
+        + r"(.+?):         y = y \+ 1\n"
+        + r"     \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaSyntaxError: Function doesn't return a value in all cases"
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
@@ -275,7 +301,9 @@ def test_no_return_while__format(capsys):
 def test_unsupported_AST__error__format(capsys):
     def a1():
         import builtins  # noqa: F401
+
         return 1
+
     try:
         parse(a1)
     except MyiaSyntaxError:
@@ -283,14 +311,16 @@ def test_unsupported_AST__error__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): import builtins  # noqa: F401\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaSyntaxError: Import not supported"
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): import builtins  # noqa: F401\n"
+        + r"(.+?)  \^\^\^\^\^\^\^\^\^\^\^\^\^\^\^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaSyntaxError: Import not supported"
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
@@ -303,6 +333,7 @@ def test_disconnected_from_output__warning__format(capsys):
     def a0():
         print(1)
         return 1
+
     with warnings.catch_warnings(record=True) as w:
         parse(a0)
 
@@ -312,17 +343,19 @@ def test_disconnected_from_output__warning__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): print\(1\)\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaDisconnectedCodeWarning: " + \
-        r"Expression was not assigned to a variable\.\n" + \
-        r"\tAs a result, it is not connected to the output " + \
-        r"and will not be executed\."
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): print\(1\)\n"
+        + r"(.+?)  \^\^\^\^\^\^\^\^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaDisconnectedCodeWarning: "
+        + r"Expression was not assigned to a variable\.\n"
+        + r"\tAs a result, it is not connected to the output "
+        + r"and will not be executed\."
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
@@ -336,6 +369,7 @@ def test_disconnected_from_output__warning__format(capsys):
             x = x + 1
         print(1)
         return 1
+
     with warnings.catch_warnings(record=True) as w:
         parse(a1)
 
@@ -345,17 +379,19 @@ def test_disconnected_from_output__warning__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): print\(1\)\n" + \
-        r"(.+?)  \^\^\^\^\^\^\^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaDisconnectedCodeWarning: " + \
-        r"Expression was not assigned to a variable\.\n" + \
-        r"\tAs a result, it is not connected to the output " + \
-        r"and will not be executed\."
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): print\(1\)\n"
+        + r"(.+?)  \^\^\^\^\^\^\^\^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaDisconnectedCodeWarning: "
+        + r"Expression was not assigned to a variable\.\n"
+        + r"\tAs a result, it is not connected to the output "
+        + r"and will not be executed\."
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
@@ -366,8 +402,10 @@ def test_disconnected_from_output__warning__format(capsys):
     def a2():
         def b2():
             return 1
+
         b2()
         return 1
+
     with warnings.catch_warnings(record=True) as w:
         parse(a2)
 
@@ -377,17 +415,19 @@ def test_disconnected_from_output__warning__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): b2\(\)\n" + \
-        r"(.+?)  \^\^\^\^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaDisconnectedCodeWarning: " + \
-        r"Expression was not assigned to a variable\.\n" + \
-        r"\tAs a result, it is not connected to the output " + \
-        r"and will not be executed\."
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): b2\(\)\n"
+        + r"(.+?)  \^\^\^\^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaDisconnectedCodeWarning: "
+        + r"Expression was not assigned to a variable\.\n"
+        + r"\tAs a result, it is not connected to the output "
+        + r"and will not be executed\."
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
@@ -398,6 +438,7 @@ def test_disconnected_from_output__warning__format(capsys):
     def a3():
         x = 1  # noqa: F841
         return 1
+
     with warnings.catch_warnings(record=True) as w:
         parse(a3)
 
@@ -407,15 +448,17 @@ def test_disconnected_from_output__warning__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): x = 1  # noqa: F841\n" + \
-        r"(.+?)     \^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaDisconnectedCodeWarning: x is not used " + \
-        r"and will therefore not be computed"
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): x = 1  # noqa: F841\n"
+        + r"(.+?)     \^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaDisconnectedCodeWarning: x is not used "
+        + r"and will therefore not be computed"
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)
@@ -428,8 +471,11 @@ def test_disconnected_from_output__warning__format(capsys):
             def c4():
                 x = 1  # noqa: F841
                 return 1
+
             return c4()
+
         return b4
+
     with warnings.catch_warnings(record=True) as w:
         parse(a4)
 
@@ -439,15 +485,17 @@ def test_disconnected_from_output__warning__format(capsys):
 
     out, err = capsys.readouterr()
 
-    reg_pattern = r"========================================" + \
-        r"========================================\n" + \
-        r"(.+?)/tests/test_parser\.py:(.+?)\n" + \
-        r"(.+?): x = 1  # noqa: F841\n" + \
-        r"(.+?)     \^\n" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + \
-        r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" + \
-        r"MyiaDisconnectedCodeWarning: x is not used " + \
-        r"and will therefore not be computed"
+    reg_pattern = (
+        r"========================================"
+        + r"========================================\n"
+        + r"(.+?)/tests/test_parser\.py:(.+?)\n"
+        + r"(.+?): x = 1  # noqa: F841\n"
+        + r"(.+?)     \^\n"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        + r"~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n"
+        + r"MyiaDisconnectedCodeWarning: x is not used "
+        + r"and will therefore not be computed"
+    )
 
     regex = re.compile(reg_pattern)
     match = re.match(regex, err)

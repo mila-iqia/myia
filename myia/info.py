@@ -33,7 +33,7 @@ class StackVar:
         return self.var.get()[0]
 
 
-_about = StackVar('_about')
+_about = StackVar("_about")
 
 
 def current_info():
@@ -89,7 +89,7 @@ class DebugInherit(DebugInfo):
         _about.pop()
 
 
-@serializable('DebugInfo')
+@serializable("DebugInfo")
 class NamedDebugInfo(DebugInfo):
     """Debug information for an object.
 
@@ -124,16 +124,15 @@ class NamedDebugInfo(DebugInfo):
             self.trace = traceback.extract_stack()[:-1]
 
     def _serialize(self):
-        return {'id': self.id,
-                'name': self.debug_name}
+        return {"id": self.id, "name": self.debug_name}
 
     @classmethod
     def _construct(cls):
         o = cls()
         data = yield o
         assert data is not None
-        o._id = data['id']
-        o.name = data['name']
+        o._id = data["id"]
+        o.name = data["name"]
 
     @property
     def obj(self):
@@ -153,10 +152,10 @@ class NamedDebugInfo(DebugInfo):
         """Return the name, create a fresh name if needed."""
         if self.name:
             return self.name
-        prefix = ''
+        prefix = ""
         if self.obj is not None:
             prefix = self.obj.__class__.__name__.lower()
-        self.name = f'_{prefix}{self.id}'
+        self.name = f"_{prefix}{self.id}"
         return self.name
 
     def find(self, prop, skip=set()):
@@ -191,9 +190,8 @@ class About:
 
     def __init__(self, debug: DebugInfo, relation: str, *args) -> None:
         """Initialize an About."""
-        if not isinstance(debug, DebugInfo):
-            raise TypeError('debug argument to About must be a DebugInfo.') \
-                # pragma: no cover
+        if not isinstance(debug, DebugInfo):  # pragma: no cover
+            raise TypeError("debug argument to About must be a DebugInfo.")
         self.debug = debug
         self.relation = relation
         self.args = args
@@ -210,9 +208,9 @@ class About:
 
 __consolidate__ = True
 __all__ = [
-    'About',
-    'DebugInfo',
-    'DebugInherit',
-    'NamedDebugInfo',
-    'current_info',
+    "About",
+    "DebugInfo",
+    "DebugInherit",
+    "NamedDebugInfo",
+    "current_info",
 ]

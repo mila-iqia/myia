@@ -40,15 +40,15 @@ def pyimpl_broadcast_shape(shpx, shpy):
             shp.append(a)
         else:
             raise ValueError(
-                f'Cannot broadcast shapes {orig_shpx} and {orig_shpy}.'
+                f"Cannot broadcast shapes {orig_shpx} and {orig_shpy}."
             )
     return tuple(shp)
 
 
 @standard_prim(P.broadcast_shape)
-async def infer_broadcast_shape(self, engine,
-                                xs: u64tup_typecheck,
-                                ys: u64tup_typecheck):
+async def infer_broadcast_shape(
+    self, engine, xs: u64tup_typecheck, ys: u64tup_typecheck
+):
     """Infer the return type of primitive `broadcast_shape`."""
     shp_x = tuple(x.xvalue() for x in xs.elements)
     shp_y = tuple(y.xvalue() for y in ys.elements)
@@ -58,10 +58,7 @@ async def infer_broadcast_shape(self, engine,
     except ValueError as e:
         raise MyiaShapeError(e.args[0])
     for n in res:
-        elems.append(AbstractScalar({
-            VALUE: n,
-            TYPE: xtype.UInt[64],
-        }))
+        elems.append(AbstractScalar({VALUE: n, TYPE: xtype.UInt[64]}))
     return AbstractTuple(elems)
 
 
@@ -72,18 +69,18 @@ def bprop_broadcast_shape(shp1, shp2, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'broadcast_shape',
-    'registered_name': 'broadcast_shape',
-    'mapping': P.broadcast_shape,
-    'python_implementation': pyimpl_broadcast_shape,
+    "name": "broadcast_shape",
+    "registered_name": "broadcast_shape",
+    "mapping": P.broadcast_shape,
+    "python_implementation": pyimpl_broadcast_shape,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'broadcast_shape',
-    'registered_name': 'broadcast_shape',
-    'type': 'backend',
-    'python_implementation': pyimpl_broadcast_shape,
-    'inferrer_constructor': infer_broadcast_shape,
-    'grad_transform': bprop_broadcast_shape,
+    "name": "broadcast_shape",
+    "registered_name": "broadcast_shape",
+    "type": "backend",
+    "python_implementation": pyimpl_broadcast_shape,
+    "inferrer_constructor": infer_broadcast_shape,
+    "grad_transform": bprop_broadcast_shape,
 }

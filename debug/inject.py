@@ -18,7 +18,7 @@ def ibuche(*args, **kwargs):
 
 
 def _lwlog(*objs):
-    if os.environ.get('BUCHE'):
+    if os.environ.get("BUCHE"):
         ibuche(*objs)
     else:
         print(*objs)
@@ -34,29 +34,31 @@ def bucheg(graph, **kwargs):
         if isinstance(node, ANFNode):
             return node.abstract
 
-    kw = dict(node_tooltip=ttip, function_in_node=True,
-              graph_width='95vw', graph_height='95vh')
+    kw = dict(
+        node_tooltip=ttip,
+        function_in_node=True,
+        graph_width="95vw",
+        graph_height="95vh",
+    )
     kw.update(kwargs)
     buche(graph, **kw)
 
 
 def buchegx(graph, **kwargs):
-    return bucheg(graph,
-                  function_in_node=False,
-                  graph_beautify=False, **kwargs)
+    return bucheg(graph, function_in_node=False, graph_beautify=False, **kwargs)
 
 
 suite = {
-    'buche': buche,
-    'bucheg': bucheg,
-    'buchegx': buchegx,
-    'ibuche': ibuche,
-    'Subgraph': gprint.Subgraph,
-    'logword': breakword.log,
-    'getword': breakword.word,
-    'afterword': breakword.after,
-    'breakword': breakword.logbrk,
-    'bw': breakword,
+    "buche": buche,
+    "bucheg": bucheg,
+    "buchegx": buchegx,
+    "ibuche": ibuche,
+    "Subgraph": gprint.Subgraph,
+    "logword": breakword.log,
+    "getword": breakword.word,
+    "afterword": breakword.after,
+    "breakword": breakword.logbrk,
+    "bw": breakword,
 }
 
 

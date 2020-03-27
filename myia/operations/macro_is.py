@@ -23,14 +23,14 @@ async def is_(info, a, b):
         return Constant(False)
     else:
         raise MyiaTypeError(
-            f'The operator "is" is only implemented for booleans ' +
-            f'and singletons such as None or NotImplemented.'
+            f'The operator "is" is only implemented for booleans '
+            + f"and singletons such as None or NotImplemented."
         )
 
 
 __operation_defaults__ = {
-    'name': 'is',
-    'registered_name': 'is_',
-    'mapping': is_,
-    'python_implementation': operator.is_,
+    "name": "is",
+    "registered_name": "is_",
+    "mapping": is_,
+    "python_implementation": operator.is_,
 }

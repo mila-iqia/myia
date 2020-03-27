@@ -11,7 +11,6 @@ import numpy
 from numpy.random import RandomState
 
 from myia import ArithmeticData, myia, value_and_grad
-# The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 
 ###########
@@ -19,8 +18,8 @@ from myia.debug import traceback  # noqa
 ###########
 
 
-dtype = 'float32'
-device_type = 'cpu'
+dtype = "float32"
+device_type = "cpu"
 # device_type = 'cuda'  # Uncomment to run on the gpu
 
 
@@ -38,17 +37,22 @@ def param(R, *size):
     return numpy.array(R.rand(*size) * 2 - 1, dtype=dtype)
 
 
-def generate_data(n, batch_size, input_size, target_size, sequence_size,
-                  *, seed=91):
+def generate_data(
+    n, batch_size, input_size, target_size, sequence_size, *, seed=91
+):
     """Generate inputs and targets.
 
     Generates n batches of samples of size input_size, matched with
     a single target.
     """
     R = RandomState(seed=seed)
-    return [([param(R, batch_size, input_size) for i in range(sequence_size)],
-             param(R, batch_size, target_size))
-            for i in range(n)]
+    return [
+        (
+            [param(R, batch_size, input_size) for i in range(sequence_size)],
+            param(R, batch_size, target_size),
+        )
+        for i in range(n)
+    ]
 
 
 def rnn_parameters(*layer_sizes, batch_size, seed=123123):
@@ -82,8 +86,8 @@ def rnn_parameters(*layer_sizes, batch_size, seed=123123):
 class Linear(ArithmeticData):
     """Linear layer."""
 
-    W: 'Weights array'
-    b: 'Biases vector'
+    W: "Weights array"
+    b: "Biases vector"
 
     def apply(self, input):
         """Apply the layer."""
@@ -103,10 +107,10 @@ class Tanh(ArithmeticData):
 class RNNLayer(ArithmeticData):
     """RNN layer."""
 
-    W: 'Input to state weights'
-    R: 'State transition weights'
-    b: 'Biases vector'
-    h0: 'Initial state'
+    W: "Input to state weights"
+    R: "State transition weights"
+    b: "Biases vector"
+    h0: "Initial state"
 
     def step(self, x, h_tm1):
         """Run one RNN step."""
@@ -125,7 +129,7 @@ class RNNLayer(ArithmeticData):
 class Sequential(ArithmeticData):
     """Sequential layer, applies all sub-layers in order."""
 
-    layers: 'Tuple of layers'
+    layers: "Tuple of layers"
 
     def apply(self, x):
         """Apply the layer."""
@@ -142,13 +146,13 @@ def cost(model, x, target):
 
 
 # @myia(backend_options={'target': device_type})
-@myia(backend='pytorch', backend_options={'device': device_type})
+@myia(backend="pytorch", backend_options={"device": device_type})
 def step(model, lr, x, y):
     """Returns the loss and parameter gradients."""
     # value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
     # The 'model' argument can be omitted: by default the derivative wrt
     # the first argument is returned.
-    _cost, dmodel = value_and_grad(cost, 'model')(model, x, y)
+    _cost, dmodel = value_and_grad(cost, "model")(model, x, y)
     return _cost, model - (lr * dmodel)
 
 
@@ -183,7 +187,7 @@ def run_helper(epochs, n, batch_size, layer_sizes):
             costs.append(cost)
         c = sum(costs) / n
         t = time.time() - t0
-        print(f'Cost: {c:15.10f}\tTime: {t:15.10f}')
+        print(f"Cost: {c:15.10f}\tTime: {t:15.10f}")
 
 
 def test_run():
@@ -201,5 +205,5 @@ def run():
     run_helper(100, 10, 5, (10, 7, 1))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()

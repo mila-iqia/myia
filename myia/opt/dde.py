@@ -8,7 +8,7 @@ from ..ir import Constant, Graph
 from ..operations import Primitive, primitives as P
 from ..utils import Named, Partializable, Registry, newenv, tracer
 
-WILDCARD = Named('WILDCARD')
+WILDCARD = Named("WILDCARD")
 MAX_NEED_DEPTH = 5
 
 
@@ -124,6 +124,7 @@ class ValuePropagator:
         be monotonic and for the sets of values/needs to be finite for it to
         terminate.
         """
+
         def _dofn(fn, inp):
             if isinstance(fn, Primitive):
                 for need in self.need[node]:
@@ -323,13 +324,13 @@ def _vprop_partial(vprop, need, inputs, out):
 
 @regvprop(P.return_, P.identity)
 def _vprop_return(vprop, need, inputs, out):
-    arg, = inputs
+    (arg,) = inputs
     vprop.passthrough(arg, out, need)
 
 
 @regvprop(P.raise_)
 def _vprop_raise_(vprop, need, inputs, out):
-    arg, = inputs
+    (arg,) = inputs
     vprop.add_need(arg, ANYTHING)
 
 
@@ -453,7 +454,7 @@ class DeadDataElimination(Partializable):
     def __init__(self, resources=None):
         """Initialize a DeadDataElimination."""
         self.resources = resources
-        self.name = 'dde'
+        self.name = "dde"
 
     def make_dead(self, node):
         """Create a dead version of the node."""
@@ -470,13 +471,8 @@ class DeadDataElimination(Partializable):
 
     def __call__(self, root):
         """Apply dead data elimination."""
-        args = dict(
-            opt=self,
-            node=None,
-            manager=root.manager,
-            profile=False,
-        )
-        with tracer('opt', **args) as tr:
+        args = dict(opt=self, node=None, manager=root.manager, profile=False)
+        with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
             root.manager.keep_roots(root)
             vprop = ValuePropagator(self.resources, root)
@@ -497,7 +493,4 @@ class DeadDataElimination(Partializable):
             return False  # Pretend there are no changes, for now
 
 
-__all__ = [
-    'ValuePropagator',
-    'DeadDataElimination',
-]
+__all__ = ["ValuePropagator", "DeadDataElimination"]

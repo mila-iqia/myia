@@ -8,8 +8,8 @@ from .utils import OperationDefinition
 
 def _operation(name, fn, pyop):
     regname = name
-    if regname in ['and', 'or']:
-        regname += '_'
+    if regname in ["and", "or"]:
+        regname += "_"
     return OperationDefinition(
         name=name,
         registered_name=regname,
@@ -20,7 +20,7 @@ def _operation(name, fn, pyop):
 
 def dunder_protocol_unary(name, pyop=None):
     """Define a function that calls a certain method (unary)."""
-    attr = f'__{name}__'
+    attr = f"__{name}__"
 
     @core(name=name)
     def protocol(data):
@@ -31,7 +31,7 @@ def dunder_protocol_unary(name, pyop=None):
 
 def dunder_protocol_binary_simple(name, pyop=None):
     """Define a function that calls a certain method (binary)."""
-    attr = f'__{name}__'
+    attr = f"__{name}__"
 
     @core(name=name)
     def protocol(data, x):
@@ -43,7 +43,7 @@ def dunder_protocol_binary_simple(name, pyop=None):
 @core(static_inline=True)
 def exc_fallback(x, y):
     """Fallback for most dunder operations."""
-    raise Exception('Not implemented')
+    raise Exception("Not implemented")
 
 
 @core(static_inline=True)
@@ -58,8 +58,9 @@ def is_not_fallback(x, y):
     return x is not y
 
 
-def dunder_protocol_binary(name, lattr, rattr,
-                           fallback=exc_fallback, pyop=None):
+def dunder_protocol_binary(
+    name, lattr, rattr, fallback=exc_fallback, pyop=None
+):
     """Define a function that calls a certain method (binary).
 
     This typically works as follows:
@@ -70,7 +71,8 @@ def dunder_protocol_binary(name, lattr, rattr,
     * If neither method exists, or they return NotImplemented, try the
       fallback (usually raise an exception).
     """
-    @core(name=name, static_inline='inner')
+
+    @core(name=name, static_inline="inner")
     def protocol(x, y):
         rval = NotImplemented
         if hasattr(x, lattr):
@@ -86,94 +88,87 @@ def dunder_protocol_binary(name, lattr, rattr,
 
 
 add = dunder_protocol_binary(
-    name='add', lattr='__add__', rattr='__radd__',
-    pyop=operator.add
+    name="add", lattr="__add__", rattr="__radd__", pyop=operator.add
 )
 sub = dunder_protocol_binary(
-    name='sub', lattr='__sub__', rattr='__rsub__',
-    pyop=operator.sub
+    name="sub", lattr="__sub__", rattr="__rsub__", pyop=operator.sub
 )
 mul = dunder_protocol_binary(
-    name='mul', lattr='__mul__', rattr='__rmul__',
-    pyop=operator.mul
+    name="mul", lattr="__mul__", rattr="__rmul__", pyop=operator.mul
 )
 mod = dunder_protocol_binary(
-    name='mod', lattr='__mod__', rattr='__rmod__',
-    pyop=operator.mod
+    name="mod", lattr="__mod__", rattr="__rmod__", pyop=operator.mod
 )
 pow = dunder_protocol_binary(
-    name='pow', lattr='__pow__', rattr='__rpow__',
-    pyop=operator.pow
+    name="pow", lattr="__pow__", rattr="__rpow__", pyop=operator.pow
 )
 truediv = dunder_protocol_binary(
-    name='truediv', lattr='__truediv__', rattr='__rtruediv__',
-    pyop=operator.truediv
+    name="truediv",
+    lattr="__truediv__",
+    rattr="__rtruediv__",
+    pyop=operator.truediv,
 )
 floordiv = dunder_protocol_binary(
-    name='floordiv', lattr='__floordiv__', rattr='__rfloordiv__',
-    pyop=operator.floordiv
+    name="floordiv",
+    lattr="__floordiv__",
+    rattr="__rfloordiv__",
+    pyop=operator.floordiv,
 )
 matmul = dunder_protocol_binary(
-    name='matmul', lattr='__matmul__', rattr='__rmatmul__',
-    pyop=operator.matmul
+    name="matmul", lattr="__matmul__", rattr="__rmatmul__", pyop=operator.matmul
 )
-pos = dunder_protocol_unary('pos')
-neg = dunder_protocol_unary('neg')
-floor = dunder_protocol_unary('floor')
-trunc = dunder_protocol_unary('trunc')
-invert = dunder_protocol_unary('invert')
+pos = dunder_protocol_unary("pos")
+neg = dunder_protocol_unary("neg")
+floor = dunder_protocol_unary("floor")
+trunc = dunder_protocol_unary("trunc")
+invert = dunder_protocol_unary("invert")
 
-bool = dunder_protocol_unary('bool')
+bool = dunder_protocol_unary("bool")
 eq = dunder_protocol_binary(
-    name='eq', lattr='__eq__', rattr='__eq__',
+    name="eq",
+    lattr="__eq__",
+    rattr="__eq__",
     pyop=operator.eq,
-    fallback=is_fallback
+    fallback=is_fallback,
 )
 lt = dunder_protocol_binary(
-    name='lt', lattr='__lt__', rattr='__gt__',
-    pyop=operator.lt
+    name="lt", lattr="__lt__", rattr="__gt__", pyop=operator.lt
 )
 gt = dunder_protocol_binary(
-    name='gt', lattr='__gt__', rattr='__lt__',
-    pyop=operator.gt
+    name="gt", lattr="__gt__", rattr="__lt__", pyop=operator.gt
 )
 ne = dunder_protocol_binary(
-    name='ne', lattr='__ne__', rattr='__ne__',
+    name="ne",
+    lattr="__ne__",
+    rattr="__ne__",
     pyop=operator.ne,
-    fallback=is_not_fallback
+    fallback=is_not_fallback,
 )
 le = dunder_protocol_binary(
-    name='le', lattr='__le__', rattr='__ge__',
-    pyop=operator.le
+    name="le", lattr="__le__", rattr="__ge__", pyop=operator.le
 )
 ge = dunder_protocol_binary(
-    name='ge', lattr='__ge__', rattr='__le__',
-    pyop=operator.ge
+    name="ge", lattr="__ge__", rattr="__le__", pyop=operator.ge
 )
 and_ = dunder_protocol_binary(
-    name='and', lattr='__and__', rattr='__rand__',
-    pyop=operator.and_
+    name="and", lattr="__and__", rattr="__rand__", pyop=operator.and_
 )
 lshift = dunder_protocol_binary(
-    name='lshift', lattr='__lshift__', rattr='__rlshift__',
-    pyop=operator.lshift
+    name="lshift", lattr="__lshift__", rattr="__rlshift__", pyop=operator.lshift
 )
 rshift = dunder_protocol_binary(
-    name='rshift', lattr='__rshift__', rattr='__rrshift__',
-    pyop=operator.rshift
+    name="rshift", lattr="__rshift__", rattr="__rrshift__", pyop=operator.rshift
 )
 or_ = dunder_protocol_binary(
-    name='or', lattr='__or__', rattr='__ror__',
-    pyop=operator.or_
+    name="or", lattr="__or__", rattr="__ror__", pyop=operator.or_
 )
 xor = dunder_protocol_binary(
-    name='xor', lattr='__xor__', rattr='__rxor__',
-    pyop=operator.xor
+    name="xor", lattr="__xor__", rattr="__rxor__", pyop=operator.xor
 )
 
-getitem = dunder_protocol_binary_simple('getitem')
-len = dunder_protocol_unary('len')
-myia_iter = dunder_protocol_unary('myia_iter')
-myia_next = dunder_protocol_unary('myia_next')
-myia_hasnext = dunder_protocol_unary('myia_hasnext')
-myia_to_array = dunder_protocol_binary_simple('myia_to_array')
+getitem = dunder_protocol_binary_simple("getitem")
+len = dunder_protocol_unary("len")
+myia_iter = dunder_protocol_unary("myia_iter")
+myia_next = dunder_protocol_unary("myia_next")
+myia_hasnext = dunder_protocol_unary("myia_hasnext")
+myia_to_array = dunder_protocol_binary_simple("myia_to_array")

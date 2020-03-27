@@ -17,9 +17,7 @@ def pyimpl_scalar_gt(x: Number, y: Number) -> Bool:
 
 
 infer_scalar_gt = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_gt,
-    impl=pyimpl_scalar_gt,
-    infer_value=True
+    prim=P.scalar_gt, impl=pyimpl_scalar_gt, infer_value=True
 )
 
 
@@ -30,18 +28,18 @@ def bprop_scalar_gt(x, y, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_gt',
-    'registered_name': 'scalar_gt',
-    'mapping': P.scalar_gt,
-    'python_implementation': pyimpl_scalar_gt,
+    "name": "scalar_gt",
+    "registered_name": "scalar_gt",
+    "mapping": P.scalar_gt,
+    "python_implementation": pyimpl_scalar_gt,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_gt',
-    'registered_name': 'scalar_gt',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_gt,
-    'inferrer_constructor': infer_scalar_gt,
-    'grad_transform': bprop_scalar_gt,
+    "name": "scalar_gt",
+    "registered_name": "scalar_gt",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_gt,
+    "inferrer_constructor": infer_scalar_gt,
+    "grad_transform": bprop_scalar_gt,
 }

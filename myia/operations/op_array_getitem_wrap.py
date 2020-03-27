@@ -21,10 +21,10 @@ def _build_slices(a_shp, item):
         if adx < len(item):
             i = item[adx]
             if isinstance(i, (slice, Slice)):
-                begin = begin + (0 if i.start is None
-                                 else _dim_explicit(i.start, a),)
-                end = end + (a if i.stop is None
-                             else _dim_explicit(i.stop, a),)
+                begin = begin + (
+                    0 if i.start is None else _dim_explicit(i.start, a),
+                )
+                end = end + (a if i.stop is None else _dim_explicit(i.stop, a),)
                 stride = stride + (1 if i.step is None else i.step,)
                 remove_dims = remove_dims + (False,)
             else:
@@ -57,8 +57,8 @@ def array_getitem_wrap(array, item):
 
 
 __operation_defaults__ = {
-    'name': 'array_getitem_wrap',
-    'registered_name': 'array_getitem_wrap',
-    'mapping': array_getitem_wrap,
-    'python_implementation': None,
+    "name": "array_getitem_wrap",
+    "registered_name": "array_getitem_wrap",
+    "mapping": array_getitem_wrap,
+    "python_implementation": None,
 }

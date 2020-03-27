@@ -1,11 +1,9 @@
-
 import pytest
 
 from myia.utils import Override, Partial, Reset, merge
 
 
 def test_Partial():
-
     def f(x, y):
         return x + y
 
@@ -15,7 +13,7 @@ def test_Partial():
     assert p1(y=3) == 13
     assert p2(x=3) == 23
     assert merge(p1, p2)() == 30
-    assert merge(p1, {'y': 20})() == 30
+    assert merge(p1, {"y": 20})() == 30
 
     with pytest.raises(TypeError):
         Partial(f, z=10)
@@ -53,7 +51,6 @@ def test_Partial():
 
 
 def test_Partial_class():
-
     class C:
         def __init__(self, x, y):
             self.x = x

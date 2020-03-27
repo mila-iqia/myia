@@ -27,19 +27,20 @@ def pyimpl_array_reduce(fn, array, shp):
     ufn = np.frompyfunc(fn, 2, 1)
     delta = len(array.shape) - len(shp)
     if delta < 0:
-        raise ValueError('Shape to reduce to cannot be larger than original')
+        raise ValueError("Shape to reduce to cannot be larger than original")
 
     def is_reduction(ishp, tshp):
         if tshp == 1 and ishp > 1:
             return True
         elif tshp != ishp:
-            raise ValueError('Dimension mismatch for reduce')
+            raise ValueError("Dimension mismatch for reduce")
         else:
             return False
 
-    reduction = [(delta + idx if is_reduction(ishp, tshp) else None, True)
-                 for idx, (ishp, tshp)
-                 in enumerate(zip(array.shape[delta:], shp))]
+    reduction = [
+        (delta + idx if is_reduction(ishp, tshp) else None, True)
+        for idx, (ishp, tshp) in enumerate(zip(array.shape[delta:], shp))
+    ]
 
     reduction = [(i, False) for i in range(delta)] + reduction
 
@@ -58,31 +59,33 @@ def pyimpl_array_reduce(fn, array, shp):
 
 def debugvm_array_reduce(vm, fn, array, shp):
     """Implement `array_reduce` for the debug VM."""
+
     def fn_(a, b):
         return vm.call(fn, [a, b])
+
     return pyimpl_array_reduce(fn_, array, shp)
 
 
 @standard_prim(P.array_reduce)
-async def infer_array_reduce(self, engine,
-                             fn: AbstractFunction,
-                             a: AbstractArray,
-                             shp: u64tup_typecheck):
+async def infer_array_reduce(
+    self, engine, fn: AbstractFunction, a: AbstractArray, shp: u64tup_typecheck
+):
     """Infer the return type of primitive `array_reduce`."""
     shp_i = await force_pending(a.xshape())
     shp_v = build_value(shp, default=ANYTHING)
     if shp_v == ANYTHING:
         raise AssertionError(
-            'We currently require knowing the shape for reduce.'
+            "We currently require knowing the shape for reduce."
         )
         # return (ANYTHING,) * (len(shp_i) - 1)
     else:
         delta = len(shp_i) - len(shp_v)
-        if delta < 0 \
-                or any(1 != s1 != ANYTHING and 1 != s2 != ANYTHING and s1 != s2
-                       for s1, s2 in zip(shp_i[delta:], shp_v)):
+        if delta < 0 or any(
+            1 != s1 != ANYTHING and 1 != s2 != ANYTHING and s1 != s2
+            for s1, s2 in zip(shp_i[delta:], shp_v)
+        ):
             raise MyiaShapeError(
-                f'Incompatible dims for reduce: {shp_i}, {shp_v}'
+                f"Incompatible dims for reduce: {shp_i}, {shp_v}"
             )
 
     res = await engine.execute(fn, a.element, a.element)
@@ -91,9 +94,7 @@ async def infer_array_reduce(self, engine,
 
 def bprop_sum(fn, xs, shp, out, dout):  # pragma: no cover
     """Backpropagator for sum(xs) = array_reduce(scalar_add, xs, shp)."""
-    return (newenv,
-            distribute(dout, shape(xs)),
-            zeros_like(shp))
+    return (newenv, distribute(dout, shape(xs)), zeros_like(shp))
 
 
 class ArrayReduceGradient(MetaGraph):
@@ -113,19 +114,19 @@ class ArrayReduceGradient(MetaGraph):
 
 
 __operation_defaults__ = {
-    'name': 'array_reduce',
-    'registered_name': 'array_reduce',
-    'mapping': P.array_reduce,
-    'python_implementation': pyimpl_array_reduce,
+    "name": "array_reduce",
+    "registered_name": "array_reduce",
+    "mapping": P.array_reduce,
+    "python_implementation": pyimpl_array_reduce,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'array_reduce',
-    'registered_name': 'array_reduce',
-    'type': 'backend',
-    'python_implementation': pyimpl_array_reduce,
-    'debugvm_implementation': debugvm_array_reduce,
-    'inferrer_constructor': infer_array_reduce,
-    'grad_transform': ArrayReduceGradient(name='array_reduce_gradient'),
+    "name": "array_reduce",
+    "registered_name": "array_reduce",
+    "type": "backend",
+    "python_implementation": pyimpl_array_reduce,
+    "debugvm_implementation": debugvm_array_reduce,
+    "inferrer_constructor": infer_array_reduce,
+    "grad_transform": ArrayReduceGradient(name="array_reduce_gradient"),
 }

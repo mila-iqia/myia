@@ -4,7 +4,7 @@ import warnings
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-infer_trace = ContextVar('infer_trace', default={})
+infer_trace = ContextVar("infer_trace", default={})
 
 
 class InferenceError(Exception):
@@ -61,6 +61,7 @@ class MyiaNameError(InferenceError):
 def type_error_nargs(ident, expected, got):
     """Return a MyiaTypeError for number of arguments mismatch."""
     from ..debug.label import label
+
     return MyiaTypeError(
         f"Wrong number of arguments for '{label(ident)}':"
         f" expected {expected}, got {got}."
@@ -80,7 +81,7 @@ class TypeMismatchError(MyiaTypeError):
 
     def __init__(self, expected, got):
         """Initialize a TypeMismatchError."""
-        message = f'Expected {expected}, but got {got}'
+        message = f"Expected {expected}, but got {got}"
         super().__init__(message)
         self.expected = expected
         self.got = got
@@ -106,17 +107,17 @@ def untested_legacy():
 
 __consolidate__ = True
 __all__ = [
-    'InferenceError',
-    'InternalInferenceError',
-    'MyiaAttributeError',
-    'MyiaConversionError',
-    'MyiaInputTypeError',
-    'MyiaNameError',
-    'MyiaShapeError',
-    'MyiaTypeError',
-    'MyiaValueError',
-    'TypeMismatchError',
-    'check_nargs',
-    'infer_trace',
-    'type_error_nargs',
+    "InferenceError",
+    "InternalInferenceError",
+    "MyiaAttributeError",
+    "MyiaConversionError",
+    "MyiaInputTypeError",
+    "MyiaNameError",
+    "MyiaShapeError",
+    "MyiaTypeError",
+    "MyiaValueError",
+    "TypeMismatchError",
+    "check_nargs",
+    "infer_trace",
+    "type_error_nargs",
 ]

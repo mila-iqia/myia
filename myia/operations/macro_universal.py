@@ -7,7 +7,7 @@ from ..lib import Constant, MetaGraph, macro, overload
 @overload
 def is_universal(g: lib.GraphFunction):
     """Check whether a function is universal or not."""
-    return g.graph.has_flags('universal')
+    return g.graph.has_flags("universal")
 
 
 @overload  # noqa: F811
@@ -23,7 +23,7 @@ class StatePassthrough(MetaGraph):
 
     def __init__(self, op):
         """Initialize a StatePassthrough."""
-        super().__init__(f'U.{op}')
+        super().__init__(f"U.{op}")
         self.op = op
 
     def expand(self, g, parameters):
@@ -36,7 +36,7 @@ class StatePassthrough(MetaGraph):
         """Inline the Graph/MetaGraph if it has the appropriate flag."""
         return engine.ref(
             self.expand(outref.node.graph, [arg.node for arg in argrefs]),
-            outref.context
+            outref.context,
         )
 
 
@@ -54,13 +54,13 @@ async def universal(info, fn):
     else:
         raise NotImplementedError(
             'Macro "universal" does not currently work on non-constant'
-            ' functions.'
+            " functions."
         )
 
 
 __operation_defaults__ = {
-    'name': 'universal',
-    'registered_name': 'universal',
-    'mapping': universal,
-    'python_implementation': None,
+    "name": "universal",
+    "registered_name": "universal",
+    "mapping": universal,
+    "python_implementation": None,
 }

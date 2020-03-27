@@ -16,18 +16,18 @@ async def infer_return_(self, engine, x):
 
 
 __operation_defaults__ = {
-    'name': 'return',
-    'registered_name': 'return_',
-    'mapping': P.return_,
-    'python_implementation': pyimpl_return,
+    "name": "return",
+    "registered_name": "return_",
+    "mapping": P.return_,
+    "python_implementation": pyimpl_return,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'return',
-    'registered_name': 'return_',
-    'type': 'backend',
-    'python_implementation': pyimpl_return,
-    'inferrer_constructor': infer_return_,
-    'grad_transform': None,
+    "name": "return",
+    "registered_name": "return_",
+    "type": "backend",
+    "python_implementation": pyimpl_return,
+    "inferrer_constructor": infer_return_,
+    "grad_transform": None,
 }

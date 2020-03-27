@@ -1,4 +1,3 @@
-
 from myia.lib import InferenceError
 from myia.operations import hastype
 from myia.pipeline import standard_debug_pipeline
@@ -8,7 +7,7 @@ from ..multitest import mt, run_debug
 from ..test_grad import gradient
 from ..test_infer import infer_scalar, infer_standard
 
-_msg = 'There is no condition in which the program succeeds'
+_msg = "There is no condition in which the program succeeds"
 
 
 @mt(
@@ -27,16 +26,14 @@ def test_assert(x):
     infer_scalar(-1, result=InferenceError(_msg)),
 )
 def test_assert_msg(x):
-    assert x >= 0, 'x must be positive'
+    assert x >= 0, "x must be positive"
     return x ** 0.5
 
 
 @mt(
     infer_scalar(i32, result=i32),
-
-    run_debug(4.5, result=4.5**0.5),
+    run_debug(4.5, result=4.5 ** 0.5),
     run_debug(-5, result=Exception),
-
     gradient(4.5, pipeline=standard_debug_pipeline.configure(validate=False)),
 )
 def test_raise(x):
@@ -64,7 +61,7 @@ def test_raise_multiple(x):
 @mt(
     infer_standard(i32, result=InferenceError(_msg)),
     infer_standard(f64, result=f64),
-    infer_standard(U(i32, i64), result=i64)
+    infer_standard(U(i32, i64), result=i64),
 )
 def test_raise_hastype(x):
     if hastype(x, i32):
@@ -91,4 +88,5 @@ def test_raise_rec(x):
             raise Exception("too big")
         else:
             return x * f(x - 1)
+
     return f(x)

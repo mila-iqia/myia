@@ -9,7 +9,7 @@ class Primitive(HasDefaults):
 
     def __init__(self, name, defaults={}):
         """Initialize a Primitive."""
-        super().__init__(name, defaults, '__primitive_defaults__')
+        super().__init__(name, defaults, "__primitive_defaults__")
 
     def __str__(self):
         return self.name
@@ -31,7 +31,7 @@ class BackendPrimitive(Primitive):
     def __init__(self, name, defaults={}):
         """Initialize a BackendPrimitive and register it for serialization."""
         super().__init__(name, defaults)
-        register_serialize(self, f'prim-{name}')
+        register_serialize(self, f"prim-{name}")
 
 
 class Operation(HasDefaults):
@@ -39,21 +39,21 @@ class Operation(HasDefaults):
 
     def __init__(self, name, defaults={}):
         """Initialize an Operation."""
-        super().__init__(name, defaults, '__operation_defaults__')
+        super().__init__(name, defaults, "__operation_defaults__")
 
     def __call__(self, *args, **kwargs):
         """Call an Operation."""
         dflt = self.defaults()
-        impl = dflt.get('python_implementation', None)
+        impl = dflt.get("python_implementation", None)
         if impl is None:
             raise RuntimeError(
-                f'Myia-only operation {self.name} cannot be called directly.'
+                f"Myia-only operation {self.name} cannot be called directly."
             )
         else:
             return impl(*args, **kwargs)
 
     def __str__(self):
-        return f'myia.operations.{self.name}'
+        return f"myia.operations.{self.name}"
 
     __repr__ = __str__
 
@@ -63,12 +63,12 @@ class OperationDefinition(dict):
 
     def __init__(self, **kwargs):
         """Initialize an OperationDefinition."""
-        assert 'name' in kwargs
+        assert "name" in kwargs
         super().__init__(**kwargs)
 
     def __to_myia__(self):
         """Return the mapping."""
-        return self['mapping']
+        return self["mapping"]
 
     def __call__(self, *args, **kwargs):
         """Raise an error when calling the OperationDefinition."""
@@ -81,8 +81,5 @@ def to_opdef(fn):
     """Create an operation definition from a function."""
     name = fn.__name__
     return OperationDefinition(
-        name=name,
-        registered_name=name,
-        mapping=fn,
-        python_implementation=None,
+        name=name, registered_name=name, mapping=fn, python_implementation=None
     )

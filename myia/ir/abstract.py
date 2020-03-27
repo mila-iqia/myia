@@ -17,12 +17,10 @@ class Node(ABC):
 
     @property
     @abstractmethod
-    def incoming(self) -> Iterable['Node']:
+    def incoming(self) -> Iterable["Node"]:
         """Return nodes used as inputs."""
         pass
 
 
 __consolidate__ = True
-__all__ = [
-    'Node',
-]
+__all__ = ["Node"]

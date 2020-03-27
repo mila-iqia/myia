@@ -19,18 +19,13 @@ def pyimpl_hastag(x, tag):
 
 
 @standard_prim(P.hastag)
-async def infer_hastag(self, engine,
-                       x: lib.AbstractTaggedUnion, tag: xtype.Int[64]):
+async def infer_hastag(
+    self, engine, x: lib.AbstractTaggedUnion, tag: xtype.Int[64]
+):
     """Infer the return type of primitive `hastag`."""
     opts = await lib.force_pending(x.options)
-    self.require_constant(
-        tag, argnum=2,
-        range={i for i, _ in opts}
-    )
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: xtype.Bool,
-    })
+    self.require_constant(tag, argnum=2, range={i for i, _ in opts})
+    return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Bool})
 
 
 @bprop_to_grad_transform(P.hastag)
@@ -40,18 +35,18 @@ def bprop_hastag(x, t, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'hastag',
-    'registered_name': 'hastag',
-    'mapping': P.hastag,
-    'python_implementation': pyimpl_hastag,
+    "name": "hastag",
+    "registered_name": "hastag",
+    "mapping": P.hastag,
+    "python_implementation": pyimpl_hastag,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'hastag',
-    'registered_name': 'hastag',
-    'type': 'backend',
-    'python_implementation': pyimpl_hastag,
-    'inferrer_constructor': infer_hastag,
-    'grad_transform': bprop_hastag,
+    "name": "hastag",
+    "registered_name": "hastag",
+    "type": "backend",
+    "python_implementation": pyimpl_hastag,
+    "inferrer_constructor": infer_hastag,
+    "grad_transform": bprop_hastag,
 }

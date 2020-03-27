@@ -91,8 +91,9 @@ def conv1d_weight(input, weight_size, grad_output, stride, padding, dilation,
 #'''
 
 
-def conv2d_weight(input, weight_size, grad_output, stride, padding, dilation,
-                  groups):
+def conv2d_weight(
+    input, weight_size, grad_output, stride, padding, dilation, groups
+):
     r"""Computes gradient of conv2d with respect to the weight.
 
     Args:
@@ -121,32 +122,62 @@ def conv2d_weight(input, weight_size, grad_output, stride, padding, dilation,
     out_channels = grad_output.shape[1]
     min_batch = input.shape[0]
 
-    grad_output = grad_output.contiguous().repeat(1, in_channels // groups, 1,
-                                                  1)
+    grad_output = grad_output.contiguous().repeat(
+        1, in_channels // groups, 1, 1
+    )
     grad_output = grad_output.contiguous().view(
-        grad_output.shape[0] * grad_output.shape[1], 1, grad_output.shape[2],
-        grad_output.shape[3])
+        grad_output.shape[0] * grad_output.shape[1],
+        1,
+        grad_output.shape[2],
+        grad_output.shape[3],
+    )
 
-    input = input.contiguous().view(1, input.shape[0] * input.shape[1],
-                                    input.shape[2], input.shape[3])
+    input = input.contiguous().view(
+        1, input.shape[0] * input.shape[1], input.shape[2], input.shape[3]
+    )
 
-    grad_weight = torch.conv2d(input, grad_output, None, dilation, padding,
-                               stride, in_channels * min_batch)
+    grad_weight = torch.conv2d(
+        input,
+        grad_output,
+        None,
+        dilation,
+        padding,
+        stride,
+        in_channels * min_batch,
+    )
 
     grad_weight = grad_weight.contiguous().view(
-        min_batch, grad_weight.shape[1] // min_batch, grad_weight.shape[2],
-        grad_weight.shape[3])
+        min_batch,
+        grad_weight.shape[1] // min_batch,
+        grad_weight.shape[2],
+        grad_weight.shape[3],
+    )
 
     if groups > 1:
-        return grad_weight.sum(dim=0).view(
-            out_channels, in_channels // groups,
-            grad_weight.shape[2], grad_weight.shape[3]).narrow(
-                2, 0, weight_size[2]).narrow(3, 0, weight_size[3])
+        return (
+            grad_weight.sum(dim=0)
+            .view(
+                out_channels,
+                in_channels // groups,
+                grad_weight.shape[2],
+                grad_weight.shape[3],
+            )
+            .narrow(2, 0, weight_size[2])
+            .narrow(3, 0, weight_size[3])
+        )
     else:
-        return grad_weight.sum(dim=0).view(
-            in_channels // groups, out_channels, grad_weight.shape[2],
-            grad_weight.shape[3]).transpose(0, 1).narrow(
-                2, 0, weight_size[2]).narrow(3, 0, weight_size[3])
+        return (
+            grad_weight.sum(dim=0)
+            .view(
+                in_channels // groups,
+                out_channels,
+                grad_weight.shape[2],
+                grad_weight.shape[3],
+            )
+            .transpose(0, 1)
+            .narrow(2, 0, weight_size[2])
+            .narrow(3, 0, weight_size[3])
+        )
 
 
 # TODO: add conv3d
@@ -251,6 +282,4 @@ def conv3d_weight(input, weight_size, grad_output, stride, padding, dilation,
 #'''
 
 
-__all__ = [
-    'conv2d_weight',
-]
+__all__ = ["conv2d_weight"]

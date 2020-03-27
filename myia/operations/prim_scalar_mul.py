@@ -16,9 +16,7 @@ def pyimpl_scalar_mul(x: Number, y: Number) -> Number:
 
 
 infer_scalar_mul = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_mul,
-    impl=pyimpl_scalar_mul,
-    infer_value=False
+    prim=P.scalar_mul, impl=pyimpl_scalar_mul, infer_value=False
 )
 
 
@@ -29,18 +27,18 @@ def bprop_scalar_mul(x, y, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'scalar_mul',
-    'registered_name': 'scalar_mul',
-    'mapping': P.scalar_mul,
-    'python_implementation': pyimpl_scalar_mul,
+    "name": "scalar_mul",
+    "registered_name": "scalar_mul",
+    "mapping": P.scalar_mul,
+    "python_implementation": pyimpl_scalar_mul,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_mul',
-    'registered_name': 'scalar_mul',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_mul,
-    'inferrer_constructor': infer_scalar_mul,
-    'grad_transform': bprop_scalar_mul,
+    "name": "scalar_mul",
+    "registered_name": "scalar_mul",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_mul,
+    "inferrer_constructor": infer_scalar_mul,
+    "grad_transform": bprop_scalar_mul,
 }

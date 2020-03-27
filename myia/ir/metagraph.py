@@ -10,7 +10,7 @@ class TypeDispatchError(MyiaTypeError):
 
     def __init__(self, metagraph, types, refs=[]):
         """Initialize a TypeDispatchError."""
-        message = f'`{metagraph}` is not defined for argument types {types}'
+        message = f"`{metagraph}` is not defined for argument types {types}"
         super().__init__(message, refs=refs)
         self.metagraph = metagraph
         self.types = types
@@ -50,7 +50,7 @@ class MetaGraph:
 
     def generate_graph(self, args):
         """Generate a Graph for the given abstract arguments."""
-        raise NotImplementedError('Override generate_graph in subclass.')
+        raise NotImplementedError("Override generate_graph in subclass.")
 
     async def reroute(self, engine, outref, argrefs):
         """By default, MetaGraphs do not reroute."""
@@ -74,10 +74,12 @@ class MultitypeGraph(MetaGraph):
 
     def register(self, *types):
         """Register a function for the given type signature."""
+
         def deco(fn):
             atypes = tuple(abstract.type_to_abstract(t) for t in types)
             self.entries.append((atypes, fn))
             return fn
+
         return deco
 
     def _getfn(self, types):
@@ -99,8 +101,4 @@ class MultitypeGraph(MetaGraph):
 
 
 __consolidate__ = True
-__all__ = [
-    'MetaGraph',
-    'MultitypeGraph',
-    'TypeDispatchError',
-]
+__all__ = ["MetaGraph", "MultitypeGraph", "TypeDispatchError"]

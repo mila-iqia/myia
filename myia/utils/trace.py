@@ -17,20 +17,21 @@ def glob_to_regex(glob):
     * `*` matches any character sequence except /
     * If glob does not start with /, `/**/` is prepended
     """
+
     def replacer(m):
-        if m.group() == '/**/':
-            return r'(/.*/|/)'
+        if m.group() == "/**/":
+            return r"(/.*/|/)"
         else:
-            return r'[^/]*'
+            return r"[^/]*"
 
-    if glob.startswith('**'):
-        glob = f'/{glob}'
-    elif not glob.startswith('/'):
-        glob = f'/**/{glob}'
-    if glob.endswith('**'):
-        glob += '/*'
+    if glob.startswith("**"):
+        glob = f"/{glob}"
+    elif not glob.startswith("/"):
+        glob = f"/**/{glob}"
+    if glob.endswith("**"):
+        glob += "/*"
 
-    patt = r'/\*\*/|\*'
+    patt = r"/\*\*/|\*"
     glob = re.sub(patt, replacer, glob)
     return re.compile(glob)
 
@@ -41,18 +42,15 @@ class Tracer:
     def __init__(self):
         """Initialize the Tracer."""
         self.stack = []
-        self.curpath = ''
+        self.curpath = ""
         self.listeners = []
 
     def emit(self, name, **kwargs):
         """Emit an event."""
-        curpath = self.curpath + f'/{name}'
+        curpath = self.curpath + f"/{name}"
         for path, fn in self.listeners:
             if path.fullmatch(curpath):
-                fn(**kwargs,
-                   _event=name,
-                   _stack=self.stack,
-                   _curpath=curpath)
+                fn(**kwargs, _event=name, _stack=self.stack, _curpath=curpath)
 
     def on(self, pattern, fn):
         """Register a function to trigger on a certain pattern.
@@ -85,10 +83,10 @@ class Tracer:
         return TracerContextManager(self, name, args, kwargs)
 
     def __getattr__(self, attr):
-        if attr.startswith('emit_'):
+        if attr.startswith("emit_"):
             attr = attr[5:]
             return lambda **kwargs: self.emit(attr, **kwargs)
-        elif attr.startswith('on_'):
+        elif attr.startswith("on_"):
             attr = attr[3:]
             return lambda fn: self.on(attr, fn)
         else:  # pragma: no cover
@@ -112,22 +110,22 @@ class TracerContextManager:
 
     def __enter__(self):
         self.tr.stack.append(self)
-        self.tr.curpath += f'/{self.name}'
-        self.tr.emit('enter', _context=self, **self.kwargs)
+        self.tr.curpath += f"/{self.name}"
+        self.tr.emit("enter", _context=self, **self.kwargs)
         return self
 
     def __exit__(self, *_):
-        self.tr.emit('exit', _context=self, **self.results)
+        self.tr.emit("exit", _context=self, **self.results)
         self.tr.stack.pop()
-        self.tr.curpath = ''.join(f'/{x.name}' for x in self.tr.stack)
+        self.tr.curpath = "".join(f"/{x.name}" for x in self.tr.stack)
 
     def __str__(self):
-        return f'<TracerContextManager {self.name}>'
+        return f"<TracerContextManager {self.name}>"
 
     __repr__ = __str__
 
 
-_tracer = ContextVar('tracer', default=Tracer())
+_tracer = ContextVar("tracer", default=Tracer())
 
 
 def tracer(name=None, **kwargs):
@@ -162,9 +160,9 @@ class TraceListener:
     def install(self, tracer):
         """Install the listeners on the tracer."""
         for method_name in dir(self):
-            if method_name.startswith('on_'):
+            if method_name.startswith("on_"):
                 ev = method_name[3:]
-                patt = f'{self.focus}/{ev}' if self.focus else ev
+                patt = f"{self.focus}/{ev}" if self.focus else ev
                 tracer.on(patt, getattr(self, method_name))
 
     def post(self):
@@ -192,13 +190,13 @@ class TraceExplorer(TraceListener):
 
     def install(self, tracer):
         """Install the TraceExplorer."""
-        patt = self.focus or '**'
+        patt = self.focus or "**"
         tracer.on(patt, self._log_keys)
 
     def _log_keys(self, _curpath=None, **kwargs):
         d = self.paths[_curpath]
         for k, v in kwargs.items():
-            if not k.startswith('_'):
+            if not k.startswith("_"):
                 d[k].add(type(v))
 
     def post(self):
@@ -207,7 +205,7 @@ class TraceExplorer(TraceListener):
             print(path)
             for key in sorted(keys):
                 typenames = {v.__qualname__ for v in keys[key]}
-                print('    ', key, '::', ' | '.join(typenames))
+                print("    ", key, "::", " | ".join(typenames))
 
 
 class DoTrace(TraceListener):
@@ -286,7 +284,7 @@ class ProfileResults(dict):
         ind = " " * indent
 
         if self.name is not None and self.total is not None:
-            print(f'{ind}{self.name:30}{_unit(self.total)}')
+            print(f"{ind}{self.name:30}{_unit(self.total)}")
             indent += 3
             ind = " " * indent
 
@@ -314,7 +312,7 @@ class Profiler(TraceListener):
             return
         d = self.hierarchical
         for part in _stack[:-1]:
-            if not part.kwargs.get('profile', True):
+            if not part.kwargs.get("profile", True):
                 return
             d = d[part.name]
         lpart = _stack[-1]
@@ -332,7 +330,7 @@ class Profiler(TraceListener):
         end = perf_counter()
         d = self.hierarchical
         for part in _stack:
-            if not part.kwargs.get('profile', True):
+            if not part.kwargs.get("profile", True):
                 return
             d = d[part.name]
         d.end = end
@@ -348,29 +346,32 @@ class Profiler(TraceListener):
     def post(self):
         """Print the results."""
         if self.print_results:
-            print('====================')
-            print('Hierarchical profile')
-            print('====================')
+            print("====================")
+            print("Hierarchical profile")
+            print("====================")
             self.hierarchical.print()
             print()
-            print('==========')
-            print('Summations')
-            print('==========')
+            print("==========")
+            print("Summations")
+            print("==========")
             if self.overhead:
                 print(f'{"[overhead]":20}{_unit(self.overhead)}')
             for k, v in self.aggregate.items():
                 if len(v) > 1:
                     tot = sum(x.total for x in v)
-                    print(f'{k:20}{_unit(tot)}')
+                    print(f"{k:20}{_unit(tot)}")
 
 
 def listener(*patterns):
     """Create a listener for one or more patterns on a tracer."""
+
     def deco(fn):
         @wraps(fn)
         def new_fn(**kwargs):
             return DoTrace({pattern: fn for pattern in patterns}, **kwargs)
+
         return new_fn
+
     return deco
 
 
@@ -388,35 +389,36 @@ def resolve_tracers(spec):
     The function is not called immediately, the consumer must call function on
     args when needed.
     """
+
     def _resolve_single(call):
-        if '(' in call:
-            path, args = call.split('(', 1)
-            assert args.endswith(')')
-            args = eval(f'({args[:-1]},)')
-        elif ':' in call:
-            path, *args = call.split(':')
+        if "(" in call:
+            path, args = call.split("(", 1)
+            assert args.endswith(")")
+            args = eval(f"({args[:-1]},)")
+        elif ":" in call:
+            path, *args = call.split(":")
         else:
             path = call
             args = ()
-        modname, field = path.rsplit('.', 1)
+        modname, field = path.rsplit(".", 1)
         mod = __import__(modname, fromlist=[field])
         fn = getattr(mod, field)
         return fn, args
 
-    return [_resolve_single(call.strip()) for call in spec.split(';')]
+    return [_resolve_single(call.strip()) for call in spec.split(";")]
 
 
 __consolidate__ = True
 __all__ = [
-    'DoTrace',
-    'MultiTrace',
-    'ProfileResults',
-    'Profiler',
-    'TraceExplorer',
-    'TraceListener',
-    'Tracer',
-    'TracerContextManager',
-    'listener',
-    'resolve_tracers',
-    'tracer',
+    "DoTrace",
+    "MultiTrace",
+    "ProfileResults",
+    "Profiler",
+    "TraceExplorer",
+    "TraceListener",
+    "Tracer",
+    "TracerContextManager",
+    "listener",
+    "resolve_tracers",
+    "tracer",
 ]

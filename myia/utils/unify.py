@@ -6,9 +6,9 @@ from typing import Any, Callable, Dict, Iterable, List, Set, TypeVar, Union
 
 from . import overload
 
-T = TypeVar('T')
+T = TypeVar("T")
 
-EquivT = Dict['Var', Any]
+EquivT = Dict["Var", Any]
 FnFiltT = Callable[[Any], bool]
 FilterT = Union[Iterable, FnFiltT]
 
@@ -57,7 +57,7 @@ class Var:
 
     def ensure_tag(self) -> None:
         """Make sure that tag is set."""
-        if not hasattr(self, 'tag'):
+        if not hasattr(self, "tag"):
             self.tag = _get_next_tag()
 
     def __str__(self) -> str:
@@ -79,7 +79,7 @@ class Seq(tuple):
 class SVar(Var):
     """Variable to represent a variable length of values."""
 
-    __slots__ = ('subtype',)
+    __slots__ = ("subtype",)
 
     def __init__(self, subtype: Var = None) -> None:
         """Create an SVar."""
@@ -108,7 +108,7 @@ class SVar(Var):
 class UnionVar(Var):
     """Variable for a possible set of values."""
 
-    __slots__ = ('values',)
+    __slots__ = ("values",)
 
     def __init__(self, values: Iterable) -> None:
         """Create a UnionVar."""
@@ -126,7 +126,7 @@ class UnionVar(Var):
 class RestrictedVar(Var):
     """Variable restricted to a set of values."""
 
-    __slots__ = ('legal_values',)
+    __slots__ = ("legal_values",)
 
     def __init__(self, legal_values: Iterable) -> None:
         """Create a RestrictedVar."""
@@ -182,8 +182,7 @@ class PredicateSet:
                 self.predicates.add(p)
 
     def __eq__(self, v):
-        return isinstance(v, PredicateSet) \
-            and self.predicates == v.predicates
+        return isinstance(v, PredicateSet) and self.predicates == v.predicates
 
     def __call__(self, x):
         """Returns the conjunction of all predicates."""
@@ -191,11 +190,12 @@ class PredicateSet:
 
     def __str__(self):
         def _str(x):
-            if hasattr(x, '__name__'):
+            if hasattr(x, "__name__"):
                 return x.__name__
             else:
                 return str(x)  # pragma: no cover
-        return '&'.join(map(_str, self.predicates))
+
+        return "&".join(map(_str, self.predicates))
 
 
 class FilterVar(Var):
@@ -268,7 +268,7 @@ def expandlist(lst: Iterable[T]) -> List[T]:
     off = 0
     for i, e in enumerate(list(lst)):
         if isinstance(e, Seq):
-            lst[off + i:off + i + 1] = e
+            lst[off + i : off + i + 1] = e
             off += len(e) - 1
     return lst
 
@@ -294,7 +294,7 @@ def default_visit(value: dict, fn):
 
 @overload  # noqa: F811
 def default_visit(value: object, fn):
-    visit = getattr(value, '__visit__', None)
+    visit = getattr(value, "__visit__", None)
     if visit is None:
         raise VisitError
     return visit(fn)
@@ -347,8 +347,9 @@ class Unification:
             if isinstance(v, SVar):
                 copy_map[v] = SVar()
             elif isinstance(v, UnionVar):
-                copy_map[v] = UnionVar(self._clone(v, copy_map)
-                                       for v in v.values)
+                copy_map[v] = UnionVar(
+                    self._clone(v, copy_map) for v in v.values
+                )
             elif isinstance(v, FilterVar):
                 copy_map[v] = FilterVar(v.filter)
             elif isinstance(v, RestrictedVar):
@@ -413,8 +414,9 @@ class Unification:
             common_diffs = map(lambda x: x - common_ground, comm_keys)
             common_diff = reduce(lambda x, v: x & v, common_diffs)
             if len(common_diff) != 1:
-                raise UnificationError("More than one match difference "
-                                       "for UnionVar")
+                raise UnificationError(
+                    "More than one match difference " "for UnionVar"
+                )
             diff = common_diff.pop()
             assert not isinstance(diff, UnionVar)
 
@@ -423,7 +425,7 @@ class Unification:
             return equiv
 
     def _getvar(self, v):
-        return getattr(v, '__var__', v)
+        return getattr(v, "__var__", v)
 
     def unify_raw(self, w, v, equiv: EquivT) -> EquivT:
         """'raw' interface for unification.
@@ -497,11 +499,14 @@ class Unification:
             values_v = list(v)
             values_w = list(w)
         else:
+
             def appender(l):
                 def fn(u):
                     l.append(self._getvar(u))
                     return u
+
                 return fn
+
             try:
                 values_v = []
                 self.visit(appender(values_v), v)
@@ -536,15 +541,15 @@ class Unification:
         if sv != -1 and len(values_w) >= len(values_v) - 1:
             wb = values_w[:sv]
             diff = len(values_w) - len(values_v) + 1
-            wm = Seq(values_w[sv:sv + diff])
-            we = values_w[sv + diff:]
+            wm = Seq(values_w[sv : sv + diff])
+            we = values_w[sv + diff :]
             values_w = wb + [wm] + we
 
         if sw != -1 and len(values_v) >= len(values_w) - 1:
             vb = values_v[:sw]
             diff = len(values_v) - len(values_w) + 1
-            vm = Seq(values_v[sw:sw + diff])
-            ve = values_v[sw + diff:]
+            vm = Seq(values_v[sw : sw + diff])
+            ve = values_v[sw + diff :]
             values_v = vb + [vm] + ve
 
         if len(values_w) != len(values_v):
@@ -618,20 +623,20 @@ class Unification:
 
 __consolidate__ = True
 __all__ = [
-    'FilterVar',
-    'PredicateSet',
-    'RestrictedVar',
-    'SVar',
-    'Seq',
-    'Unification',
-    'UnificationError',
-    'UnionVar',
-    'Var',
-    'VisitError',
-    'default_visit',
-    'expandlist',
-    'noseq',
-    'svar',
-    'uvar',
-    'var',
+    "FilterVar",
+    "PredicateSet",
+    "RestrictedVar",
+    "SVar",
+    "Seq",
+    "Unification",
+    "UnificationError",
+    "UnionVar",
+    "Var",
+    "VisitError",
+    "default_visit",
+    "expandlist",
+    "noseq",
+    "svar",
+    "uvar",
+    "var",
 ]

@@ -20,7 +20,7 @@ from tvm import relay
 
 # Philox constants for 32-bits generation.
 
-PHILOX_M2x32_0 = np.uint64(0xd256d193)
+PHILOX_M2x32_0 = np.uint64(0xD256D193)
 PHILOX_W32_0 = np.uint32(0x9E3779B9)
 PHILOX2x32_DEFAULT_ROUNDS = 10
 
@@ -33,12 +33,12 @@ R123_0x1p_31f = F1 / (F1024 * F1024 * F1024 * F2)
 R123_0x1p_24f = F128 * R123_0x1p_31f
 
 # Relay constants.
-RELAY_UINT32_8 = relay.const(8, 'uint32')
-RELAY_UINT64_32 = relay.const(32, 'uint64')
-RELAY_UINT64_CLEAR_HIGH = relay.const(0x00000000ffffffff, 'uint64')
-RELAY_PHILOX_M2x32_0 = relay.const(PHILOX_M2x32_0, 'uint64')
-RELAY_PHILOX_W32_0 = relay.const(PHILOX_W32_0, 'uint32')
-RELAY_R123_0x1p_24f = relay.const(R123_0x1p_24f, 'float32')
+RELAY_UINT32_8 = relay.const(8, "uint32")
+RELAY_UINT64_32 = relay.const(32, "uint64")
+RELAY_UINT64_CLEAR_HIGH = relay.const(0x00000000FFFFFFFF, "uint64")
+RELAY_PHILOX_M2x32_0 = relay.const(PHILOX_M2x32_0, "uint64")
+RELAY_PHILOX_W32_0 = relay.const(PHILOX_W32_0, "uint32")
+RELAY_R123_0x1p_24f = relay.const(R123_0x1p_24f, "float32")
 
 
 def generate_function(impl, inputs):
@@ -56,7 +56,7 @@ def generate_function(impl, inputs):
 class Philox2x32:
     """Implementation of Philox2x32 RNG."""
 
-    __slots__ = ('output_size', 'n', 'philox_2x_round')
+    __slots__ = ("output_size", "n", "philox_2x_round")
 
     @staticmethod
     def get_counter_size(output_size):
@@ -83,21 +83,22 @@ class Philox2x32:
         counter must be a relay expression
         (e.g. a relay constant or variable).
         """
-        c = relay.cast(counter, 'uint64')
-        b = relay.op.transform.full(c, (self.n,), 'uint64')
+        c = relay.cast(counter, "uint64")
+        b = relay.op.transform.full(c, (self.n,), "uint64")
         d = relay.left_shift(b, RELAY_UINT64_32)
-        e = relay.arange(relay.const(self.n, 'uint64'), dtype='uint64')
+        e = relay.arange(relay.const(self.n, "uint64"), dtype="uint64")
         return relay.bitwise_or(d, e)
 
     def __init__(self, output_size: int):
         """Initialize Philox2x32 RNG for given output size."""
         self.output_size = output_size
         self.n = self.get_counter_size(output_size)
-        ctr_type = relay.ty.TensorType((self.n,), 'uint64')
-        local_ctr = relay.var('ctr', type_annotation=ctr_type)
-        local_key = relay.var('key', dtype='uint32', shape=())
+        ctr_type = relay.ty.TensorType((self.n,), "uint64")
+        local_ctr = relay.var("ctr", type_annotation=ctr_type)
+        local_key = relay.var("key", dtype="uint32", shape=())
         self.philox_2x_round = generate_function(
-            self.__impl_philox_2x_round, [local_ctr, local_key])
+            self.__impl_philox_2x_round, [local_ctr, local_key]
+        )
 
     def __impl_philox_2x_round(self, ctr, key):
         """Compute a round in Philox2x32.
@@ -112,7 +113,7 @@ class Philox2x32:
         # mul_hi_lo
         product = relay.multiply(RELAY_PHILOX_M2x32_0, ctr_0)
 
-        key_64 = relay.cast(key, 'uint64')
+        key_64 = relay.cast(key, "uint64")
         ctr_1_xor_key = relay.bitwise_xor(ctr_1, key_64)
         ctr_1_xor_key_up = relay.left_shift(ctr_1_xor_key, RELAY_UINT64_32)
         return relay.bitwise_xor(product, ctr_1_xor_key_up)
@@ -128,8 +129,8 @@ class Philox2x32:
         """
         hi = relay.right_shift(ctr, RELAY_UINT64_32)
         lo = relay.bitwise_and(ctr, RELAY_UINT64_CLEAR_HIGH)
-        hi_32 = relay.cast(hi, 'uint32')
-        lo_32 = relay.cast(lo, 'uint32')
+        hi_32 = relay.cast(hi, "uint32")
+        lo_32 = relay.cast(lo, "uint32")
         vector_hi_32 = relay.reshape(hi_32, (self.n, 1))
         vector_lo_32 = relay.reshape(lo_32, (self.n, 1))
         tensor = relay.concatenate([vector_hi_32, vector_lo_32], 1)
@@ -166,5 +167,6 @@ class Philox2x32:
         output = self.__uint64_to_2xuint32_vector(output_64)
         if self.output_size % 2 == 1:
             output = relay.op.transform.strided_slice(
-                output, [0], [2 * self.n - 1])
+                output, [0], [2 * self.n - 1]
+            )
         return output

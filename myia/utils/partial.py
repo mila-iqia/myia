@@ -48,7 +48,7 @@ class Partial:
     def _validate(self):
         """Check that all the argument names are valid."""
         if isinstance(self.func, type):
-            f = getattr(self.func, '__init__', self.func)
+            f = getattr(self.func, "__init__", self.func)
         else:
             f = self.func
         _, invalid = partition_keywords(f, self.keywords)
@@ -71,18 +71,17 @@ class Partial:
 
         assert isinstance(partial, Partial)
 
-        if partial.func is self.func \
-                or mode == 'override' or mode == 'reset':
+        if partial.func is self.func or mode == "override" or mode == "reset":
             func = partial.func
         else:
-            raise ValueError('Incompatible func')
+            raise ValueError("Incompatible func")
 
         kwargs = merge(self.keywords, partial.keywords, mode)
 
         return Partial(func, **kwargs)
 
     def __repr__(self):
-        args = [f'{k}={v}' for k, v in self.keywords.items()]
+        args = [f"{k}={v}" for k, v in self.keywords.items()]
         return f'{self.func.__name__}({", ".join(args)})'
 
 
@@ -100,8 +99,4 @@ class Partializable:
 
 
 __consolidate__ = True
-__all__ = [
-    'Partial',
-    'Partializable',
-    'partition_keywords',
-]
+__all__ = ["Partial", "Partializable", "partition_keywords"]

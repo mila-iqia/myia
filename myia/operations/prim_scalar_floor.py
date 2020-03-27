@@ -14,25 +14,23 @@ def pyimpl_scalar_floor(x: Number) -> Number:
 
 
 infer_scalar_floor = UniformPrimitiveInferrer.partial(
-    prim=P.scalar_floor,
-    impl=pyimpl_scalar_floor,
-    infer_value=False
+    prim=P.scalar_floor, impl=pyimpl_scalar_floor, infer_value=False
 )
 
 
 __operation_defaults__ = {
-    'name': 'scalar_floor',
-    'registered_name': 'scalar_floor',
-    'mapping': P.scalar_floor,
-    'python_implementation': pyimpl_scalar_floor,
+    "name": "scalar_floor",
+    "registered_name": "scalar_floor",
+    "mapping": P.scalar_floor,
+    "python_implementation": pyimpl_scalar_floor,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'scalar_floor',
-    'registered_name': 'scalar_floor',
-    'type': 'backend',
-    'python_implementation': pyimpl_scalar_floor,
-    'inferrer_constructor': infer_scalar_floor,
-    'grad_transform': None,
+    "name": "scalar_floor",
+    "registered_name": "scalar_floor",
+    "type": "backend",
+    "python_implementation": pyimpl_scalar_floor,
+    "inferrer_constructor": infer_scalar_floor,
+    "grad_transform": None,
 }

@@ -1,4 +1,3 @@
-
 from myia.lib import InferenceError
 from myia.operations import dtype, scalar_cast
 
@@ -14,10 +13,6 @@ def test_dtype(arr):
     return dtype(arr)
 
 
-@mt(
-    infer(af32_of(4, 5), i64, result=f32),
-
-    run(MA(2, 3), 7, result=7.0),
-)
+@mt(infer(af32_of(4, 5), i64, result=f32), run(MA(2, 3), 7, result=7.0))
 def test_cast_to_dtype(arr, x):
     return scalar_cast(x, dtype(arr))

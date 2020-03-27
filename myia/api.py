@@ -35,27 +35,38 @@ class MyiaFunction:
 
     """
 
-    def __init__(self, fn, specialize_values=[], return_backend=False,
-                 backend=None, backend_options=None, alias_tracker=None,
-                 use_universe=False, tracer=ABSENT):
+    def __init__(
+        self,
+        fn,
+        specialize_values=[],
+        return_backend=False,
+        backend=None,
+        backend_options=None,
+        alias_tracker=None,
+        use_universe=False,
+        tracer=ABSENT,
+    ):
         """Initialize a MyiaFunction."""
         # Change this once relay becomes the default backend.
-        if use_universe and backend != 'relay':
+        if use_universe and backend != "relay":
             raise RuntimeError(  # pragma: no cover
-                "Universe is only supported for the relay backend.")
+                "Universe is only supported for the relay backend."
+            )
         self.fn = fn
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
-        self.pip = standard_pipeline.configure({
-            'resources.universal': use_universe,
-            'resources.backend.name': backend,
-            'resources.backend.options': backend_options,
-            'resources.return_backend': return_backend,
-        })
+        self.pip = standard_pipeline.configure(
+            {
+                "resources.universal": use_universe,
+                "resources.backend.name": backend,
+                "resources.backend.options": backend_options,
+                "resources.return_backend": return_backend,
+            }
+        )
         self._cache = {}
         self.latest = None
         if tracer is ABSENT:
-            mt = os.environ.get('MYIATRACER')
+            mt = os.environ.get("MYIATRACER")
             if mt:
                 pairs = resolve_tracers(mt)
                 tracers = [fn(*args) for fn, args in pairs]
@@ -75,7 +86,7 @@ class MyiaFunction:
         n2 = len(args)
         if n1 != n2:
             raise MyiaTypeError(
-                f'Wrong number of arguments: expected {n1}, got {n2}'
+                f"Wrong number of arguments: expected {n1}, got {n2}"
             )
 
         alias_map, aid_to_paths = find_aliases(args, self.alias_tracker)
@@ -83,7 +94,8 @@ class MyiaFunction:
             from_value(
                 arg,
                 broaden=name not in self.specialize_values,
-                alias_map=alias_map)
+                alias_map=alias_map,
+            )
             for arg, name in zip(args, argnames)
         )
 
@@ -101,7 +113,7 @@ class MyiaFunction:
 
     def compile(self, args):
         """Returns a function specialized for the given args."""
-        self.latest = self.specialize(args)['output']
+        self.latest = self.specialize(args)["output"]
         return self.latest
 
     def __call__(self, *args):
@@ -115,14 +127,28 @@ class MyiaFunction:
 
     def to_device(self, v, *, broaden=True, vm_t=None, orig_t=None):
         """Move value to the function's accelerator hardware."""
-        backr = self.pip.steps['resources'].keywords['backend'].keywords
-        return to_device(v, backr['name'], backr['options'],
-                         broaden=broaden, vm_t=vm_t, orig_t=orig_t)
+        backr = self.pip.steps["resources"].keywords["backend"].keywords
+        return to_device(
+            v,
+            backr["name"],
+            backr["options"],
+            broaden=broaden,
+            vm_t=vm_t,
+            orig_t=orig_t,
+        )
 
 
 @keyword_decorator
-def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
-         return_backend=False, alias_tracker=None, use_universe=False):
+def myia(
+    fn,
+    *,
+    specialize_values=[],
+    backend=None,
+    backend_options=None,
+    return_backend=False,
+    alias_tracker=None,
+    use_universe=False,
+):
     """Create a function using Myia's runtime.
 
     `@myia` can be used as a simple decorator. If custom options are needed,
@@ -148,19 +174,31 @@ def myia(fn, *, specialize_values=[], backend=None, backend_options=None,
         use_universe: Enable use of sequential code (experimental)
 
     """
-    return MyiaFunction(fn, specialize_values, backend=backend,
-                        backend_options=backend_options,
-                        return_backend=return_backend,
-                        alias_tracker=alias_tracker,
-                        use_universe=use_universe)
+    return MyiaFunction(
+        fn,
+        specialize_values,
+        backend=backend,
+        backend_options=backend_options,
+        return_backend=return_backend,
+        alias_tracker=alias_tracker,
+        use_universe=use_universe,
+    )
 
 
 #############################################
 # Move value to target accelerator hardware #
 #############################################
 
-def to_device(value, backend, backend_options=None, *, broaden=True,
-              orig_t=None, vm_t=None):
+
+def to_device(
+    value,
+    backend,
+    backend_options=None,
+    *,
+    broaden=True,
+    orig_t=None,
+    vm_t=None,
+):
     """Move value to target accelerator hardware (using selected backend)."""
     if not isinstance(backend, Backend):
         backend = load_backend(backend, backend_options)
@@ -173,8 +211,4 @@ def to_device(value, backend, backend_options=None, *, broaden=True,
     return BackendValue(value, orig_t, vm_t, backend)
 
 
-__all__ = [
-    'MyiaFunction',
-    'myia',
-    'to_device',
-]
+__all__ = ["MyiaFunction", "myia", "to_device"]

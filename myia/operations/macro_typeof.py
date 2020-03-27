@@ -10,8 +10,8 @@ async def typeof(info, data):
 
 
 __operation_defaults__ = {
-    'name': 'typeof',
-    'registered_name': 'typeof',
-    'mapping': typeof,
-    'python_implementation': None,
+    "name": "typeof",
+    "registered_name": "typeof",
+    "mapping": typeof,
+    "python_implementation": None,
 }

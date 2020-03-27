@@ -54,6 +54,7 @@ def build_value(a, default=ABSENT):
             If not provided, a ValueError will be raised in those cases.
 
     """
+
     def return_default(err):
         if default is ABSENT:
             raise err
@@ -113,11 +114,10 @@ class CheckState:
     prop: str
 
 
-@overload.wrapper(
-    initial_state=lambda: CheckState({}, None)
-)
+@overload.wrapper(initial_state=lambda: CheckState({}, None))
 def abstract_check(__call__, self, x, *args):
     """Check that a predicate applies to a given object."""
+
     def proceed():
         if prop:
             if hasattr(x, prop):
@@ -239,15 +239,16 @@ def _make_constructor(inst):
     def f(*args, **kwargs):
         inst.__init__(*args, **kwargs)
         return inst
+
     return f
 
 
 @overload.wrapper(
-    initial_state=lambda: CloneState({}, None, None),
-    postprocess=intern,
+    initial_state=lambda: CloneState({}, None, None), postprocess=intern
 )
 def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
+
     def proceed():
         if isinstance(x, (AbstractValue, VirtualFunction)) and x in cache:
             return cache[x]
@@ -269,7 +270,7 @@ def abstract_clone(__call__, self, x, *args):
             return e.value
         else:
             raise AssertionError(
-                'Generators in abstract_clone must yield once, then return.'
+                "Generators in abstract_clone must yield once, then return."
             )
 
     cache = self.state.cache
@@ -312,15 +313,15 @@ def abstract_clone(self, x: AbstractTuple, *args):
     if x.elements is ANYTHING:
         return (yield AbstractTuple)(ANYTHING)
     return (yield AbstractTuple)(
-        [self(y, *args) for y in x.elements],
-        self(x.values, *args)
+        [self(y, *args) for y in x.elements], self(x.values, *args)
     )
 
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractDict, *args):
-    return (yield AbstractDict)(dict((k, self(v, *args))
-                                     for k, v in x.entries.items()))
+    return (yield AbstractDict)(
+        dict((k, self(v, *args)) for k, v in x.entries.items())
+    )
 
 
 @overload  # noqa: F811
@@ -334,7 +335,7 @@ def abstract_clone(self, x: AbstractClassBase, *args):
         x.tag,
         {k: self(v, *args) for k, v in x.attributes.items()},
         values=self(x.values, *args),
-        constructor=x.constructor
+        constructor=x.constructor,
     )
 
 
@@ -350,10 +351,7 @@ def abstract_clone(self, x: AbstractTaggedUnion, *args):
 
 @overload  # noqa: F811
 def abstract_clone(self, x: AbstractKeywordArgument, *args):
-    return (yield AbstractKeywordArgument)(
-        x.key,
-        self(x.argument, *args)
-    )
+    return (yield AbstractKeywordArgument)(x.key, self(x.argument, *args))
 
 
 @overload  # noqa: F811
@@ -369,8 +367,7 @@ def abstract_clone(self, x: TaggedPossibilities, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: PartialApplication, *args):
     return PartialApplication(
-        self(x.fn, *args),
-        [self(arg, *args) for arg in x.args]
+        self(x.fn, *args), [self(arg, *args) for arg in x.args]
     )
 
 
@@ -382,8 +379,7 @@ def abstract_clone(self, x: JTransformedFunction, *args):
 @overload  # noqa: F811
 def abstract_clone(self, x: VirtualFunction, *args):
     return (yield VirtualFunction)(
-        [self(arg, *args) for arg in x.args],
-        self(x.output, *args)
+        [self(arg, *args) for arg in x.args], self(x.output, *args)
     )
 
 
@@ -406,14 +402,14 @@ def abstract_clone(self, x: object, *args):
 
 
 @abstract_clone.variant(
-    initial_state=lambda: CloneState({}, '_concrete', abstract_check)
+    initial_state=lambda: CloneState({}, "_concrete", abstract_check)
 )
 def concretize_abstract(self, x: Pending):
     """Clone an abstract value while resolving all Pending (synchronous)."""
     if x.done():
         return self(x.result())
     else:
-        raise AssertionError('Unresolved Pending', x)
+        raise AssertionError("Unresolved Pending", x)
 
 
 ###############
@@ -422,7 +418,7 @@ def concretize_abstract(self, x: Pending):
 
 
 @abstract_check.variant(
-    initial_state=lambda: CheckState(cache={}, prop='_broad')
+    initial_state=lambda: CheckState(cache={}, prop="_broad")
 )
 def is_broad(self, x: object, *args):
     """Check whether the object is broad or not."""
@@ -440,7 +436,7 @@ def is_broad(self, x: (AbstractScalar, AbstractFunction), *args):
 
 
 @abstract_clone.variant(
-    initial_state=lambda: CloneState({}, '_broad', is_broad)
+    initial_state=lambda: CloneState({}, "_broad", is_broad)
 )
 def broaden(self, d: TrackDict, *args):  # noqa: D417
     """Broaden an abstract value.
@@ -466,10 +462,7 @@ def sensitivity_transform(self, x: AbstractFunction):
     * The sensitivity of a function is an Env
     * The sensitivity of J(x) is x
     """
-    return AbstractScalar({
-        VALUE: ANYTHING,
-        TYPE: xtype.EnvType,
-    })
+    return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.EnvType})
 
 
 @overload  # noqa: F811
@@ -486,10 +479,7 @@ async def _force_through_post(x):
     return intern(await x)
 
 
-@overload.wrapper(
-    initial_state=lambda: {},
-    postprocess=_force_through_post,
-)
+@overload.wrapper(initial_state=lambda: {}, postprocess=_force_through_post)
 async def force_through(__call__, self, x, through):
     """Clone an abstract value (asynchronous)."""
     if not isinstance(x, through) and not isinstance(x, Pending):
@@ -533,14 +523,15 @@ async def force_through(__call__, self, x, through):
 async def force_through(self, x: AbstractTuple, through):
     yield (yield AbstractTuple)(
         [(await self(y, through)) for y in x.elements],
-        await self(x.values, through)
+        await self(x.values, through),
     )
 
 
 @overload  # noqa: F811
 async def force_through(self, x: AbstractArray, through):
-    yield (yield type(x))(await self(x.element, through),
-                          await self(x.values, through))
+    yield (yield type(x))(
+        await self(x.element, through), await self(x.values, through)
+    )
 
 
 @overload  # noqa: F811
@@ -548,7 +539,7 @@ async def force_through(self, x: AbstractClassBase, through):
     yield (yield type(x))(
         x.tag,
         {k: (await self(v, through)) for k, v in x.attributes.items()},
-        values=await self(x.values, through)
+        values=await self(x.values, through),
     )
 
 
@@ -556,7 +547,7 @@ async def force_through(self, x: AbstractClassBase, through):
 async def force_through(self, x: AbstractDict, through):
     yield (yield AbstractDict)(
         {k: (await self(v, through)) for k, v in x.entries.items()},
-        await self(x.values, through)
+        await self(x.values, through),
     )
 
 
@@ -651,8 +642,7 @@ def _normalize_adt_helper(x, done, tag_to_adt):
     if isinstance(x, AbstractADT):
         if x.tag not in tag_to_adt:
             adt = AbstractADT.new(
-                x.tag,
-                {k: AbstractUnion.new([]) for k in x.attributes},
+                x.tag, {k: AbstractUnion.new([]) for k in x.attributes}
             )
             tag_to_adt = {**tag_to_adt, x.tag: adt}
         else:
@@ -661,8 +651,7 @@ def _normalize_adt_helper(x, done, tag_to_adt):
         for attr, value in x.attributes.items():
             value = _normalize_adt_helper(value, done, tag_to_adt)
             adt.attributes[attr] = union_simplify(
-                [adt.attributes[attr], value],
-                constructor=AbstractUnion.new
+                [adt.attributes[attr], value], constructor=AbstractUnion.new
             )
         return adt
     elif isinstance(x, AbstractUnion):
@@ -688,17 +677,17 @@ def _finalize_adt(self, x: AbstractUnion):
 
 __consolidate__ = True
 __all__ = [
-    'CheckState',
-    'CloneState',
-    'abstract_check',
-    'abstract_clone',
-    'broaden',
-    'build_value',
-    'collapse_options',
-    'concretize_abstract',
-    'force_through',
-    'is_broad',
-    'normalize_adt',
-    'sensitivity_transform',
-    'union_simplify',
+    "CheckState",
+    "CloneState",
+    "abstract_check",
+    "abstract_clone",
+    "broaden",
+    "build_value",
+    "collapse_options",
+    "concretize_abstract",
+    "force_through",
+    "is_broad",
+    "normalize_adt",
+    "sensitivity_transform",
+    "union_simplify",
 ]

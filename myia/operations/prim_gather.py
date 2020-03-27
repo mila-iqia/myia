@@ -7,14 +7,16 @@ from . import primitives as P
 
 
 @standard_prim(P.gather)
-async def infer_gather(self, engine,
-                       input: lib.AbstractArray,
-                       dim: xtype.UInt[64],
-                       index: lib.AbstractArray):
+async def infer_gather(
+    self,
+    engine,
+    input: lib.AbstractArray,
+    dim: xtype.UInt[64],
+    index: lib.AbstractArray,
+):
     """Infer the return type of primitive `gather`."""
     return type(input)(
-        input.element,
-        {SHAPE: index.xshape(), TYPE: input.xtype()}
+        input.element, {SHAPE: index.xshape(), TYPE: input.xtype()}
     )
 
 
@@ -27,18 +29,18 @@ def bprop_gather(x, dim, index, out, dout):
 
 
 __operation_defaults__ = {
-    'name': 'gather',
-    'registered_name': 'gather',
-    'mapping': P.gather,
-    'python_implementation': None,
+    "name": "gather",
+    "registered_name": "gather",
+    "mapping": P.gather,
+    "python_implementation": None,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'gather',
-    'registered_name': 'gather',
-    'type': 'backend',
-    'python_implementation': None,
-    'inferrer_constructor': infer_gather,
-    'grad_transform': bprop_gather,
+    "name": "gather",
+    "registered_name": "gather",
+    "type": "backend",
+    "python_implementation": None,
+    "inferrer_constructor": infer_gather,
+    "grad_transform": bprop_gather,
 }

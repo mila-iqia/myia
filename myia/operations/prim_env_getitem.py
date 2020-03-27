@@ -11,10 +11,9 @@ def pyimpl_env_getitem(env, key, default):
 
 
 @standard_prim(P.env_getitem)
-async def infer_env_getitem(self, engine,
-                            env: xtype.EnvType,
-                            key: xtype.SymbolicKeyType,
-                            dflt):
+async def infer_env_getitem(
+    self, engine, env: xtype.EnvType, key: xtype.SymbolicKeyType, dflt
+):
     """Infer the return type of primitive `env_getitem`."""
     expected = key.xvalue().abstract
     engine.abstract_merge(expected, dflt)
@@ -22,18 +21,18 @@ async def infer_env_getitem(self, engine,
 
 
 __operation_defaults__ = {
-    'name': 'env_getitem',
-    'registered_name': 'env_getitem',
-    'mapping': P.env_getitem,
-    'python_implementation': pyimpl_env_getitem,
+    "name": "env_getitem",
+    "registered_name": "env_getitem",
+    "mapping": P.env_getitem,
+    "python_implementation": pyimpl_env_getitem,
 }
 
 
 __primitive_defaults__ = {
-    'name': 'env_getitem',
-    'registered_name': 'env_getitem',
-    'type': 'backend',
-    'python_implementation': pyimpl_env_getitem,
-    'inferrer_constructor': infer_env_getitem,
-    'grad_transform': None,
+    "name": "env_getitem",
+    "registered_name": "env_getitem",
+    "type": "backend",
+    "python_implementation": pyimpl_env_getitem,
+    "inferrer_constructor": infer_env_getitem,
+    "grad_transform": None,
 }
