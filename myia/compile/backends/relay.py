@@ -382,6 +382,12 @@ def relay_conv_transpose2d(
     assert dilation.is_constant(tuple)
     assert groups.is_constant(int)
 
+    # Only groups==1 and dilation==(1, 1) is supported, on both CPU and GPU.
+    if groups.value != 1:
+        raise RuntimeError(f"Only support groups=1, got {groups.value}")
+    if dilation.value != (1, 1):
+        raise RuntimeError(f"Only support dilation=(1, 1), got {dilation.value}")
+
     data_shape = input.abstract.xshape()
     weight_shape = weight.abstract.xshape()
     _, in_channels, _, _ = data_shape

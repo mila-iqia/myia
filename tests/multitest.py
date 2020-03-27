@@ -91,7 +91,7 @@ class MyiaFunctionTest:
         """Configure this test with new kwargs."""
         return MyiaFunctionTest(self.runtest, spec={**self.spec, **spec})
 
-    def check(self, run, args, expected):
+    def check(self, run, args, expected, **kwargs):
         """Check the result of run() against expected.
 
         Expected can be either:
@@ -118,7 +118,7 @@ class MyiaFunctionTest:
                 if not expected(args, res):
                     raise Exception(f"Failed the result check function")
 
-            elif not eqtest(res, expected):
+            elif not eqtest(res, expected, **kwargs):
                 raise Exception(f"Mismatch: expected {expected}, got {res}")
 
     def generate_params(self):
@@ -238,6 +238,7 @@ def _run(
     validate=True,
     pipeline=standard_pipeline,
     backend=None,
+    **kwargs,
 ):
     """Test a Myia function.
 
@@ -287,7 +288,7 @@ def _run(
     if result is None:
         result = fn(*args)
 
-    self.check(out, args, result)
+    self.check(out, args, result, **kwargs)
 
 
 backend_gpu = Multiple(
@@ -324,6 +325,13 @@ backend_all = Multiple(
         marks=pytest.mark.pytorch,
     ),
 )
+backend_no_relay = Multiple(
+    pytest.param(
+        ("pytorch", {"device": "cpu"}),
+        id="pytorch-cpu",
+        marks=pytest.mark.pytorch,
+    )
+)
 run = _run.configure(backend=backend_all)
 run_relay_debug = _run.configure(
     backend=Multiple(
@@ -335,6 +343,7 @@ run_relay_debug = _run.configure(
     )
 )
 run_gpu = _run.configure(backend=backend_gpu)
+run_no_relay = _run.configure(backend=backend_no_relay)
 run_debug = run.configure(
     pipeline=standard_debug_pipeline, validate=False, backend=False
 )
