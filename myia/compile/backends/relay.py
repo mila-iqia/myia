@@ -386,7 +386,9 @@ def relay_conv_transpose2d(
     if groups.value != 1:
         raise RuntimeError(f"Only support groups=1, got {groups.value}")
     if dilation.value != (1, 1):
-        raise RuntimeError(f"Only support dilation=(1, 1), got {dilation.value}")
+        raise RuntimeError(
+            f"Only support dilation=(1, 1), got {dilation.value}"
+        )
 
     data_shape = input.abstract.xshape()
     weight_shape = weight.abstract.xshape()

@@ -521,7 +521,7 @@ def test_conv2d(inp, w, b):
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
         nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
-        None
+        None,
     ),
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
@@ -539,7 +539,7 @@ def test_torch_conv2d__non_tuple_args(inp, w, b):
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
         nn.Parameter(torch.randn(3, 6, 3, 3, dtype=torch.float32)),
-        None
+        None,
     ),
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 2, 4, 5, dtype=torch.float32)),
@@ -565,7 +565,7 @@ def test_torch_conv2d__group3(inp, w, b):
 @fwd_and_bwd(
     nn.Parameter(torch.randn(2, 1, 4, 5, dtype=torch.float32)),
     nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
-    None
+    None,
 )
 def test_conv2d__group3(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (1, 1), 1)

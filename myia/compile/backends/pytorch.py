@@ -381,9 +381,7 @@ def pytorch_conv2d(op):
 def pytorch_conv_transpose2d(op):
     """Implementation of conv_transpose2d."""
 
-    def _impl(
-        input, weight, stride, padding, output_padding, groups, dilation
-    ):
+    def _impl(input, weight, stride, padding, output_padding, groups, dilation):
         stride = tuple(_x.item() for _x in stride)
         padding = tuple(_x.item() for _x in padding)
         output_padding = tuple(_x.item() for _x in output_padding)

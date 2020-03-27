@@ -42,10 +42,7 @@ from .common import AA, MA, MB, Point3D, U, f64, to_abstract_test, u64
 from .multitest import backend_all, mt, myia_function_test
 
 
-@pytest.fixture(params=[
-    pytest.param("pytorch"),
-    pytest.param("relay"),
-])
+@pytest.fixture(params=[pytest.param("pytorch"), pytest.param("relay")])
 def _backend_fixture(request):
     return request.param
 
