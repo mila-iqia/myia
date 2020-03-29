@@ -13,17 +13,18 @@ from numpy.random import RandomState
 
 from myia import ArithmeticData, myia, value_and_grad
 from myia.api import to_device
+
 # The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 from myia.frontends import activate_frontend
 from myia.public_api import _sum, mean, softmax, std
 
-activate_frontend('pytorch')
+activate_frontend("pytorch")
 
 
-dtype = 'float32'
-backend = 'pytorch'
-backend_options = {'device': 'cpu'}
+dtype = "float32"
+backend = "pytorch"
+backend_options = {"device": "cpu"}
 
 HIDDEN_LAYER = 24  # NN hidden layer size
 lr = LR = 0.01
@@ -32,7 +33,7 @@ GAMMA = 0.99
 INPUT_SIZE = 4
 OUTPUT_SIZE = 2
 
-ENV = gym.make('CartPole-v0').unwrapped
+ENV = gym.make("CartPole-v0").unwrapped
 HISTORY = []
 
 
@@ -48,9 +49,10 @@ def generate_data(n, batch_size, input_size, target_size, *, seed=87):
     a single target.
     """
     R = RandomState(seed=seed)
-    return [(param(R, batch_size, input_size),
-             param(R, batch_size, target_size))
-            for i in range(n)]
+    return [
+        (param(R, batch_size, input_size), param(R, batch_size, target_size))
+        for i in range(n)
+    ]
 
 
 def mlp_parameters(*layer_sizes, seed=90909):
@@ -68,8 +70,8 @@ def mlp_parameters(*layer_sizes, seed=90909):
 class Linear(ArithmeticData):
     """Linear layer."""
 
-    W: 'Weights array'
-    b: 'Biases vector'
+    W: "Weights array"
+    b: "Biases vector"
 
     def apply(self, input):
         """Apply the layer."""
@@ -101,7 +103,7 @@ class Softmax(ArithmeticData):
 class Sequential(ArithmeticData):
     """Sequential layer, applies all sub-layers in order."""
 
-    layers: 'Tuple of layers'
+    layers: "Tuple of layers"
 
     def apply(self, x):
         """Apply the layer."""
@@ -113,12 +115,14 @@ class Sequential(ArithmeticData):
 layer_sizes = (4, 24, 2)
 
 mlp = mlp_parameters(*layer_sizes)
-model = Sequential((
-    Linear(mlp[0][0], mlp[0][1]),
-    Tanh(),
-    Linear(mlp[1][0], mlp[1][1]),
-    Softmax(1)
-))
+model = Sequential(
+    (
+        Linear(mlp[0][0], mlp[0][1]),
+        Tanh(),
+        Linear(mlp[1][0], mlp[1][1]),
+        Softmax(1),
+    )
+)
 
 model = to_device(model, backend, backend_options, broaden=False)
 
@@ -127,8 +131,12 @@ use_cuda = torch.cuda.is_available()
 FloatTensor = torch.cuda.FloatTensor if use_cuda else torch.FloatTensor
 LongTensor = torch.cuda.LongTensor if use_cuda else torch.LongTensor
 
-@myia(backend=backend, backend_options=backend_options,
-      specialize_values=["model"])
+
+@myia(
+    backend=backend,
+    backend_options=backend_options,
+    specialize_values=["model"],
+)
 def step_eval(model, data):
     output = model.apply(data)
     return output
@@ -142,12 +150,15 @@ def cost(model, x, y, adv):
     return loss
 
 
-@myia(backend=backend, backend_options=backend_options,
-      specialize_values=["model"])
+@myia(
+    backend=backend,
+    backend_options=backend_options,
+    specialize_values=["model"],
+)
 def step_update(model, x, y, adv):
     adv = (adv - mean(adv)) / (std(adv) + 1e-7)
     # loss = cost(model, x, y, adv)
-    loss, dmodel = value_and_grad(cost, 'model')(model, x, y, adv)
+    loss, dmodel = value_and_grad(cost, "model")(model, x, y, adv)
     return loss, model - dmodel
 
 
@@ -164,15 +175,15 @@ def discount_rewards(r):
 def run_episode(net, e, env):
     state = env.reset()
     reward_sum = 0
-    xs = np.array([]).astype('float32')
-    ys = np.array([]).astype('float32')
-    rewards = np.array([]).astype('float32')
+    xs = np.array([]).astype("float32")
+    ys = np.array([]).astype("float32")
+    rewards = np.array([]).astype("float32")
     steps = 0
 
     while True:
         # env.render()
 
-        x = np.expand_dims(state, axis=0).astype('float32')
+        x = np.expand_dims(state, axis=0).astype("float32")
 
         if xs.shape[0] == 0:
             xs = x
@@ -185,14 +196,14 @@ def run_episode(net, e, env):
         # select an action depends on probability
         action = 0 if np.random.random() < action_prob.data[0][0] else 1
 
-        y = np.array([[1, 0]] if action == 0 else [[0, 1]], dtype='float32')
+        y = np.array([[1, 0]] if action == 0 else [[0, 1]], dtype="float32")
         if ys.shape[0] == 0:
             ys = y
         else:
             ys = np.concatenate([ys, y])
 
         state, reward, done, _ = env.step(action)
-        reward_np = np.array([[reward]], dtype='float32')
+        reward_np = np.array([[reward]], dtype="float32")
         if rewards.shape[0] == 0:
             rewards = reward_np
         else:
@@ -206,20 +217,22 @@ def run_episode(net, e, env):
             adv = adv.numpy()
             loss, net = step_update(net, xs, ys, adv)
             HISTORY.append(reward_sum)
-            print("[Episode {:>5}]  steps: {:>5} loss: {:>5} "
-                  "sum(HISTORY[-5:])/5: {:>5}"
-                  "".format(e, steps, loss, sum(HISTORY[-5:]) / 5))
+            print(
+                "[Episode {:>5}]  steps: {:>5} loss: {:>5} "
+                "sum(HISTORY[-5:])/5: {:>5}"
+                "".format(e, steps, loss, sum(HISTORY[-5:]) / 5)
+            )
             if sum(HISTORY[-5:]) / 5 > 490:
                 return True
             else:
                 return False
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # for e in range(10000):
     for e in range(10):
         complete = run_episode(model, e, ENV)
 
         if complete:
-            print('complete...!')
+            print("complete...!")
             break

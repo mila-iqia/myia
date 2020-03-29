@@ -87,7 +87,7 @@ APT_bool = AbstractArray(
 
 AA = AbstractArray(
     AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING}),
-    {SHAPE: ANYTHING, TYPE: NDArray}
+    {SHAPE: ANYTHING, TYPE: NDArray},
 )
 
 

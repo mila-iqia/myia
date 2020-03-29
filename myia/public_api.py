@@ -33,6 +33,7 @@ from .xtype import TupleT, f32, i64, u64
 
 # HELPER FUNCTIONS ##########################################################
 
+
 @myia_static
 def _chunks_to_split_sections(a_dim_shp, chunks):
     rem = a_dim_shp % chunks
@@ -93,7 +94,7 @@ def _build_fwd_tuple(shp):
 
 @core
 def _ensure_u64(x):
-    assert (P.hastype(x, i64) or P.hastype(x, u64))
+    assert P.hastype(x, i64) or P.hastype(x, u64)
     assert x >= 0
     return P.scalar_cast(x, u64)
 
@@ -154,8 +155,11 @@ def _shp_explicit(a_shp, shp):
         e_msg = "New shape can only contain 1 unknown (-1) dim in reshape"
         raise MyiaValueError(e_msg)
 
-    if (prod(a_shp) % prod(shp) != 0 if unk_count == 1
-            else prod(shp) != prod(a_shp)):
+    if (
+        prod(a_shp) % prod(shp) != 0
+        if unk_count == 1
+        else prod(shp) != prod(a_shp)
+    ):
         e_msg = "Cannot change the total number of elements in reshape"
         raise MyiaValueError(e_msg)
 
@@ -163,9 +167,9 @@ def _shp_explicit(a_shp, shp):
     shp_explicit = ()
     for s in shp:
         if s == -1:
-            shp_explicit = shp_explicit + (known_unk_dim, )
+            shp_explicit = shp_explicit + (known_unk_dim,)
         else:
-            shp_explicit = shp_explicit + (s, )
+            shp_explicit = shp_explicit + (s,)
 
     return shp_explicit
 
@@ -242,6 +246,7 @@ def _var_denom(shp, dim, unbiased):
 
 # ACTUAL FUNCTIONS ##########################################################
 
+
 @core
 def argmax(self, dim=None, keepdim=False):
     """Map of 'argmax' pytorch method."""
@@ -253,9 +258,9 @@ def argmax(self, dim=None, keepdim=False):
         dim = (dim,)
     dim = _dim_tuple_explicit(x.shape, dim)
     ret = P.argmax(x, dim)
-    final_shape = _shp_squeeze(ret.shape,
-                               _dim_explicit(x.shape, dim_orig),
-                               keepdim)
+    final_shape = _shp_squeeze(
+        ret.shape, _dim_explicit(x.shape, dim_orig), keepdim
+    )
     return P.reshape(ret, final_shape)
 
 
@@ -275,8 +280,7 @@ def chunk(self, chunks, dim=0):
 
 
 @core
-def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
-           groups=1):
+def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
     r"""Applies a Conv2d."""
     # noqa: D202
     """
@@ -297,15 +301,24 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1,
 
 
 @core
-def conv_transpose2d(input, weight, bias, stride=1, padding=0,
-                     output_padding=0, groups=1, dilation=1):
+def conv_transpose2d(
+    input,
+    weight,
+    bias,
+    stride=1,
+    padding=0,
+    output_padding=0,
+    groups=1,
+    dilation=1,
+):
     """Map of Pytorch method torch.nn.functional.conv_transpose2d."""
-    return P.conv_transpose2d(input, weight, bias, stride, padding,
-                              output_padding, groups, dilation)
+    return P.conv_transpose2d(
+        input, weight, bias, stride, padding, output_padding, groups, dilation
+    )
 
 
 @core
-def cross_entropy(input, target, reduction='mean'):
+def cross_entropy(input, target, reduction="mean"):
     """Map of method torch.nn.functional.cross_entropy."""
     a = log_softmax(input, 1)
     b = nll_loss(a, target, reduction=reduction)
@@ -352,8 +365,12 @@ def linear(input, weight, bias=None):
 @core
 def lstm_cell(input, hidden, w_ih, w_hh, b_ih, b_hh):
     hx, cx = hidden
-    gates = P.dot(input, operations.t(w_ih)) + P.dot(hx, operations.t(w_hh)) \
-        + b_ih + b_hh
+    gates = (
+        P.dot(input, operations.t(w_ih))
+        + P.dot(hx, operations.t(w_hh))
+        + b_ih
+        + b_hh
+    )
 
     ingate, forgetgate, cellgate, outgate = chunk(gates, 4, 1)
 
@@ -379,7 +396,8 @@ def log_softmax(self, dim=None, dtype=None):
 
     maxes = _max(x, dim, keepdim=True)[0]
     lse_stable = operations.array_log(
-        _sum(operations.array_exp(x - maxes), dim, keepdim=True))
+        _sum(operations.array_exp(x - maxes), dim, keepdim=True)
+    )
     return x - maxes - lse_stable
 
 
@@ -408,16 +426,25 @@ def _max(self, dim=None, keepdim=False):
         final_shape = ()
         return P.reshape(ret_max, final_shape)
     else:
-        final_shape = _shp_squeeze(ret_max.shape,
-                                   _dim_explicit(x.shape, dim_orig),
-                                   keepdim)
-        return (P.reshape(ret_max, final_shape),
-                P.reshape(ret_argmax, final_shape))
+        final_shape = _shp_squeeze(
+            ret_max.shape, _dim_explicit(x.shape, dim_orig), keepdim
+        )
+        return (
+            P.reshape(ret_max, final_shape),
+            P.reshape(ret_argmax, final_shape),
+        )
 
 
 @core
-def max_pool2d(input, kernel_size, stride=(), padding=0, dilation=1,
-               ceil_mode=False, return_indices=False):
+def max_pool2d(
+    input,
+    kernel_size,
+    stride=(),
+    padding=0,
+    dilation=1,
+    ceil_mode=False,
+    return_indices=False,
+):
     r"""Applies a max_pool2d."""
     kernel_size = _pair(kernel_size)
     stride = _pair(stride)
@@ -425,8 +452,7 @@ def max_pool2d(input, kernel_size, stride=(), padding=0, dilation=1,
     dilation = _pair(dilation)
     assert return_indices is False
 
-    ret = P.max_pool2d(input, kernel_size, stride, padding, dilation,
-                       ceil_mode)
+    ret = P.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
     return ret
 
 
@@ -444,23 +470,25 @@ def mean(self, dim=None, keepdim=False, *, dtype=None):
         x = P.array_cast(x, dtype)
 
     if dim is None:
-        return P.array_reduce(P.scalar_add, x, ()) \
-            / P.scalar_cast(_total_elements(x.shape), x.dtype)
+        return P.array_reduce(P.scalar_add, x, ()) / P.scalar_cast(
+            _total_elements(x.shape), x.dtype
+        )
     else:
-        return operations.array_reduce_dim(P.scalar_add, x, dim, keepdim) \
-            / P.scalar_cast(x.shape[dim], x.dtype)
+        return operations.array_reduce_dim(
+            P.scalar_add, x, dim, keepdim
+        ) / P.scalar_cast(x.shape[dim], x.dtype)
 
 
 @core
-def mse_loss(input, target, reduction='mean'):
+def mse_loss(input, target, reduction="mean"):
     """Map of 'mse_loss' pytorch method."""
     out = (input - target) ** 2
 
-    if reduction == 'none':
+    if reduction == "none":
         out = out
-    elif reduction == 'mean':
+    elif reduction == "mean":
         out = mean(out)
-    elif reduction == 'sum':
+    elif reduction == "sum":
         out = _sum(out)
     return out
 
@@ -470,20 +498,20 @@ def mse_loss(input, target, reduction='mean'):
 # reduce=None, reduction='mean')
 # Is current implementation numerically stable?
 @core
-def nll_loss(logs, targets, reduction='mean'):
+def nll_loss(logs, targets, reduction="mean"):
     """Map of 'nll_loss' pytorch method."""
     out = -reshape(
-        gather(logs,
-               1,
-               P.array_cast(reshape(targets, (logs.shape[0], 1)), i64)),
-        (logs.shape[0],)
+        gather(
+            logs, 1, P.array_cast(reshape(targets, (logs.shape[0], 1)), i64)
+        ),
+        (logs.shape[0],),
     )
 
-    if reduction == 'none':
+    if reduction == "none":
         out = out
-    elif reduction == 'mean':
+    elif reduction == "mean":
         out = mean(out)
-    elif reduction == 'sum':
+    elif reduction == "sum":
         out = _sum(out)
     return out
 
@@ -525,8 +553,12 @@ def norm(inp, p=None, dim=None):
         # leading shape,
         # and reshaping tuple (leading shape + (-1,)), to apply to
         # permuted input if necessary.
-        leading_dims, permutation, leading_shape, reshaping_tuple = \
-            _prepare_dims_to_norm(inp.shape, dim)
+        (
+            leading_dims,
+            permutation,
+            leading_shape,
+            reshaping_tuple,
+        ) = _prepare_dims_to_norm(inp.shape, dim)
 
         # Now we can reshape inp.
         if leading_dims is None:
@@ -610,7 +642,7 @@ def size(self, dim=None):
 
 
 @core
-def smooth_l1_loss(input, target, reduction='mean'):
+def smooth_l1_loss(input, target, reduction="mean"):
     """Map of 'smooth_l1_loss' pytorch method."""
     z_raw = input - target
     z_abs = operations.array_abs(z_raw)
@@ -621,11 +653,11 @@ def smooth_l1_loss(input, target, reduction='mean'):
 
     out = P.array_map(pw, z_abs)
 
-    if reduction == 'none':
+    if reduction == "none":
         out = out
-    elif reduction == 'mean':
+    elif reduction == "mean":
         out = mean(out)
-    elif reduction == 'sum':
+    elif reduction == "sum":
         out = _sum(out)
     return out
 
@@ -674,9 +706,10 @@ def stack(self, dim=0):
 @core
 def std(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
     """Map of 'std' pytorch method."""
-    return var(self,
-               dim=dim, unbiased=unbiased,
-               keepdim=keepdim, dtype=dtype) ** .5
+    return (
+        var(self, dim=dim, unbiased=unbiased, keepdim=keepdim, dtype=dtype)
+        ** 0.5
+    )
 
 
 @core
@@ -776,11 +809,11 @@ def zeros(*shp, dtype=None):
 
 
 __all__ = [
-    'conv2d',
-    'cross_entropy',
-    'item',
-    'linear',
-    'relu',
-    'sigmoid',
-    'zeros',
+    "conv2d",
+    "cross_entropy",
+    "item",
+    "linear",
+    "relu",
+    "sigmoid",
+    "zeros",
 ]
