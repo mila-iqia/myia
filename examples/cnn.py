@@ -20,8 +20,6 @@ from myia.debug import traceback  # noqa
 from myia.frontends import activate_frontend
 from myia.public_api import conv2d, log_softmax, max_pool2d, nll_loss, reshape
 
-# TODO: add back nll_loss
-
 activate_frontend('pytorch')
 
 
