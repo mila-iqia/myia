@@ -10,7 +10,7 @@ from ..abstract.data import (
     AbstractScalar,
 )
 from ..utils import MyiaInputTypeError
-from ..xtype import Bool, Float, Int, Object, UInt
+from ..xtype import Bool, Float, Int, NDArray, Object, UInt
 
 
 class PyTorchTensor(Object):
@@ -83,6 +83,15 @@ APT_bool = AbstractArray(
     AbstractScalar({TYPE: Bool, VALUE: ANYTHING}),
     {SHAPE: ANYTHING, TYPE: PyTorchTensor},
 )
+
+
+AA = AbstractArray(
+    AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING}),
+    {SHAPE: ANYTHING, TYPE: NDArray}
+)
+
+
+AS = AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING})
 
 
 __all__ = ["AbstractModule", "PyTorchTensor", "pytorch_dtype_to_type"]

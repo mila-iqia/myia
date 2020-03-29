@@ -2,6 +2,7 @@
 from copy import copy
 from types import FunctionType
 
+import numpy as np
 import pytest
 
 from myia.abstract import AbstractArray, from_value
@@ -20,28 +21,24 @@ from myia.frontends.pytorch_abstract_types import (
     pytorch_dtype_to_type,
 )
 from myia.pipeline import standard_pipeline
+from myia.xtype import NDArray, np_dtype_to_type
 
 from ..common import MA, MB, to_abstract_test
 from ..multitest import (
+    Multiple,
     backend_all,
     backend_no_relay,
     eqtest,
     mt,
     myia_function_test,
-    run,
-    run_no_relay,
 )
 from ..test_grad import grad_wrap
-
-from myia.xtype import NDArray
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
 F = torch.nn.functional
 
 activate_frontend('pytorch')
-
-import numpy as np
 
 
 # Uncomment this line to print values at specific precision
@@ -67,9 +64,12 @@ def is_tensor_param(x):
 
 # sens of 3.21 is used because sens!=1 is more robust test
 def _make_sens(o, sens=3.21):
-    #return torch.ones(o.shape, dtype=o.dtype).fill_(sens)
+    return torch.ones(o.shape, dtype=o.dtype).fill_(sens)
+
+
+# sens of 3.21 is used because sens!=1 is more robust test
+def _make_sens_numpy(o, sens=3.21):
     ret = np.ones(o.shape, dtype=o.dtype)
-    #breakpoint()
     ret.fill(sens)
     return ret
 
@@ -109,6 +109,7 @@ def make_argspec(args, broad_specs):
         broad_specs = (True,) * len(args)
     return tuple(from_value(arg, broaden=bs)
                  for bs, arg in zip(broad_specs, clean_args(args)))
+
 
 """
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
@@ -163,7 +164,7 @@ def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
 
 @myia_function_test(marks=[pytest.mark.grad], id='grad')
 def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
-                 backend=False, atol=1e-8, rtol=1e-5,
+                 backend=False, numpy_compat=True, atol=1e-8, rtol=1e-5,
                  grad_atol=1e-6, grad_rtol=1e-5):
     if backend:
         backend_name = backend[0]
@@ -176,18 +177,18 @@ def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
 
     def mksens(x):
         return AbstractArray(
-            AbstractScalar({TYPE: x.dtype,
+            AbstractScalar({TYPE: pytorch_dtype_to_type(x.dtype),
                             VALUE: ANYTHING}),
-            {SHAPE: tuple(x.shape), TYPE: NDArray}
+            {SHAPE: tuple(x.shape), TYPE: PyTorchTensor}
         )
 
-    #ref_result = fn(*map(copy, args))
+    ref_result = fn(*map(copy, args))
     argspec = make_argspec(args, broad_specs)
     res = pipeline.run(input=fn, argspec=argspec)
     myia_fn = res['output']
     myia_result = myia_fn(*map(copy, args))
 
-    #assert eqtest(ref_result, myia_result, atol=atol, rtol=rtol)
+    assert eqtest(ref_result, myia_result, atol=atol, rtol=rtol)
 
     if isinstance(myia_result, tuple):
         sens_type = AbstractTuple(
@@ -199,32 +200,168 @@ def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
         sens_type = mksens(myia_result)
         sens = _make_sens(myia_result)
 
-    #pytorch_grads = pt_fn_grads(fn, *args)
+    pytorch_grads = pt_fn_grads(fn, *args)
 
     gpipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
     sens_type = to_abstract_test(sens_type)
-    #breakpoint()
     assert isinstance(fn, FunctionType)
     res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])
 
     myia_grads = res['output'](*args, sens)
-    #assert eqtest(pytorch_grads, myia_grads, rtol=grad_rtol, atol=grad_atol)
-    #"""
+    assert eqtest(pytorch_grads, myia_grads, rtol=grad_rtol, atol=grad_atol)
+
+    ########################################################################
+    if numpy_compat:
+        args_torch = args
+        args = ()
+        for _ in args_torch:
+            if isinstance(_, torch.Tensor):
+                args += (_.detach().numpy(),)
+            else:
+                args += (_,)
+
+        if backend:
+            backend_name = backend[0]
+            backend_options = backend[1]
+
+            pipeline = pipeline.configure({
+                'resources.backend.name': backend_name,
+                'resources.backend.options': backend_options
+            })
+
+        def mksens(x):
+            return AbstractArray(
+                AbstractScalar({TYPE: np_dtype_to_type(x.dtype.name),
+                                VALUE: ANYTHING}),
+                {SHAPE: tuple(x.shape), TYPE: NDArray}
+            )
+
+        argspec = make_argspec(args, broad_specs)
+        res = pipeline.run(input=fn, argspec=argspec)
+        myia_fn = res['output']
+        myia_result = myia_fn(*map(copy, args))
+
+        if isinstance(myia_result, tuple):
+            sens_type = AbstractTuple(
+                [mksens(res) for res in myia_result]
+            )
+            sens = tuple(_make_sens_numpy(res)
+                         for res in myia_result)
+        else:
+            sens_type = mksens(myia_result)
+            sens = _make_sens_numpy(myia_result)
+
+        gpipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
+        sens_type = to_abstract_test(sens_type)
+        assert isinstance(fn, FunctionType)
+        res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])
+
+        myia_grads = res['output'](*args, sens)
 
 
 fwd_and_bwd = _fwd_and_bwd.configure(backend=backend_all)
+fwd_and_bwd_no_numpy_compat = _fwd_and_bwd.configure(backend=backend_all,
+                                                     numpy_compat=False)
 fwd_and_bwd_no_relay = _fwd_and_bwd.configure(backend=backend_no_relay)
+
+
+@myia_function_test(marks=[pytest.mark.run], id='run')
+def _run(self, fn, args, result=None, abstract=None, broad_specs=None,
+         validate=True, pipeline=standard_pipeline, backend=None,
+         numpy_compat=True):
+    """Test a Myia function.
+
+    Arguments:
+        fn: The Myia function to test.
+        args: The args for the function.
+        result: The expected result, or an exception subclass. If result is
+            None, we will call the Python version of the function to compare
+            with.
+        abstract: The argspec. If None, it will be derived automatically from
+            the args.
+        broad_specs: For each argument, whether to broaden the type. By
+            default, broaden all arguments.
+        validate: Whether to run the validation step.
+        pipeline: The pipeline to use.
+    """
+
+    if backend:
+        backend_name = backend[0]
+        backend_options = backend[1]
+
+        pipeline = pipeline.configure({
+            'resources.backend.name': backend_name,
+            'resources.backend.options': backend_options
+        })
+
+    if abstract is None:
+        if broad_specs is None:
+            broad_specs = (True,) * len(args)
+        argspec = tuple(from_value(arg, broaden=bs)
+                        for bs, arg in zip(broad_specs, args))
+    else:
+        argspec = tuple(to_abstract_test(a) for a in abstract)
+
+    if not validate:
+        pipeline = pipeline.configure(validate=False)
+
+    def out(args):
+        pip = pipeline.make()
+        mfn = pip(input=fn, argspec=argspec)
+        rval = mfn['output'](*args)
+        return rval
+
+    if result is None:
+        result = fn(*args)
+
+    self.check(out, args, result)
+
+    #################################################################
+
+    if numpy_compat:
+        args_torch = args
+        args = ()
+        for _ in args_torch:
+            if isinstance(_, torch.Tensor):
+                args += (_.detach().numpy(),)
+            else:
+                args += (_,)
+
+        if abstract is None:
+            if broad_specs is None:
+                broad_specs = (True,) * len(args)
+            argspec = tuple(from_value(arg, broaden=bs)
+                            for bs, arg in zip(broad_specs, args))
+        else:
+            argspec = tuple(to_abstract_test(a) for a in abstract)
+
+        out(args)
+
+
+backend_all = Multiple(
+    pytest.param(('relay', {'target': 'cpu', 'device_id': 0}),
+                 id='relay-cpu',
+                 marks=pytest.mark.relay),
+    pytest.param(('pytorch', {'device': 'cpu'}),
+                 id='pytorch-cpu',
+                 marks=pytest.mark.pytorch),
+)
+backend_no_relay = Multiple(
+    pytest.param(('pytorch', {'device': 'cpu'}),
+                 id='pytorch-cpu',
+                 marks=pytest.mark.pytorch),
+)
+run = _run.configure(backend=backend_all)
+run_no_numpy_compat = _run.configure(backend=backend_all, numpy_compat=False)
+run_no_relay = _run.configure(backend=backend_no_relay)
 
 
 # THIS TEST ALL OPS that are in dir of "torch" or "torch.tensor"
 # all_torch_ops = dir(torch)
 # all_torch_tensor_ops = dir(torch.Tensor([5.49670]))
 
-#torch = np
 
-#torch.manual_seed(123)
-
-from myia import public_api
+torch.manual_seed(123)
 
 
 single_tensor_arg_tests = (
@@ -440,8 +577,8 @@ def test_torch_detach(x):
     # Example copied from here (2019/12/03):
     # http://www.bnikolic.co.uk/blog/pytorch-detach.html
     y = x ** 2
-    z = x.detach() ** 3
-    r = (y + z).sum()
+    z = torch.detach(x) ** 3
+    r = torch.sum(y + z)
     return r
 
 
@@ -586,7 +723,7 @@ def test_torch_nll_loss_reduce_cast(x, y):
     return torch.nn.functional.nll_loss(x, y, reduction='mean')
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 3, 4, 5))))
+@fwd_and_bwd_no_numpy_compat(nn.Parameter(torch.randn(2, 3, 4, 5)))
 def test_torch_tensor_permute(x):
     return x.permute((0, 3, 2, 1))
 
@@ -605,7 +742,7 @@ def test_torch_tensor_pow(x):
     broad_specs=(True, False)
 )
 def test_torch_tensor_reshape(x, y):
-    return x.reshape(y)
+    return torch.reshape(x, y)
 
 
 @fwd_and_bwd_no_relay(nn.Parameter(torch.Tensor(MA(3, 4))),
@@ -646,7 +783,7 @@ def test_torch_tensor_set(x, y):
 # """
 
 
-@run(nn.Parameter(torch.Tensor(MA(2, 3))))
+@run_no_numpy_compat(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_size(x):
     return x.size(-1), x.size()
 
@@ -680,13 +817,13 @@ def test_torch_split(x):
     broad_specs=(True, False)
 )
 def test_torch_tensor_squeeze(x, y):
-    return x.squeeze(y)
+    return torch.squeeze(x, y)
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 1))),
              broad_specs=(True, False))
 def test_torch_tensor_squeeze_all(x):
-    return x.squeeze()
+    return torch.squeeze(x)
 
 
 @mt(
@@ -698,16 +835,10 @@ def test_torch_tensor_squeeze_all(x):
 def test_torch_stack(a, b, c):
     return torch.stack((a, b, c), dim=1)
 
-"""
+
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
 def test_torch_std(x):
     return torch.std(x, dim=-1)
-"""
-
-
-@fwd_and_bwd(np.random.rand(3,2).astype('f'))
-def test_torch_std(x):
-    return public_api.std(x, dim=-1)
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
@@ -749,7 +880,7 @@ def test_torch_sum_multi_dim(x):
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 4, 3, 5))))
 def test_torch_tensor_transpose(x):
-    return x.transpose(3, 1)
+    return torch.transpose(x, 3, 1)
 
 
 @mt(
@@ -760,7 +891,7 @@ def test_torch_tensor_transpose(x):
     broad_specs=(True, False)
 )
 def test_torch_tensor_unsqueeze(x, y):
-    return x.unsqueeze(y)
+    return torch.unsqueeze(x, y)
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))
@@ -773,8 +904,8 @@ def test_torch_var_dim(x):
     return torch.var(x, dim=-1)
 
 
-@fwd_and_bwd(nn.Parameter(torch.Tensor(torch.randn(2, 4, 3))),
-             nn.Parameter(torch.Tensor(torch.randn(4, 3, 2))))
+@fwd_and_bwd_no_numpy_compat(nn.Parameter(torch.Tensor(torch.randn(2, 4, 3))),
+                             nn.Parameter(torch.Tensor(torch.randn(4, 3, 2))))
 def test_torch_tensor_view_as(x, y):
     return x.view_as(y)
 

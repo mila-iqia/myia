@@ -110,55 +110,58 @@ standard_object_map.update(
         torch.nn.functional.cross_entropy: cross_entropy,
         torch.nn.functional.embedding: embedding,
         torch.nn.functional.linear: linear,
+        torch.nn.functional.log_softmax: log_softmax,
         torch.nn.functional.max_pool2d: max_pool2d,
         torch.nn.functional.mse_loss: mse_loss,
         torch.nn.functional.nll_loss: nll_loss,
         torch.nn.functional.smooth_l1_loss: smooth_l1_loss,
+
         torch.zeros: zeros,
     }
 )
 
 
-standard_method_map[PyTorchTensor] = standard_method_map[NDArray].copy()
+standard_method_map[PyTorchTensor] = \
+    standard_method_map[NDArray].copy()
 standard_method_map[PyTorchTensor].update(
     {
-        "abs": operations.array_abs,
-        "argmax": argmax,
-        "chunk": chunk,
-        "detach": operations.stop_gradient,
-        "dim": operations.ndim,
-        "dtype": property(operations.dtype),
-        "eq": operations.array_eq,
-        "exp": operations.array_exp,
-        "gather": gather,
-        "item": item,
-        "log": operations.array_log,
-        "log_softmax": log_softmax,
-        "max": _max,
-        "mean": mean,
-        "permute": P.transpose,
-        "pow": operations.array_pow,
-        "relu": relu,
-        "reshape": reshape,
-        "scatter": scatter,
-        "scatter_add": scatter_add,
-        "sigmoid": sigmoid,
-        "shape": property(operations.shape),
-        "sign": operations.array_sign,
-        "size": size,
-        "softmax": softmax,
-        "split": split,
-        "squeeze": squeeze,
-        "std": std,
-        "sum": _sum,
-        "t": operations.t,
-        "transpose": transpose,
-        "tanh": operations.array_tanh,
-        "unsqueeze": unsqueeze,
-        "var": var,
-        "view": reshape,  # contiguousness is ignored by us for now?
-        "view_as": view_as,  # contiguousness is ignored by us for now?
-        "zeros_like": operations.zeros_like,  # hidden method used by bwd (I think)
+        'abs': operations.array_abs,
+        'argmax': argmax,
+        'chunk': chunk,
+        'detach': operations.stop_gradient,
+        'dim': operations.ndim,
+        'dtype': property(operations.dtype),
+        'eq': operations.array_eq,
+        'exp': operations.array_exp,
+        'gather': gather,
+        'item': item,
+        'log': operations.array_log,
+        'log_softmax': log_softmax,
+        'max': _max,
+        'mean': mean,
+        'permute': P.transpose,
+        'pow': operations.array_pow,
+        'relu': relu,
+        'reshape': reshape,
+        'scatter': scatter,
+        'scatter_add': scatter_add,
+        'sigmoid': sigmoid,
+        'shape': property(operations.shape),
+        'sign': operations.array_sign,
+        'size': size,
+        'softmax': softmax,
+        'split': split,
+        'squeeze': squeeze,
+        'std': std,
+        'sum': _sum,
+        't': operations.t,
+        'transpose': transpose,
+        'tanh': operations.array_tanh,
+        'unsqueeze': unsqueeze,
+        'var': var,
+        'view': reshape,  # contiguousness is ignored by us for now?
+        'view_as': view_as,  # contiguousness is ignored by us for now?
+        'zeros_like': operations.zeros_like,  # hidden method used by bwd (I think)
     }
 )
 
