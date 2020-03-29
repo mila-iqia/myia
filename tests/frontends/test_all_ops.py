@@ -116,57 +116,6 @@ def make_argspec(args, broad_specs):
     )
 
 
-"""
-@myia_function_test(marks=[pytest.mark.grad], id='grad')
-def _fwd_and_bwd(self, fn, args, broad_specs=None, pipeline=standard_pipeline,
-                 backend=False, atol=1e-8, rtol=1e-5,
-                 grad_atol=1e-6, grad_rtol=1e-5):
-    if backend:
-        backend_name = backend[0]
-        backend_options = backend[1]
-
-        pipeline = pipeline.configure({
-            'resources.backend.name': backend_name,
-            'resources.backend.options': backend_options
-        })
-
-    def mksens(x):
-        return AbstractArray(
-            AbstractScalar({TYPE: pytorch_dtype_to_type(x.dtype),
-                            VALUE: ANYTHING}),
-            {SHAPE: tuple(x.shape), TYPE: PyTorchTensor}
-        )
-
-    ref_result = fn(*map(copy, args))
-    argspec = make_argspec(args, broad_specs)
-    res = pipeline.run(input=fn, argspec=argspec)
-    myia_fn = res['output']
-    myia_result = myia_fn(*map(copy, args))
-
-    assert eqtest(ref_result, myia_result, atol=atol, rtol=rtol)
-
-    if isinstance(myia_result, tuple):
-        sens_type = AbstractTuple(
-            [mksens(res) for res in myia_result]
-        )
-        sens = tuple(_make_sens(res)
-                     for res in myia_result)
-    else:
-        sens_type = mksens(myia_result)
-        sens = _make_sens(myia_result)
-
-    pytorch_grads = pt_fn_grads(fn, *args)
-
-    gpipeline = pipeline.insert_after('parse', grad_wrap=grad_wrap)
-    sens_type = to_abstract_test(sens_type)
-    assert isinstance(fn, FunctionType)
-    res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])
-
-    myia_grads = res['output'](*args, sens)
-    assert eqtest(pytorch_grads, myia_grads, rtol=grad_rtol, atol=grad_atol)
-#"""
-
-
 @myia_function_test(marks=[pytest.mark.grad], id="grad")
 def _fwd_and_bwd(
     self,
@@ -225,7 +174,6 @@ def _fwd_and_bwd(
     myia_grads = res["output"](*args, sens)
     assert eqtest(pytorch_grads, myia_grads, rtol=grad_rtol, atol=grad_atol)
 
-    ########################################################################
     if numpy_compat:
         args_torch = args
         args = ()
@@ -343,8 +291,6 @@ def _run(
         result = fn(*args)
 
     self.check(out, args, result)
-
-    #################################################################
 
     if numpy_compat:
         args_torch = args
