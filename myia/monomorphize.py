@@ -416,9 +416,10 @@ class Monomorphizer:
 
     """
 
-    def __init__(self, engine, reuse_existing=True):
+    def __init__(self, resources, reuse_existing=True):
         """Initialize the monomorphizer."""
-        self.engine = engine
+        self.engine = resources.inferrer.engine
+        self.manager = resources.manager
         self.specializations = {}
         self.replacements = defaultdict(dict)
         self.results = {}
@@ -430,7 +431,6 @@ class Monomorphizer:
 
     def run(self, context):
         """Run monomorphization."""
-        self.manager = context.graph.manager
         concretize_cache(self.engine.cache.cache)
         concretize_cache(self.engine.reference_map)
         self.collect(context)
@@ -814,9 +814,9 @@ class _MonoRemapper(CloneRemapper):
             self.remap_node((g, fv), g, fv, ng, new, link=False)
 
 
-def monomorphize(engine, root_context, reuse_existing=True):
+def monomorphize(resources, root_context, reuse_existing=True):
     """Monomorphize all graphs starting with the given root context."""
-    mono = Monomorphizer(engine, reuse_existing=reuse_existing)
+    mono = Monomorphizer(resources, reuse_existing=reuse_existing)
     return mono.run(root_context)
 
 

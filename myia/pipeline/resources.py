@@ -200,7 +200,7 @@ class InferenceResource(Partializable):
     def monomorphize(self, context):
         """Perform monomorphization."""
         with tracer("monomorphize", engine=self.engine, context=context) as tr:
-            rval = monomorphize(self.engine, context, reuse_existing=True)
+            rval = monomorphize(self.resources, context, reuse_existing=True)
             tr.set_results(output=rval)
             return rval
 
