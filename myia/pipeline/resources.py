@@ -8,7 +8,7 @@ from .. import parser, xtype
 from ..abstract import InferenceEngine, LiveInferenceEngine, type_to_abstract
 from ..compile import load_backend
 from ..ir import Graph, clone
-from ..monomorphize import monomorphize
+from ..monomorphize import Monomorphizer
 from ..operations.utils import Operation
 from ..utils import (
     MyiaConversionError,
@@ -160,27 +160,8 @@ class InferenceResource(Partializable):
             constructors=self.constructors,
             max_stack_depth=self.max_stack_depth,
         )
-        self.live = LiveInferenceEngine(
-            resources, constructors=self.constructors
-        )
 
-    def infer_incremental(self):
-        """Perform inference."""
-        tracker = self.resources.tracker
-        if not tracker.activated:
-            return
-        mng = self.manager
-        todo = tracker.todo
-        while todo:
-            nodes = [
-                node
-                for node in todo
-                if node.abstract is None and node in mng.all_nodes
-            ]
-            todo.clear()
-            self.live.run(nodes)
-
-    def infer(self, graph, argspec, outspec=None):
+    def __call__(self, graph, argspec, outspec=None):
         """Perform inference."""
         with tracer(
             "infer", graph=graph, argspec=argspec, outspec=outspec
@@ -197,10 +178,50 @@ class InferenceResource(Partializable):
             tr.set_results(output=rval)
             return rval
 
-    def monomorphize(self, context):
+
+class LiveInferenceResource(Partializable):
+    """Performs live inference."""
+
+    def __init__(self, resources, constructors):
+        """Initialize a LiveInferenceResource."""
+        self.resources = resources
+        self.manager = resources.manager
+        self.constructors = constructors
+        self.live = LiveInferenceEngine(
+            resources, constructors=self.constructors
+        )
+
+    def __call__(self):
+        """Perform live inference."""
+        tracker = self.resources.tracker
+        if not tracker.activated:
+            return
+        mng = self.manager
+        todo = tracker.todo
+        while todo:
+            nodes = [
+                node
+                for node in todo
+                if node.abstract is None and node in mng.all_nodes
+            ]
+            todo.clear()
+            self.live.run(nodes)
+
+
+class MonomorphizationResource(Partializable):
+    """Performs monomorphization."""
+
+    def __init__(self, resources):
+        """Initialize a MonomorphizationResource."""
+        self.resources = resources
+        self.engine = resources.inferrer.engine
+        self.manager = resources.manager
+        self.mono = Monomorphizer(resources, self.engine)
+
+    def __call__(self, context):
         """Perform monomorphization."""
         with tracer("monomorphize", engine=self.engine, context=context) as tr:
-            rval = monomorphize(self.resources, context)
+            rval = self.mono.run(context)
             tr.set_results(output=rval)
             return rval
 

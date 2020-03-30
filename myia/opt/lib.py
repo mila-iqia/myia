@@ -1110,7 +1110,8 @@ def expand_J(resources, node, equiv):
         newg = Jimpl(arg, prev_resources, node)
 
         resources = resources.copy()
-        inf = resources.inferrer
+        engine = resources.inferrer.engine
+        mono = resources.monomorphizer
         vfn = node.abstract.get_unique()
         argspec = vfn.args
         outspec = vfn.output
@@ -1119,18 +1120,16 @@ def expand_J(resources, node, equiv):
             newg = newg.generate_graph(sig)
         newg = clone(newg, quarantine=lambda g: g.abstract is not None)
         resources.manager.add_graph(newg)
-        empty = inf.engine.context_class.empty()
+        empty = engine.context_class.empty()
         context = empty.add(newg, tuple(argspec))
-        inf.engine.run_coroutine(
-            inf.engine.infer_function(newg, argspec, outspec)
-        )
-        newg2 = inf.monomorphize(context)
+        engine.run_coroutine(engine.infer_function(newg, argspec, outspec))
+        newg2 = resources.monomorphizer(context)
 
         newg = newg2
-        for node in inf.manager.all_nodes:
+        for node in mono.manager.all_nodes:
             if node.is_constant(Quarantined):
                 node.value = node.value.graph
-        for g in inf.manager.graphs:
+        for g in mono.manager.graphs:
             g._manager = None
 
         if isinstance(arg, Graph):

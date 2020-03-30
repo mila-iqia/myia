@@ -148,7 +148,7 @@ def step_infer(resources, graph, argspec):
     orig_argspec = argspec
     if resources.universal:
         argspec = (type_to_abstract(UniverseType), *argspec)
-    outspec, context = resources.inferrer.infer(graph, argspec)
+    outspec, context = resources.inferrer(graph, argspec)
     if not nobottom(outspec):
         raise InferenceError(
             "There is no condition in which the program succeeds"
@@ -180,7 +180,7 @@ def step_specialize(resources, graph, inference_context):
     Outputs:
         graph: The specialized graph.
     """
-    new_graph = resources.inferrer.monomorphize(inference_context)
+    new_graph = resources.monomorphizer(inference_context)
     return {"graph": new_graph}
 
 
@@ -205,7 +205,7 @@ def step_simplify_types(resources, graph, argspec, outspec):
     simplify_types(graph, mng)
     mng.keep_roots(graph)
     new_argspec = tuple(p.abstract for p in graph.parameters)
-    resources.inferrer.infer_incremental()
+    resources.live_inferrer()
     new_outspec = graph.output.abstract
     return {
         "graph": graph,

@@ -21,6 +21,8 @@ from .resources import (
     ConverterResource,
     DebugVMResource,
     InferenceResource,
+    LiveInferenceResource,
+    MonomorphizationResource,
     Resources,
     Tracker,
 )
@@ -270,6 +272,8 @@ standard_resources = Resources.partial(
     inferrer=InferenceResource.partial(
         constructors=inferrer_registry, max_stack_depth=50
     ),
+    monomorphizer=MonomorphizationResource.partial(),
+    live_inferrer=LiveInferenceResource.partial(constructors=inferrer_registry),
     tracker=Tracker.partial(),
     backend=BackendResource.partial(),
     debug_vm=DebugVMResource.partial(implementations=vm_registry),

@@ -415,9 +415,9 @@ class Monomorphizer:
 
     """
 
-    def __init__(self, resources):
+    def __init__(self, resources, engine):
         """Initialize the monomorphizer."""
-        self.engine = resources.inferrer.engine
+        self.engine = engine
         self.manager = resources.manager
         self.specializations = {}
         self.replacements = defaultdict(dict)
@@ -793,15 +793,8 @@ class _MonoRemapper(CloneRemapper):
             self.remap_node((g, fv), g, fv, ng, new, link=False)
 
 
-def monomorphize(resources, root_context):
-    """Monomorphize all graphs starting with the given root context."""
-    mono = Monomorphizer(resources)
-    return mono.run(root_context)
-
-
 __all__ = [
     "Monomorphizer",
     "Unspecializable",
     "concretize_cache",
-    "monomorphize",
 ]
