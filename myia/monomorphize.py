@@ -412,11 +412,10 @@ class Monomorphizer:
 
     Arguments:
         engine: The InferenceEngine containing the type information.
-        reuse_existing: Whether to reuse existing graphs when possible.
 
     """
 
-    def __init__(self, resources, reuse_existing=True):
+    def __init__(self, resources):
         """Initialize the monomorphizer."""
         self.engine = resources.inferrer.engine
         self.manager = resources.manager
@@ -424,7 +423,6 @@ class Monomorphizer:
         self.replacements = defaultdict(dict)
         self.results = {}
         self.ctcache = {}
-        self.reuse_existing = reuse_existing
         self.invmap = {}
         self.finder = TypeFinder(self.engine)
         self._fix_type = type_fixer(self.finder, self)
@@ -589,12 +587,8 @@ class Monomorphizer:
         that context.parent comes before context. That way, when copying
         children graphs, their parent graphs will have also been copied, so we
         can access their free variables.
-
-        self.last is a dictionary mapping each of the original graph to the
-        last context that uses it.
         """
         seen = set()
-        self.last = {}
         self.tasks = []
 
         def _process_ctx(ctx, orig_ctx):
@@ -605,7 +599,6 @@ class Monomorphizer:
             if ctx.parent != Context.empty():
                 orig_parent_ctx = self.specializations[ctx.parent]
                 _process_ctx(ctx.parent, orig_parent_ctx)
-            self.last[ctx.graph] = ctx
             self.tasks.append([ctx, orig_ctx])
 
         for ctx, orig_ctx in self.specializations.items():
@@ -616,25 +609,11 @@ class Monomorphizer:
     #################
 
     def create_graphs(self):
-        """Create the (empty) graphs associated to the contexts.
-
-        If self.reuse_existing is True, the last context that uses a graph will
-        be monomorphized in place, that is to say, into the original graph. The
-        exception to that is any graph that has the 'reference' flag. This flag
-        indicates the graph is a "reference graph" that may be used elsewhere
-        or reintroduced and we should not modify it.
-        """
+        """Create the (empty) graphs associated to the contexts."""
         for entry in self.tasks:
             ctx, orig_ctx = entry
-            if (
-                self.reuse_existing
-                and self.last[ctx.graph] is ctx
-                and not ctx.graph.has_flags("reference")
-            ):
-                newgraph = ctx.graph
-            else:
-                newgraph = ctx.graph.make_new(relation=next(_count))
-                newgraph.set_flags(reference=False)
+            newgraph = ctx.graph.make_new(relation=next(_count))
+            newgraph.set_flags(reference=False)
             self.results[ctx] = newgraph
             entry.append(newgraph)
 
@@ -814,9 +793,9 @@ class _MonoRemapper(CloneRemapper):
             self.remap_node((g, fv), g, fv, ng, new, link=False)
 
 
-def monomorphize(resources, root_context, reuse_existing=True):
+def monomorphize(resources, root_context):
     """Monomorphize all graphs starting with the given root context."""
-    mono = Monomorphizer(resources, reuse_existing=reuse_existing)
+    mono = Monomorphizer(resources)
     return mono.run(root_context)
 
 
