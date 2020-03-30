@@ -13,6 +13,7 @@ from ..operations import primitives as P
 from ..operations.gen import lop, reverse_binop, rop
 from ..public_api import item
 from ..utils import Registry
+from ..validate import AbstractValidator, MultiValidator, OperatorValidator
 from . import steps
 from .pipeline import PipelineDefinition
 from .resources import (
@@ -272,6 +273,13 @@ standard_resources = Resources.partial(
     tracker=Tracker.partial(),
     backend=BackendResource.partial(),
     debug_vm=DebugVMResource.partial(implementations=vm_registry),
+    validator=MultiValidator.partial(
+        validators=[
+            OperatorValidator,
+            AbstractValidator,
+            # CallValidator,
+        ]
+    ),
     return_backend=False,
     universal=False,
 )

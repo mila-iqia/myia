@@ -1,5 +1,7 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
+from types import SimpleNamespace
+
 from . import xtype
 from .abstract import (
     DEAD,
@@ -15,10 +17,9 @@ from .abstract import (
     VirtualFunction,
     abstract_check,
 )
-from .ir import manage
 from .operations import Primitive
 from .operations.primitives import BackendPrimitive
-from .utils import ErrorPool, overload
+from .utils import ErrorPool, Partializable, overload
 
 
 class ValidationError(Exception):
@@ -93,6 +94,10 @@ def validate_abstract(self, a: AbstractFunction, uses):
 class NodeValidator:
     """Validate each node in a graph."""
 
+    def __init__(self, resources, errors=None):
+        self.errors = errors or ErrorPool(exc_class=ValidationError)
+        self.manager = resources.manager
+
     def _test(self, node):
         try:
             self.test_node(node)
@@ -101,14 +106,8 @@ class NodeValidator:
             node.debug.errors.add(err)
             self.errors.add(err)
 
-    def setup(self, root, errors=None, manager=None):
-        """Set the error pool and the manager."""
-        self.errors = errors or ErrorPool(exc_class=ValidationError)
-        self.manager = manager or manage(root)
-
-    def run(self, root):
+    def __call__(self, root):
         """Run on the root graph."""
-        self.setup(root)
         for node in list(self.manager.all_nodes):
             self._test(node)
 
@@ -177,18 +176,16 @@ class CallValidator(NodeValidator):  # pragma: no cover
                 )
 
 
-class MultiValidator(NodeValidator):
+class MultiValidator(NodeValidator, Partializable):
     """Combine multiple validators."""
 
-    def __init__(self, *validators):
+    def __init__(self, validators, resources):
         """Initialize the MultiValidator."""
-        self.validators = [v for v in validators if v]
-
-    def setup(self, root):
-        """Set up all validators."""
-        super().setup(root)
-        for v in self.validators:
-            v.setup(root, errors=self.errors, manager=self.manager)
+        super().__init__(resources=resources)
+        self.resources = resources
+        self.validators = [
+            v(resources=resources, errors=self.errors) for v in validators if v
+        ]
 
     def test_node(self, node):
         """Test the node through every validator."""
@@ -204,11 +201,14 @@ def validate(root):
     primitive must be a BackendPrimitive.
     """
     mv = MultiValidator(
-        OperatorValidator(),
-        AbstractValidator(),
-        # CallValidator(),
+        validators=[
+            OperatorValidator,
+            AbstractValidator,
+            # CallValidator,
+        ],
+        resources=SimpleNamespace(manager=root.manager),
     )
-    mv.run(root)
+    mv(root)
 
 
 __all__ = [

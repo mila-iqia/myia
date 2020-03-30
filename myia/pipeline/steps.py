@@ -24,7 +24,7 @@ from ..utils import (
     new_universe,
     tracer,
 )
-from ..validate import ValidationError, validate
+from ..validate import ValidationError
 from ..xtype import UniverseType
 
 #############
@@ -378,7 +378,7 @@ def step_validate(resources, graph, outspec=None):
         raise ValidationError(
             "The output type of the graph changed during optimization."
         )
-    validate(graph)
+    resources.validator(graph)
     return {"graph": graph}
 
 
