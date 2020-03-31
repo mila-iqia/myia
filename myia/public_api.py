@@ -22,7 +22,7 @@ import numpy as np
 
 from . import operations
 from .abstract import myia_static
-from .frontends.pytorch_abstract_types import AA, APT, AS, APT_bool
+from .frontends.pytorch_abstract_types import APT, AS, APT_bool
 from .hypermap import hyper_map
 from .operations import primitives as P
 from .utils import MyiaValueError, core
@@ -527,16 +527,10 @@ def norm(inp, p=None, dim=None):
     if p is None:
         p = 2
 
-    if P.hastype(inp, APT):
-        # Convert p to input type.
-        p = P.scalar_to_array(P.scalar_cast(p, inp.dtype), APT)
-        # Create a value 1 with input type.
-        one = P.scalar_to_array(P.scalar_cast(1, inp.dtype), APT)
-    else:
-        # Convert p to input type.
-        p = P.scalar_to_array(P.scalar_cast(p, inp.dtype), AA)
-        # Create a value 1 with input type.
-        one = P.scalar_to_array(P.scalar_cast(1, inp.dtype), AA)
+    # Convert p to input type.
+    p = P.scalar_to_array(P.scalar_cast(p, inp.dtype), operations.typeof(inp))
+    # Create a value 1 with input type.
+    one = P.scalar_to_array(P.scalar_cast(1, inp.dtype), operations.typeof(inp))
 
     # Reshape inp based on dims, making sure that dimensions to norm
     # are all assembled in latest inp dimension.

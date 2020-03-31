@@ -157,7 +157,6 @@ def cost(model, x, y, adv):
 )
 def step_update(model, x, y, adv):
     adv = (adv - mean(adv)) / (std(adv) + 1e-7)
-    # loss = cost(model, x, y, adv)
     loss, dmodel = value_and_grad(cost, "model")(model, x, y, adv)
     return loss, model - dmodel
 
@@ -181,8 +180,6 @@ def run_episode(net, e, env):
     steps = 0
 
     while True:
-        # env.render()
-
         x = np.expand_dims(state, axis=0).astype("float32")
 
         if xs.shape[0] == 0:
@@ -229,7 +226,6 @@ def run_episode(net, e, env):
 
 
 if __name__ == "__main__":
-    # for e in range(10000):
     for e in range(10):
         complete = run_episode(model, e, ENV)
 
