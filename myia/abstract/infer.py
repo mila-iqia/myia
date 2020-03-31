@@ -18,6 +18,7 @@ from ..utils import (
     infer_trace,
     tracer,
     type_error_nargs,
+    untested_legacy,
 )
 from .amerge import amerge, bind
 from .data import (
@@ -30,12 +31,14 @@ from .data import (
     AbstractScalar,
     AbstractTuple,
     AbstractValue,
+    DummyFunction,
     Function,
     GraphFunction,
     JTransformedFunction,
     MacroFunction,
     MetaGraphFunction,
     PartialApplication,
+    Primitive,
     PrimitiveFunction,
     TypedPrimitive,
     VirtualFunction,
@@ -689,6 +692,52 @@ def compute_bprop_type(orig_fn, args, out):
     )
 
 
+async def compute_jinv_type(x):
+    """Compute the abstract type of jinv(_ :: x)."""
+    if isinstance(x, AbstractJTagged):
+        return x.element
+    elif isinstance(x, VirtualFunction):
+        return VirtualFunction(
+            tuple([await compute_jinv_type(arg) for arg in x.args]),
+            await compute_jinv_type(x.output.elements[0]),
+        )
+    elif isinstance(x, JTransformedFunction):
+        return x.fn
+    elif isinstance(x, GraphFunction):
+        g = x.graph
+        primal = g and g.transforms.get("primal", None)
+        if primal:
+            if isinstance(primal, Graph):
+                if primal.parent:
+                    # The primal for a closure can't be used
+                    # because it points to the original nodes
+                    # of its parent, whereas we would like to
+                    # point to the transformed nodes of the
+                    # parent. This is fixable, and will need
+                    # to be fixed to support a few edge cases.
+                    res = DummyFunction()
+                else:
+                    with untested_legacy():
+                        # Not sure why this never happens anymore
+                        # primal = engine.resources.convert(primal)
+                        res = GraphFunction(primal, Context.empty())
+            else:
+                with untested_legacy():
+                    # Not sure why this never happens either
+                    res = primal
+                    if isinstance(res, Primitive):
+                        tid = getattr(x, "tracking_id", None)
+                        res = PrimitiveFunction(res, tracking_id=tid)
+        else:
+            raise MyiaTypeError(f"Bad input type for Jinv: {x}")
+        return res
+    elif isinstance(x, AbstractFunction):
+        fns = [await compute_jinv_type(f) for f in await x.get()]
+        return AbstractFunction(*fns)
+    else:
+        raise MyiaTypeError(f"Wrong type for jinv: {x}")
+
+
 class JInferrer(Inferrer):
     """Inferrer for a function transformed through J."""
 
@@ -697,10 +746,6 @@ class JInferrer(Inferrer):
         super().__init__()
         self.fn = fn
         self.orig_fn = orig_fn
-
-    def _jinv(self, x):
-        assert isinstance(x, AbstractJTagged)
-        return x.element
 
     async def _jtag(self, x):
         if isinstance(x, AbstractFunction):
@@ -712,7 +757,7 @@ class JInferrer(Inferrer):
         """Run the inference."""
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
-            jinv_args = tuple(self._jinv(a) for a in args)
+            jinv_args = [await compute_jinv_type(a) for a in args]
             jinv_argrefs = tuple(VirtualReference(arg) for arg in jinv_args)
             res = await self.fn.run(engine, None, jinv_argrefs)
             res_wrapped = await self._jtag(res)
@@ -911,5 +956,6 @@ __all__ = [
     "VirtualInferrer",
     "compute_bprop_type",
     "execute_inferrers",
+    "compute_jinv_type",
     "standard_prim",
 ]
