@@ -29,7 +29,6 @@ from ..multitest import (
     eqtest,
     mt,
     myia_function_test,
-    run_gpu,
 )
 from ..test_grad import grad_wrap
 
@@ -51,6 +50,21 @@ def eqtest(t1: torch.Tensor, t2, rtol=1e-5, atol=1e-8, **kwargs):
     and display a more informative log if comparison fail,
     especially max absolute and relative difference.
     """
+    # Quick debug code to display mismatching values
+    shape = t1.shape
+    if len(shape) > 1:
+        x1 = t1.flatten()
+        x2 = t2.flatten()
+        s = x1.shape[0]
+        c = 0
+        for i in range(s):
+            v1 = x1[i].item()
+            v2 = x2[i].item()
+            if abs(v1 - v2) > atol:
+                c += 1
+                print('diff', c, i + 1, v1, v2)
+    # End debug code
+
     np.testing.assert_allclose(
         t1.detach().numpy(),
         t2.detach().numpy(),
@@ -599,8 +613,50 @@ def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
     return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)
 
 
+# conv_transpose2d seems to fail with relay
+# when output padding is not full zero.
 @mt(
-    run_gpu(
+    run(
+        torch.randn(2, 3, 5, 3),
+        torch.randn(3, 6, 3, 3),
+        None,
+        (2, 3),
+        (3, 2),
+        (0, 1),  # output padding != (0, 0), will fail with relay
+        1,
+        (1, 1),
+    ),
+    run(
+        torch.randn(2, 3, 5, 3),
+        torch.randn(3, 6, 3, 3),
+        None,
+        (2, 3),
+        (3, 2),
+        (1, 0),  # output padding != (0, 0), will fail with relay
+        1,
+        (1, 1),
+    ),
+    run(
+        torch.randn(2, 3, 5, 3),
+        torch.randn(3, 6, 3, 3),
+        None,
+        (2, 3),
+        (3, 2),
+        (1, 1),  # output padding != (0, 0), will fail with relay
+        1,
+        (1, 1),
+    ),
+    run(
+        torch.randn(2, 3, 5, 3),
+        torch.randn(3, 6, 3, 3),
+        None,
+        (2, 3),
+        (3, 2),
+        (0, 0),  # output padding is zero, pass
+        1,
+        (1, 1),
+    ),
+    run(
         torch.randn(5, 2, 5, 6),
         torch.randn(2, 2, 4, 4),
         None,
@@ -610,7 +666,7 @@ def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
         1,
         (1, 1),
     ),
-    run_gpu(
+    run(
         torch.randn(1, 1, 4, 4),
         torch.randn(1, 3, 2, 2),
         None,
