@@ -2,7 +2,7 @@ from pytest import mark
 
 from myia.compile import closure_convert
 from myia.ir import manage
-from myia.pipeline import scalar_debug_pipeline
+from myia.pipeline import scalar_debug_pipeline, steps
 
 
 def step_cconv(graph):
@@ -11,7 +11,7 @@ def step_cconv(graph):
 
 
 cconv_pipeline = scalar_debug_pipeline.select(
-    "resources", "parse", "resolve", "export"
+    "resources", "parse", {"resolve": steps.step_resolve}, "export"
 ).insert_after("resolve", cconv=step_cconv)
 
 

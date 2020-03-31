@@ -297,7 +297,6 @@ standard_resources = Resources.partial(
 standard_pipeline = PipelineDefinition(
     resources=standard_resources,
     parse=steps.step_parse,
-    resolve=steps.step_resolve,
     infer=steps.step_infer,
     specialize=steps.step_specialize,
     simplify_types=steps.step_simplify_types,
@@ -317,7 +316,6 @@ scalar_pipeline = standard_pipeline.configure(
 standard_debug_pipeline = PipelineDefinition(
     resources=standard_resources,
     parse=steps.step_parse,
-    resolve=steps.step_resolve,
     infer=steps.step_infer,
     specialize=steps.step_specialize,
     simplify_types=steps.step_simplify_types,
@@ -345,12 +343,12 @@ standard_parse = standard_pipeline.select(
 
 
 scalar_parse = scalar_pipeline.select(
-    "resources", "parse", "resolve"
+    "resources", "parse", {"resolve": steps.step_resolve}
 ).make_transformer("input", "graph")
 
 
 scalar_debug_compile = scalar_debug_pipeline.select(
-    "resources", "parse", "resolve", "export"
+    "resources", "parse", {"resolve": steps.step_resolve}, "export"
 ).make_transformer("input", "output")
 
 

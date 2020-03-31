@@ -45,6 +45,7 @@ class MyiaFunction:
         alias_tracker=None,
         use_universe=False,
         tracer=ABSENT,
+        pipeline=standard_pipeline,
     ):
         """Initialize a MyiaFunction."""
         # Change this once relay becomes the default backend.
@@ -55,7 +56,7 @@ class MyiaFunction:
         self.fn = fn
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
-        self.pip = standard_pipeline.configure(
+        self.pip = pipeline.configure(
             {
                 "resources.universal": use_universe,
                 "resources.backend.name": backend,
@@ -148,6 +149,7 @@ def myia(
     return_backend=False,
     alias_tracker=None,
     use_universe=False,
+    pipeline=standard_pipeline,
 ):
     """Create a function using Myia's runtime.
 
@@ -182,6 +184,7 @@ def myia(
         return_backend=return_backend,
         alias_tracker=alias_tracker,
         use_universe=use_universe,
+        pipeline=pipeline,
     )
 
 

@@ -63,7 +63,6 @@ def grad_wrap(graph, argspec):
 grad_pipeline = PipelineDefinition(
     resources=standard_resources,
     parse=steps.step_parse,
-    resolve=steps.step_resolve,
     infer=steps.step_infer,
     specialize=steps.step_specialize,
     opt=steps.step_debug_opt,

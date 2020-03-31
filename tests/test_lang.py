@@ -1,12 +1,12 @@
 from pytest import mark
 
-from myia.pipeline import scalar_debug_pipeline
+from myia.pipeline import scalar_debug_pipeline, steps
 
 from .common import Point, mysum
 from .multitest import mt, run, run_debug
 
 lang_pipeline = scalar_debug_pipeline.select(
-    "resources", "parse", "resolve", "export"
+    "resources", "parse", {"resolve": steps.step_resolve}, "export"
 )
 
 
