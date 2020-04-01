@@ -1119,7 +1119,7 @@ def expand_J(resources, node, equiv):
             sig = newg.make_signature(argspec)
             newg = newg.generate_graph(sig)
         newg = clone(newg, quarantine=lambda g: g.abstract is not None)
-        resources.manager.add_graph(newg)
+        resources.infer_manager.add_graph(newg)
         empty = engine.context_class.empty()
         context = empty.add(newg, tuple(argspec))
         engine.run_coroutine(engine.infer_function(newg, argspec, outspec))
@@ -1167,8 +1167,8 @@ class JElim(Partializable):
 
     def __call__(self, root):
         """Apply JElim on root."""
-        mng = self.resources.manager
-        args = dict(opt=self, node=None, manager=self.resources.manager)
+        mng = self.resources.opt_manager
+        args = dict(opt=self, node=None, manager=mng)
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
             mng.keep_roots(root)

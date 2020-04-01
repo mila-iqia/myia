@@ -418,7 +418,8 @@ class Monomorphizer:
     def __init__(self, resources, engine):
         """Initialize the monomorphizer."""
         self.engine = engine
-        self.manager = resources.manager
+        self.infer_manager = resources.infer_manager
+        self.opt_manager = resources.opt_manager
         self.specializations = {}
         self.replacements = defaultdict(dict)
         self.results = {}
@@ -437,7 +438,7 @@ class Monomorphizer:
         self.monomorphize()
         self.fill_placeholders()
         result = self.results[context]
-        self.manager.keep_roots(result)
+        self.opt_manager.keep_roots(result)
         self.fix_types()
         return result
 
@@ -594,7 +595,7 @@ class Monomorphizer:
         def _process_ctx(ctx, orig_ctx):
             if ctx in seen:
                 return
-            self.manager.add_graph(ctx.graph, root=True)
+            self.infer_manager.add_graph(ctx.graph, root=True)
             seen.add(ctx)
             if ctx.parent != Context.empty():
                 orig_parent_ctx = self.specializations[ctx.parent]
@@ -637,7 +638,7 @@ class Monomorphizer:
         4. Set node.abstract for all of the cloned graph's nodes.
         5. Undo the modifications on the original graph.
         """
-        m = self.manager
+        m = self.infer_manager
         cloners = {}
 
         for ctx, orig_ctx, newgraph in self.tasks:
@@ -703,7 +704,6 @@ class Monomorphizer:
         constants directly, therefore the manager is cleared entirely before
         doing the procedure.
         """
-        self.manager.clear()
         for ctx, g in self.results.items():
             for node in dfs(g.return_, succ=succ_incoming):
                 if node.is_constant(_Placeholder):
@@ -718,7 +718,7 @@ class Monomorphizer:
 
     def fix_types(self):
         """Fix all node types."""
-        for node in self.manager.all_nodes:
+        for node in self.opt_manager.all_nodes:
             old_ref = self.invmap.get(node, None)
             assert old_ref is not None
             if getattr(old_ref.node, "force_abstract", False):
@@ -729,7 +729,7 @@ class Monomorphizer:
             else:
                 node.abstract = AbstractError(DEAD)
 
-        for node in self.manager.all_nodes:
+        for node in self.opt_manager.all_nodes:
             if node.is_constant(Graph):
                 node.abstract = node.value.abstract
             node.abstract = self._fix_type(node.abstract)

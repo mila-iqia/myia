@@ -36,7 +36,7 @@ def default_convert(env, fn: FunctionType):
 
 @overload  # noqa: F811
 def default_convert(env, g: Graph):
-    mng = env.resources.manager
+    mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
         env.object_map[g] = g2
@@ -106,6 +106,9 @@ class ConverterResource(Partializable):
 
     def __call__(self, value, manage=True):
         """Convert a value."""
+        if isinstance(value, Graph) and value.abstract is not None:
+            return value
+
         try:
             v = self.object_map[value]
             if isinstance(v, _Unconverted):
@@ -115,7 +118,7 @@ class ConverterResource(Partializable):
             v = default_convert(self, value)
 
         if manage and isinstance(v, Graph):
-            self.resources.manager.add_graph(v)
+            self.resources.infer_manager.add_graph(v)
         return v
 
 
@@ -125,7 +128,7 @@ class Tracker(Partializable):
     def __init__(self, resources):
         """Initialize a Tracker."""
         self.todo = set()
-        self.manager = resources.manager
+        self.manager = resources.opt_manager
         self.activated = False
 
     def activate(self):
@@ -152,11 +155,12 @@ class InferenceResource(Partializable):
     def __init__(self, resources, constructors, max_stack_depth):
         """Initialize an InferenceResource."""
         self.resources = resources
-        self.manager = resources.manager
+        self.manager = resources.infer_manager
         self.constructors = constructors
         self.max_stack_depth = max_stack_depth
         self.engine = InferenceEngine(
             resources,
+            manager=self.manager,
             constructors=self.constructors,
             max_stack_depth=self.max_stack_depth,
         )
@@ -185,10 +189,10 @@ class LiveInferenceResource(Partializable):
     def __init__(self, resources, constructors):
         """Initialize a LiveInferenceResource."""
         self.resources = resources
-        self.manager = resources.manager
+        self.manager = resources.opt_manager
         self.constructors = constructors
         self.live = LiveInferenceEngine(
-            resources, constructors=self.constructors
+            resources, constructors=self.constructors, manager=self.manager
         )
 
     def __call__(self):
@@ -196,7 +200,7 @@ class LiveInferenceResource(Partializable):
         tracker = self.resources.tracker
         if not tracker.activated:
             return
-        mng = self.manager
+        mng = self.resources.opt_manager
         todo = tracker.todo
         while todo:
             nodes = [
@@ -215,7 +219,7 @@ class MonomorphizationResource(Partializable):
         """Initialize a MonomorphizationResource."""
         self.resources = resources
         self.engine = resources.inferrer.engine
-        self.manager = resources.manager
+        self.manager = resources.opt_manager
         self.mono = Monomorphizer(resources, self.engine)
 
     def __call__(self, context):
@@ -268,7 +272,7 @@ class DebugVMResource(Partializable):
         """Initialize a DebugVMResource."""
         self.vm = VM(
             resources.convert,
-            resources.manager,
+            resources.opt_manager,
             resources.py_implementations,
             implementations,
         )

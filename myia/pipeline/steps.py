@@ -7,7 +7,7 @@ from itertools import count
 
 from ..abstract import AbstractTuple, find_aliases, nobottom, type_to_abstract
 from ..compile import BackendValue
-from ..ir import Graph
+from ..ir import Graph, clone
 from ..opt import (
     CSE,
     DeadDataElimination,
@@ -86,7 +86,7 @@ class Optimizer(Partializable):
                 if run_only_once:
                     break
         with tracer("keep_roots"):
-            resources.manager.keep_roots(graph)
+            resources.opt_manager.keep_roots(graph)
         res = {"graph": graph}
         return res
 
@@ -122,11 +122,24 @@ def step_parse(resources, input, argspec=None):
 ###########
 
 
-step_resolve = Optimizer.partial(
-    run_only_once=True,
-    phases=dict(resolve=[optlib.resolve_globals]),
-    use_tracker=False,
-)
+def step_resolve(resources, graph, argspec=None, outspec=None):
+    """Resolve all global symbols in the graph.
+
+    This will remove all resolve(...) calls in the graph.
+
+    This step is unnecessary if the infer/specialize steps are in the pipeline.
+    """
+    new_graph = clone(graph, total=True)
+    resources.opt_manager.add_graph(new_graph, root=True)
+    resources.infer_manager = resources.opt_manager
+    opt = Optimizer(
+        run_only_once=True,
+        phases=dict(resolve=[optlib.resolve_globals]),
+        use_tracker=False,
+    )
+    return opt(
+        resources=resources, graph=new_graph, argspec=argspec, outspec=outspec
+    )
 
 
 #########
@@ -201,7 +214,7 @@ def step_simplify_types(resources, graph, argspec, outspec):
         graph: The prepared graph.
     """
     resources.tracker.activate()
-    mng = resources.manager
+    mng = resources.opt_manager
     simplify_types(graph, mng)
     mng.keep_roots(graph)
     new_argspec = tuple(p.abstract for p in graph.parameters)

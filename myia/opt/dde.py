@@ -42,7 +42,7 @@ class ValuePropagator:
     def __init__(self, resources, root):
         """Initialize a ValuePropagator and run the algorithm."""
         self.resources = resources
-        self.manager = resources.manager
+        self.manager = resources.opt_manager
         # need :: node -> {paths}
         self.need = defaultdict(set)
         # flow :: node -> {node}

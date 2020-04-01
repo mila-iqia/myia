@@ -264,7 +264,8 @@ standard_method_map = {
 
 
 standard_resources = Resources.partial(
-    manager=GraphManager.partial(),
+    infer_manager=GraphManager.partial(),
+    opt_manager=GraphManager.partial(),
     py_implementations=py_registry,
     grad_implementations=grad_registry,
     method_map=standard_method_map,

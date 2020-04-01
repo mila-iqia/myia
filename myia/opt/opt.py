@@ -176,7 +176,7 @@ class LocalPassOptimizer:
         due to optimizations.
         """
         if self.resources is not None:
-            mng = self.resources.manager
+            mng = self.resources.opt_manager
             mng.add_graph(graph)
         else:
             mng = manage(graph)

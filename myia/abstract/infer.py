@@ -76,6 +76,7 @@ class InferenceEngine:
         self,
         resources,
         *,
+        manager,
         constructors,
         max_stack_depth=50,
         context_class=Context,
@@ -83,7 +84,7 @@ class InferenceEngine:
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop(InferenceError)
         self.resources = resources
-        self.mng = self.resources.manager
+        self.mng = manager
         self._constructors = constructors
         self.errors = []
         self.context_class = context_class
@@ -273,6 +274,10 @@ class InferenceEngine:
             self.constructors[m] = MacroInferrer(m.macro)
         return self.constructors[m]
 
+    @get_inferrer_for.register
+    def get_inferrer_for(self, df: DummyFunction):
+        raise MyiaTypeError(f"Trying to call dummy")
+
     async def execute(self, fn, *args):
         r"""Infer the result of fn(\*args)."""
         infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
@@ -383,12 +388,15 @@ class LiveInferenceEngine(InferenceEngine):
     Each node of each graph is only allowed to have a single type.
     """
 
-    def __init__(self, resources, *, constructors):
+    def __init__(self, resources, *, constructors, manager):
         """Initialize a LiveInferenceEngine."""
         from ..monomorphize import type_fixer, TypeFinder
 
         super().__init__(
-            resources, constructors=constructors, max_stack_depth=50
+            resources,
+            constructors=constructors,
+            max_stack_depth=50,
+            manager=manager,
         )
         self.fix_type = type_fixer(TypeFinder(self))
 

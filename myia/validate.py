@@ -96,7 +96,7 @@ class NodeValidator:
 
     def __init__(self, resources, errors=None):
         self.errors = errors or ErrorPool(exc_class=ValidationError)
-        self.manager = resources.manager
+        self.manager = resources.opt_manager
 
     def _test(self, node):
         try:
@@ -206,7 +206,7 @@ def validate(root):
             AbstractValidator,
             # CallValidator,
         ],
-        resources=SimpleNamespace(manager=root.manager),
+        resources=SimpleNamespace(opt_manager=root.manager),
     )
     mv(root)
 
