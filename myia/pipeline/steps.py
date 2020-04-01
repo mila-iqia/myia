@@ -194,6 +194,7 @@ def step_specialize(resources, graph, inference_context):
         graph: The specialized graph.
     """
     new_graph = resources.monomorphizer(inference_context)
+    resources.opt_manager.keep_roots(new_graph)
     return {"graph": new_graph}
 
 

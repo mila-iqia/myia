@@ -1124,6 +1124,7 @@ def expand_J(resources, node, equiv):
         context = empty.add(newg, tuple(argspec))
         engine.run_coroutine(engine.infer_function(newg, argspec, outspec))
         newg2 = resources.monomorphizer(context)
+        resources.opt_manager.keep_roots(newg2)
 
         newg = newg2
         for node in mono.manager.all_nodes:

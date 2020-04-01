@@ -419,7 +419,6 @@ class Monomorphizer:
         """Initialize the monomorphizer."""
         self.engine = engine
         self.infer_manager = resources.infer_manager
-        self.opt_manager = resources.opt_manager
         self.specializations = {}
         self.replacements = defaultdict(dict)
         self.results = {}
@@ -438,7 +437,6 @@ class Monomorphizer:
         self.monomorphize()
         self.fill_placeholders()
         result = self.results[context]
-        self.opt_manager.keep_roots(result)
         self.fix_types()
         return result
 
@@ -718,7 +716,12 @@ class Monomorphizer:
 
     def fix_types(self):
         """Fix all node types."""
-        for node in self.opt_manager.all_nodes:
+        all_nodes = set()
+        for ctx, g in self.results.items():
+            all_nodes.update(g.parameters)
+            all_nodes.update(dfs(g.return_, succ=succ_incoming))
+
+        for node in all_nodes:
             old_ref = self.invmap.get(node, None)
             assert old_ref is not None
             if getattr(old_ref.node, "force_abstract", False):
@@ -729,7 +732,7 @@ class Monomorphizer:
             else:
                 node.abstract = AbstractError(DEAD)
 
-        for node in self.opt_manager.all_nodes:
+        for node in all_nodes:
             if node.is_constant(Graph):
                 node.abstract = node.value.abstract
             node.abstract = self._fix_type(node.abstract)
