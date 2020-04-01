@@ -22,11 +22,11 @@ import numpy as np
 
 from . import operations
 from .abstract import myia_static
-from .frontends.pytorch_abstract_types import APT, AS, APT_bool
+from .frontends.abstract_types import AS, AA_bool
 from .hypermap import hyper_map
 from .operations import primitives as P
 from .utils import MyiaValueError, core
-from .xtype import TupleT, f32, i64, u64
+from .xtype import TupleT, i64, u64
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 
@@ -463,7 +463,7 @@ def mean(self, dim=None, keepdim=False, *, dtype=None):
     x = self
     dim = _dim_explicit(x.shape, dim)
 
-    if P.hastype(x, APT_bool):
+    if P.hastype(x, AA_bool):
         x = P.array_cast(x, i64)
 
     if dtype is not None:
@@ -606,9 +606,10 @@ def reshape(x, *shp):
 @core
 def scatter(self, dim, index, src):
     """Map of 'scatter' pytorch method."""
-    if not P.hastype(src, APT):
-        if P.hastype(self, APT) or P.hastype(src, AS):
-            src = P.scalar_to_array(P.scalar_cast(src, self.dtype), APT)
+    if P.hastype(src, AS):
+        src = P.scalar_to_array(
+            P.scalar_cast(src, self.dtype), operations.typeof(self)
+        )
     if len(src.shape) == 0:
         src = P.distribute(src, index.shape)
     return P.scatter(self, dim, index, src)
@@ -715,7 +716,7 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
     else:
         dim = _dim_explicit(x.shape, dim)
 
-    if P.hastype(x, APT_bool):
+    if P.hastype(x, AA_bool):
         x = P.array_cast(x, i64)
 
     if dtype is not None:
@@ -768,7 +769,7 @@ def var(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
     x = self
     dim = _dim_explicit(x.shape, dim)
 
-    if P.hastype(x, APT_bool):
+    if P.hastype(x, AA_bool):
         x = P.array_cast(x, i64)
 
     if dtype is not None:
@@ -790,24 +791,4 @@ def view_as(x, y):
     return P.reshape(x, y.shape)
 
 
-@core
-def zeros(*shp, dtype=None):
-    """Map of 'dim' pytorch method."""
-    if dtype is None:
-        dtype = f32
-
-    if len(shp) == 1:
-        if isinstance(shp[0], tuple):
-            shp = shp[0]
-    return P.distribute(P.scalar_to_array(P.scalar_cast(0.0, dtype), APT), shp)
-
-
-__all__ = [
-    "conv2d",
-    "cross_entropy",
-    "item",
-    "linear",
-    "relu",
-    "sigmoid",
-    "zeros",
-]
+__all__ = ["conv2d", "cross_entropy", "item", "linear", "relu", "sigmoid"]

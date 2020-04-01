@@ -58,15 +58,28 @@ from ..public_api import (
     unsqueeze,
     var,
     view_as,
-    zeros,
 )
 from ..utils import OrderedSet, core, get_fields
-from ..xtype import NDArray
+from ..xtype import NDArray, f32
 from .pytorch_abstract_types import (
+    APT,
     AbstractModule,
     PyTorchTensor,
     pytorch_dtype_to_type,
 )
+
+
+@core
+def zeros(*shp, dtype=None):
+    """Map of 'dim' pytorch method."""
+    if dtype is None:
+        dtype = f32
+
+    if len(shp) == 1:
+        if isinstance(shp[0], tuple):
+            shp = shp[0]
+    return P.distribute(P.scalar_to_array(P.scalar_cast(0.0, dtype), APT), shp)
+
 
 standard_object_map.update(
     {

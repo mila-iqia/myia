@@ -79,13 +79,4 @@ APT = AbstractArray(
 )
 
 
-APT_bool = AbstractArray(
-    AbstractScalar({TYPE: Bool, VALUE: ANYTHING}),
-    {SHAPE: ANYTHING, TYPE: PyTorchTensor},
-)
-
-
-AS = AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING})
-
-
 __all__ = ["AbstractModule", "PyTorchTensor", "pytorch_dtype_to_type"]
