@@ -14,7 +14,6 @@ from numpy.random import RandomState
 from myia import ArithmeticData, myia, value_and_grad
 from myia.api import to_device
 
-# The following import installs custom tracebacks for inference errors
 from myia.debug import traceback  # noqa
 from myia.frontends import activate_frontend
 from myia.public_api import _sum, mean, softmax, std
