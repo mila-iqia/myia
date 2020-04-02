@@ -20,6 +20,7 @@ from .resources import (
     BackendResource,
     ConverterResource,
     DebugVMResource,
+    Incorporator,
     InferenceResource,
     LiveInferenceResource,
     MonomorphizationResource,
@@ -285,6 +286,7 @@ standard_resources = Resources.partial(
             # CallValidator,
         ]
     ),
+    incorporate=Incorporator.partial(),
     return_backend=False,
     universal=False,
 )

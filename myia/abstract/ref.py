@@ -175,6 +175,7 @@ class EvaluationCache:
     def __init__(self, loop, keycalc, keytransform):
         """Initialize an EvaluationCache."""
         self.cache = {}
+        self.new = {}
         self.loop = loop
         self.keytransform = keytransform
         self.keycalc = keycalc
@@ -184,7 +185,7 @@ class EvaluationCache:
         key = self.keytransform(key)
         if key not in self.cache:
             coro = self.keycalc(key)
-            self.cache[key] = self.loop.create_task(coro)
+            self.cache[key] = self.new[key] = self.loop.create_task(coro)
         return self.cache[key]
 
     def set_value(self, key, value):
@@ -194,7 +195,7 @@ class EvaluationCache:
         """
         fut = asyncio.Future(loop=self.loop)
         fut.set_result(value)
-        self.cache[key] = fut
+        self.cache[key] = self.new[key] = fut
 
 
 __consolidate__ = True

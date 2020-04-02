@@ -100,6 +100,7 @@ class InferenceEngine:
             keytransform=self.get_actual_ref,
         )
         self.reference_map = {}
+        self.new_reference_map = {}
         self.constructors = {}
 
     async def infer_function(self, fn, argspec, outspec=None):
@@ -198,7 +199,7 @@ class InferenceEngine:
             # This will link the old node's debug info to the new node, if
             # necessary.
             new.node.debug.about = About(orig.node.debug, "reroute")
-        self.reference_map[orig] = new
+        self.reference_map[orig] = self.new_reference_map[orig] = new
         return await self.get_inferred(new)
 
     def get_actual_ref(self, ref):
@@ -384,8 +385,10 @@ class InferenceEngine:
 
     def concretize_cache(self):
         """Complete the engine's caches with concretized contexts."""
-        concretize_cache(self.cache.cache)
-        concretize_cache(self.reference_map)
+        concretize_cache(self.cache.new, dest=self.cache.cache)
+        self.cache.new = {}
+        concretize_cache(self.new_reference_map, dest=self.reference_map)
+        self.new_reference_map = {}
 
 
 class LiveInferenceEngine(InferenceEngine):

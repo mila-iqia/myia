@@ -1091,10 +1091,8 @@ def expand_J(resources, node, equiv):
     arg = equiv[C].value
     assert getattr(arg, "parent", None) is None
 
-    prev_resources = resources
-
-    if not hasattr(prev_resources, "grad_cache"):
-        prev_resources.grad_cache = {}
+    if not hasattr(resources, "grad_cache"):
+        resources.grad_cache = {}
 
     try:
         if isinstance(arg, Graph):
@@ -1102,41 +1100,19 @@ def expand_J(resources, node, equiv):
         else:
             key = (arg, equiv[C].abstract)
 
-        if key in prev_resources.grad_cache:
-            ct = Constant(prev_resources.grad_cache[key])
+        if key in resources.grad_cache:
+            ct = Constant(resources.grad_cache[key])
             ct.abstract = ct.value.abstract
             return ct
 
-        newg = Jimpl(arg, prev_resources, node)
-
-        resources = resources.copy()
-        engine = resources.inferrer.engine
-        mono = resources.monomorphizer
         vfn = node.abstract.get_unique()
-        argspec = vfn.args
-        outspec = vfn.output
-        if not isinstance(newg, Graph):
-            sig = newg.make_signature(argspec)
-            newg = newg.generate_graph(sig)
-        newg = clone(newg, quarantine=lambda g: g.abstract is not None)
-        resources.infer_manager.add_graph(newg)
-        empty = engine.context_class.empty()
-        context = empty.add(newg, tuple(argspec))
-        engine.run_coroutine(engine.infer_function(newg, argspec, outspec))
-        newg2 = resources.monomorphizer(context)
-        resources.opt_manager.keep_roots(newg2)
-
-        newg = newg2
-        for node in mono.manager.all_nodes:
-            if node.is_constant(Quarantined):
-                node.value = node.value.graph
-        for g in mono.manager.graphs:
-            g._manager = None
+        newg = Jimpl(arg, resources, node)
+        newg = resources.incorporate(newg, vfn.args, vfn.output)
 
         if isinstance(arg, Graph):
             arg.transforms["grad"] = newg
 
-        prev_resources.grad_cache[key] = newg
+        resources.grad_cache[key] = newg
 
     except NotImplementedError:
         return None

@@ -55,8 +55,9 @@ from .ir import (
     MetaGraph,
     succ_incoming,
 )
+from .ir.clone import Quarantined
 from .operations import Primitive
-from .utils import InferenceError, MyiaTypeError, overload
+from .utils import InferenceError, MyiaTypeError, OrderedSet, overload
 
 
 class Unspecializable(Exception):
@@ -372,12 +373,12 @@ class Monomorphizer:
         self.results = {}
         self.ctcache = {}
         self.invmap = {}
-        self.finder = TypeFinder(self.engine)
-        self._fix_type = type_fixer(self.finder, self)
 
     def run(self, context):
         """Run monomorphization."""
         self.engine.concretize_cache()
+        self.finder = TypeFinder(self.engine)
+        self._fix_type = type_fixer(self.finder, self)
         self.collect(context)
         self.order_tasks()
         self.create_graphs()
@@ -538,7 +539,7 @@ class Monomorphizer:
         self.tasks = []
 
         def _process_ctx(ctx, orig_ctx):
-            if ctx in seen:
+            if ctx in seen or ctx in self.results:
                 return
             self.infer_manager.add_graph(ctx.graph, root=True)
             seen.add(ctx)
@@ -649,7 +650,7 @@ class Monomorphizer:
         constants directly, therefore the manager is cleared entirely before
         doing the procedure.
         """
-        for ctx, g in self.results.items():
+        for ctx, orig_ctx, g in self.tasks:
             for node in dfs(g.return_, succ=succ_incoming):
                 if node.is_constant(_Placeholder):
                     node.value = self.results[node.value.context]
@@ -663,15 +664,16 @@ class Monomorphizer:
 
     def fix_types(self):
         """Fix all node types."""
-        all_nodes = set()
-        for ctx, g in self.results.items():
+        all_nodes = OrderedSet()
+        for ctx, orig_ctx, g in self.tasks:
             all_nodes.update(g.parameters)
             all_nodes.update(dfs(g.return_, succ=succ_incoming))
 
         for node in all_nodes:
             old_ref = self.invmap.get(node, None)
-            assert old_ref is not None
-            if getattr(old_ref.node, "force_abstract", False):
+            if old_ref is None:
+                assert node.abstract is not None
+            elif getattr(old_ref.node, "force_abstract", False):
                 assert old_ref.node.abstract is not None
                 node.abstract = old_ref.node.abstract
             elif old_ref in self.engine.cache.cache:

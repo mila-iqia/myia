@@ -230,6 +230,41 @@ class MonomorphizationResource(Partializable):
             return rval
 
 
+class Incorporator(Partializable):
+    """Resource to integrate a new graph during optimization."""
+
+    def __init__(self, resources):
+        """Initialize an Incorporator."""
+        self.infer_manager = resources.infer_manager
+        self.opt_manager = resources.opt_manager
+        self.engine = resources.inferrer.engine
+        self.mono = resources.monomorphizer
+
+    def opaque_to_inference(self, node):
+        """A graph is opaque to inference if it has a type."""
+        g = node.value if node.is_constant_graph() else node.graph
+        return g and g.abstract is not None
+
+    def __call__(self, graph, argspec, outspec):
+        """Run inferrer and monomorphizer on graph.
+
+        The graph's input types are given in argspec, and the expected output
+        type in outspec.
+        """
+        self.infer_manager.set_opaque_condition(self.opaque_to_inference)
+        if not isinstance(graph, Graph):
+            sig = graph.make_signature(argspec)
+            graph = graph.generate_graph(sig)
+        self.infer_manager.add_graph(graph)
+        context = self.engine.context_class.empty().add(graph, tuple(argspec))
+        self.engine.run_coroutine(
+            self.engine.infer_function(graph, argspec, outspec)
+        )
+        mgraph = self.mono(context)
+        # self.opt_manager.add_graph(mgraph)
+        return mgraph
+
+
 class NumpyChecker:
     """Dummy backend used for debug mode."""
 
@@ -317,6 +352,7 @@ __all__ = [
     "BackendResource",
     "ConverterResource",
     "DebugVMResource",
+    "Incorporator",
     "InferenceResource",
     "NumpyChecker",
     "Resources",
