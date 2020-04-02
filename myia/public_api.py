@@ -1,4 +1,4 @@
-"""PyTorch Frontend."""
+"""Myia Frontend API of functions."""
 
 #############################################################################
 # WARNING:  None of this file is explicitly executed by pytest or forced    #
@@ -19,15 +19,14 @@ import operator
 from functools import reduce
 
 import numpy as np
-import torch
 
-from .. import operations
-from ..abstract import myia_static
-from ..hypermap import hyper_map
-from ..operations import primitives as P
-from ..utils import MyiaValueError, core
-from ..xtype import TupleT, f32, i64, u64
-from .pytorch_abstract_types import APT, APT_bool
+from . import operations
+from .abstract import myia_static
+from .frontends.abstract_types import AS, AA_bool
+from .hypermap import hyper_map
+from .operations import primitives as P
+from .utils import MyiaValueError, core
+from .xtype import TupleT, i64, u64
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 
@@ -297,7 +296,7 @@ def conv2d(input, weight, bias=None, stride=1, padding=0, dilation=1, groups=1):
     groups = _ensure_u64(groups)
     ret = P.conv2d(input, weight, stride, padding, dilation, groups)
     if bias is not None:
-        ret = ret + bias.reshape((1, bias.shape[0], 1, 1))
+        ret = ret + reshape(bias, (1, bias.shape[0], 1, 1))
     return ret
 
 
@@ -321,8 +320,8 @@ def conv_transpose2d(
 @core
 def cross_entropy(input, target, reduction="mean"):
     """Map of method torch.nn.functional.cross_entropy."""
-    a = torch.nn.functional.log_softmax(input, 1)
-    b = torch.nn.functional.nll_loss(a, target, reduction=reduction)
+    a = log_softmax(input, 1)
+    b = nll_loss(a, target, reduction=reduction)
     return b
 
 
@@ -366,17 +365,22 @@ def linear(input, weight, bias=None):
 @core
 def lstm_cell(input, hidden, w_ih, w_hh, b_ih, b_hh):
     hx, cx = hidden
-    gates = torch.mm(input, w_ih.t()) + torch.mm(hx, w_hh.t()) + b_ih + b_hh
+    gates = (
+        P.dot(input, operations.t(w_ih))
+        + P.dot(hx, operations.t(w_hh))
+        + b_ih
+        + b_hh
+    )
 
-    ingate, forgetgate, cellgate, outgate = gates.chunk(4, 1)
+    ingate, forgetgate, cellgate, outgate = chunk(gates, 4, 1)
 
-    ingate = torch.sigmoid(ingate)
-    forgetgate = torch.sigmoid(forgetgate)
-    cellgate = torch.tanh(cellgate)
-    outgate = torch.sigmoid(outgate)
+    ingate = sigmoid(ingate)
+    forgetgate = sigmoid(forgetgate)
+    cellgate = operations.array_tanh(cellgate)
+    outgate = sigmoid(outgate)
 
     cy = (forgetgate * cx) + (ingate * cellgate)
-    hy = outgate * torch.tanh(cy)
+    hy = outgate * operations.array_tanh(cy)
 
     return hy, cy
 
@@ -390,32 +394,29 @@ def log_softmax(self, dim=None, dtype=None):
     if dtype is not None:
         x = P.array_cast(x, dtype)
 
-    maxes = torch.max(x, dim, keepdim=True)[0]
-    lse_stable = torch.log(torch.sum(torch.exp(x - maxes), dim, keepdim=True))
+    maxes = _max(x, dim, keepdim=True)[0]
+    lse_stable = operations.array_log(
+        _sum(operations.array_exp(x - maxes), dim, keepdim=True)
+    )
     return x - maxes - lse_stable
 
 
 @core
 def item(x):
     """Map of 'item' pytorch method."""
-    return P.array_to_scalar(x.reshape(()))
+    return P.array_to_scalar(reshape(x, ()))
 
 
+# TODO 2_array_compare_max also; will probably need multitype graph
 @core
 def _max(self, dim=None, keepdim=False):
     """Map of 'max' pytorch method."""
     x = self
     dim_orig = dim
-
     if dim is None:
         dim = _build_fwd_tuple(x.shape)
     elif isinstance(dim, int):
         dim = (dim,)
-    elif isinstance(dim, tuple):
-        pass
-    else:
-        assert keepdim is False
-        return P.array_map(P.scalar_max, x, dim)
 
     dim = _dim_tuple_explicit(x.shape, dim)
 
@@ -462,7 +463,7 @@ def mean(self, dim=None, keepdim=False, *, dtype=None):
     x = self
     dim = _dim_explicit(x.shape, dim)
 
-    if P.hastype(x, APT_bool):
+    if P.hastype(x, AA_bool):
         x = P.array_cast(x, i64)
 
     if dtype is not None:
@@ -486,9 +487,9 @@ def mse_loss(input, target, reduction="mean"):
     if reduction == "none":
         out = out
     elif reduction == "mean":
-        out = torch.mean(out)
+        out = mean(out)
     elif reduction == "sum":
-        out = torch.sum(out)
+        out = _sum(out)
     return out
 
 
@@ -499,16 +500,19 @@ def mse_loss(input, target, reduction="mean"):
 @core
 def nll_loss(logs, targets, reduction="mean"):
     """Map of 'nll_loss' pytorch method."""
-    out = -torch.gather(logs, 1, targets.reshape((logs.shape[0], 1))).reshape(
-        (logs.shape[0],)
+    out = -reshape(
+        gather(
+            logs, 1, P.array_cast(reshape(targets, (logs.shape[0], 1)), i64)
+        ),
+        (logs.shape[0],),
     )
 
     if reduction == "none":
         out = out
     elif reduction == "mean":
-        out = torch.mean(out)
+        out = mean(out)
     elif reduction == "sum":
-        out = torch.sum(out)
+        out = _sum(out)
     return out
 
 
@@ -524,9 +528,9 @@ def norm(inp, p=None, dim=None):
         p = 2
 
     # Convert p to input type.
-    p = P.scalar_to_array(P.scalar_cast(p, inp.dtype), APT)
+    p = P.scalar_to_array(P.scalar_cast(p, inp.dtype), operations.typeof(inp))
     # Create a value 1 with input type.
-    one = P.scalar_to_array(P.scalar_cast(1, inp.dtype), APT)
+    one = P.scalar_to_array(P.scalar_cast(1, inp.dtype), operations.typeof(inp))
 
     # Reshape inp based on dims, making sure that dimensions to norm
     # are all assembled in latest inp dimension.
@@ -535,7 +539,7 @@ def norm(inp, p=None, dim=None):
 
     if dim is None:
         # We must norm the entire tensor.
-        new_inp = inp.reshape(1, -1)
+        new_inp = reshape(inp, (1, -1))
     else:
         # Check input shape and given dimensions to retrieve
         # leading dimensions (not to norm),
@@ -553,34 +557,34 @@ def norm(inp, p=None, dim=None):
         # Now we can reshape inp.
         if leading_dims is None:
             # We must norm the entire tensor.
-            new_inp = inp.reshape(1, -1)
+            new_inp = reshape(inp, (1, -1))
         else:
             # We must norm only dimensions in normed_dims.
             # 1) Move dimensions to norm to the end of tensor dimension.
             # 2) Reshape to pack trailing dimensions to norm into 1 dimension.
-            new_inp = inp.permute(permutation)
-            new_inp = new_inp.reshape(*reshaping_tuple)
+            new_inp = P.transpose(inp, permutation)
+            new_inp = reshape(new_inp, *reshaping_tuple)
 
     # Then we can compute norm.
     if p.item() == np.inf:
         # Maximum of absolute values
-        res = new_inp.abs().max(-1)[0]
+        res = _max(operations.array_abs(new_inp), -1)[0]
     elif p.item() == -np.inf:
         # Minimum of absolute values.
         # res = new_inp.abs().min(-1)[0]
-        u = new_inp.abs()
+        u = operations.array_abs(new_inp)
         v = -u
-        w = v.max(-1)[0]
+        w = _max(v, -1)[0]
         res = -w
     else:
         # Classical p-norm.
         # res = (new_inp.abs() ** p_value).sum(-1) ** (1 / p_value)
-        a = new_inp.abs() ** p
-        b = a.sum(-1)
+        a = operations.array_abs(new_inp) ** p
+        b = _sum(a, -1)
         c = one / p
         res = b ** c
     if leading_dims is not None:
-        res = res.reshape(leading_shape)
+        res = reshape(res, leading_shape)
     return res
 
 
@@ -602,8 +606,10 @@ def reshape(x, *shp):
 @core
 def scatter(self, dim, index, src):
     """Map of 'scatter' pytorch method."""
-    if not P.hastype(src, APT):
-        src = P.scalar_to_array(P.scalar_cast(src, self.dtype), APT)
+    if P.hastype(src, AS):
+        src = P.scalar_to_array(
+            P.scalar_cast(src, self.dtype), operations.typeof(self)
+        )
     if len(src.shape) == 0:
         src = P.distribute(src, index.shape)
     return P.scatter(self, dim, index, src)
@@ -634,7 +640,7 @@ def size(self, dim=None):
 def smooth_l1_loss(input, target, reduction="mean"):
     """Map of 'smooth_l1_loss' pytorch method."""
     z_raw = input - target
-    z_abs = torch.abs(z_raw)
+    z_abs = operations.array_abs(z_raw)
 
     def pw(_z_abs):
         out = P.switch(_z_abs < 1, 0.5 * (_z_abs ** 2), _z_abs - 0.5)
@@ -645,9 +651,9 @@ def smooth_l1_loss(input, target, reduction="mean"):
     if reduction == "none":
         out = out
     elif reduction == "mean":
-        out = torch.mean(out)
+        out = mean(out)
     elif reduction == "sum":
-        out = torch.sum(out)
+        out = _sum(out)
     return out
 
 
@@ -660,9 +666,9 @@ def softmax(self, dim=None, dtype=None):
     if dtype is not None:
         x = P.array_cast(x, dtype)
 
-    maxes = torch.max(x, dim, keepdim=True)[0]
-    x_exp = torch.exp(x - maxes)
-    x_exp_sum = torch.sum(x_exp, dim, keepdim=True)
+    maxes = _max(x, dim, keepdim=True)[0]
+    x_exp = operations.array_exp(x - maxes)
+    x_exp_sum = _sum(x_exp, dim, keepdim=True)
     return x_exp / x_exp_sum
 
 
@@ -678,7 +684,7 @@ def squeeze(self, dim=None):
     """Map of 'squeeze' pytorch method."""
     dim = _dim_explicit(self.shape, dim)
     final_shape = _shp_squeeze(self.shape, dim, False)
-    return self.reshape(final_shape)
+    return reshape(self, final_shape)
 
 
 @core
@@ -687,7 +693,7 @@ def stack(self, dim=0):
     x = self
     x_u = ()
     for _x in x:
-        x_u = x_u + (_x.unsqueeze(dim),)
+        x_u = x_u + (unsqueeze(_x, dim),)
     return P.concat(x_u, dim)
 
 
@@ -696,9 +702,7 @@ def stack(self, dim=0):
 def std(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
     """Map of 'std' pytorch method."""
     return (
-        torch.var(
-            self, dim=dim, unbiased=unbiased, keepdim=keepdim, dtype=dtype
-        )
+        var(self, dim=dim, unbiased=unbiased, keepdim=keepdim, dtype=dtype)
         ** 0.5
     )
 
@@ -712,7 +716,7 @@ def _sum(self, dim=None, keepdim=False, *, dtype=None):
     else:
         dim = _dim_explicit(x.shape, dim)
 
-    if P.hastype(x, APT_bool):
+    if P.hastype(x, AA_bool):
         x = P.array_cast(x, i64)
 
     if dtype is not None:
@@ -755,7 +759,7 @@ def unsqueeze(self, dim=None):
     """Map of 'unsqueeze' pytorch method."""
     dim = _dim_explicit_unsqueeze(self.shape, dim)
     final_shape = _shp_unsqueeze(self.shape, dim)
-    return self.reshape(final_shape)
+    return reshape(self, final_shape)
 
 
 # TODO: var with tuple dim (reduce over multiple chosen dims)
@@ -765,14 +769,14 @@ def var(self, dim=None, unbiased=True, keepdim=False, *, dtype=None):
     x = self
     dim = _dim_explicit(x.shape, dim)
 
-    if P.hastype(x, APT_bool):
+    if P.hastype(x, AA_bool):
         x = P.array_cast(x, i64)
 
     if dtype is not None:
         x = P.array_cast(x, dtype)
 
-    x = (x - x.mean(dim=dim, keepdim=True, dtype=None)) ** 2
-    x = torch.sum(x, dim=dim, keepdim=keepdim, dtype=None)
+    x = (x - mean(x, dim=dim, keepdim=True, dtype=None)) ** 2
+    x = _sum(x, dim=dim, keepdim=keepdim, dtype=None)
 
     denom = _var_denom(self.shape, dim, unbiased)
 
@@ -787,24 +791,4 @@ def view_as(x, y):
     return P.reshape(x, y.shape)
 
 
-@core
-def zeros(*shp, dtype=None):
-    """Map of 'dim' pytorch method."""
-    if dtype is None:
-        dtype = f32
-
-    if len(shp) == 1:
-        if isinstance(shp[0], tuple):
-            shp = shp[0]
-    return P.distribute(P.scalar_to_array(P.scalar_cast(0.0, dtype), APT), shp)
-
-
-__all__ = [
-    "conv2d",
-    "cross_entropy",
-    "item",
-    "linear",
-    "relu",
-    "sigmoid",
-    "zeros",
-]
+__all__ = ["conv2d", "cross_entropy", "item", "linear", "relu", "sigmoid"]

@@ -11,6 +11,7 @@ from ..abstract import ABSENT
 from ..ir import GraphManager
 from ..operations import primitives as P
 from ..operations.gen import lop, reverse_binop, rop
+from ..public_api import item
 from ..utils import Registry
 from . import steps
 from .pipeline import PipelineDefinition
@@ -242,7 +243,7 @@ standard_method_map = {
         "__getitem__": operations.array_getitem_wrap,
         "__myia_iter__": operations.array_iter,
         "__myia_to_array__": operations.identity,
-        "item": operations.array_to_scalar,
+        "item": item,
         "shape": property(operations.shape),
         "T": property(operations.t),
         "ndim": property(operations.ndim),

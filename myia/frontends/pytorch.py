@@ -22,14 +22,7 @@ from ..hypermap import hyper_map
 from ..operations import primitives as P
 from ..pipeline.resources import default_convert
 from ..pipeline.standard import standard_method_map, standard_object_map
-from ..utils import OrderedSet, core, get_fields
-from ..xtype import NDArray
-from .pytorch_abstract_types import (
-    AbstractModule,
-    PyTorchTensor,
-    pytorch_dtype_to_type,
-)
-from .pytorch_functions import (
+from ..public_api import (
     _max,
     _sum,
     argmax,
@@ -65,8 +58,28 @@ from .pytorch_functions import (
     unsqueeze,
     var,
     view_as,
-    zeros,
 )
+from ..utils import OrderedSet, core, get_fields
+from ..xtype import NDArray, f32
+from .pytorch_abstract_types import (
+    APT,
+    AbstractModule,
+    PyTorchTensor,
+    pytorch_dtype_to_type,
+)
+
+
+@core
+def zeros(*shp, dtype=None):
+    """Map of 'dim' pytorch method."""
+    if dtype is None:
+        dtype = f32
+
+    if len(shp) == 1:
+        if isinstance(shp[0], tuple):
+            shp = shp[0]
+    return P.distribute(P.scalar_to_array(P.scalar_cast(0.0, dtype), APT), shp)
+
 
 standard_object_map.update(
     {
@@ -110,6 +123,7 @@ standard_object_map.update(
         torch.nn.functional.cross_entropy: cross_entropy,
         torch.nn.functional.embedding: embedding,
         torch.nn.functional.linear: linear,
+        torch.nn.functional.log_softmax: log_softmax,
         torch.nn.functional.max_pool2d: max_pool2d,
         torch.nn.functional.mse_loss: mse_loss,
         torch.nn.functional.nll_loss: nll_loss,
