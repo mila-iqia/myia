@@ -16,7 +16,6 @@ from ..ir import (
     Constant,
     Graph,
     GraphCloner,
-    Quarantined,
     clone,
     transformable_clone,
 )

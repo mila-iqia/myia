@@ -55,7 +55,6 @@ from .ir import (
     MetaGraph,
     succ_incoming,
 )
-from .ir.clone import Quarantined
 from .operations import Primitive
 from .utils import InferenceError, MyiaTypeError, OrderedSet, overload
 
@@ -710,7 +709,6 @@ class _MonoRemapper(CloneRemapper):
         engine,
         graph_repl,
         fv_function,
-        quarantine,
     ):
         """Initialize the _MonoRemapper."""
         super().__init__(
@@ -722,7 +720,6 @@ class _MonoRemapper(CloneRemapper):
             graph_relation=graph_relation,
             clone_constants=clone_constants,
             set_abstract=False,
-            quarantine=quarantine,
         )
         self.engine = engine
         self.fv_function = fv_function
