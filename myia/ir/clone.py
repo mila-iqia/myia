@@ -461,11 +461,7 @@ class GraphCloner:
 
 
 def clone(
-    g,
-    total=True,
-    relation="copy",
-    clone_constants=False,
-    graph_relation=None,
+    g, total=True, relation="copy", clone_constants=False, graph_relation=None,
 ):
     """Return a clone of g."""
     return GraphCloner(

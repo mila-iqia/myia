@@ -18,7 +18,6 @@ from .abstract import (
     AbstractFunction,
     AbstractJTagged,
     AbstractTuple,
-    AbstractValue,
     Context,
     DummyFunction,
     GraphFunction,
@@ -32,7 +31,6 @@ from .abstract import (
     TypedPrimitive,
     VirtualFunction,
     VirtualReference,
-    abstract_check,
     abstract_clone,
     amerge,
     broaden,
@@ -44,7 +42,6 @@ from .abstract import (
     refmap,
 )
 from .abstract.infer import VirtualInferrer
-from .abstract.utils import CheckState, CloneState
 from .graph_utils import dfs
 from .info import About
 from .ir import (
@@ -56,7 +53,7 @@ from .ir import (
     succ_incoming,
 )
 from .operations import Primitive
-from .utils import InferenceError, MyiaTypeError, OrderedSet, overload
+from .utils import InferenceError, MyiaTypeError, OrderedSet
 
 
 class Unspecializable(Exception):

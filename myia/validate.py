@@ -108,6 +108,7 @@ class NodeValidator:
     """Validate each node in a graph."""
 
     def __init__(self, resources, errors=None):
+        """Initialize a NodeValidator."""
         self.errors = errors or ErrorPool(exc_class=ValidationError)
         self.manager = resources.opt_manager
 

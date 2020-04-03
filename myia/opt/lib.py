@@ -16,7 +16,6 @@ from ..ir import (
     Constant,
     Graph,
     GraphCloner,
-    clone,
     transformable_clone,
 )
 from ..operations import Primitive, primitives as P

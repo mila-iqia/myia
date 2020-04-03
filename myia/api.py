@@ -174,6 +174,7 @@ def myia(
         alias_tracker: function to indicate aliases
             (see :func:`myia.abstract.find_aliases`)
         use_universe: Enable use of sequential code (experimental)
+        pipeline: Pipeline to use
 
     """
     return MyiaFunction(
