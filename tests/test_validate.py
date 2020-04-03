@@ -1,6 +1,13 @@
 import pytest
 
-from myia.abstract import AbstractFunction, VirtualFunction
+from myia.abstract import (
+    SHAPE,
+    TYPE,
+    AbstractArray,
+    AbstractFunction,
+    VirtualFunction,
+)
+from myia.frontends.pytorch_abstract_types import PyTorchTensor
 from myia.operations import partial, primitives as P
 from myia.pipeline import scalar_parse, scalar_pipeline
 from myia.validate import ValidationError, validate, validate_abstract
@@ -132,6 +139,19 @@ def test_validate_abstract():
     fn = AbstractFunction(
         VirtualFunction((), to_abstract_test(i64)),
         VirtualFunction((), to_abstract_test(f64)),
+    )
+    with pytest.raises(ValidationError):
+        validate_abstract(fn, {})
+
+
+def test_validate_abstract_2():
+    fn = AbstractFunction(
+        VirtualFunction(
+            (),
+            AbstractArray(
+                to_abstract_test(f64), {SHAPE: (1, 2), TYPE: PyTorchTensor}
+            ),
+        ),
     )
     with pytest.raises(ValidationError):
         validate_abstract(fn, {})
