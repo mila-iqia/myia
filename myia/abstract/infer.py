@@ -137,9 +137,13 @@ class InferenceEngine:
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
+        if node.abstract is not None:
+            return Reference(self, node, CONTEXTLESS)
         if context is CONTEXTLESS:
             return Reference(self, node, CONTEXTLESS)
         if node.is_constant_graph():
+            if node.value.abstract is not None:
+                return Reference(self, node, CONTEXTLESS)
             graph = node.value.parent
         else:
             graph = node.graph

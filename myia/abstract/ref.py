@@ -115,6 +115,8 @@ class Reference(ReferenceBase):
 
     def get_resolved(self):
         """Get the value if resolved. Error out if not."""
+        if self.node.abstract is not None:
+            return self.node.abstract
         c = self.engine.cache.cache
         if self in c:
             fut = c[self]

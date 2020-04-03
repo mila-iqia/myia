@@ -1087,7 +1087,6 @@ def expand_J(resources, node, equiv):
     from ..grad import Jimpl
 
     arg = equiv[C].value
-    assert getattr(arg, "parent", None) is None
 
     if not hasattr(resources, "grad_cache"):
         resources.grad_cache = {}

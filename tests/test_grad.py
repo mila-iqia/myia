@@ -499,7 +499,6 @@ def _runwith(f, *args):
     return res["output"](*args)
 
 
-@pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freevar_outside_grad():
     def f(x, y):
         a = x * x
@@ -513,7 +512,6 @@ def test_freevar_outside_grad():
     assert _runwith(f, 5.0, 8.0) == 25.0
 
 
-@pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freegraph_outside_grad():
     def f(x, y):
         def sqx():
