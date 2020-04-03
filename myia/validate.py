@@ -4,8 +4,10 @@ from types import SimpleNamespace
 
 from . import xtype
 from .abstract import (
+    ANYTHING,
     DEAD,
     POLY,
+    AbstractArray,
     AbstractClass,
     AbstractError,
     AbstractExternal,
@@ -51,6 +53,16 @@ def validate_abstract(self, a: AbstractError, uses):
 
 
 @overload  # noqa: F811
+def validate_abstract(self, a: AbstractArray, uses):
+    at = a.xtype()
+    if at is not ANYTHING and not issubclass(at, xtype.NDArray):
+        raise ValidationError(
+            f"Illegal array type in the graph: {a.xtype()}", type=a.xtype()
+        )
+    return True
+
+
+@overload  # noqa: F811
 def validate_abstract(self, a: AbstractScalar, uses):
     if not issubclass(
         a.xtype(),
@@ -89,6 +101,7 @@ def validate_abstract(self, a: AbstractFunction, uses):
         raise ValidationError(
             f"All function types should be VirtualFunction, not {fn}"
         )
+    return self(a.values, uses)
 
 
 class NodeValidator:
