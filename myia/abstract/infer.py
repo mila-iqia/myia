@@ -280,10 +280,6 @@ class InferenceEngine:
             self.constructors[m] = MacroInferrer(m.macro)
         return self.constructors[m]
 
-    @get_inferrer_for.register
-    def get_inferrer_for(self, df: DummyFunction):
-        raise MyiaTypeError(f"Trying to call dummy")
-
     async def execute(self, fn, *args):
         r"""Infer the result of fn(\*args)."""
         infs = [self.get_inferrer_for(poss) for poss in await fn.get()]

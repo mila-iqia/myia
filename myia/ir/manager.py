@@ -563,14 +563,6 @@ class GraphManager(Partializable):
         self.check_opaque = None
         self.reset()
 
-    def clear(self):
-        """Clear the manager entirely."""
-        self.roots = []
-        if self.manage:
-            for graph in self.graphs:
-                graph._manager = None
-        self.reset()
-
     def reset(self):
         """Reset the manager's state.
 

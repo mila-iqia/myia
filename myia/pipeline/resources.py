@@ -236,7 +236,6 @@ class Incorporator(Partializable):
     def __init__(self, resources):
         """Initialize an Incorporator."""
         self.infer_manager = resources.infer_manager
-        self.opt_manager = resources.opt_manager
         self.engine = resources.inferrer.engine
         self.mono = resources.monomorphizer
 
@@ -260,9 +259,7 @@ class Incorporator(Partializable):
         self.engine.run_coroutine(
             self.engine.infer_function(graph, argspec, outspec)
         )
-        mgraph = self.mono(context)
-        # self.opt_manager.add_graph(mgraph)
-        return mgraph
+        return self.mono(context)
 
 
 class NumpyChecker:
