@@ -56,6 +56,7 @@ from .to_abstract import to_abstract
 from .utils import (
     broaden as _broaden,
     concretize_abstract,
+    concretize_cache,
     sensitivity_transform,
 )
 
@@ -380,6 +381,11 @@ class InferenceEngine:
         immediately.
         """
         return await force_pending(self.check(predicate, *values))
+
+    def concretize_cache(self):
+        """Complete the engine's caches with concretized contexts."""
+        concretize_cache(self.cache.cache)
+        concretize_cache(self.reference_map)
 
 
 class LiveInferenceEngine(InferenceEngine):

@@ -39,6 +39,9 @@ from .abstract import (
     build_value,
     compute_bprop_type,
     concretize_abstract,
+    concretize_cache,
+    no_tracking_id,
+    refmap,
 )
 from .abstract.infer import VirtualInferrer
 from .abstract.utils import CheckState, CloneState
@@ -150,61 +153,6 @@ def type_fixer(finder, monomorphizer=None):
     return fn
 
 
-@abstract_check.variant(initial_state=lambda: CheckState({}, "_no_track"))
-def _check_no_tracking_id(self, x: GraphFunction):
-    return x.tracking_id is None
-
-
-@concretize_abstract.variant(
-    initial_state=lambda: CloneState(
-        cache={}, prop="_no_track", check=_check_no_tracking_id
-    )
-)
-def _no_tracking_id(self, x: GraphFunction):
-    return dc_replace(x, tracking_id=None)
-
-
-@overload(bootstrap=True)
-def _refmap(self, fn, x: Context):
-    return Context(
-        self(fn, x.parent), x.graph, tuple(fn(arg) for arg in x.argkey)
-    )
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: Reference):
-    return Reference(x.engine, x.node, self(fn, x.context))
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: tuple):
-    return tuple(self(fn, y) for y in x)
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: AbstractValue):
-    return fn(x)
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: object):
-    return x
-
-
-def concretize_cache(cache):
-    """Complete a cache with concretized versions of its keys.
-
-    If an entry in the cache has a key that contains a Pending, a new key
-    is created where the Pending is resolved, and it is entered in the cache
-    so that it can be found more easily.
-    """
-    for k, v in list(cache.items()):
-        kc = _refmap(concretize_abstract, k)
-        cache[kc] = v
-        kc2 = _refmap(_no_tracking_id, kc)
-        cache[kc2] = v
-
-
 _count = count(1)
 
 
@@ -256,7 +204,7 @@ class _TodoEntry:
 
 
 def _normalize_context(ctx):
-    return _refmap(_no_tracking_id, ctx)
+    return refmap(no_tracking_id, ctx)
 
 
 class TypeFinder:
@@ -429,8 +377,7 @@ class Monomorphizer:
 
     def run(self, context):
         """Run monomorphization."""
-        concretize_cache(self.engine.cache.cache)
-        concretize_cache(self.engine.reference_map)
+        self.engine.concretize_cache()
         self.collect(context)
         self.order_tasks()
         self.create_graphs()
