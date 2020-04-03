@@ -1092,28 +1092,29 @@ def expand_J(resources, node, equiv):
     if not hasattr(resources, "grad_cache"):
         resources.grad_cache = {}
 
+    if isinstance(arg, Graph):
+        key = arg
+    else:
+        key = (arg, equiv[C].abstract)
+
+    if key in resources.grad_cache:
+        ct = Constant(resources.grad_cache[key])
+        ct.abstract = ct.value.abstract
+        return ct
+
     try:
-        if isinstance(arg, Graph):
-            key = arg
-        else:
-            key = (arg, equiv[C].abstract)
-
-        if key in resources.grad_cache:
-            ct = Constant(resources.grad_cache[key])
-            ct.abstract = ct.value.abstract
-            return ct
-
-        vfn = node.abstract.get_unique()
         newg = Jimpl(arg, resources, node)
-        newg = resources.incorporate(newg, vfn.args, vfn.output)
-
-        if isinstance(arg, Graph):
-            arg.transforms["grad"] = newg
-
-        resources.grad_cache[key] = newg
-
     except NotImplementedError:
         return None
+
+    vfn = node.abstract.get_unique()
+    newg = resources.incorporate(newg, vfn.args, vfn.output)
+
+    if isinstance(arg, Graph):
+        arg.transforms["grad"] = newg
+
+    resources.grad_cache[key] = newg
+
     return Constant(newg)
 
 
