@@ -342,10 +342,6 @@ class Resources(Partializable):
         """Run the Resources as a pipeline step."""
         return {"resources": self}
 
-    def copy(self):
-        """Copy the resources object."""
-        return Resources(**self._members)
-
 
 __consolidate__ = True
 __all__ = [

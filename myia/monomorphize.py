@@ -7,7 +7,7 @@ function may be called with.
 from collections import defaultdict
 from dataclasses import dataclass, replace as dc_replace
 from functools import reduce
-from itertools import chain, count
+from itertools import count
 from typing import Optional
 from warnings import warn
 
@@ -72,9 +72,8 @@ def type_fixer(finder, monomorphizer=None):
 
     @fn.register
     def _fix_type(self, a: GraphFunction):
-        if a.graph.abstract is not None:
-            return self(a.graph.abstract.get_unique())
-        elif a.tracking_id in monomorphizer.ctcache:
+        assert a.graph.abstract is None
+        if a.tracking_id in monomorphizer.ctcache:
             ctx = monomorphizer.ctcache[a.tracking_id]
             g = monomorphizer.results[ctx]
             return VirtualFunction(
@@ -594,19 +593,6 @@ class Monomorphizer:
             with m.transact() as tr:
                 for (ref, key), repl in self.replacements[ctx].items():
                     tr.set_edge(ref.node, key, repl)
-
-            if newgraph is ctx.graph:
-                for node in chain(ctx.graph.nodes, ctx.graph.constants):
-                    self.invmap[node] = self.engine.ref(node, orig_ctx)
-
-                with m.transact() as tr_fv:
-                    for node in ctx.graph.free_variables_direct:
-                        new_node = fv_function(node)
-                        if new_node is not node:
-                            for user, key in m.uses[node]:
-                                if user.graph is ctx.graph:
-                                    tr_fv.set_edge(user, key, new_node)
-                continue
 
             # Clone the graph
             cl = GraphCloner(
