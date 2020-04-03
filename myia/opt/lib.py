@@ -1146,7 +1146,6 @@ class JElim(Partializable):
         args = dict(opt=self, node=None, manager=mng)
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
-            mng.keep_roots(root)
             nodes = []
             typesubs = []
             for node in mng.all_nodes:

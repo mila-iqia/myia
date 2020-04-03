@@ -474,7 +474,6 @@ class DeadDataElimination(Partializable):
         args = dict(opt=self, node=None, manager=root.manager, profile=False)
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
-            root.manager.keep_roots(root)
             vprop = ValuePropagator(self.resources, root)
             present = {node for node, needs in vprop.need.items() if needs}
             missing = vprop.manager.all_nodes - present

@@ -85,8 +85,6 @@ class Optimizer(Partializable):
                             changes = True
                 if run_only_once:
                     break
-        with tracer("keep_roots"):
-            resources.opt_manager.keep_roots(graph)
         res = {"graph": graph}
         return res
 
@@ -217,7 +215,6 @@ def step_simplify_types(resources, graph, argspec, outspec):
     resources.tracker.activate()
     mng = resources.opt_manager
     simplify_types(graph, mng)
-    mng.keep_roots(graph)
     new_argspec = tuple(p.abstract for p in graph.parameters)
     resources.live_inferrer()
     new_outspec = graph.output.abstract
