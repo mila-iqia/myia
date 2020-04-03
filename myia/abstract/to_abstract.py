@@ -15,6 +15,7 @@ from ..utils import (
     HandleInstance,
     MyiaTypeError,
     SymbolicKeyInstance,
+    Tag,
     UniverseInstance,
     dataclass_fields,
     is_dataclass_type,
@@ -310,6 +311,11 @@ def type_to_abstract(self, t: typing._GenericAlias):
         object if isinstance(arg, typing.TypeVar) else arg for arg in t.__args__
     )
     return pytype_to_abstract[t.__origin__](t, args)
+
+
+@overload  # noqa: F811
+def type_to_abstract(self, t: Tag):
+    return ANYTHING
 
 
 @overload  # noqa: F811
