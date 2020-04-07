@@ -266,6 +266,7 @@ def _run(
     pipeline=standard_pipeline,
     backend=None,
     numpy_compat=True,
+    **kwargs,
 ):
     """Test a Myia function.
 
@@ -315,7 +316,7 @@ def _run(
     if result is None:
         result = fn(*args)
 
-    self.check(out, args, result)
+    self.check(out, args, result, **kwargs)
 
     if numpy_compat:
         args_torch = args
@@ -360,8 +361,6 @@ backend_no_relay = Multiple(
 )
 run = _run.configure(backend=backend_all)
 run_no_numpy_compat = _run.configure(backend=backend_all, numpy_compat=False)
-run_no_relay = _run.configure(backend=backend_no_relay)
-fwd_and_bwd_no_relay = _fwd_and_bwd.configure(backend=backend_no_relay)
 
 
 # THIS TEST ALL OPS that are in dir of "torch" or "torch.tensor"
@@ -535,7 +534,7 @@ def test_conv2d(inp, w, b):
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
         nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
-        None,
+        nn.Parameter(torch.randn(3, dtype=torch.float32)),
     ),
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
@@ -553,7 +552,7 @@ def test_torch_conv2d__non_tuple_args(inp, w, b):
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 6, 4, 5, dtype=torch.float32)),
         nn.Parameter(torch.randn(3, 6, 3, 3, dtype=torch.float32)),
-        None,
+        nn.Parameter(torch.randn(3, dtype=torch.float32)),
     ),
     fwd_and_bwd(
         nn.Parameter(torch.randn(2, 2, 4, 5, dtype=torch.float32)),
@@ -566,10 +565,13 @@ def test_conv2d__non_tuple_args(inp, w, b):
     return torch.sum(value)
 
 
-@fwd_and_bwd_no_relay(
-    nn.Parameter(torch.randn(2, 1, 4, 5, dtype=torch.float32)),
-    nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
-    None,
+@mt(
+    fwd_and_bwd(
+        nn.Parameter(torch.randn(2, 1, 4, 5, dtype=torch.float32)),
+        nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
+        nn.Parameter(torch.randn(3, dtype=torch.float32)),
+    ),
+    backend=backend_no_relay
 )
 def test_torch_conv2d__group3(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 1)
@@ -579,7 +581,7 @@ def test_torch_conv2d__group3(inp, w, b):
 @fwd_and_bwd(
     nn.Parameter(torch.randn(2, 1, 4, 5, dtype=torch.float32)),
     nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
-    None,
+    nn.Parameter(torch.randn(3, dtype=torch.float32)),
 )
 def test_conv2d__group3(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (1, 1), 1)
@@ -587,17 +589,17 @@ def test_conv2d__group3(inp, w, b):
 
 
 @mt(
-    run_no_relay(
+    run(
         torch.randn(1, 2, 4, 4),
         torch.randn(2, 3, 2, 2),
-        None,
+        torch.randn(6),
         (1, 1),
         (1, 1),
         (0, 0),
         2,
         (1, 1),
     ),
-    run_no_relay(
+    run(
         torch.randn(1, 2, 5, 4),
         torch.randn(2, 4, 1, 3),
         None,
@@ -608,6 +610,7 @@ def test_conv2d__group3(inp, w, b):
         (5, 4),
     ),
     broad_specs=(True, True, False, False, False, False, False, False),
+    backend=backend_no_relay
 )
 def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
     return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)
