@@ -23,13 +23,7 @@ from myia.pipeline import standard_pipeline
 from myia.xtype import NDArray, np_dtype_to_type
 
 from ..common import MA, MB, to_abstract_test
-from ..multitest import (
-    Multiple,
-    backend_all,
-    eqtest,
-    mt,
-    myia_function_test,
-)
+from ..multitest import Multiple, backend_all, eqtest, mt, myia_function_test
 from ..test_grad import grad_wrap
 
 torch = pytest.importorskip("torch")
@@ -62,7 +56,7 @@ def eqtest(t1: torch.Tensor, t2, rtol=1e-5, atol=1e-8, **kwargs):
             v2 = x2[i].item()
             if abs(v1 - v2) > atol:
                 c += 1
-                print('diff', c, i + 1, v1, v2)
+                print("diff", c, i + 1, v1, v2)
     # End debug code
 
     np.testing.assert_allclose(
@@ -571,7 +565,7 @@ def test_conv2d__non_tuple_args(inp, w, b):
         nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
         nn.Parameter(torch.randn(3, dtype=torch.float32)),
     ),
-    backend=backend_no_relay
+    backend=backend_no_relay,
 )
 def test_torch_conv2d__group3(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 1)
@@ -610,7 +604,7 @@ def test_conv2d__group3(inp, w, b):
         (5, 4),
     ),
     broad_specs=(True, True, False, False, False, False, False, False),
-    backend=backend_no_relay
+    backend=backend_no_relay,
 )
 def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
     return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)
