@@ -237,10 +237,10 @@ def eq(obj1, obj2):
         return True
 
     key1 = deep_eqkey(obj1)
-    key2 = deep_eqkey(obj2)
     if key1 is RECURSIVE:
-        return key2 is RECURSIVE and eqrec(obj1, obj2, set())
+        return eqrec(obj1, obj2, set())
     else:
+        key2 = deep_eqkey(obj2)
         return key1 == key2
 
 
