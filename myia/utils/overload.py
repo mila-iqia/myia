@@ -211,7 +211,13 @@ class Overload:
             return ov.wrapper(wrapper)
 
     def __get__(self, obj, cls):
-        return Overload(bind_to=obj, _parent=self, name=self.name)
+        return OverloadCall(
+            map=self.map,
+            state=self.initial_state() if self.initial_state else None,
+            which=self.which,
+            wrapper=self._wrapper,
+            bind_to=True if (obj is self or self.initial_state or self.postprocess) else obj
+        )
 
     def __getitem__(self, t):
         if self.__self__:
@@ -221,16 +227,32 @@ class Overload:
 
     def __call__(self, *args, **kwargs):
         """Call the overloaded function."""
-        if self.initial_state or self.postprocess:
-            ov = Overload(bind_to=True, _parent=self)
-            if self.initial_state:
-                ov.state = self.initial_state()
-            res = ov(*args, **kwargs)
-            if self.postprocess:
-                res = self.postprocess(res)
-            return res
+        ovc = self.__get__(self.__self__, None)
+        res = ovc(*args, **kwargs)
+        if self.postprocess:
+            res = self.postprocess(res)
+        return res
 
-        fself = self.__self__
+    def __repr__(self):
+        return f"<Overload {self.name or hex(id(self))}>"
+
+
+class OverloadCall:
+    """Context for an Overload call."""
+
+    def __init__(self, map, state, which, wrapper, bind_to):
+        """Initialize an OverloadCall."""
+        self.map = map
+        self.state = state
+        self.which = which
+        self.wrapper = wrapper
+        self.bind_to = self if bind_to is True else bind_to
+
+    def __getitem__(self, t):
+        return self.map[t].__get__(self)
+
+    def __call__(self, *args, **kwargs):
+        fself = self.bind_to
         if fself is not None:
             args = (fself,) + args
 
@@ -243,13 +265,10 @@ class Overload:
                 f"No overloaded method in {self} for {type(main)}"
             )
 
-        if self._wrapper is None:
+        if self.wrapper is None:
             return method(*args, **kwargs)
         else:
-            return self._wrapper(method, *args, **kwargs)
-
-    def __repr__(self):
-        return f"<Overload {self.name or hex(id(self))}>"
+            return self.wrapper(method, *args, **kwargs)
 
 
 def _find_overload(fn, bootstrap, initial_state, postprocess):
