@@ -1,7 +1,10 @@
 """Utilities to overload functions for multiple types."""
 
 
+import ast
 import inspect
+from functools import lru_cache
+from textwrap import dedent
 
 from .misc import MISSING, keyword_decorator
 
@@ -43,6 +46,10 @@ class TypeMap(dict):
             return handler
         else:
             raise KeyError(obj_t)
+
+
+def _fresh(t):
+    return type(t.__name__, (t,), {})
 
 
 class Overload:
@@ -106,6 +113,7 @@ class Overload:
             _map.update(mixin._uncached_map)
         self.map = TypeMap(_map)
         self._uncached_map = _map
+        self.ocls = _fresh(OverloadCall)
 
     def _set_attrs_from(self, fn, wrapper=False):
         if self.name is None:
@@ -128,6 +136,28 @@ class Overload:
                 p.replace(annotation=inspect.Parameter.empty) for p in params
             ]
             self.__signature__ = sign.replace(parameters=params)
+
+    def compile(self):
+        """Finalize this overload."""
+        cls = type(self)
+        if self.name is not None:
+            name = self.__name__
+            cls.__call__ = rename_function(cls.__real_call__, f"{name}.entry")
+            self.ocls.__call__ = rename_function(
+                self.ocls.__call__, f"{name}.dispatch"
+            )
+            if self._wrapper:
+                self._wrapper = rename_function(
+                    self._wrapper, f"{name}.wrapper"
+                )
+            self.map = TypeMap(
+                {
+                    t: rename_function(fn, f"{name}[{t.__name__}]")
+                    for t, fn in self.map.items()
+                }
+            )
+        else:
+            cls.__call__ = cls.__real_call__
 
     def wrapper(self, wrapper):
         """Set a wrapper function."""
@@ -175,7 +205,7 @@ class Overload:
         """
         fself = self.__self__
         bootstrap = True if fself is self else fself
-        return Overload(
+        return _fresh(Overload)(
             bind_to=bootstrap,
             wrapper=self._wrapper if wrapper is MISSING else wrapper,
             mixins=[self],
@@ -211,12 +241,14 @@ class Overload:
             return ov.wrapper(wrapper)
 
     def __get__(self, obj, cls):
-        return OverloadCall(
+        return self.ocls(
             map=self.map,
             state=self.initial_state() if self.initial_state else None,
             which=self.which,
             wrapper=self._wrapper,
-            bind_to=True if (obj is self or self.initial_state or self.postprocess) else obj
+            bind_to=True
+            if (obj is self or self.initial_state or self.postprocess)
+            else obj,
         )
 
     def __getitem__(self, t):
@@ -226,6 +258,11 @@ class Overload:
             return self.map[t]
 
     def __call__(self, *args, **kwargs):
+        """Compile the overloaded function and then call it."""
+        self.compile()
+        return self(*args, **kwargs)
+
+    def __real_call__(self, *args, **kwargs):
         """Call the overloaded function."""
         ovc = self.__get__(self.__self__, None)
         res = ovc(*args, **kwargs)
@@ -261,9 +298,7 @@ class OverloadCall:
         try:
             method = self.map[type(main)]
         except KeyError:
-            raise TypeError(
-                f"No overloaded method in {self} for {type(main)}"
-            )
+            raise TypeError(f"No overloaded method in {self} for {type(main)}")
 
         if self.wrapper is None:
             return method(*args, **kwargs)
@@ -275,7 +310,7 @@ def _find_overload(fn, bootstrap, initial_state, postprocess):
     mod = __import__(fn.__module__, fromlist="_")
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload(
+        dispatch = _fresh(Overload)(
             bind_to=bootstrap,
             initial_state=initial_state,
             postprocess=postprocess,
@@ -343,6 +378,29 @@ def overload_wrapper(
 
 
 overload.wrapper = overload_wrapper
+
+
+@lru_cache(maxsize=64)
+def _fn_ast(fn):
+    src = dedent(inspect.getsource(fn))
+    filename = inspect.getsourcefile(fn)
+    tree = ast.parse(src, filename)
+    tree = tree.body[0]
+    assert isinstance(tree, (ast.FunctionDef, ast.AsyncFunctionDef))
+    _, lineno = inspect.getsourcelines(fn)
+    ast.increment_lineno(tree, lineno - 1)
+    return tree, filename
+
+
+def rename_function(fn, newname):
+    """Create a copy of the function with a different name."""
+    tree, filename = _fn_ast(fn)
+    tree.name = newname
+    tree.decorator_list = []
+    new_fn = compile(ast.Module(body=[tree], type_ignores=[]), filename, "exec")
+    glb = fn.__globals__
+    exec(new_fn, glb, glb)
+    return glb[newname]
 
 
 __consolidate__ = True

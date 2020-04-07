@@ -233,7 +233,7 @@ def to_abstract(self, v: object, **kwargs):
 @overload  # noqa: F811
 def to_abstract(self, v: type, **kwargs):
     try:
-        rval = AbstractType(type_to_abstract(v))
+        return AbstractType(type_to_abstract(v))
     except KeyError:
         return AbstractExternal({VALUE: v, TYPE: type(v)})
 
