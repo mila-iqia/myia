@@ -239,15 +239,12 @@ class Overload:
         try:
             method = self.map[type(main)]
         except KeyError:
-            method = None
+            raise TypeError(
+                f"No overloaded method in {self} for {type(main)}"
+            )
 
         if self._wrapper is None:
-            if method is None:
-                raise TypeError(
-                    f"No overloaded method in {self} for {type(main)}"
-                )
-            else:
-                return method(*args, **kwargs)
+            return method(*args, **kwargs)
         else:
             return self._wrapper(method, *args, **kwargs)
 

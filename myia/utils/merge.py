@@ -102,13 +102,7 @@ def merge(__call__, a, b, mode=MergeMode.mode):
         mode = b.mode
         b = b.value
     assert not isinstance(a, MergeMode)
-    if __call__ is None:
-        if hasattr(a, "__merge__"):
-            return a.__merge__(b, mode)
-        else:
-            return cleanup(b)
-    else:
-        return __call__(a, b, mode)
+    return __call__(a, b, mode)
 
 
 @overload  # noqa: F811
@@ -164,6 +158,14 @@ def merge(xs: set, ys, mode):
         return xs | ys
     else:
         return ys
+
+
+@overload  # noqa: F811
+def merge(a: object, b, mode):
+    if hasattr(a, "__merge__"):
+        return a.__merge__(b, mode)
+    else:
+        return cleanup(b)
 
 
 __consolidate__ = True

@@ -159,12 +159,6 @@ def test_Overload_variant_wrapper():
 
     assert g(1) == {2}
 
-    @f.variant_wrapper(initial_state=lambda: 10)
-    def h(fn, self, x):
-        return self.state * x
-
-    assert h(1) == 10
-
 
 def test_Overload_stateful():
 
