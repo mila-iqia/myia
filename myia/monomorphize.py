@@ -18,6 +18,9 @@ from .abstract import (
     AbstractFunction,
     AbstractJTagged,
     AbstractTuple,
+    AbstractValue,
+    CheckState,
+    CloneState,
     Context,
     DummyFunction,
     GraphFunction,
@@ -67,8 +70,23 @@ class Unspecializable(Exception):
 
 
 def type_fixer(finder, monomorphizer=None):
+    @abstract_check.variant(initial_state=lambda: CheckState({}, "_fixed"))
+    def _chk(
+        self,
+        a: (
+            GraphFunction,
+            PartialApplication,
+            JTransformedFunction,
+            PrimitiveFunction,
+            MetaGraphFunction,
+            TypedPrimitive,
+        ),
+    ):
+        return False
 
-    fn = abstract_clone.copy()
+    fn = abstract_clone.copy(
+        initial_state=lambda: CloneState(cache={}, prop="_fixed", check=_chk)
+    )
 
     @fn.register
     def _fix_type(self, a: GraphFunction):
