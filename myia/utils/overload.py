@@ -44,7 +44,7 @@ class TypeMap(dict):
             return handler
         elif hasattr(self, "_key_error"):
             raise self._key_error(obj_t)
-        else:
+        else:  # pragma: no cover
             raise KeyError(obj_t)
 
 
@@ -87,11 +87,9 @@ class Overload:
         postprocess=None,
         mixins=[],
         name=None,
-        _parent=None,
     ):
         """Initialize an Overload."""
         self.bind_to = bind_to
-        self._parent = _parent
         self._wrapper = wrapper
         self.state = None
         self.initial_state = initial_state
@@ -100,13 +98,6 @@ class Overload:
             bootstrap or self.initial_state or self.postprocess
         )
         self.name = name
-        if _parent:
-            assert _parent.which is not None
-            self.map = _parent.map
-            self._uncached_map = _parent._uncached_map
-            self.which = _parent.which
-            self._wrapper = _parent._wrapper
-            return
         _map = {}
         self.which = None
         for mixin in mixins:
@@ -185,8 +176,6 @@ class Overload:
 
     def register(self, fn):
         """Register a function."""
-        if self._parent:  # pragma: no cover
-            raise Exception("Cannot register a function on derived Overload")
         ann = fn.__annotations__
         if len(ann) != 1:
             raise Exception("Only one parameter may be annotated.")

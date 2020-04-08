@@ -534,19 +534,22 @@ async def force_through(__call__, self, x, through):
         return await call
 
 
-@overload  # noqa: F811
-async def force_through(self, x: AbstractScalar, through):
-    return AbstractScalar(await self(x.values, through))
+# Uncomment and test the other implementations if/when needed:
 
 
-@overload  # noqa: F811
-async def force_through(self, x: AbstractFunction, through):
-    yield (yield AbstractFunction)(*(await self(x.get_sync(), through)))
+# @overload  # noqa: F811
+# async def force_through(self, x: AbstractScalar, through):
+#     return AbstractScalar(await self(x.values, through))
 
 
-@overload  # noqa: F811
-async def force_through(self, d: TrackDict, through):
-    return {k: await self(v, through) for k, v in d.items()}
+# @overload  # noqa: F811
+# async def force_through(self, x: AbstractFunction, through):
+#     yield (yield AbstractFunction)(*(await self(x.get_sync(), through)))
+
+
+# @overload  # noqa: F811
+# async def force_through(self, d: TrackDict, through):
+#     return {k: await self(v, through) for k, v in d.items()}
 
 
 @overload  # noqa: F811
@@ -613,6 +616,11 @@ async def force_through(self, x: TaggedPossibilities, through):
 @overload  # noqa: F811
 async def force_through(self, x: Pending, through):
     return await self(await x, through)
+
+
+@overload  # noqa: F811
+async def force_through(self, x: object, through):
+    raise NotImplementedError(type(x))
 
 
 ################################
