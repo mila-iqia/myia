@@ -232,18 +232,6 @@ class Overload:
             ov.register(fn)
             return ov
 
-    def variant_wrapper(self, wrapper=MISSING, *, initial_state=None):
-        """Decorator to create a variant of this Overload with a new wrapper.
-
-        New functions can be registered to the variant without affecting the
-        original.
-        """
-        ov = self.copy(wrapper=None, initial_state=initial_state)
-        if wrapper is MISSING:
-            return ov.wrapper
-        else:
-            return ov.wrapper(wrapper)
-
     def __get__(self, obj, cls):
         return self.ocls(
             map=self.map,
@@ -255,11 +243,8 @@ class Overload:
         )
 
     def __getitem__(self, t):
-        assert not self.bootstrap
-        if self.bind_to:
-            return self.map[t].__get__(self.bind_to)
-        else:
-            return self.map[t]
+        assert not self.bootstrap and self.bind_to is None
+        return self.map[t]
 
     def __call__(self, *args, **kwargs):
         """Compile the overloaded function and then call it."""

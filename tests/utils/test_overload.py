@@ -143,23 +143,6 @@ def test_Overload_wrapper():
     assert f((1, 2, (3, 4))) == [([2], [3], [([4], [5])])]
 
 
-def test_Overload_variant_wrapper():
-
-    f = Overload()
-
-    @f.register
-    def f(x: int):
-        return x + 1
-
-    assert f(1) == 2
-
-    @f.variant_wrapper
-    def g(fn, x):
-        return {fn(x)}
-
-    assert g(1) == {2}
-
-
 def test_Overload_stateful():
 
     f = Overload(initial_state=lambda: -1)
