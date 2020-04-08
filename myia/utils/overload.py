@@ -1,10 +1,8 @@
 """Utilities to overload functions for multiple types."""
 
 
-import ast
 import inspect
-from functools import lru_cache
-from textwrap import dedent
+from types import FunctionType
 
 from .misc import MISSING, keyword_decorator
 
@@ -380,27 +378,29 @@ def overload_wrapper(
 overload.wrapper = overload_wrapper
 
 
-@lru_cache(maxsize=64)
-def _fn_ast(fn):
-    src = dedent(inspect.getsource(fn))
-    filename = inspect.getsourcefile(fn)
-    tree = ast.parse(src, filename)
-    tree = tree.body[0]
-    assert isinstance(tree, (ast.FunctionDef, ast.AsyncFunctionDef))
-    _, lineno = inspect.getsourcelines(fn)
-    ast.increment_lineno(tree, lineno - 1)
-    return tree, filename
-
-
 def rename_function(fn, newname):
     """Create a copy of the function with a different name."""
-    tree, filename = _fn_ast(fn)
-    tree.name = newname
-    tree.decorator_list = []
-    new_fn = compile(ast.Module(body=[tree], type_ignores=[]), filename, "exec")
-    glb = fn.__globals__
-    exec(new_fn, glb, glb)
-    return glb[newname]
+    co = fn.__code__
+    newcode = type(co)(
+        co.co_argcount,
+        co.co_kwonlyargcount,
+        co.co_nlocals,
+        co.co_stacksize,
+        co.co_flags,
+        co.co_code,
+        co.co_consts,
+        co.co_names,
+        co.co_varnames,
+        co.co_filename,
+        newname,
+        co.co_firstlineno,
+        co.co_lnotab,
+        co.co_freevars,
+        co.co_cellvars,
+    )
+    return FunctionType(
+        newcode, fn.__globals__, newname, fn.__defaults__, fn.__closure__
+    )
 
 
 __consolidate__ = True
