@@ -116,6 +116,9 @@ class Overload:
                 assert mixin.which == self.which
             _map.update(mixin._uncached_map)
         self.map = TypeMap(_map)
+        self.map._key_error = lambda key: TypeError(
+            f"No overloaded method in {self} for {key}"
+        )
         self._uncached_map = _map
         self.ocls = _fresh(OverloadCall)
 
@@ -163,7 +166,7 @@ class Overload:
                 )
 
             # Rename the mapped functions
-            self.map = TypeMap(
+            self.map.update(
                 {
                     t: rename_function(fn, f"{name}[{t.__name__}]")
                     for t, fn in self.map.items()
@@ -171,10 +174,6 @@ class Overload:
             )
         else:
             cls.__call__ = cls.__real_call__
-
-        self.map._key_error = lambda key: TypeError(
-            f"No overloaded method in {self} for {key}"
-        )
 
     def wrapper(self, wrapper):
         """Set a wrapper function."""

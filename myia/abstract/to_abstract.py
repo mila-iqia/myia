@@ -234,7 +234,7 @@ def to_abstract(self, v: object, **kwargs):
 def to_abstract(self, v: type, **kwargs):
     try:
         return AbstractType(type_to_abstract(v))
-    except KeyError:
+    except TypeError:
         return AbstractExternal({VALUE: v, TYPE: type(v)})
 
 

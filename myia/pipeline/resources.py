@@ -71,7 +71,7 @@ def default_convert(env, x: object):
 def default_convert(env, x: type):
     try:
         return type_to_abstract(x)
-    except KeyError:
+    except TypeError:
         return x
 
 
