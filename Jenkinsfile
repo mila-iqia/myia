@@ -3,7 +3,7 @@ node ('gpu') {
     checkout scm
   }
   stage ('Install') {
-    sh script: './ci-install.sh --gpu'
+    sh script: './scripts/ci-install.sh --gpu'
   }
   try {
     stage ('Test') {
@@ -20,7 +20,7 @@ pytest --cov=./ --cov-report= --gpu --junit-xml test-report.xml
     sh script: """
 . $HOME/miniconda/etc/profile.d/conda.sh &&
 conda activate test &&
-./cov.sh &&
+./scripts/consolidate-coverage.sh &&
 coverage xml
 """
     sh script: """

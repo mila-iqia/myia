@@ -1,7 +1,7 @@
 language: python
 
 install:
-  - ./ci-install.sh
+  - ./scripts/ci-install.sh
   - export PATH="$HOME/miniconda/bin:$PATH"
 env:
   - TEST_SUITE=static

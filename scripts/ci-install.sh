@@ -27,6 +27,5 @@ conda create -y -n test python=3.7
 conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
 conda activate test
-conda install --file=requirements-$DEV.conda
-pip install -r requirements.txt
-pip install -e . --no-deps
+pip install poetry
+./scripts/install-deps-$DEV.sh
