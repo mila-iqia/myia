@@ -43,7 +43,7 @@ sphinx = "^2.4.4"
 "pytorch::cpuonly" = "1.0"
 
 [custom.tool.conda.gpu-dependencies]
-cudatoolkit = "10.1"
+cudatoolkit = "10.1.*"
 cudnn = "6.0"
 
 [tool.black]
