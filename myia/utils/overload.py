@@ -142,14 +142,27 @@ class Overload:
         cls = type(self)
         if self.name is not None:
             name = self.__name__
+
+            # Place __real_call__ into __call__, renamed as the entry function
             cls.__call__ = rename_function(cls.__real_call__, f"{name}.entry")
-            self.ocls.__call__ = rename_function(
-                self.ocls.__call__, f"{name}.dispatch"
-            )
+
+            # Use the proper dispatch function
+            method_name = "__xcall"
+            if self.bootstrap or self.__self__:
+                method_name += "_bind"
+            if self._wrapper is not None:
+                method_name += "_wrap"
+            method_name += "__"
+            callfn = getattr(self.ocls, method_name)
+            self.ocls.__call__ = rename_function(callfn, f"{name}.dispatch")
+
+            # Rename the wrapper
             if self._wrapper:
                 self._wrapper = rename_function(
                     self._wrapper, f"{name}.wrapper"
                 )
+
+            # Rename the mapped functions
             self.map = TypeMap(
                 {
                     t: rename_function(fn, f"{name}[{t.__name__}]")
@@ -158,6 +171,7 @@ class Overload:
             )
         else:
             cls.__call__ = cls.__real_call__
+
         self.map._key_error = lambda key: TypeError(
             f"No overloaded method in {self} for {key}"
         )
@@ -289,6 +303,26 @@ class OverloadCall:
 
     def __getitem__(self, t):
         return self.map[t].__get__(self)
+
+    def __xcall_bind_wrap__(self, *args, **kwargs):
+        main = args[self.which - 1]
+        method = self.map[type(main)]
+        return self.wrapper(method, self.bind_to, *args, **kwargs)
+
+    def __xcall_bind__(self, *args, **kwargs):
+        main = args[self.which - 1]
+        method = self.map[type(main)]
+        return method(self.bind_to, *args, **kwargs)
+
+    def __xcall_wrap__(self, *args, **kwargs):
+        main = args[self.which]
+        method = self.map[type(main)]
+        return self.wrapper(method, *args, **kwargs)
+
+    def __xcall__(self, *args, **kwargs):
+        main = args[self.which]
+        method = self.map[type(main)]
+        return method(*args, **kwargs)
 
     def __call__(self, *args, **kwargs):
         fself = self.bind_to
