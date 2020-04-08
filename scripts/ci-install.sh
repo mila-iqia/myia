@@ -28,4 +28,7 @@ conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
 conda activate test
 pip install poetry
-. ./scripts/install-deps-$DEV.sh
+poetry install
+python scripts/make-reqs.py custom.tool.conda.dependencies > requirements.conda
+python scripts/make-reqs.py custom.tool.conda.$DEV-dependencies >> requirements.conda
+conda install -y --file=requirements.conda
