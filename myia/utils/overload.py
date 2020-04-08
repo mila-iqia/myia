@@ -60,6 +60,9 @@ class Overload:
     function should annotate the same parameter.
 
     Arguments:
+        bootstrap: Whether to bind the first argument to the OverloadCall
+            object. Forced to True if initial_state or postprocess is not
+            None.
         bind_to: Binds the first argument to the given object.
         wrapper: A function to use as the entry point. In addition to all
             normal arguments, it will receive as its first argument the
@@ -70,12 +73,14 @@ class Overload:
             after recursive calls.
         mixins: A list of Overload instances that contribute functions to this
             Overload.
-
+        name: Optional name for the Overload. If not provided, it will be
+            gotten automatically from the first registered function or wrapper.
     """
 
     def __init__(
         self,
         *,
+        bootstrap=False,
         bind_to=None,
         wrapper=None,
         initial_state=None,
@@ -85,16 +90,15 @@ class Overload:
         _parent=None,
     ):
         """Initialize an Overload."""
-        if bind_to is True:
-            bind_to = self
-        elif bind_to is False:
-            bind_to = None
         self.__self__ = bind_to
         self._parent = _parent
         self._wrapper = wrapper
         self.state = None
         self.initial_state = initial_state
         self.postprocess = postprocess
+        self.bootstrap = bool(
+            bootstrap or self.initial_state or self.postprocess
+        )
         self.name = name
         if _parent:
             assert _parent.which is not None
@@ -126,11 +130,7 @@ class Overload:
             params = list(sign.parameters.values())
             if wrapper:
                 params = params[1:]
-            if (
-                self.__self__ is not None
-                or self.initial_state
-                or self.postprocess
-            ):
+            if self.bootstrap or self.__self__ is not None:
                 params = params[1:]
             params = [
                 p.replace(annotation=inspect.Parameter.empty) for p in params
@@ -206,10 +206,9 @@ class Overload:
         New functions can be registered to the copy without affecting the
         original.
         """
-        fself = self.__self__
-        bootstrap = True if fself is self else fself
         return _fresh(Overload)(
-            bind_to=bootstrap,
+            bootstrap=self.bootstrap,
+            bind_to=self.__self__,
             wrapper=self._wrapper if wrapper is MISSING else wrapper,
             mixins=[self],
             initial_state=initial_state or self.initial_state,
@@ -249,12 +248,12 @@ class Overload:
             state=self.initial_state() if self.initial_state else None,
             which=self.which,
             wrapper=self._wrapper,
-            bind_to=True
-            if (obj is self or self.initial_state or self.postprocess)
-            else obj,
+            bootstrap=self.bootstrap,
+            bind_to=obj,
         )
 
     def __getitem__(self, t):
+        assert not self.bootstrap
         if self.__self__:
             return self.map[t].__get__(self.__self__)
         else:
@@ -280,13 +279,13 @@ class Overload:
 class OverloadCall:
     """Context for an Overload call."""
 
-    def __init__(self, map, state, which, wrapper, bind_to):
+    def __init__(self, map, state, which, wrapper, bootstrap, bind_to):
         """Initialize an OverloadCall."""
         self.map = map
         self.state = state
         self.which = which
         self.wrapper = wrapper
-        self.bind_to = self if bind_to is True else bind_to
+        self.bind_to = self if bootstrap else bind_to
 
     def __getitem__(self, t):
         return self.map[t].__get__(self)
@@ -310,7 +309,7 @@ def _find_overload(fn, bootstrap, initial_state, postprocess):
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
         dispatch = _fresh(Overload)(
-            bind_to=bootstrap,
+            bootstrap=bootstrap,
             initial_state=initial_state,
             postprocess=postprocess,
         )
