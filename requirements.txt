@@ -1,7 +1,0 @@
-antlr4-python3-runtime==4.7.2
-asttokens
-black==19.10b0
-codecov
-gym
-prettyprinter
-pydocstyle==5.0.1
