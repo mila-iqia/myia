@@ -90,7 +90,7 @@ class Overload:
         _parent=None,
     ):
         """Initialize an Overload."""
-        self.__self__ = bind_to
+        self.bind_to = bind_to
         self._parent = _parent
         self._wrapper = wrapper
         self.state = None
@@ -130,7 +130,7 @@ class Overload:
             params = list(sign.parameters.values())
             if wrapper:
                 params = params[1:]
-            if self.bootstrap or self.__self__ is not None:
+            if self.bootstrap or self.bind_to is not None:
                 params = params[1:]
             params = [
                 p.replace(annotation=inspect.Parameter.empty) for p in params
@@ -148,7 +148,7 @@ class Overload:
 
             # Use the proper dispatch function
             method_name = "__xcall"
-            if self.bootstrap or self.__self__:
+            if self.bootstrap or self.bind_to:
                 method_name += "_bind"
             if self._wrapper is not None:
                 method_name += "_wrap"
@@ -222,7 +222,7 @@ class Overload:
         """
         return _fresh(Overload)(
             bootstrap=self.bootstrap,
-            bind_to=self.__self__,
+            bind_to=self.bind_to,
             wrapper=self._wrapper if wrapper is MISSING else wrapper,
             mixins=[self],
             initial_state=initial_state or self.initial_state,
@@ -268,8 +268,8 @@ class Overload:
 
     def __getitem__(self, t):
         assert not self.bootstrap
-        if self.__self__:
-            return self.map[t].__get__(self.__self__)
+        if self.bind_to:
+            return self.map[t].__get__(self.bind_to)
         else:
             return self.map[t]
 
@@ -280,7 +280,7 @@ class Overload:
 
     def __real_call__(self, *args, **kwargs):
         """Call the overloaded function."""
-        ovc = self.__get__(self.__self__, None)
+        ovc = self.__get__(self.bind_to, None)
         res = ovc(*args, **kwargs)
         if self.postprocess:
             res = self.postprocess(res)
