@@ -13,8 +13,28 @@ repository = "https://github.com/mila-iqia/myia"
 
 [tool.poetry.dependencies]
 python = ">=3.7,<3.8a0"
+antlr4-python3-runtime = "4.7.2"
+asttokens = "^2.0.3"
+colorama = "^0.4.3"
+numpy = "^1.18.2"
+opt_einsum = "^3.2.0"
+prettyprinter = "^0.18.0"
+"ruamel.yaml" = "^0.16.10"
+"ruamel.yaml.clib" = "^0.2.0"
 
 [tool.poetry.dev-dependencies]
+black = "^19.10b0"
+docopt = "^0.6.2"
+flake8 = "^3.7.9"
+isort = "^4.3.21"
+pydocstyle = "5.0.1"
+pytest = "^5.4.1"
+pytest-cov = "^2.8.1"
+sphinx = "^2.4.4"
+
+[custom.tool.conda.dependencies]
+"abergeron::tvm" = "0.7dev1+0.*"
+"pytorch::pytorch" = "1.1.0"
 
 [tool.black]
 line-length = 80
