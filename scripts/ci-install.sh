@@ -28,4 +28,4 @@ conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
 conda activate test
 pip install poetry
-./scripts/install-deps-$DEV.sh
+. ./scripts/install-deps-$DEV.sh
