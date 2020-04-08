@@ -42,6 +42,8 @@ class TypeMap(dict):
 
         if handler is not None:
             return handler
+        elif hasattr(self, "_key_error"):
+            raise self._key_error(obj_t)
         else:
             raise KeyError(obj_t)
 
@@ -156,6 +158,9 @@ class Overload:
             )
         else:
             cls.__call__ = cls.__real_call__
+        self.map._key_error = lambda key: TypeError(
+            f"No overloaded method in {self} for {key}"
+        )
 
     def wrapper(self, wrapper):
         """Set a wrapper function."""
@@ -292,11 +297,7 @@ class OverloadCall:
             args = (fself,) + args
 
         main = args[self.which]
-
-        try:
-            method = self.map[type(main)]
-        except KeyError:
-            raise TypeError(f"No overloaded method in {self} for {type(main)}")
+        method = self.map[type(main)]
 
         if self.wrapper is None:
             return method(*args, **kwargs)
