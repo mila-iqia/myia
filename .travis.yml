@@ -1,3 +1,5 @@
+# Set language to generic because we install using conda and there is no need
+# for travis to create a virtualenv.
 language: generic
 
 install:
