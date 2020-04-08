@@ -1,4 +1,4 @@
-language: python
+language: generic
 
 install:
   - ./scripts/ci-install.sh
