@@ -218,6 +218,8 @@ async def execute_trials(engine, cond_trials, g, condref, tbref, fbref):
 
     replaceable_condition = True
     for keys, cond_trial in cond_trials.items():
+        if len(set(node for node, opt in keys)) != len(keys):
+            continue
         result = await engine.ref(cond_trial, ctx).get()
         assert result.xtype() is Bool
         value = result.xvalue()
