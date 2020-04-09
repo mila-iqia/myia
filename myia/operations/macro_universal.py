@@ -28,7 +28,7 @@ class StatePassthrough(MetaGraph):
 
     def expand(self, g, parameters):
         """Generate a graph wrapper based on the number of arguments."""
-        u, *params = parameters
+        *params, u = parameters
         res = g.apply(self.op, *params)
         return g.apply(operations.make_tuple, u, res)
 

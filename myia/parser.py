@@ -949,7 +949,10 @@ class Block:
         for pred in self.preds:
             arg = pred.read(varnum)
             jump = pred.jumps[self]
-            jump.inputs.append(arg)
+            if self.use_universe:
+                jump.inputs.insert(-1, arg)
+            else:
+                jump.inputs.append(arg)
         # TODO remove_unnecessary_phi(phi)
 
     def mature(self) -> None:
@@ -974,7 +977,7 @@ class Block:
             tget = self.operation("tuple_getitem")
             usl = self.operation("universal")
             ufn = self.graph.apply(usl, fn)
-            pair = self.graph.apply(ufn, self.universe, *args)
+            pair = self.graph.apply(ufn, *args, self.universe)
             self.universe = self.graph.apply(tget, pair, 0)
             return self.graph.apply(tget, pair, 1)
         else:
@@ -983,7 +986,10 @@ class Block:
     def add_parameter(self, parameter=None):
         """Add a parameter to the graph."""
         p = parameter or Parameter(self.graph)
-        self.graph.parameters.append(p)
+        if self.use_universe:
+            self.graph.parameters.insert(-1, p)
+        else:
+            self.graph.parameters.append(p)
         return p
 
     def make_resolve(self, module_name, symbol_name):
