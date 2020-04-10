@@ -307,6 +307,9 @@ step_opt = Optimizer.partial(
             optlib.merge_transposes,
             optlib.elim_transpose,
             # Miscellaneous
+            optlib.universe_get_set,
+            optlib.universe_get_handle,
+            optlib.universe_set_chain,
             optlib.elim_identity,
             optlib.getitem_tuple,
             optlib.getitem_constant_tuple,

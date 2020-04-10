@@ -520,6 +520,79 @@ def simplify_array_map(resources, node, equiv):
             return True
 
 
+##################################
+# Universe-related optimizations #
+##################################
+
+
+# uget(U, handle(y)) => y
+# if U is a parameter, because the handle is created after U is provided
+# and therefore cannot have been set to a different value
+@pattern_replacer(P.universe_getitem, X, (P.handle, Y))
+def universe_get_handle(resources, node, equiv):
+    x = equiv[X]
+    if not x.is_parameter():
+        return None
+    arg = node.inputs[2]
+    if arg.graph not in x.graph.scope:
+        return None
+    return equiv[Y]
+
+# * uget(uset(U, h, v), h) => v
+# * uget(uset(U, h1, v), h2) => uget(U, h2) if h1 cannot possibly be h2:
+#   * if h1 and h2 have different types
+#   * if h1 is a call to handle and is not h2
+#   * if h2 is a call to handle and is not h1
+@pattern_replacer(P.universe_getitem, (P.universe_setitem, X1, X2, X3), X4)
+def universe_get_set(resources, node, equiv):
+    h_inner = equiv[X2]
+    h_outer = equiv[X4]
+    if h_inner is h_outer:
+        return equiv[X3]
+    elif h_inner.abstract is not h_outer.abstract or (
+        h_inner is not h_outer
+        and (h_inner.is_apply(P.handle) or h_outer.is_apply(P.handle))
+    ):
+        return sexp_to_node(
+            (P.universe_getitem, equiv[X1], h_outer), node.graph
+        )
+    else:
+        return None
+
+
+def _analyze_universe_chain(node):
+    curr = node
+    handles = []
+    values = []
+    is_new = []
+    while curr.is_apply(P.universe_setitem):
+        assert curr.graph is node.graph
+        h = curr.inputs[2]
+        handles.append(h)
+        values.append(curr.inputs[3])
+        is_new.append(h.is_apply(P.handle) and h.graph in node.graph.scope)
+        curr = curr.inputs[1]
+    return curr, handles, values, is_new
+
+
+@pattern_replacer(P.universe_setitem, X, Y, Z)
+def universe_set_chain(resources, node, equiv):
+    curr, handles, values, is_new = _analyze_universe_chain(node)
+    if len(handles) == len(set(handles)):
+        return None
+
+    # curr is the root universe
+    while handles:
+        handle = handles.pop()
+        value = values.pop()
+        new = is_new.pop()
+        if handle in handles:
+            continue
+        curr = (P.universe_setitem, curr, handle, value)
+
+    return sexp_to_node(curr, node.graph)
+
+
 #############################
 # Env-related optimizations #
 #############################
