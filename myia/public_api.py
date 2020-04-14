@@ -312,9 +312,12 @@ def conv_transpose2d(
     dilation=1,
 ):
     """Map of Pytorch method torch.nn.functional.conv_transpose2d."""
-    return P.conv_transpose2d(
-        input, weight, bias, stride, padding, output_padding, groups, dilation
+    ret = P.conv_transpose2d(
+        input, weight, stride, padding, output_padding, groups, dilation
     )
+    if bias is not None:
+        ret = ret + reshape(bias, (1, bias.shape[0], 1, 1))
+    return ret
 
 
 @core

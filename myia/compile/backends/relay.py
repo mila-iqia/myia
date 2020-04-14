@@ -374,13 +374,17 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
 
 
 def relay_conv_transpose2d(
-    c, input, weight, bias, stride, padding, output_padding, groups, dilation
+    c, input, weight, stride, padding, output_padding, groups, dilation
 ):
+    """Implement conv2d_transpose using 10 relay calls including conv2d.
 
-    if not bias.is_constant(type(None)):
-        raise NotImplementedError(
-            "conv_transpose2d: bias not yet supported " "in relay backend."
-        )
+    Support all values for groups, dilation, strides, padding and
+    output padding.
+    Based on Theano implementation (2020/04/14):
+    https://github.com/Theano/Theano/blob/master/theano/tensor/nnet/abstract_conv.py#L2927
+    Need implementation of operation relay.nn.dilate
+    in TVM relay backend
+    """
 
     assert stride.is_constant(tuple)
     assert padding.is_constant(tuple)
@@ -389,22 +393,72 @@ def relay_conv_transpose2d(
     assert groups.is_constant(int)
 
     data_shape = input.abstract.xshape()
-    weight_shape = weight.abstract.xshape()
-    _, in_channels, _, _ = data_shape
-    _, w_c, filter_h, filter_w = weight_shape
-    _i = c.ref(input)
-    _w = c.ref(weight)
-    return relay.nn.conv2d_transpose(
-        _i,
-        _w,
-        strides=stride.value,
-        padding=padding.value,
-        dilation=dilation.value,
-        groups=groups.value,
-        output_padding=output_padding.value,
-        kernel_size=(filter_h, filter_w),
-        channels=in_channels,
+    kern_shape = weight.abstract.xshape()
+    h_in, w_in = data_shape[2:]
+    filter_h, filter_w = kern_shape[2:]
+    strides = stride.value
+    padding = padding.value
+    dilation = dilation.value
+    output_padding = output_padding.value
+    groups = groups.value
+    data = c.ref(input)
+    weight = c.ref(weight)
+
+    h_out = (
+        (h_in - 1) * strides[0]
+        - 2 * padding[0]
+        + dilation[0] * (filter_h - 1)
+        + output_padding[0]
+        + 1
     )
+    w_out = (
+        (w_in - 1) * strides[1]
+        - 2 * padding[1]
+        + dilation[1] * (filter_w - 1)
+        + output_padding[1]
+        + 1
+    )
+
+    data_dilated = relay.nn.dilate(data, (1, 1) + strides)
+    data_padded = relay.nn.pad(
+        data_dilated,
+        ((0, 0), (0, 0), (0, output_padding[0]), (0, output_padding[1]),),
+    )
+
+    # Pre-process kernel,
+    # from (m0, m1, m2, m3) to (m1 * g, m0 // g, m2, m3).
+    mshp0 = kern_shape[0] // groups
+    c_out = kern_shape[1] * groups
+    kern = relay.reshape(weight, (groups, mshp0) + kern_shape[1:])
+    # => (g, m0 // g, m1, m2, m3)
+    kern = relay.op.transpose(kern, axes=(1, 0, 2, 3, 4))
+    # => (m0 // g, g, m1, m2, m3)
+    kern = relay.reshape(kern, (mshp0, c_out, kern_shape[-2], kern_shape[-1]))
+    # => (m0 // g, m1 * g, m2, m3)
+    kern = relay.op.transpose(kern, (1, 0, 2, 3))
+    # => (m1 * g, m0 // g, m2, m3)
+    # Kernel 2 latest dimensions must be flipped
+    kern = relay.op.transform.reverse(kern, 2)
+    kern = relay.op.transform.reverse(kern, 3)
+    # End pre-processing kernel.
+
+    img = relay.nn.conv2d(
+        data_padded,
+        kern,
+        groups=groups,
+        channels=c_out,
+        padding=[(kern_shape[2 + i] - 1) * dilation[i] for i in range(2)],
+        dilation=dilation,
+    )
+
+    if any(p != 0 for p in padding):
+        img = relay.op.transform.strided_slice(
+            data=img,
+            begin=[0, 0, padding[0], padding[1]],
+            end=[None, None, h_out + padding[0], w_out + padding[1]],
+        )
+
+    return img
 
 
 def relay_concat(c, x, dim):

@@ -91,7 +91,7 @@ class MyiaFunctionTest:
         """Configure this test with new kwargs."""
         return MyiaFunctionTest(self.runtest, spec={**self.spec, **spec})
 
-    def check(self, run, args, expected):
+    def check(self, run, args, expected, **kwargs):
         """Check the result of run() against expected.
 
         Expected can be either:
@@ -118,7 +118,7 @@ class MyiaFunctionTest:
                 if not expected(args, res):
                     raise Exception(f"Failed the result check function")
 
-            elif not eqtest(res, expected):
+            elif not eqtest(res, expected, **kwargs):
                 raise Exception(f"Mismatch: expected {expected}, got {res}")
 
     def generate_params(self):
