@@ -6,7 +6,9 @@ from . import make_handle, universe_getitem, universe_setitem
 from .utils import to_opdef
 
 cell_id = HandleInstance(
-    0, abstract=AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]})
+    0,
+    abstract=AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]}),
+    id="cell_id",
 )
 
 

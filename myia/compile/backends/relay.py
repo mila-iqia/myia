@@ -606,7 +606,7 @@ COMPLEX_MAP = {
     P.conv_transpose2d: relay_conv_transpose2d,
     P.concat: relay_concat,
     P.split: relay_split,
-    P.handle: relay_handle,
+    P.make_handle: relay_handle,
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
     P.take_grad_inp: relay_take_grad_inp,

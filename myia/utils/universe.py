@@ -45,10 +45,11 @@ class UniverseInstance:
 class HandleInstance:
     """Key to use in an Universe."""
 
-    def __init__(self, state, abstract=None):
+    def __init__(self, state, abstract=None, id=None):
         """Initialize a HandleInstance."""
         self.state = state
         self.abstract = abstract
+        self.id = id
 
     def _serialize(self):
         return {"state": self.state}
@@ -58,6 +59,11 @@ class HandleInstance:
         res = cls(None)
         data = yield res
         res.state = data["state"]
+
+    def __str__(self):
+        return f"H:{self.id}"
+
+    __repr__ = __str__
 
 
 new_universe = UniverseInstance()
