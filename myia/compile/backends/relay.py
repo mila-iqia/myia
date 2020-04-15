@@ -500,7 +500,7 @@ def relay_split(c, x, sections, dim):
     return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
-def relay_handle(c, v):
+def relay_handle(c, _, v):
     return relay.expr.RefCreate(c.ref(v))
 
 
@@ -735,6 +735,9 @@ class RelayConstantConverter(Converter):
     def convert_env(self, v, t):
         assert len(v) == 0
         return self.types.build_default_env_val()
+
+    def convert_handle(self, v, t):
+        return relay.expr.RefCreate(self(v.state, v.abstract or t.element))
 
     def convert_tuple(self, v, t):
         return relay.Tuple([self(e, et) for e, et in zip(v, t.elements)])

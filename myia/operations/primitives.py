@@ -121,8 +121,6 @@ extract_kwarg = InferencePrimitive(
 
 gather = BackendPrimitive(name="gather", defaults="myia.operations.prim_gather")
 
-handle = BackendPrimitive(name="handle", defaults="myia.operations.prim_handle")
-
 hastag = BackendPrimitive(name="hastag", defaults="myia.operations.prim_hastag")
 
 hastype = InferencePrimitive(
@@ -144,6 +142,10 @@ make_dict = InferencePrimitive(
 
 make_exception = BackendPrimitive(
     name="make_exception", defaults="myia.operations.prim_make_exception"
+)
+
+make_handle = BackendPrimitive(
+    name="make_handle", defaults="myia.operations.prim_make_handle"
 )
 
 make_kwarg = InferencePrimitive(

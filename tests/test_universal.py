@@ -3,7 +3,7 @@ import pytest
 from myia import myia
 from myia.compile.backends import load_backend
 from myia.lib import Empty, HandleInstance, core
-from myia.operations import handle, handle_get, handle_set
+from myia.operations import cell_get, cell_set, make_cell
 from myia.pipeline import standard_pipeline, steps
 
 try:
@@ -22,7 +22,7 @@ def add_one(x):
 
 @core(use_universe=True)
 def increment(h):
-    return handle_set(h, add_one(handle_get(h)))
+    return cell_set(h, add_one(cell_get(h)))
 
 
 def test_increment():
@@ -33,12 +33,12 @@ def test_increment():
         pipeline=upipeline,
     )
     def plus4(x):
-        h = handle(x)
+        h = make_cell(x)
         increment(h)
         increment(h)
         increment(h)
         increment(h)
-        return handle_get(h)
+        return cell_get(h)
 
     assert plus4(3) == 7
     assert plus4(10) == 14
@@ -52,13 +52,13 @@ def test_increment_interleave():
         pipeline=upipeline,
     )
     def plus2(x, y):
-        h1 = handle(x)
-        h2 = handle(y)
+        h1 = make_cell(x)
+        h2 = make_cell(y)
         increment(h1)
         increment(h2)
         increment(h1)
         increment(h2)
-        return handle_get(h1), handle_get(h2)
+        return cell_get(h1), cell_get(h2)
 
     assert plus2(3, 6) == (5, 8)
     assert plus2(10, -21) == (12, -19)
@@ -72,12 +72,12 @@ def test_increment_loop():
         pipeline=upipeline,
     )
     def plus(x, y):
-        h = handle(x)
+        h = make_cell(x)
         i = y
         while i > 0:
             increment(h)
             i = i - 1
-        return handle_get(h)
+        return cell_get(h)
 
     assert plus(3, 4) == 7
     assert plus(10, 13) == 23
@@ -94,7 +94,7 @@ def test_increment_recursion():
         if not isinstance(xs, Empty):
             increment(h)
             length(h, xs.tail)
-        return handle_get(h)
+        return cell_get(h)
 
     h = HandleInstance(0)
     hb = length.to_device(h)
@@ -113,7 +113,7 @@ def test_give_handle():
         while i > 0:
             increment(h)
             i = i - 1
-        return handle_get(h)
+        return cell_get(h)
 
     h1 = HandleInstance(0)
     h2 = HandleInstance(0)

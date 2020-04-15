@@ -525,10 +525,10 @@ def simplify_array_map(resources, node, equiv):
 ##################################
 
 
-# uget(U, handle(y)) => y
+# uget(U, make_handle(_, z)) => z
 # if U is a parameter, because the handle is created after U is provided
 # and therefore cannot have been set to a different value
-@pattern_replacer(P.universe_getitem, X, (P.handle, Y))
+@pattern_replacer(P.universe_getitem, X, (P.make_handle, Y, Z))
 def universe_get_handle(resources, node, equiv):
     x = equiv[X]
     if not x.is_parameter():
@@ -536,7 +536,8 @@ def universe_get_handle(resources, node, equiv):
     arg = node.inputs[2]
     if arg.graph not in x.graph.scope:
         return None
-    return equiv[Y]
+    return equiv[Z]
+
 
 # * uget(uset(U, h, v), h) => v
 # * uget(uset(U, h1, v), h2) => uget(U, h2) if h1 cannot possibly be h2:
@@ -551,7 +552,7 @@ def universe_get_set(resources, node, equiv):
         return equiv[X3]
     elif h_inner.abstract is not h_outer.abstract or (
         h_inner is not h_outer
-        and (h_inner.is_apply(P.handle) or h_outer.is_apply(P.handle))
+        and (h_inner.is_apply(P.make_handle) or h_outer.is_apply(P.make_handle))
     ):
         return sexp_to_node(
             (P.universe_getitem, equiv[X1], h_outer), node.graph
@@ -570,7 +571,7 @@ def _analyze_universe_chain(node):
         h = curr.inputs[2]
         handles.append(h)
         values.append(curr.inputs[3])
-        is_new.append(h.is_apply(P.handle) and h.graph in node.graph.scope)
+        is_new.append(h.is_apply(P.make_handle) and h.graph in node.graph.scope)
         curr = curr.inputs[1]
     return curr, handles, values, is_new
 
