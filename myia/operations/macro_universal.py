@@ -22,8 +22,12 @@ def is_universal(self, g: lib.GraphFunction):
 
 @overload  # noqa: F811
 def is_universal(self, g: lib.PartialApplication):
-    """Check whether a function is universal or not."""
     return self(g.fn)
+
+
+@overload  # noqa: F811
+def is_universal(self, p: (lib.PrimitiveFunction, lib.TypedPrimitive)):
+    return p.prim.universal
 
 
 @overload  # noqa: F811

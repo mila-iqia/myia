@@ -500,8 +500,8 @@ def relay_split(c, x, sections, dim):
     return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
-def relay_handle(c, _, v):
-    return relay.expr.RefCreate(c.ref(v))
+def relay_handle(c, v, u):
+    return relay.Tuple((c.ref(u), relay.expr.RefCreate(c.ref(v))))
 
 
 # Proper sequencing is handled in convert_func() below

@@ -338,10 +338,6 @@ lshift = Operation(name="lshift", defaults="myia.operations.ops_dunder.lshift")
 
 lt = Operation(name="lt", defaults="myia.operations.ops_dunder.lt")
 
-make_cell = Operation(
-    name="make_cell", defaults="myia.operations.ops_universe.make_cell"
-)
-
 make_dict = Operation(
     name="make_dict", defaults="myia.operations.prim_make_dict"
 )

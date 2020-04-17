@@ -6,9 +6,12 @@ from ..common import H, f64, i64
 from ..multitest import infer, mt, run_debug
 
 
-@mt(infer(i64, result=H(i64)), infer((i64, f64), result=H((i64, f64))))
-def test_make_handle(x):
-    return make_handle(1234, x)
+@mt(
+    infer(UniverseType, i64, result=H(i64)),
+    infer(UniverseType, (i64, f64), result=H((i64, f64))),
+)
+def test_make_handle(U, x):
+    return make_handle(x, U)[1]
 
 
 @mt(

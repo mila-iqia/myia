@@ -525,18 +525,14 @@ def simplify_array_map(resources, node, equiv):
 ##################################
 
 
-# uget(U, make_handle(_, z)) => z
-# if U is a parameter, because the handle is created after U is provided
-# and therefore cannot have been set to a different value
-@pattern_replacer(P.universe_getitem, X, (P.make_handle, Y, Z))
+# uget(*make_handle(y, _)) => y
+@pattern_replacer(
+    P.universe_getitem,
+    (P.tuple_getitem, (P.make_handle, X, Y), 0),
+    (P.tuple_getitem, (P.make_handle, X, Y), 1),
+)
 def universe_get_handle(resources, node, equiv):
-    x = equiv[X]
-    if not x.is_parameter():
-        return None
-    arg = node.inputs[2]
-    if arg.graph not in x.graph.scope:
-        return None
-    return equiv[Z]
+    return equiv[X]
 
 
 # * uget(uset(U, h, v), h) => v

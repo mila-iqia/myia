@@ -12,14 +12,14 @@ cell_id = HandleInstance(
 )
 
 
-@to_opdef
-@core(universal=True)
-def make_cell(init, U):
-    """Create a new cell."""
-    curr_cell_id = universe_getitem(U, cell_id)
-    next_cell_id = curr_cell_id + 1
-    h = make_handle(next_cell_id, init)
-    return universe_setitem(U, cell_id, next_cell_id), h
+# @to_opdef
+# @core(universal=True)
+# def make_cell(init, U):
+#     """Create a new cell."""
+#     curr_cell_id = universe_getitem(U, cell_id)
+#     next_cell_id = curr_cell_id + 1
+#     h = make_handle(next_cell_id, init)
+#     return universe_setitem(U, cell_id, next_cell_id), h
 
 
 @to_opdef

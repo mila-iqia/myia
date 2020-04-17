@@ -11,6 +11,11 @@ class Primitive(HasDefaults):
         """Initialize a Primitive."""
         super().__init__(name, defaults, "__primitive_defaults__")
 
+    @property
+    def universal(self):
+        """Whether this primitive is universal or not."""
+        return self.defaults().get("universal", False)
+
     def __str__(self):
         return self.name
 
