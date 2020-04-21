@@ -13,6 +13,7 @@ from ..opt import (
     DeadDataElimination,
     LocalPassOptimizer,
     NodeMap,
+    lambda_lift,
     lib as optlib,
 )
 from ..parser import parse
@@ -369,6 +370,24 @@ step_opt2 = Optimizer.partial(
         cse=CSE.partial(report_changes=False),
     )
 )
+
+
+##################
+# Lambda lifting #
+##################
+
+
+def step_llift(resources, graph, outspec=None):
+    """Pipeline step to lambda-lift the graph.
+
+    Inputs:
+        graph: The graph to lambda-lift.
+
+    Outputs:
+        None.
+    """
+    lambda_lift(graph)
+    return {"graph": graph}
 
 
 ############

@@ -13,6 +13,7 @@ short_relation_symbols = {
     "copy": "",
     "cosmetic": "",
     "phi": "Φ",
+    "llift": "Φ",
     "iterator": "*",
     "fv": "⤋",
     "if_true": "✓",
