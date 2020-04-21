@@ -15,12 +15,14 @@ from . import primitives as P
 
 
 @standard_prim(P.make_handle)
-async def infer_make_handle(self, engine, init, universe: xtype.UniverseType):
+async def infer_make_handle(
+    self, engine, typ: AbstractType, universe: xtype.UniverseType
+):
     """Infer the return type of primitive `make_handle`."""
     return AbstractTuple(
         (
             AbstractScalar({VALUE: ANYTHING, TYPE: xtype.UniverseType}),
-            AbstractHandle(init),
+            AbstractHandle(typ.element),
         )
     )
 

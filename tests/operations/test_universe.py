@@ -1,4 +1,9 @@
-from myia.operations import make_handle, universe_getitem, universe_setitem
+from myia.operations import (
+    make_handle,
+    typeof,
+    universe_getitem,
+    universe_setitem,
+)
 from myia.utils import HandleInstance, InferenceError, new_universe
 from myia.xtype import EnvType, UniverseType
 
@@ -11,7 +16,7 @@ from ..multitest import infer, mt, run_debug
     infer(UniverseType, (i64, f64), result=H((i64, f64))),
 )
 def test_make_handle(U, x):
-    return make_handle(x, U)[1]
+    return make_handle(typeof(x), U)[1]
 
 
 @mt(
