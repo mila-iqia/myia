@@ -1,9 +1,12 @@
+from dataclasses import dataclass
+
 import numpy
 
 from myia import lib
 from myia.hypermap import HyperMap
 from myia.lib import InferenceError
 from myia.operations import hyper_map, scalar_add
+from myia.utils import tags
 
 from ..common import MA, MB, Point, Point3D, U, af64_of, ai64_of, f64, i64
 from ..multitest import mt, run, run_debug
@@ -128,3 +131,39 @@ def test_hypermap_python():
 def test_arithmetic_data_python():
     assert Point(1, 2) + Point(10, 20) == Point(11, 22)
     assert Point(1, 2) + 10 == Point(11, 12)
+
+
+@dataclass
+class ConstYPoint:
+    x: tags.Update
+    y: object
+
+
+add_update = HyperMap(fn_leaf=scalar_add, update_tag=tags.Update)
+
+
+@mt(
+    run(ConstYPoint(5, 10), result=ConstYPoint(6, 10)),
+    run((3, ConstYPoint(5, 10)), result=(4, ConstYPoint(6, 10))),
+    run(
+        ConstYPoint(ConstYPoint(10, 20), ConstYPoint(30, 40)),
+        result=ConstYPoint(ConstYPoint(11, 20), ConstYPoint(30, 40)),
+    ),
+)
+def test_partial_update(pt):
+    return add_update(pt, 1)
+
+
+@run(ConstYPoint(5, 10), ConstYPoint(5, 10), result=ConstYPoint(10, 10))
+def test_partial_update_binary(pt1, pt2):
+    return add_update(pt1, pt2)
+
+
+@run(ConstYPoint(5, 10), result=InferenceError)
+def test_bad_update(pt):
+    return add_update(1, pt)
+
+
+def test_partial_update_python():
+    pt = ConstYPoint(5, 10)
+    assert add_update(pt, 1) == ConstYPoint(6, 10)

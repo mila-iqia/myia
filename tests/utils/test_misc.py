@@ -13,12 +13,18 @@ from myia.utils import (
     SymbolicKeyInstance,
     newenv,
     smap,
+    tags,
 )
 
 
 def test_named():
     named = Named("foo")
     assert repr(named) == "foo"
+
+
+def test_tags():
+    assert tags.Update is tags.Update
+    assert repr(tags.Update) == "Update"
 
 
 @smap.variant

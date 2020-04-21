@@ -472,6 +472,39 @@ def assert_scalar(*args):
             raise TypeError(f"Expected scalar, not {type(x)}")
 
 
+class Tag:
+    """A tag for dataclass fields."""
+
+    def __init__(self, name):
+        """Construct a Tag.
+
+        Arguments:
+            name: The name of this tag.
+
+        """
+        self.name = name
+
+    def __repr__(self):
+        """Return the object's name."""
+        return self.name
+
+
+class TagFactory:
+    """A factory for Tags."""
+
+    def __init__(self):
+        """Initialize a TagFactory."""
+        self.cache = {}
+
+    def __getattr__(self, attr):
+        if attr not in self.cache:
+            self.cache[attr] = Tag(attr)
+        return self.cache[attr]
+
+
+tags = TagFactory()
+
+
 __consolidate__ = True
 __all__ = [
     "ClosureNamespace",
@@ -486,6 +519,8 @@ __all__ = [
     "Named",
     "Namespace",
     "Registry",
+    "Tag",
+    "TagFactory",
     "TaggedValue",
     "UNKNOWN",
     "assert_scalar",
@@ -496,4 +531,5 @@ __all__ = [
     "list_str",
     "repr_",
     "resolve_from_path",
+    "tags",
 ]

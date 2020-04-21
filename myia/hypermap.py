@@ -48,6 +48,7 @@ class HyperMap(MetaGraph):
         trust_union_match=False,
         infer_value=False,
         name=None,
+        update_tag=None,
     ):
         """Initialize a HyperMap."""
         if name is None:
@@ -68,6 +69,7 @@ class HyperMap(MetaGraph):
             abstract.Possibilities,
             abstract.TaggedPossibilities,
         )
+        self.update_tag = update_tag
 
     async def normalize_args(self, args):
         """Return broadened arguments."""
@@ -249,14 +251,27 @@ class HyperMap(MetaGraph):
 
         vals = []
         for k in a.attributes.keys():
-            args = [
-                arg if isleaf else g.apply(P.record_getitem, arg, k)
-                for arg, (_, isleaf) in argmap.items()
-            ]
-            if fnarg is None:
-                val = g.apply(self.fn_rec, *args)
+            if (
+                self.update_tag
+                and not a.tag.__annotations__[k] is self.update_tag
+            ):
+                (arg0, (__, isleaf)), *_ = argmap.items()
+                if isleaf:
+                    raise MyiaTypeError(
+                        f"If any argument is a {a.tag.__name__},"
+                        " the first argument must also be an instance"
+                        " of that class."
+                    )
+                val = g.apply(P.record_getitem, arg0, k)
             else:
-                val = g.apply(self.fn_rec, fnarg, *args)
+                args = [
+                    arg if isleaf else g.apply(P.record_getitem, arg, k)
+                    for arg, (_, isleaf) in argmap.items()
+                ]
+                if fnarg is None:
+                    val = g.apply(self.fn_rec, *args)
+                else:
+                    val = g.apply(self.fn_rec, fnarg, *args)
             vals.append(val)
 
         # We recover the original, potentially more generic type corresponding
@@ -367,10 +382,19 @@ class HyperMap(MetaGraph):
         elif is_dataclass(main):
             results = {}
             for name, field in main.__dataclass_fields__.items():
-                args = [
-                    getattr(x, name) if nonleaf else x for x, nonleaf in argmap
-                ]
-                results[name] = _reccall(args)
+                if (
+                    self.update_tag
+                    and not main.__annotations__[name] is self.update_tag
+                ):
+                    (arg0, nonleaf), *_ = argmap
+                    assert nonleaf
+                    results[name] = getattr(arg0, name)
+                else:
+                    args = [
+                        getattr(x, name) if nonleaf else x
+                        for x, nonleaf in argmap
+                    ]
+                    results[name] = _reccall(args)
             return type(main)(**results)
 
         elif isinstance(main, np.ndarray):
