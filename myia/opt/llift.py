@@ -1,27 +1,21 @@
 """Lambda lifting."""
 
-from collections import defaultdict, deque
 from types import SimpleNamespace as NS
 
 from ..info import About
-from ..ir import ANFNode, Constant, Graph, Parameter, manage, sexp_to_node
-from ..operations import primitives as P
+from ..ir import ANFNode, manage
+from ..utils import WorkSet
 
 
 def _find_fvs(graph):
     fvs = set()
-    processed = set()
-    graphs = deque([graph])
-    while graphs:
-        g = graphs.pop()
-        if g in processed:
-            continue
-        processed.add(g)
+    work = WorkSet([graph])
+    for g in work:
         for fv in g.free_variables_total:
             if isinstance(fv, ANFNode):
                 fvs.add(fv)
             else:
-                graphs.append(fv)
+                work.add(fv)
     return [fv for fv in fvs if fv.graph not in graph.scope]
 
 
@@ -34,19 +28,14 @@ def lambda_lift(root):
     This is a destructive operation.
     """
     mng = manage(root)
-    processed = set()
-    graphs = deque(mng.graphs)
+    graphs = WorkSet(mng.graphs)
     todo = {}
 
-    while graphs:
-        g = graphs.popleft()
-        if g.parent and g.parent not in processed:
-            graphs.push(g)
-            continue
-        if g in processed:
+    for g in graphs:
+        if g.parent and g.parent not in graphs.processed:
+            graphs.add(g)
             continue
 
-        processed.add(g)
         todo[g] = NS(graph=g, calls=[], fvs={})
 
         if not g.free_variables_total:

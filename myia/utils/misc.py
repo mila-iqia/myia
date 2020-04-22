@@ -2,6 +2,7 @@
 
 import builtins
 import functools
+from collections import deque
 from typing import Any, Dict, List, TypeVar
 
 import numpy as np
@@ -505,6 +506,32 @@ class TagFactory:
 tags = TagFactory()
 
 
+class WorkSet:
+    """Tool to iterate over an evolving set of objects.
+
+    Elements can be added to a WorkSet during iteration.
+
+    Iterating over a WorkSet will never yield the same object twice.
+    """
+
+    def __init__(self, elements):
+        self.processed = None
+        self.elements = deque(elements)
+
+    def add(self, element):
+        """Add an element to the queue."""
+        self.elements.append(element)
+
+    def __iter__(self):
+        self.processed = set()
+        while self.elements:
+            elem = self.elements.popleft()
+            if elem in self.processed:
+                continue
+            self.processed.add(elem)
+            yield elem
+
+
 __consolidate__ = True
 __all__ = [
     "ClosureNamespace",
@@ -523,6 +550,7 @@ __all__ = [
     "TagFactory",
     "TaggedValue",
     "UNKNOWN",
+    "WorkSet",
     "assert_scalar",
     "core",
     "dataclass_fields",
