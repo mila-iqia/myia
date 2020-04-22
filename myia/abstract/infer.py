@@ -18,6 +18,7 @@ from ..utils import (
     infer_trace,
     tracer,
     type_error_nargs,
+    untested_legacy,
 )
 from .amerge import amerge, bind
 from .data import (
@@ -30,12 +31,14 @@ from .data import (
     AbstractScalar,
     AbstractTuple,
     AbstractValue,
+    DummyFunction,
     Function,
     GraphFunction,
     JTransformedFunction,
     MacroFunction,
     MetaGraphFunction,
     PartialApplication,
+    Primitive,
     PrimitiveFunction,
     TypedPrimitive,
     VirtualFunction,
@@ -53,6 +56,7 @@ from .to_abstract import to_abstract
 from .utils import (
     broaden as _broaden,
     concretize_abstract,
+    concretize_cache,
     sensitivity_transform,
 )
 
@@ -73,6 +77,7 @@ class InferenceEngine:
         self,
         resources,
         *,
+        manager,
         constructors,
         max_stack_depth=50,
         context_class=Context,
@@ -80,7 +85,7 @@ class InferenceEngine:
         """Initialize the InferenceEngine."""
         self.loop = InferenceLoop(InferenceError)
         self.resources = resources
-        self.mng = self.resources.manager
+        self.mng = manager
         self._constructors = constructors
         self.errors = []
         self.context_class = context_class
@@ -95,6 +100,7 @@ class InferenceEngine:
             keytransform=self.get_actual_ref,
         )
         self.reference_map = {}
+        self.new_reference_map = {}
         self.constructors = {}
 
     async def infer_function(self, fn, argspec, outspec=None):
@@ -131,9 +137,13 @@ class InferenceEngine:
 
     def ref(self, node, context):
         """Return a Reference to the node in the given context."""
+        if node.abstract is not None:
+            return Reference(self, node, CONTEXTLESS)
         if context is CONTEXTLESS:
             return Reference(self, node, CONTEXTLESS)
         if node.is_constant_graph():
+            if node.value.abstract is not None:
+                return Reference(self, node, CONTEXTLESS)
             graph = node.value.parent
         else:
             graph = node.graph
@@ -193,7 +203,7 @@ class InferenceEngine:
             # This will link the old node's debug info to the new node, if
             # necessary.
             new.node.debug.about = About(orig.node.debug, "reroute")
-        self.reference_map[orig] = new
+        self.reference_map[orig] = self.new_reference_map[orig] = new
         return await self.get_inferred(new)
 
     def get_actual_ref(self, ref):
@@ -373,6 +383,13 @@ class InferenceEngine:
         """
         return await force_pending(self.check(predicate, *values))
 
+    def concretize_cache(self):
+        """Complete the engine's caches with concretized contexts."""
+        concretize_cache(self.cache.new, dest=self.cache.cache)
+        self.cache.new = {}
+        concretize_cache(self.new_reference_map, dest=self.reference_map)
+        self.new_reference_map = {}
+
 
 class LiveInferenceEngine(InferenceEngine):
     """Implements an inference engine for live inference.
@@ -380,12 +397,15 @@ class LiveInferenceEngine(InferenceEngine):
     Each node of each graph is only allowed to have a single type.
     """
 
-    def __init__(self, resources, *, constructors):
+    def __init__(self, resources, *, constructors, manager):
         """Initialize a LiveInferenceEngine."""
         from ..monomorphize import type_fixer, TypeFinder
 
         super().__init__(
-            resources, constructors=constructors, max_stack_depth=50
+            resources,
+            constructors=constructors,
+            max_stack_depth=50,
+            manager=manager,
         )
         self.fix_type = type_fixer(TypeFinder(self))
 
@@ -689,6 +709,52 @@ def compute_bprop_type(orig_fn, args, out):
     )
 
 
+async def compute_jinv_type(x):
+    """Compute the abstract type of jinv(_ :: x)."""
+    if isinstance(x, AbstractJTagged):
+        return x.element
+    elif isinstance(x, VirtualFunction):
+        return VirtualFunction(
+            tuple([await compute_jinv_type(arg) for arg in x.args]),
+            await compute_jinv_type(x.output.elements[0]),
+        )
+    elif isinstance(x, JTransformedFunction):
+        return x.fn
+    elif isinstance(x, GraphFunction):
+        g = x.graph
+        primal = g and g.transforms.get("primal", None)
+        if primal:
+            if isinstance(primal, Graph):
+                if primal.parent:
+                    # The primal for a closure can't be used
+                    # because it points to the original nodes
+                    # of its parent, whereas we would like to
+                    # point to the transformed nodes of the
+                    # parent. This is fixable, and will need
+                    # to be fixed to support a few edge cases.
+                    res = DummyFunction()
+                else:
+                    with untested_legacy():
+                        # Not sure why this never happens anymore
+                        # primal = engine.resources.convert(primal)
+                        res = GraphFunction(primal, Context.empty())
+            else:
+                with untested_legacy():
+                    # Not sure why this never happens either
+                    res = primal
+                    if isinstance(res, Primitive):
+                        tid = getattr(x, "tracking_id", None)
+                        res = PrimitiveFunction(res, tracking_id=tid)
+        else:
+            raise MyiaTypeError(f"Bad input type for Jinv: {x}")
+        return res
+    elif isinstance(x, AbstractFunction):
+        fns = [await compute_jinv_type(f) for f in await x.get()]
+        return AbstractFunction(*fns)
+    else:
+        raise MyiaTypeError(f"Wrong type for jinv: {x}")
+
+
 class JInferrer(Inferrer):
     """Inferrer for a function transformed through J."""
 
@@ -697,10 +763,6 @@ class JInferrer(Inferrer):
         super().__init__()
         self.fn = fn
         self.orig_fn = orig_fn
-
-    def _jinv(self, x):
-        assert isinstance(x, AbstractJTagged)
-        return x.element
 
     async def _jtag(self, x):
         if isinstance(x, AbstractFunction):
@@ -712,7 +774,7 @@ class JInferrer(Inferrer):
         """Run the inference."""
         args = tuple([await ref.get() for ref in argrefs])
         if args not in self.cache:
-            jinv_args = tuple(self._jinv(a) for a in args)
+            jinv_args = [await compute_jinv_type(a) for a in args]
             jinv_argrefs = tuple(VirtualReference(arg) for arg in jinv_args)
             res = await self.fn.run(engine, None, jinv_argrefs)
             res_wrapped = await self._jtag(res)
@@ -911,5 +973,6 @@ __all__ = [
     "VirtualInferrer",
     "compute_bprop_type",
     "execute_inferrers",
+    "compute_jinv_type",
     "standard_prim",
 ]

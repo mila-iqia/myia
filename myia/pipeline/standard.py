@@ -13,13 +13,17 @@ from ..operations import primitives as P
 from ..operations.gen import lop, reverse_binop, rop
 from ..public_api import item
 from ..utils import Registry
+from ..validate import AbstractValidator, MultiValidator, OperatorValidator
 from . import steps
 from .pipeline import PipelineDefinition
 from .resources import (
     BackendResource,
     ConverterResource,
     DebugVMResource,
+    Incorporator,
     InferenceResource,
+    LiveInferenceResource,
+    MonomorphizationResource,
     Resources,
     Tracker,
 )
@@ -261,7 +265,8 @@ standard_method_map = {
 
 
 standard_resources = Resources.partial(
-    manager=GraphManager.partial(),
+    infer_manager=GraphManager.partial(),
+    opt_manager=GraphManager.partial(),
     py_implementations=py_registry,
     grad_implementations=grad_registry,
     method_map=standard_method_map,
@@ -269,9 +274,19 @@ standard_resources = Resources.partial(
     inferrer=InferenceResource.partial(
         constructors=inferrer_registry, max_stack_depth=50
     ),
+    monomorphizer=MonomorphizationResource.partial(),
+    live_inferrer=LiveInferenceResource.partial(constructors=inferrer_registry),
     tracker=Tracker.partial(),
     backend=BackendResource.partial(),
     debug_vm=DebugVMResource.partial(implementations=vm_registry),
+    validator=MultiValidator.partial(
+        validators=[
+            OperatorValidator,
+            AbstractValidator,
+            # CallValidator,
+        ]
+    ),
+    incorporate=Incorporator.partial(),
     return_backend=False,
     universal=False,
 )
@@ -285,7 +300,6 @@ standard_resources = Resources.partial(
 standard_pipeline = PipelineDefinition(
     resources=standard_resources,
     parse=steps.step_parse,
-    resolve=steps.step_resolve,
     infer=steps.step_infer,
     specialize=steps.step_specialize,
     simplify_types=steps.step_simplify_types,
@@ -305,7 +319,6 @@ scalar_pipeline = standard_pipeline.configure(
 standard_debug_pipeline = PipelineDefinition(
     resources=standard_resources,
     parse=steps.step_parse,
-    resolve=steps.step_resolve,
     infer=steps.step_infer,
     specialize=steps.step_specialize,
     simplify_types=steps.step_simplify_types,
@@ -333,12 +346,12 @@ standard_parse = standard_pipeline.select(
 
 
 scalar_parse = scalar_pipeline.select(
-    "resources", "parse", "resolve"
+    "resources", "parse", {"resolve": steps.step_resolve}
 ).make_transformer("input", "graph")
 
 
 scalar_debug_compile = scalar_debug_pipeline.select(
-    "resources", "parse", "resolve", "export"
+    "resources", "parse", {"resolve": steps.step_resolve}, "export"
 ).make_transformer("input", "output")
 
 

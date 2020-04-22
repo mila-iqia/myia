@@ -7,7 +7,7 @@ from itertools import count
 
 from ..abstract import AbstractTuple, find_aliases, nobottom, type_to_abstract
 from ..compile import BackendValue
-from ..ir import Graph
+from ..ir import Graph, clone
 from ..opt import (
     CSE,
     DeadDataElimination,
@@ -24,7 +24,7 @@ from ..utils import (
     new_universe,
     tracer,
 )
-from ..validate import ValidationError, validate
+from ..validate import ValidationError
 from ..xtype import UniverseType
 
 #############
@@ -85,8 +85,6 @@ class Optimizer(Partializable):
                             changes = True
                 if run_only_once:
                     break
-        with tracer("keep_roots"):
-            resources.manager.keep_roots(graph)
         res = {"graph": graph}
         return res
 
@@ -122,11 +120,24 @@ def step_parse(resources, input, argspec=None):
 ###########
 
 
-step_resolve = Optimizer.partial(
-    run_only_once=True,
-    phases=dict(resolve=[optlib.resolve_globals]),
-    use_tracker=False,
-)
+def step_resolve(resources, graph, argspec=None, outspec=None):
+    """Resolve all global symbols in the graph.
+
+    This will remove all resolve(...) calls in the graph.
+
+    This step is unnecessary if the infer/specialize steps are in the pipeline.
+    """
+    new_graph = clone(graph, total=True)
+    resources.opt_manager.add_graph(new_graph, root=True)
+    resources.infer_manager = resources.opt_manager
+    opt = Optimizer(
+        run_only_once=True,
+        phases=dict(resolve=[optlib.resolve_globals]),
+        use_tracker=False,
+    )
+    return opt(
+        resources=resources, graph=new_graph, argspec=argspec, outspec=outspec
+    )
 
 
 #########
@@ -148,7 +159,7 @@ def step_infer(resources, graph, argspec):
     orig_argspec = argspec
     if resources.universal:
         argspec = (type_to_abstract(UniverseType), *argspec)
-    outspec, context = resources.inferrer.infer(graph, argspec)
+    outspec, context = resources.inferrer(graph, argspec)
     if not nobottom(outspec):
         raise InferenceError(
             "There is no condition in which the program succeeds"
@@ -180,7 +191,8 @@ def step_specialize(resources, graph, inference_context):
     Outputs:
         graph: The specialized graph.
     """
-    new_graph = resources.inferrer.monomorphize(inference_context)
+    new_graph = resources.monomorphizer(inference_context)
+    resources.opt_manager.keep_roots(new_graph)
     return {"graph": new_graph}
 
 
@@ -201,11 +213,10 @@ def step_simplify_types(resources, graph, argspec, outspec):
         graph: The prepared graph.
     """
     resources.tracker.activate()
-    mng = resources.manager
+    mng = resources.opt_manager
     simplify_types(graph, mng)
-    mng.keep_roots(graph)
     new_argspec = tuple(p.abstract for p in graph.parameters)
-    resources.inferrer.infer_incremental()
+    resources.live_inferrer()
     new_outspec = graph.output.abstract
     return {
         "graph": graph,
@@ -378,7 +389,7 @@ def step_validate(resources, graph, outspec=None):
         raise ValidationError(
             "The output type of the graph changed during optimization."
         )
-    validate(graph)
+    resources.validator(graph)
     return {"graph": graph}
 
 

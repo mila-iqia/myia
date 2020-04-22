@@ -4,11 +4,15 @@ from myia import myia
 from myia.compile.backends import load_backend
 from myia.lib import Empty, HandleInstance, core
 from myia.operations import handle, handle_get, handle_set
+from myia.pipeline import standard_pipeline, steps
 
 try:
     load_backend("relay")
 except Exception:
     pytestmark = pytest.mark.skip("Requires relay")
+
+
+upipeline = standard_pipeline.insert_after("parse", resolve=steps.step_resolve)
 
 
 def add_one(x):
@@ -26,6 +30,7 @@ def test_increment():
         use_universe=True,
         backend="relay",
         backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
     )
     def plus4(x):
         h = handle(x)
@@ -44,6 +49,7 @@ def test_increment_interleave():
         use_universe=True,
         backend="relay",
         backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
     )
     def plus2(x, y):
         h1 = handle(x)
@@ -63,6 +69,7 @@ def test_increment_loop():
         use_universe=True,
         backend="relay",
         backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
     )
     def plus(x, y):
         h = handle(x)
@@ -81,6 +88,7 @@ def test_increment_recursion():
         use_universe=True,
         backend="relay",
         backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
     )
     def length(h, xs):
         if not isinstance(xs, Empty):
@@ -98,6 +106,7 @@ def test_give_handle():
         use_universe=True,
         backend="relay",
         backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
     )
     def plus(h, y):
         i = y
@@ -123,6 +132,7 @@ def test_return_handle():
         use_universe=True,
         backend="relay",
         backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
     )
     def plus2(h):
         increment(h)

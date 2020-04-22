@@ -10,7 +10,7 @@ from myia.opt import (
     cse,
     pattern_replacer,
 )
-from myia.pipeline import scalar_pipeline
+from myia.pipeline import scalar_pipeline, steps
 from myia.utils import InferenceError, Merge
 from myia.utils.unify import Var, var
 from myia.validate import ValidationError
@@ -33,7 +33,7 @@ parse = (
             )
         }
     )
-    .select("resources", "parse", "resolve")
+    .select("resources", "parse", {"resolve": steps.step_resolve})
     .make_transformer("input", "graph")
 )
 
@@ -44,7 +44,9 @@ specialize = scalar_pipeline.configure(
             {operations.getitem: prim.tuple_getitem}
         )
     }
-).select("resources", "parse", "resolve", "infer", "specialize")
+).select(
+    "resources", "parse", {"resolve": steps.step_resolve}, "infer", "specialize"
+)
 
 
 # We will optimize patterns of these fake primitives

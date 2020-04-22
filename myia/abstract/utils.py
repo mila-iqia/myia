@@ -1,6 +1,6 @@
 """Utilities for abstract values and inference."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dc_replace
 from types import AsyncGeneratorType, GeneratorType
 
 from .. import xtype
@@ -27,6 +27,7 @@ from .data import (
     AbstractUnion,
     AbstractValue,
     AbstractWrapper,
+    GraphFunction,
     JTransformedFunction,
     PartialApplication,
     Possibilities,
@@ -35,6 +36,7 @@ from .data import (
     VirtualFunction,
 )
 from .loop import Pending
+from .ref import Context, Reference
 
 ############
 # Building #
@@ -412,6 +414,37 @@ def concretize_abstract(self, x: Pending):
         raise AssertionError("Unresolved Pending", x)
 
 
+@abstract_check.variant(initial_state=lambda: CheckState({}, "_no_track"))
+def _check_no_tracking_id(self, x: GraphFunction):
+    return x.tracking_id is None
+
+
+@concretize_abstract.variant(
+    initial_state=lambda: CloneState(
+        cache={}, prop="_no_track", check=_check_no_tracking_id
+    )
+)
+def no_tracking_id(self, x: GraphFunction):
+    """Resolve all Pending and erase tracking_id information."""
+    return dc_replace(x, tracking_id=None)
+
+
+def concretize_cache(src, dest=None):
+    """Complete a cache with concretized versions of its keys.
+
+    If an entry in the cache has a key that contains a Pending, a new key
+    is created where the Pending is resolved, and it is entered in the cache
+    so that it can be found more easily.
+    """
+    if dest is None:
+        dest = src
+    for k, v in list(src.items()):
+        kc = refmap(concretize_abstract, k)
+        dest[kc] = v
+        kc2 = refmap(no_tracking_id, kc)
+        dest[kc2] = v
+
+
 ###############
 # Broad check #
 ###############
@@ -585,6 +618,39 @@ async def force_through(self, x: Pending, through):
     return await self(await x, through)
 
 
+################################
+# Map a function on references #
+################################
+
+
+@overload(bootstrap=True)
+def refmap(self, fn, x: Context):
+    """Map a function on a Reference/Context/etc."""
+    return Context(
+        self(fn, x.parent), x.graph, tuple(fn(arg) for arg in x.argkey)
+    )
+
+
+@overload  # noqa: F811
+def refmap(self, fn, x: Reference):
+    return Reference(x.engine, x.node, self(fn, x.context))
+
+
+@overload  # noqa: F811
+def refmap(self, fn, x: tuple):
+    return tuple(self(fn, y) for y in x)
+
+
+@overload  # noqa: F811
+def refmap(self, fn, x: AbstractValue):
+    return fn(x)
+
+
+@overload  # noqa: F811
+def refmap(self, fn, x: object):
+    return x
+
+
 ###########################
 # Typing-related routines #
 ###########################
@@ -685,9 +751,12 @@ __all__ = [
     "build_value",
     "collapse_options",
     "concretize_abstract",
+    "concretize_cache",
     "force_through",
     "is_broad",
+    "no_tracking_id",
     "normalize_adt",
+    "refmap",
     "sensitivity_transform",
     "union_simplify",
 ]

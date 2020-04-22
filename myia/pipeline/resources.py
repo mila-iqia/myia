@@ -8,7 +8,7 @@ from .. import parser, xtype
 from ..abstract import InferenceEngine, LiveInferenceEngine, type_to_abstract
 from ..compile import load_backend
 from ..ir import Graph, clone
-from ..monomorphize import monomorphize
+from ..monomorphize import Monomorphizer
 from ..operations.utils import Operation
 from ..utils import (
     MyiaConversionError,
@@ -36,7 +36,7 @@ def default_convert(env, fn: FunctionType):
 
 @overload  # noqa: F811
 def default_convert(env, g: Graph):
-    mng = env.resources.manager
+    mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
         env.object_map[g] = g2
@@ -106,6 +106,9 @@ class ConverterResource(Partializable):
 
     def __call__(self, value, manage=True):
         """Convert a value."""
+        if isinstance(value, Graph) and value.abstract is not None:
+            return value
+
         try:
             v = self.object_map[value]
             if isinstance(v, _Unconverted):
@@ -115,7 +118,7 @@ class ConverterResource(Partializable):
             v = default_convert(self, value)
 
         if manage and isinstance(v, Graph):
-            self.resources.manager.add_graph(v)
+            self.resources.infer_manager.add_graph(v)
         return v
 
 
@@ -125,7 +128,7 @@ class Tracker(Partializable):
     def __init__(self, resources):
         """Initialize a Tracker."""
         self.todo = set()
-        self.manager = resources.manager
+        self.manager = resources.opt_manager
         self.activated = False
 
     def activate(self):
@@ -152,35 +155,17 @@ class InferenceResource(Partializable):
     def __init__(self, resources, constructors, max_stack_depth):
         """Initialize an InferenceResource."""
         self.resources = resources
-        self.manager = resources.manager
+        self.manager = resources.infer_manager
         self.constructors = constructors
         self.max_stack_depth = max_stack_depth
         self.engine = InferenceEngine(
             resources,
+            manager=self.manager,
             constructors=self.constructors,
             max_stack_depth=self.max_stack_depth,
         )
-        self.live = LiveInferenceEngine(
-            resources, constructors=self.constructors
-        )
 
-    def infer_incremental(self):
-        """Perform inference."""
-        tracker = self.resources.tracker
-        if not tracker.activated:
-            return
-        mng = self.manager
-        todo = tracker.todo
-        while todo:
-            nodes = [
-                node
-                for node in todo
-                if node.abstract is None and node in mng.all_nodes
-            ]
-            todo.clear()
-            self.live.run(nodes)
-
-    def infer(self, graph, argspec, outspec=None):
+    def __call__(self, graph, argspec, outspec=None):
         """Perform inference."""
         with tracer(
             "infer", graph=graph, argspec=argspec, outspec=outspec
@@ -197,12 +182,84 @@ class InferenceResource(Partializable):
             tr.set_results(output=rval)
             return rval
 
-    def monomorphize(self, context):
+
+class LiveInferenceResource(Partializable):
+    """Performs live inference."""
+
+    def __init__(self, resources, constructors):
+        """Initialize a LiveInferenceResource."""
+        self.resources = resources
+        self.manager = resources.opt_manager
+        self.constructors = constructors
+        self.live = LiveInferenceEngine(
+            resources, constructors=self.constructors, manager=self.manager
+        )
+
+    def __call__(self):
+        """Perform live inference."""
+        tracker = self.resources.tracker
+        if not tracker.activated:
+            return
+        mng = self.resources.opt_manager
+        todo = tracker.todo
+        while todo:
+            nodes = [
+                node
+                for node in todo
+                if node.abstract is None and node in mng.all_nodes
+            ]
+            todo.clear()
+            self.live.run(nodes)
+
+
+class MonomorphizationResource(Partializable):
+    """Performs monomorphization."""
+
+    def __init__(self, resources):
+        """Initialize a MonomorphizationResource."""
+        self.resources = resources
+        self.engine = resources.inferrer.engine
+        self.manager = resources.opt_manager
+        self.mono = Monomorphizer(resources, self.engine)
+
+    def __call__(self, context):
         """Perform monomorphization."""
         with tracer("monomorphize", engine=self.engine, context=context) as tr:
-            rval = monomorphize(self.engine, context, reuse_existing=True)
+            rval = self.mono.run(context)
             tr.set_results(output=rval)
             return rval
+
+
+class Incorporator(Partializable):
+    """Resource to integrate a new graph during optimization."""
+
+    def __init__(self, resources):
+        """Initialize an Incorporator."""
+        self.infer_manager = resources.infer_manager
+        self.engine = resources.inferrer.engine
+        self.mono = resources.monomorphizer
+
+    def opaque_to_inference(self, node):
+        """A graph is opaque to inference if it has a type."""
+        g = node.value if node.is_constant_graph() else node.graph
+        return g and g.abstract is not None
+
+    def __call__(self, graph, argspec, outspec):
+        """Run inferrer and monomorphizer on graph.
+
+        The graph's input types are given in argspec, and the expected output
+        type in outspec.
+        """
+        self.infer_manager.set_opaque_condition(self.opaque_to_inference)
+        if not isinstance(graph, Graph):
+            sig = graph.make_signature(argspec)
+            graph = graph.generate_graph(sig)
+        self.infer_manager.add_graph(graph)
+        context = self.engine.context_class.empty().add(graph, tuple(argspec))
+        self.engine.run_coroutine(
+            self.engine.infer_function(graph, argspec, outspec)
+        )
+        return self.mono(context)
 
 
 class NumpyChecker:
@@ -247,7 +304,7 @@ class DebugVMResource(Partializable):
         """Initialize a DebugVMResource."""
         self.vm = VM(
             resources.convert,
-            resources.manager,
+            resources.opt_manager,
             resources.py_implementations,
             implementations,
         )
@@ -282,16 +339,13 @@ class Resources(Partializable):
         """Run the Resources as a pipeline step."""
         return {"resources": self}
 
-    def copy(self):
-        """Copy the resources object."""
-        return Resources(**self._members)
-
 
 __consolidate__ = True
 __all__ = [
     "BackendResource",
     "ConverterResource",
     "DebugVMResource",
+    "Incorporator",
     "InferenceResource",
     "NumpyChecker",
     "Resources",

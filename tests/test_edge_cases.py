@@ -8,8 +8,11 @@ import pytest
 from myia import myia
 from myia.lib import core
 from myia.operations import array_map
+from myia.pipeline import standard_pipeline, steps
 
 from .multitest import eqtest
+
+pipeline2 = standard_pipeline.insert_after("parse", resolve=steps.step_resolve)
 
 
 def test_static_inline_array_map():
@@ -34,7 +37,7 @@ def test_call_opdef():
     with pytest.raises(TypeError):
         f(1, 2)
 
-    @myia
+    @myia(pipeline=pipeline2)
     def g(x, y):
         return f(x, y)
 

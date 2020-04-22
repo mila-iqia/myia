@@ -1,9 +1,13 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
+from types import SimpleNamespace
+
 from . import xtype
 from .abstract import (
+    ANYTHING,
     DEAD,
     POLY,
+    AbstractArray,
     AbstractClass,
     AbstractError,
     AbstractExternal,
@@ -15,10 +19,9 @@ from .abstract import (
     VirtualFunction,
     abstract_check,
 )
-from .ir import manage
 from .operations import Primitive
 from .operations.primitives import BackendPrimitive
-from .utils import ErrorPool, overload
+from .utils import ErrorPool, Partializable, overload
 
 
 class ValidationError(Exception):
@@ -47,6 +50,16 @@ def validate_abstract(self, a: AbstractError, uses):
         # As it turns out, the inferrer now catches this error before we get to
         # validation.
         raise ValidationError(f"Illegal type in the graph: {a}", type=a)
+
+
+@overload  # noqa: F811
+def validate_abstract(self, a: AbstractArray, uses):
+    at = a.xtype()
+    if at is not ANYTHING and not issubclass(at, xtype.NDArray):
+        raise ValidationError(
+            f"Illegal array type in the graph: {a.xtype()}", type=a.xtype()
+        )
+    return True
 
 
 @overload  # noqa: F811
@@ -88,10 +101,16 @@ def validate_abstract(self, a: AbstractFunction, uses):
         raise ValidationError(
             f"All function types should be VirtualFunction, not {fn}"
         )
+    return self(a.values, uses)
 
 
 class NodeValidator:
     """Validate each node in a graph."""
+
+    def __init__(self, resources, errors=None):
+        """Initialize a NodeValidator."""
+        self.errors = errors or ErrorPool(exc_class=ValidationError)
+        self.manager = resources.opt_manager
 
     def _test(self, node):
         try:
@@ -101,14 +120,8 @@ class NodeValidator:
             node.debug.errors.add(err)
             self.errors.add(err)
 
-    def setup(self, root, errors=None, manager=None):
-        """Set the error pool and the manager."""
-        self.errors = errors or ErrorPool(exc_class=ValidationError)
-        self.manager = manager or manage(root)
-
-    def run(self, root):
+    def __call__(self, root):
         """Run on the root graph."""
-        self.setup(root)
         for node in list(self.manager.all_nodes):
             self._test(node)
 
@@ -177,18 +190,16 @@ class CallValidator(NodeValidator):  # pragma: no cover
                 )
 
 
-class MultiValidator(NodeValidator):
+class MultiValidator(NodeValidator, Partializable):
     """Combine multiple validators."""
 
-    def __init__(self, *validators):
+    def __init__(self, validators, resources):
         """Initialize the MultiValidator."""
-        self.validators = [v for v in validators if v]
-
-    def setup(self, root):
-        """Set up all validators."""
-        super().setup(root)
-        for v in self.validators:
-            v.setup(root, errors=self.errors, manager=self.manager)
+        super().__init__(resources=resources)
+        self.resources = resources
+        self.validators = [
+            v(resources=resources, errors=self.errors) for v in validators if v
+        ]
 
     def test_node(self, node):
         """Test the node through every validator."""
@@ -204,11 +215,14 @@ def validate(root):
     primitive must be a BackendPrimitive.
     """
     mv = MultiValidator(
-        OperatorValidator(),
-        AbstractValidator(),
-        # CallValidator(),
+        validators=[
+            OperatorValidator,
+            AbstractValidator,
+            # CallValidator,
+        ],
+        resources=SimpleNamespace(opt_manager=root.manager),
     )
-    mv.run(root)
+    mv(root)
 
 
 __all__ = [

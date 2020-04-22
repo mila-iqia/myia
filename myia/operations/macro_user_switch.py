@@ -30,7 +30,6 @@ class _CastRemapper(CloneRemapper):
         graph_relation,
         clone_constants,
         graph_repl,
-        quarantine,
         fv_replacements,
     ):
         """Initialize the GraphCloner."""
@@ -42,7 +41,6 @@ class _CastRemapper(CloneRemapper):
             graph_repl=graph_repl,
             graph_relation=graph_relation,
             clone_constants=clone_constants,
-            quarantine=quarantine,
         )
         self.fv_replacements = fv_replacements
 

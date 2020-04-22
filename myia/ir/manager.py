@@ -560,14 +560,7 @@ class GraphManager(Partializable):
         if allow_changes is None:
             allow_changes = self.manage
         self.allow_changes = allow_changes
-        self.reset()
-
-    def clear(self):
-        """Clear the manager entirely."""
-        self.roots = []
-        if self.manage:
-            for graph in self.graphs:
-                graph._manager = None
+        self.check_opaque = None
         self.reset()
 
     def reset(self):
@@ -612,6 +605,10 @@ class GraphManager(Partializable):
         for root in roots:
             self.add_graph(root, root=True)
 
+    def set_opaque_condition(self, fn):
+        """Set a condition on nodes that should not be included."""
+        self.check_opaque = fn
+
     def add_graph(self, graph, root=False):
         """Add a graph to this manager, optionally as a root graph."""
         if root:
@@ -647,7 +644,9 @@ class GraphManager(Partializable):
         """Ensure that the graph is managed by this manager."""
         if self.manage:
             if graph._manager and graph._manager is not self:
-                raise ManagerError("A graph can only have one manager.")
+                raise ManagerError(
+                    "A graph can only have one manager. " f"Graph: {graph}"
+                )
             graph._manager = self
         self.graphs.add(graph)
 
@@ -691,6 +690,8 @@ class GraphManager(Partializable):
                 * -1 if the edge is removed.
 
         """
+        if self.check_opaque and self.check_opaque(inp):
+            return
         if direction == -1:
             if (node, key) not in self.uses[inp]:
                 # It's possible that we already got here when we
@@ -723,16 +724,18 @@ class GraphManager(Partializable):
         """Add newly connected nodes."""
 
         def limit(x):
-            if x in self.all_nodes:
+            if x in self.all_nodes or (
+                self.check_opaque and self.check_opaque(x)
+            ):
                 return EXCLUDE
             else:
                 return FOLLOW
 
         acq = OrderedSet()
         for node in nodes:
-            new_nodes = OrderedSet(dfs(node, succ_deeper, limit))
-            self.all_nodes |= new_nodes
-            acq |= new_nodes
+            acq |= OrderedSet(dfs(node, succ_deeper, limit))
+
+        self.all_nodes |= acq
 
         for node in acq:
             g = node.graph

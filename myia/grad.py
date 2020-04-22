@@ -472,7 +472,7 @@ class SensRemapper(GradRemapper):
                 ng.add_parameter()
 
 
-def _grad(mng, root):
+def _grad(root):
     graphs = root.scope
 
     remappers = RemapperSet(
@@ -507,8 +507,7 @@ def Jimpl(prim: Primitive, resources, node):
 @overload  # noqa: F811
 def Jimpl(graph: Graph, resources, node):
     """Implement J on a Graph."""
-    manager = resources.manager
-    return _grad(manager, graph)
+    return _grad(graph)
 
 
 @overload  # noqa: F811

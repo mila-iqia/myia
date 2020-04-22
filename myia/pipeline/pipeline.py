@@ -130,7 +130,13 @@ class PipelineDefinition:
         The names don't have to be in the same order as the original
         definition, so pipeline steps can be reordered this way.
         """
-        return PipelineDefinition(**{name: self.steps[name] for name in names})
+        new_steps = {}
+        for name in names:
+            if isinstance(name, str):
+                new_steps[name] = self.steps[name]
+            else:
+                new_steps.update(name)
+        return PipelineDefinition(**new_steps)
 
     def make(self):
         """Create a Pipeline from this definition."""

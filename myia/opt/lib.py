@@ -16,8 +16,6 @@ from ..ir import (
     Constant,
     Graph,
     GraphCloner,
-    Quarantined,
-    clone,
     transformable_clone,
 )
 from ..operations import Primitive, primitives as P
@@ -1089,57 +1087,33 @@ def expand_J(resources, node, equiv):
     from ..grad import Jimpl
 
     arg = equiv[C].value
-    assert getattr(arg, "parent", None) is None
 
-    prev_resources = resources
+    if not hasattr(resources, "grad_cache"):
+        resources.grad_cache = {}
 
-    if not hasattr(prev_resources, "grad_cache"):
-        prev_resources.grad_cache = {}
+    if isinstance(arg, Graph):
+        key = arg
+    else:
+        key = (arg, equiv[C].abstract)
+
+    if key in resources.grad_cache:
+        ct = Constant(resources.grad_cache[key])
+        ct.abstract = ct.value.abstract
+        return ct
 
     try:
-        if isinstance(arg, Graph):
-            key = arg
-        else:
-            key = (arg, equiv[C].abstract)
-
-        if key in prev_resources.grad_cache:
-            ct = Constant(prev_resources.grad_cache[key])
-            ct.abstract = ct.value.abstract
-            return ct
-
-        newg = Jimpl(arg, prev_resources, node)
-
-        resources = resources.copy()
-        inf = resources.inferrer
-        vfn = node.abstract.get_unique()
-        argspec = vfn.args
-        outspec = vfn.output
-        if not isinstance(newg, Graph):
-            sig = newg.make_signature(argspec)
-            newg = newg.generate_graph(sig)
-        newg = clone(newg, quarantine=lambda g: g.abstract is not None)
-        resources.manager.add_graph(newg)
-        empty = inf.engine.context_class.empty()
-        context = empty.add(newg, tuple(argspec))
-        inf.engine.run_coroutine(
-            inf.engine.infer_function(newg, argspec, outspec)
-        )
-        newg2 = inf.monomorphize(context)
-
-        newg = newg2
-        for node in inf.manager.all_nodes:
-            if node.is_constant(Quarantined):
-                node.value = node.value.graph
-        for g in inf.manager.graphs:
-            g._manager = None
-
-        if isinstance(arg, Graph):
-            arg.transforms["grad"] = newg
-
-        prev_resources.grad_cache[key] = newg
-
+        newg = Jimpl(arg, resources, node)
     except NotImplementedError:
         return None
+
+    vfn = node.abstract.get_unique()
+    newg = resources.incorporate(newg, vfn.args, vfn.output)
+
+    if isinstance(arg, Graph):
+        arg.transforms["grad"] = newg
+
+    resources.grad_cache[key] = newg
+
     return Constant(newg)
 
 
@@ -1168,11 +1142,10 @@ class JElim(Partializable):
 
     def __call__(self, root):
         """Apply JElim on root."""
-        mng = self.resources.manager
-        args = dict(opt=self, node=None, manager=self.resources.manager)
+        mng = self.resources.opt_manager
+        args = dict(opt=self, node=None, manager=mng)
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
-            mng.keep_roots(root)
             nodes = []
             typesubs = []
             for node in mng.all_nodes:

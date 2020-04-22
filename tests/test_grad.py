@@ -63,7 +63,6 @@ def grad_wrap(graph, argspec):
 grad_pipeline = PipelineDefinition(
     resources=standard_resources,
     parse=steps.step_parse,
-    resolve=steps.step_resolve,
     infer=steps.step_infer,
     specialize=steps.step_specialize,
     opt=steps.step_debug_opt,
@@ -500,7 +499,6 @@ def _runwith(f, *args):
     return res["output"](*args)
 
 
-@pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freevar_outside_grad():
     def f(x, y):
         a = x * x
@@ -514,7 +512,6 @@ def test_freevar_outside_grad():
     assert _runwith(f, 5.0, 8.0) == 25.0
 
 
-@pytest.mark.xfail(reason="Grad not supported on graphs with freevars")
 def test_freegraph_outside_grad():
     def f(x, y):
         def sqx():

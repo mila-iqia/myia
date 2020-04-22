@@ -7,7 +7,7 @@ function may be called with.
 from collections import defaultdict
 from dataclasses import dataclass, replace as dc_replace
 from functools import reduce
-from itertools import chain, count
+from itertools import count
 from typing import Optional
 from warnings import warn
 
@@ -18,7 +18,6 @@ from .abstract import (
     AbstractFunction,
     AbstractJTagged,
     AbstractTuple,
-    AbstractValue,
     Context,
     DummyFunction,
     GraphFunction,
@@ -32,16 +31,17 @@ from .abstract import (
     TypedPrimitive,
     VirtualFunction,
     VirtualReference,
-    abstract_check,
     abstract_clone,
     amerge,
     broaden,
     build_value,
     compute_bprop_type,
     concretize_abstract,
+    concretize_cache,
+    no_tracking_id,
+    refmap,
 )
 from .abstract.infer import VirtualInferrer
-from .abstract.utils import CheckState, CloneState
 from .graph_utils import dfs
 from .info import About
 from .ir import (
@@ -53,7 +53,7 @@ from .ir import (
     succ_incoming,
 )
 from .operations import Primitive
-from .utils import InferenceError, MyiaTypeError, overload
+from .utils import InferenceError, MyiaTypeError, OrderedSet
 
 
 class Unspecializable(Exception):
@@ -72,9 +72,8 @@ def type_fixer(finder, monomorphizer=None):
 
     @fn.register
     def _fix_type(self, a: GraphFunction):
-        if a.graph.abstract is not None:
-            return self(a.graph.abstract.get_unique())
-        elif a.tracking_id in monomorphizer.ctcache:
+        assert a.graph.abstract is None
+        if a.tracking_id in monomorphizer.ctcache:
             ctx = monomorphizer.ctcache[a.tracking_id]
             g = monomorphizer.results[ctx]
             return VirtualFunction(
@@ -150,61 +149,6 @@ def type_fixer(finder, monomorphizer=None):
     return fn
 
 
-@abstract_check.variant(initial_state=lambda: CheckState({}, "_no_track"))
-def _check_no_tracking_id(self, x: GraphFunction):
-    return x.tracking_id is None
-
-
-@concretize_abstract.variant(
-    initial_state=lambda: CloneState(
-        cache={}, prop="_no_track", check=_check_no_tracking_id
-    )
-)
-def _no_tracking_id(self, x: GraphFunction):
-    return dc_replace(x, tracking_id=None)
-
-
-@overload(bootstrap=True)
-def _refmap(self, fn, x: Context):
-    return Context(
-        self(fn, x.parent), x.graph, tuple(fn(arg) for arg in x.argkey)
-    )
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: Reference):
-    return Reference(x.engine, x.node, self(fn, x.context))
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: tuple):
-    return tuple(self(fn, y) for y in x)
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: AbstractValue):
-    return fn(x)
-
-
-@overload  # noqa: F811
-def _refmap(self, fn, x: object):
-    return x
-
-
-def concretize_cache(cache):
-    """Complete a cache with concretized versions of its keys.
-
-    If an entry in the cache has a key that contains a Pending, a new key
-    is created where the Pending is resolved, and it is entered in the cache
-    so that it can be found more easily.
-    """
-    for k, v in list(cache.items()):
-        kc = _refmap(concretize_abstract, k)
-        cache[kc] = v
-        kc2 = _refmap(_no_tracking_id, kc)
-        cache[kc2] = v
-
-
 _count = count(1)
 
 
@@ -256,7 +200,7 @@ class _TodoEntry:
 
 
 def _normalize_context(ctx):
-    return _refmap(_no_tracking_id, ctx)
+    return refmap(no_tracking_id, ctx)
 
 
 class TypeFinder:
@@ -412,34 +356,30 @@ class Monomorphizer:
 
     Arguments:
         engine: The InferenceEngine containing the type information.
-        reuse_existing: Whether to reuse existing graphs when possible.
 
     """
 
-    def __init__(self, engine, reuse_existing=True):
+    def __init__(self, resources, engine):
         """Initialize the monomorphizer."""
         self.engine = engine
+        self.infer_manager = resources.infer_manager
         self.specializations = {}
         self.replacements = defaultdict(dict)
         self.results = {}
         self.ctcache = {}
-        self.reuse_existing = reuse_existing
         self.invmap = {}
-        self.finder = TypeFinder(self.engine)
-        self._fix_type = type_fixer(self.finder, self)
 
     def run(self, context):
         """Run monomorphization."""
-        self.manager = context.graph.manager
-        concretize_cache(self.engine.cache.cache)
-        concretize_cache(self.engine.reference_map)
+        self.engine.concretize_cache()
+        self.finder = TypeFinder(self.engine)
+        self._fix_type = type_fixer(self.finder, self)
         self.collect(context)
         self.order_tasks()
         self.create_graphs()
         self.monomorphize()
         self.fill_placeholders()
         result = self.results[context]
-        self.manager.keep_roots(result)
         self.fix_types()
         return result
 
@@ -589,23 +529,18 @@ class Monomorphizer:
         that context.parent comes before context. That way, when copying
         children graphs, their parent graphs will have also been copied, so we
         can access their free variables.
-
-        self.last is a dictionary mapping each of the original graph to the
-        last context that uses it.
         """
         seen = set()
-        self.last = {}
         self.tasks = []
 
         def _process_ctx(ctx, orig_ctx):
-            if ctx in seen:
+            if ctx in seen or ctx in self.results:
                 return
-            self.manager.add_graph(ctx.graph, root=True)
+            self.infer_manager.add_graph(ctx.graph, root=True)
             seen.add(ctx)
             if ctx.parent != Context.empty():
                 orig_parent_ctx = self.specializations[ctx.parent]
                 _process_ctx(ctx.parent, orig_parent_ctx)
-            self.last[ctx.graph] = ctx
             self.tasks.append([ctx, orig_ctx])
 
         for ctx, orig_ctx in self.specializations.items():
@@ -616,25 +551,11 @@ class Monomorphizer:
     #################
 
     def create_graphs(self):
-        """Create the (empty) graphs associated to the contexts.
-
-        If self.reuse_existing is True, the last context that uses a graph will
-        be monomorphized in place, that is to say, into the original graph. The
-        exception to that is any graph that has the 'reference' flag. This flag
-        indicates the graph is a "reference graph" that may be used elsewhere
-        or reintroduced and we should not modify it.
-        """
+        """Create the (empty) graphs associated to the contexts."""
         for entry in self.tasks:
             ctx, orig_ctx = entry
-            if (
-                self.reuse_existing
-                and self.last[ctx.graph] is ctx
-                and not ctx.graph.has_flags("reference")
-            ):
-                newgraph = ctx.graph
-            else:
-                newgraph = ctx.graph.make_new(relation=next(_count))
-                newgraph.set_flags(reference=False)
+            newgraph = ctx.graph.make_new(relation=next(_count))
+            newgraph.set_flags(reference=False)
             self.results[ctx] = newgraph
             entry.append(newgraph)
 
@@ -658,7 +579,7 @@ class Monomorphizer:
         4. Set node.abstract for all of the cloned graph's nodes.
         5. Undo the modifications on the original graph.
         """
-        m = self.manager
+        m = self.infer_manager
         cloners = {}
 
         for ctx, orig_ctx, newgraph in self.tasks:
@@ -672,19 +593,6 @@ class Monomorphizer:
             with m.transact() as tr:
                 for (ref, key), repl in self.replacements[ctx].items():
                     tr.set_edge(ref.node, key, repl)
-
-            if newgraph is ctx.graph:
-                for node in chain(ctx.graph.nodes, ctx.graph.constants):
-                    self.invmap[node] = self.engine.ref(node, orig_ctx)
-
-                with m.transact() as tr_fv:
-                    for node in ctx.graph.free_variables_direct:
-                        new_node = fv_function(node)
-                        if new_node is not node:
-                            for user, key in m.uses[node]:
-                                if user.graph is ctx.graph:
-                                    tr_fv.set_edge(user, key, new_node)
-                continue
 
             # Clone the graph
             cl = GraphCloner(
@@ -724,8 +632,7 @@ class Monomorphizer:
         constants directly, therefore the manager is cleared entirely before
         doing the procedure.
         """
-        self.manager.clear()
-        for ctx, g in self.results.items():
+        for ctx, orig_ctx, g in self.tasks:
             for node in dfs(g.return_, succ=succ_incoming):
                 if node.is_constant(_Placeholder):
                     node.value = self.results[node.value.context]
@@ -739,10 +646,16 @@ class Monomorphizer:
 
     def fix_types(self):
         """Fix all node types."""
-        for node in self.manager.all_nodes:
+        all_nodes = OrderedSet()
+        for ctx, orig_ctx, g in self.tasks:
+            all_nodes.update(g.parameters)
+            all_nodes.update(dfs(g.return_, succ=succ_incoming))
+
+        for node in all_nodes:
             old_ref = self.invmap.get(node, None)
-            assert old_ref is not None
-            if getattr(old_ref.node, "force_abstract", False):
+            if old_ref is None:
+                assert node.abstract is not None
+            elif getattr(old_ref.node, "force_abstract", False):
                 assert old_ref.node.abstract is not None
                 node.abstract = old_ref.node.abstract
             elif old_ref in self.engine.cache.cache:
@@ -750,7 +663,7 @@ class Monomorphizer:
             else:
                 node.abstract = AbstractError(DEAD)
 
-        for node in self.manager.all_nodes:
+        for node in all_nodes:
             if node.is_constant(Graph):
                 node.abstract = node.value.abstract
             node.abstract = self._fix_type(node.abstract)
@@ -779,7 +692,6 @@ class _MonoRemapper(CloneRemapper):
         engine,
         graph_repl,
         fv_function,
-        quarantine,
     ):
         """Initialize the _MonoRemapper."""
         super().__init__(
@@ -791,7 +703,6 @@ class _MonoRemapper(CloneRemapper):
             graph_relation=graph_relation,
             clone_constants=clone_constants,
             set_abstract=False,
-            quarantine=quarantine,
         )
         self.engine = engine
         self.fv_function = fv_function
@@ -814,15 +725,8 @@ class _MonoRemapper(CloneRemapper):
             self.remap_node((g, fv), g, fv, ng, new, link=False)
 
 
-def monomorphize(engine, root_context, reuse_existing=True):
-    """Monomorphize all graphs starting with the given root context."""
-    mono = Monomorphizer(engine, reuse_existing=reuse_existing)
-    return mono.run(root_context)
-
-
 __all__ = [
     "Monomorphizer",
     "Unspecializable",
     "concretize_cache",
-    "monomorphize",
 ]

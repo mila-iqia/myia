@@ -120,4 +120,5 @@ __all__ = [
     "check_nargs",
     "infer_trace",
     "type_error_nargs",
+    "untested_legacy",
 ]

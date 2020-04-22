@@ -176,7 +176,7 @@ class LocalPassOptimizer:
         due to optimizations.
         """
         if self.resources is not None:
-            mng = self.resources.manager
+            mng = self.resources.opt_manager
             mng.add_graph(graph)
         else:
             mng = manage(graph)
@@ -232,8 +232,8 @@ class LocalPassOptimizer:
                         mng.replace(n, new)
                         tracer().emit_success(**args, new_node=new)
                         tr.set_results(success=True, **args)
-                        if self.resources and self.resources.inferrer:
-                            self.resources.inferrer.infer_incremental()
+                        if self.resources and self.resources.live_inferrer:
+                            self.resources.live_inferrer()
                         n = new
                         loop = True
                         changes = True

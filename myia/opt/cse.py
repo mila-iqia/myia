@@ -83,11 +83,14 @@ class CSE(Partializable):
     def __call__(self, root):
         """Apply CSE on root."""
         args = dict(
-            opt=self, node=None, manager=self.resources.manager, profile=False
+            opt=self,
+            node=None,
+            manager=self.resources.opt_manager,
+            profile=False,
         )
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
-            chg = cse(root, self.resources.manager)
+            chg = cse(root, self.resources.opt_manager)
             if chg:
                 tracer().emit_success(**args, new_node=None)
             return chg and self.report_changes
