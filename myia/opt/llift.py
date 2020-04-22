@@ -5,6 +5,7 @@ from types import SimpleNamespace as NS
 from ..info import About
 from ..ir import ANFNode, manage
 from ..utils import WorkSet
+from ..utils.errors import untested_legacy
 
 
 def _find_fvs(graph):
@@ -15,7 +16,7 @@ def _find_fvs(graph):
             if isinstance(fv, ANFNode):
                 fvs.add(fv)
             else:
-                work.add(fv)
+                work.queue(fv)
     return [fv for fv in fvs if fv.graph not in graph.scope]
 
 
@@ -32,9 +33,12 @@ def lambda_lift(root):
     todo = {}
 
     for g in graphs:
-        if g.parent and g.parent not in graphs.processed:
-            graphs.add(g)
-            continue
+        with untested_legacy():
+            # The manager seems to naturally sort graphs so that parents are
+            # before their children but I don't think we have any guarantee
+            if g.parent and not graphs.processed(g.parent):
+                graphs.requeue(g)
+                continue
 
         todo[g] = NS(graph=g, calls=[], fvs={})
 

@@ -11,6 +11,7 @@ from myia.utils import (
     Named,
     Registry,
     SymbolicKeyInstance,
+    WorkSet,
     newenv,
     smap,
     tags,
@@ -223,3 +224,37 @@ def test_registry():
         print(HasDefaults("d", 123, defaults_field="apple"))
     with pytest.raises(KeyError):
         print(r["xyz"])
+
+
+def test_workset():
+    ws = WorkSet([3, 5])
+    results = []
+    for item in ws:
+        ws.queue((item + 1) % 7)
+        results.append(item)
+    assert results == [3, 5, 4, 6, 0, 1, 2]
+
+    assert all(ws.processed(i) for i in range(7))
+
+    for item in ws:
+        # The queue should be exhausted
+        assert False
+
+
+def test_workset_requeue():
+    ws = WorkSet([1, 3, 4])
+    results = []
+    for item in ws:
+        if item and not ws.processed(item - 1):
+            ws.queue(item - 1)
+            ws.requeue(item)
+            continue
+        results.append(item)
+    assert results == [0, 1, 2, 3, 4]
+
+
+def test_workset_set_next():
+    ws = WorkSet([1, 2, 3])
+    ws.set_next(4)
+    ws.queue(5)
+    assert list(ws) == [4, 1, 2, 3, 5]

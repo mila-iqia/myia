@@ -515,20 +515,33 @@ class WorkSet:
     """
 
     def __init__(self, elements):
-        self.processed = None
+        self.done = None
         self.elements = deque(elements)
 
-    def add(self, element):
+    def processed(self, element):
+        """Return whether an element was processed."""
+        return element in self.done
+
+    def set_next(self, element):
+        """Add an element to the beginning of the queue."""
+        self.elements.appendleft(element)
+
+    def queue(self, element):
         """Add an element to the queue."""
         self.elements.append(element)
 
+    def requeue(self, element):
+        """Add an element to the queue."""
+        self.done.discard(element)
+        self.elements.append(element)
+
     def __iter__(self):
-        self.processed = set()
+        self.done = set()
         while self.elements:
             elem = self.elements.popleft()
-            if elem in self.processed:
+            if elem in self.done:
                 continue
-            self.processed.add(elem)
+            self.done.add(elem)
             yield elem
 
 
