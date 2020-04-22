@@ -5,6 +5,8 @@ from ..abstract import (
     DEAD,
     AbstractFunction,
     AbstractJTagged,
+    CheckState,
+    CloneState,
     VirtualFunction,
     abstract_check,
     abstract_clone,
@@ -1117,17 +1119,21 @@ def expand_J(resources, node, equiv):
     return Constant(newg)
 
 
-@abstract_clone.variant
+@abstract_check.variant(initial_state=lambda: CheckState({}, "_noj"))
+def _jelim_jfree(self, j: AbstractJTagged):
+    return False
+
+
+@abstract_clone.variant(
+    initial_state=lambda: CloneState(cache={}, prop="_noj", check=_jelim_jfree)
+)
 def _jelim_retype(self, j: AbstractJTagged):
-    return _jelim_retype_helper(j.element)
+    if not _jelim_nofunc(j.element):
+        raise TypeError("Function found")
+    return _jelim_retype(j.element)
 
 
-@abstract_clone.variant
-def _jelim_retype_helper(self, f: AbstractFunction):
-    raise TypeError("Function found")
-
-
-@abstract_check.variant
+@abstract_check.variant(initial_state=lambda: CheckState({}, "_nofunc"))
 def _jelim_nofunc(self, f: AbstractFunction):
     return False
 

@@ -2,10 +2,22 @@
 
 import weakref
 
+from .misc import Named
+
 _intern_pool = weakref.WeakValueDictionary()
 
 
 pyhash = hash
+
+
+RECURSIVE = Named("RECURSIVE")
+
+
+def _maybe_setattr(obj, attr, value):
+    try:
+        object.__setattr__(obj, attr, value)
+    except (TypeError, AttributeError):
+        pass
 
 
 class EqKey:
@@ -53,6 +65,7 @@ class ItemEK(ElementsBase):
         for key, value in zip(self.keys, self.values):
             assert not isinstance(key, EqKey)
             obj[key] = intern(value)
+        _maybe_setattr(obj, "$intern_canonical", obj)
 
 
 class AttrEK(ElementsBase):
@@ -74,6 +87,7 @@ class AttrEK(ElementsBase):
                 key.canonicalize()
             else:
                 setattr(obj, key, intern(value))
+        _maybe_setattr(obj, "$intern_canonical", obj)
 
 
 def eqkey(x):
@@ -93,42 +107,39 @@ def eqkey(x):
         return Atom(x, x)
 
 
-class RecursionException(Exception):
-    """Raised when a data structure is found to be recursive."""
-
-
 class IncompleteException(Exception):
     """Raised when a data structure is incomplete."""
 
 
 def deep_eqkey(obj, path=frozenset()):
     """Return a key for equality tests for non-recursive structures."""
-    cachable = getattr(obj, "__cache_eqkey__", False)
-    if cachable:
-        cached = getattr(obj, "_eqkey_deepkey", None)
-        if cached is RecursionException:
-            raise RecursionException()
-        if cached is not None:
-            return cached
+    if obj is None or isinstance(obj, (int, float)):
+        return obj
+
+    cached = getattr(obj, "$intern_deep_eqkey", None)
+    if cached is not None:
+        return cached
 
     oid = id(obj)
     if oid in path:
-        if cachable:
-            obj._eqkey_deepkey = RecursionException
-        raise RecursionException()
+        _maybe_setattr(obj, "$intern_deep_eqkey", RECURSIVE)
+        return RECURSIVE
 
     key = eqkey(obj)
     if isinstance(key, ElementsBase):
+        subs = [deep_eqkey(x, path | {oid}) for x in key.values]
+        if RECURSIVE in subs:
+            _maybe_setattr(obj, "$intern_deep_eqkey", RECURSIVE)
+            return RECURSIVE
         dk = (
             key.type,
-            type(key.values)(deep_eqkey(x, path | {oid}) for x in key.values),
+            type(key.values)(subs),
         )
     else:
         assert isinstance(key, Atom)
         dk = key.type, key.value
 
-    if cachable:
-        obj._eqkey_deepkey = dk
+    _maybe_setattr(obj, "$intern_deep_eqkey", dk)
     return dk
 
 
@@ -206,11 +217,18 @@ def eqrec(obj1, obj2, cache=None):
 
 def hash(obj):
     """Hash a (possibly self-referential) object."""
-    try:
-        return pyhash(deep_eqkey(obj))
+    h = getattr(obj, "$intern_hash", None)
+    if h is not None:
+        return h
 
-    except RecursionException:
-        return hashrec(obj)
+    dk = deep_eqkey(obj)
+    if dk is RECURSIVE:
+        rval = hashrec(obj)
+    else:
+        rval = pyhash(dk)
+
+    _maybe_setattr(obj, "$intern_hash", rval)
+    return rval
 
 
 def eq(obj1, obj2):
@@ -218,13 +236,12 @@ def eq(obj1, obj2):
     if obj1 is obj2:
         return True
 
-    try:
-        key1 = deep_eqkey(obj1)
+    key1 = deep_eqkey(obj1)
+    if key1 is RECURSIVE:
+        return eqrec(obj1, obj2, set())
+    else:
         key2 = deep_eqkey(obj2)
         return key1 == key2
-
-    except RecursionException:
-        return eqrec(obj1, obj2, set())
 
 
 class Wrapper:
@@ -293,6 +310,11 @@ class PossiblyRecursive:
 
 def intern(inst):
     """Get the interned instance."""
+    if inst is None:
+        return None
+    canon = getattr(inst, "$intern_canonical", None)
+    if canon is not None:
+        return canon
     try:
         wrap = Wrapper(inst)
     except TypeError:
@@ -308,6 +330,7 @@ def intern(inst):
         eqk.canonicalize()
         return inst
     else:
+        _maybe_setattr(inst, "$intern_canonical", existing)
         return existing
 
 
