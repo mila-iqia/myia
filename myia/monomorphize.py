@@ -56,7 +56,7 @@ from .ir import (
     succ_incoming,
 )
 from .operations import Primitive
-from .utils import InferenceError, MyiaTypeError, OrderedSet
+from .utils import InferenceError, MyiaTypeError, OrderedSet, overload
 
 
 class Unspecializable(Exception):
@@ -90,9 +90,8 @@ def _chk(
     initial_state=lambda: CloneState(cache={}, prop="_fixed", check=_chk)
 )
 def _fix_type(self, a: GraphFunction, finder, monomorphizer):
-    if a.graph.abstract is not None:
-        return self(a.graph.abstract.get_unique(), finder, monomorphizer)
-    elif a.tracking_id in monomorphizer.ctcache:
+    assert a.graph.abstract is None
+    if a.tracking_id in monomorphizer.ctcache:
         ctx = monomorphizer.ctcache[a.tracking_id]
         g = monomorphizer.results[ctx]
         return VirtualFunction(
