@@ -724,7 +724,9 @@ class GraphManager(Partializable):
         """Add newly connected nodes."""
 
         def limit(x):
-            if x in self.all_nodes:
+            if x in self.all_nodes or (
+                self.check_opaque and self.check_opaque(x)
+            ):
                 return EXCLUDE
             else:
                 return FOLLOW
@@ -732,9 +734,6 @@ class GraphManager(Partializable):
         acq = OrderedSet()
         for node in nodes:
             acq |= OrderedSet(dfs(node, succ_deeper, limit))
-
-        if self.check_opaque:
-            acq = [n for n in acq if not self.check_opaque(n)]
 
         self.all_nodes |= acq
 
