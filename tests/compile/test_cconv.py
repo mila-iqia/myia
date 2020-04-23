@@ -11,8 +11,8 @@ def step_cconv(graph):
 
 
 cconv_pipeline = scalar_debug_pipeline.select(
-    "resources", "parse", {"resolve": steps.step_resolve}, "llift", "export"
-).insert_after("llift", cconv=step_cconv)
+    "resources", "parse", {"resolve": steps.step_resolve}, "export"
+).insert_after("parse", cconv=step_cconv)
 
 
 def check_no_free_variables(root):
