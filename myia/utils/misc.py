@@ -515,6 +515,7 @@ class WorkSet:
     """
 
     def __init__(self, elements):
+        """Initialize a WorkSet."""
         self.done = None
         self.elements = deque(elements)
 
