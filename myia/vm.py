@@ -298,9 +298,8 @@ class VM:
         if isinstance(node, Constant):
             # We only visit constant graphs
             assert node.is_constant_graph()
-            with untested_legacy():
-                if frame.closure is not None and node in frame.closure:
-                    return
+            if frame.closure is not None and node in frame.closure:
+                return
             g = node.value
             if len(self._vars[g]) != 0:
                 frame.values[node] = self._make_closure(g, frame)
