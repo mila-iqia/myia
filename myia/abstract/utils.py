@@ -618,6 +618,11 @@ async def force_through(self, x: Pending, through):
     return await self(await x, through)
 
 
+@overload  # noqa: F811
+async def force_through(self, x: object, through):
+    raise NotImplementedError(type(x))
+
+
 ################################
 # Map a function on references #
 ################################

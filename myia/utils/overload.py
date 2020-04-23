@@ -2,6 +2,7 @@
 
 
 import inspect
+from types import FunctionType
 
 from .misc import MISSING, keyword_decorator
 
@@ -41,8 +42,14 @@ class TypeMap(dict):
 
         if handler is not None:
             return handler
-        else:
+        elif hasattr(self, "_key_error"):
+            raise self._key_error(obj_t)
+        else:  # pragma: no cover
             raise KeyError(obj_t)
+
+
+def _fresh(t):
+    return type(t.__name__, (t,), {})
 
 
 class Overload:
@@ -53,6 +60,9 @@ class Overload:
     function should annotate the same parameter.
 
     Arguments:
+        bootstrap: Whether to bind the first argument to the OverloadCall
+            object. Forced to True if initial_state or postprocess is not
+            None.
         bind_to: Binds the first argument to the given object.
         wrapper: A function to use as the entry point. In addition to all
             normal arguments, it will receive as its first argument the
@@ -63,39 +73,31 @@ class Overload:
             after recursive calls.
         mixins: A list of Overload instances that contribute functions to this
             Overload.
-
+        name: Optional name for the Overload. If not provided, it will be
+            gotten automatically from the first registered function or wrapper.
     """
 
     def __init__(
         self,
         *,
+        bootstrap=False,
         bind_to=None,
         wrapper=None,
         initial_state=None,
         postprocess=None,
         mixins=[],
         name=None,
-        _parent=None,
     ):
         """Initialize an Overload."""
-        if bind_to is True:
-            bind_to = self
-        elif bind_to is False:
-            bind_to = None
-        self.__self__ = bind_to
-        self._parent = _parent
+        self.bind_to = bind_to
         self._wrapper = wrapper
         self.state = None
         self.initial_state = initial_state
         self.postprocess = postprocess
+        self.bootstrap = bool(
+            bootstrap or self.initial_state or self.postprocess
+        )
         self.name = name
-        if _parent:
-            assert _parent.which is not None
-            self.map = _parent.map
-            self._uncached_map = _parent._uncached_map
-            self.which = _parent.which
-            self._wrapper = _parent._wrapper
-            return
         _map = {}
         self.which = None
         for mixin in mixins:
@@ -105,7 +107,11 @@ class Overload:
                 assert mixin.which == self.which
             _map.update(mixin._uncached_map)
         self.map = TypeMap(_map)
+        self.map._key_error = lambda key: TypeError(
+            f"No overloaded method in {self} for {key}"
+        )
         self._uncached_map = _map
+        self.ocls = _fresh(OverloadCall)
 
     def _set_attrs_from(self, fn, wrapper=False):
         if self.name is None:
@@ -118,16 +124,47 @@ class Overload:
             params = list(sign.parameters.values())
             if wrapper:
                 params = params[1:]
-            if (
-                self.__self__ is not None
-                or self.initial_state
-                or self.postprocess
-            ):
+            if self.bootstrap or self.bind_to is not None:
                 params = params[1:]
             params = [
                 p.replace(annotation=inspect.Parameter.empty) for p in params
             ]
             self.__signature__ = sign.replace(parameters=params)
+
+    def compile(self):
+        """Finalize this overload."""
+        cls = type(self)
+        if self.name is not None:
+            name = self.__name__
+
+            # Place __real_call__ into __call__, renamed as the entry function
+            cls.__call__ = rename_function(cls.__real_call__, f"{name}.entry")
+
+            # Use the proper dispatch function
+            method_name = "__xcall"
+            if self.bootstrap or self.bind_to:
+                method_name += "_bind"
+            if self._wrapper is not None:
+                method_name += "_wrap"
+            method_name += "__"
+            callfn = getattr(self.ocls, method_name)
+            self.ocls.__call__ = rename_function(callfn, f"{name}.dispatch")
+
+            # Rename the wrapper
+            if self._wrapper:
+                self._wrapper = rename_function(
+                    self._wrapper, f"{name}.wrapper"
+                )
+
+            # Rename the mapped functions
+            self.map.update(
+                {
+                    t: rename_function(fn, f"{name}[{t.__name__}]")
+                    for t, fn in self.map.items()
+                }
+            )
+        else:
+            cls.__call__ = cls.__real_call__
 
     def wrapper(self, wrapper):
         """Set a wrapper function."""
@@ -139,8 +176,6 @@ class Overload:
 
     def register(self, fn):
         """Register a function."""
-        if self._parent:  # pragma: no cover
-            raise Exception("Cannot register a function on derived Overload")
         ann = fn.__annotations__
         if len(ann) != 1:
             raise Exception("Only one parameter may be annotated.")
@@ -173,10 +208,9 @@ class Overload:
         New functions can be registered to the copy without affecting the
         original.
         """
-        fself = self.__self__
-        bootstrap = True if fself is self else fself
-        return Overload(
-            bind_to=bootstrap,
+        return _fresh(Overload)(
+            bootstrap=self.bootstrap,
+            bind_to=self.bind_to,
             wrapper=self._wrapper if wrapper is MISSING else wrapper,
             mixins=[self],
             initial_state=initial_state or self.initial_state,
@@ -198,69 +232,91 @@ class Overload:
             ov.register(fn)
             return ov
 
-    def variant_wrapper(self, wrapper=MISSING, *, initial_state=None):
-        """Decorator to create a variant of this Overload with a new wrapper.
-
-        New functions can be registered to the variant without affecting the
-        original.
-        """
-        ov = self.copy(wrapper=None, initial_state=initial_state)
-        if wrapper is MISSING:
-            return ov.wrapper
-        else:
-            return ov.wrapper(wrapper)
-
     def __get__(self, obj, cls):
-        return Overload(bind_to=obj, _parent=self, name=self.name)
+        return self.ocls(
+            map=self.map,
+            state=self.initial_state() if self.initial_state else None,
+            which=self.which,
+            wrapper=self._wrapper,
+            bootstrap=self.bootstrap,
+            bind_to=obj,
+        )
 
     def __getitem__(self, t):
-        if self.__self__:
-            return self.map[t].__get__(self.__self__)
-        else:
-            return self.map[t]
+        assert not self.bootstrap and self.bind_to is None
+        return self.map[t]
 
     def __call__(self, *args, **kwargs):
-        """Call the overloaded function."""
-        if self.initial_state or self.postprocess:
-            ov = Overload(bind_to=True, _parent=self)
-            if self.initial_state:
-                ov.state = self.initial_state()
-            res = ov(*args, **kwargs)
-            if self.postprocess:
-                res = self.postprocess(res)
-            return res
+        """Compile the overloaded function and then call it."""
+        self.compile()
+        return self(*args, **kwargs)
 
-        fself = self.__self__
+    def __real_call__(self, *args, **kwargs):
+        """Call the overloaded function."""
+        ovc = self.__get__(self.bind_to, None)
+        res = ovc(*args, **kwargs)
+        if self.postprocess:
+            res = self.postprocess(res)
+        return res
+
+    def __repr__(self):
+        return f"<Overload {self.name or hex(id(self))}>"
+
+
+class OverloadCall:
+    """Context for an Overload call."""
+
+    def __init__(self, map, state, which, wrapper, bootstrap, bind_to):
+        """Initialize an OverloadCall."""
+        self.map = map
+        self.state = state
+        self.which = which
+        self.wrapper = wrapper
+        self.bind_to = self if bootstrap else bind_to
+
+    def __getitem__(self, t):
+        return self.map[t].__get__(self)
+
+    def __xcall_bind_wrap__(self, *args, **kwargs):
+        main = args[self.which - 1]
+        method = self.map[type(main)]
+        return self.wrapper(method, self.bind_to, *args, **kwargs)
+
+    def __xcall_bind__(self, *args, **kwargs):
+        main = args[self.which - 1]
+        method = self.map[type(main)]
+        return method(self.bind_to, *args, **kwargs)
+
+    def __xcall_wrap__(self, *args, **kwargs):
+        main = args[self.which]
+        method = self.map[type(main)]
+        return self.wrapper(method, *args, **kwargs)
+
+    def __xcall__(self, *args, **kwargs):
+        main = args[self.which]
+        method = self.map[type(main)]
+        return method(*args, **kwargs)
+
+    def __call__(self, *args, **kwargs):
+        fself = self.bind_to
         if fself is not None:
             args = (fself,) + args
 
         main = args[self.which]
+        method = self.map[type(main)]
 
-        try:
-            method = self.map[type(main)]
-        except KeyError:
-            method = None
-
-        if self._wrapper is None:
-            if method is None:
-                raise TypeError(
-                    f"No overloaded method in {self} for {type(main)}"
-                )
-            else:
-                return method(*args, **kwargs)
+        if self.wrapper is None:
+            return method(*args, **kwargs)
         else:
-            return self._wrapper(method, *args, **kwargs)
-
-    def __repr__(self):
-        return f"<Overload {self.name or hex(id(self))}>"
+            return self.wrapper(method, *args, **kwargs)
 
 
 def _find_overload(fn, bootstrap, initial_state, postprocess):
     mod = __import__(fn.__module__, fromlist="_")
     dispatch = getattr(mod, fn.__name__, None)
     if dispatch is None:
-        dispatch = Overload(
-            bind_to=bootstrap,
+        dispatch = _fresh(Overload)(
+            bootstrap=bootstrap,
             initial_state=initial_state,
             postprocess=postprocess,
         )
@@ -327,6 +383,31 @@ def overload_wrapper(
 
 
 overload.wrapper = overload_wrapper
+
+
+def rename_function(fn, newname):
+    """Create a copy of the function with a different name."""
+    co = fn.__code__
+    newcode = type(co)(
+        co.co_argcount,
+        co.co_kwonlyargcount,
+        co.co_nlocals,
+        co.co_stacksize,
+        co.co_flags,
+        co.co_code,
+        co.co_consts,
+        co.co_names,
+        co.co_varnames,
+        co.co_filename,
+        newname,
+        co.co_firstlineno,
+        co.co_lnotab,
+        co.co_freevars,
+        co.co_cellvars,
+    )
+    return FunctionType(
+        newcode, fn.__globals__, newname, fn.__defaults__, fn.__closure__
+    )
 
 
 __consolidate__ = True

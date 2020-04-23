@@ -92,8 +92,8 @@ def from_value(v, broaden=False, **kwargs):
 ###############
 
 
-@overload.wrapper(bootstrap=True)
-def to_abstract(fn, self, v, **kwargs):
+@overload(bootstrap=True)
+def to_abstract(self, v: AbstractValue, **kwargs):
     """Translate the value to an abstract value.
 
     Arguments:
@@ -107,29 +107,6 @@ def to_abstract(fn, self, v, **kwargs):
             the variables they interact with.
 
     """
-    if fn is not None:
-        rval = fn(self, v, **kwargs)
-
-    elif is_dataclass(v):
-        assert not isinstance(v, Function)
-        new_args = {}
-        for name, value in dataclass_fields(v).items():
-            new_args[name] = self(value, **kwargs)
-        rval = AbstractClass(type(v), new_args)
-
-    elif isinstance(v, type):
-        try:
-            rval = AbstractType(type_to_abstract(v))
-        except KeyError:
-            return AbstractExternal({VALUE: v, TYPE: type(v)})
-    else:
-        rval = AbstractExternal({VALUE: v, TYPE: type(v)})
-
-    return rval
-
-
-@overload  # noqa: F811
-def to_abstract(self, v: AbstractValue, **kwargs):
     return AbstractType(v)
 
 
@@ -239,6 +216,26 @@ def to_abstract(self, v: ADT, **kwargs):
         new_args[name] = self(value, **kwargs)
     draft = AbstractADT(type(v), new_args)
     return normalize_adt(draft)
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: object, **kwargs):
+    if is_dataclass(v):
+        assert not isinstance(v, Function)
+        new_args = {}
+        for name, value in dataclass_fields(v).items():
+            new_args[name] = self(value, **kwargs)
+        return AbstractClass(type(v), new_args)
+    else:
+        return AbstractExternal({VALUE: v, TYPE: type(v)})
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: type, **kwargs):
+    try:
+        return AbstractType(type_to_abstract(v))
+    except TypeError:
+        return AbstractExternal({VALUE: v, TYPE: type(v)})
 
 
 ####################

@@ -76,7 +76,7 @@ def test_Overload_mixins():
 
 def test_Overload_bootstrap():
 
-    f = Overload(bind_to=True)
+    f = Overload(bootstrap=True)
 
     @f.register
     def f(self, xs: list):
@@ -141,29 +141,6 @@ def test_Overload_wrapper():
 
     assert f(1) == [2]
     assert f((1, 2, (3, 4))) == [([2], [3], [([4], [5])])]
-
-
-def test_Overload_variant_wrapper():
-
-    f = Overload()
-
-    @f.register
-    def f(x: int):
-        return x + 1
-
-    assert f(1) == 2
-
-    @f.variant_wrapper
-    def g(fn, x):
-        return {fn(x)}
-
-    assert g(1) == {2}
-
-    @f.variant_wrapper(initial_state=lambda: 10)
-    def h(fn, self, x):
-        return self.state * x
-
-    assert h(1) == 10
 
 
 def test_Overload_stateful():
