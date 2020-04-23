@@ -34,11 +34,8 @@ def lambda_lift(root):
 
     for g in graphs:
         if g.parent and not graphs.processed(g.parent):
-            with untested_legacy():
-                # The manager seems to naturally sort graphs so that parents are
-                # before their children but I don't think we have any guarantee
-                graphs.requeue(g)
-                continue
+            graphs.requeue(g)
+            continue
 
         todo[g] = NS(graph=g, calls=[], fvs={})
 
