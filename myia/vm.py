@@ -12,7 +12,7 @@ from .graph_utils import toposort
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .operations import Primitive
 from .operations.primitives import partial, return_
-from .utils import TypeMap, untested_legacy
+from .utils import TypeMap
 
 
 class VMFrame:

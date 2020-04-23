@@ -24,6 +24,30 @@ def test_lambda_lift_simple():
     assert isomorphic(f1, f2)
 
 
+def test_lambda_lift_nested():
+    @llift
+    def f1(x, y):
+        def g(z):
+            def h():
+                return x + z
+
+            return h()
+
+        return g(y)
+
+    @scalar_parse
+    def f2(x, y):
+        def g(z, _x):
+            def h(__x, _z):
+                return __x + _z
+
+            return h(_x, z)
+
+        return g(y, x)
+
+    assert isomorphic(f1, f2)
+
+
 def test_lambda_lift_chain():
     @llift
     def f1(x, y):

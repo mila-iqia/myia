@@ -32,15 +32,22 @@ def lambda_lift(root):
     This is a destructive operation.
     """
     mng = manage(root)
-    todo = {}
+    graphs = WorkSet(mng.graphs)
+    todo = []
 
     # Step 1: Figure out what to do
     # For each graph that is a closure, we collect all uses. If all uses are in
     # call position, this means we can easily modify the function's interface,
     # so we collect all the free variables and create new parameters for them.
-    for g in mng.graphs:
+    for g in graphs:
+        if g.parent and not graphs.processed(g.parent):
+            # Process parents first (we will reverse the order later)
+            graphs.requeue(g)
+            continue
+
         if not g.free_variables_total:
             continue
+
         gcalls = [
             (node, idx)
             for ct in mng.graph_constants[g]
@@ -54,17 +61,25 @@ def lambda_lift(root):
                     param.abstract = fv.abstract
                     return param
 
-            todo[g] = NS(
-                graph=g,
-                calls=gcalls,
-                fvs={fv: _param(fv) for fv in _find_fvs(g)},
+            todo.append(
+                NS(
+                    graph=g,
+                    calls=gcalls,
+                    fvs={fv: _param(fv) for fv in _find_fvs(g)},
+                )
             )
+
+    # Reverse the order so that children are processed before parents. This is
+    # important for step 3, because children that are lambda lifted must
+    # replace their uses first (otherwise the original fvs would be replaced
+    # by their parent's parameters, which is not what we want)
+    todo.reverse()
 
     # Step 2: Add arguments to call sites.
     # For each closure, we add arguments to each call of the closure. The
     # arguments that are added are the original free variables.
-    with mng.transact() as tr:
-        for entry in todo.values():
+    for entry in todo:
+        with mng.transact() as tr:
             for node, _ in entry.calls:
                 new_node = node.graph.apply(*node.inputs, *entry.fvs)
                 new_node.abstract = node.abstract
@@ -73,9 +88,9 @@ def lambda_lift(root):
     # Step 3: Redirect the free variables
     # For each closure, we redirect all free variables within scope by the
     # new parameters, which means that they are not closures anymore. This
-    # may modify the arguments added in step 2.
-    with mng.transact() as tr:
-        for entry in todo.values():
+    # may modify the arguments added in step 2. Children before parents.
+    for entry in todo:
+        with mng.transact() as tr:
             # Redirect the fvs to the parameter (those in scope)
             for fv, param in entry.fvs.items():
                 for node, idx in mng.uses[fv]:
