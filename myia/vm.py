@@ -12,7 +12,7 @@ from .graph_utils import toposort
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .operations import Primitive
 from .operations.primitives import partial, return_
-from .utils import TypeMap
+from .utils import TypeMap, untested_legacy
 
 
 class VMFrame:
@@ -299,7 +299,8 @@ class VM:
             # We only visit constant graphs
             assert node.is_constant_graph()
             if frame.closure is not None and node in frame.closure:
-                return
+                with untested_legacy():
+                    return
             g = node.value
             if len(self._vars[g]) != 0:
                 frame.values[node] = self._make_closure(g, frame)

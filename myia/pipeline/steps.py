@@ -13,6 +13,7 @@ from ..opt import (
     DeadDataElimination,
     LocalPassOptimizer,
     NodeMap,
+    lambda_lift,
     lib as optlib,
 )
 from ..parser import parse
@@ -371,6 +372,24 @@ step_opt2 = Optimizer.partial(
 )
 
 
+##################
+# Lambda lifting #
+##################
+
+
+def step_llift(resources, graph, outspec=None):
+    """Pipeline step to lambda-lift the graph.
+
+    Inputs:
+        graph: The graph to lambda-lift.
+
+    Outputs:
+        None.
+    """
+    lambda_lift(graph)
+    return {"graph": graph}
+
+
 ############
 # Validate #
 ############
@@ -387,7 +406,8 @@ def step_validate(resources, graph, outspec=None):
     """
     if graph.output.abstract != outspec:
         raise ValidationError(
-            "The output type of the graph changed during optimization."
+            "The output type of the graph changed during optimization"
+            f" from {outspec} to {graph.output.abstract}"
         )
     resources.validator(graph)
     return {"graph": graph}

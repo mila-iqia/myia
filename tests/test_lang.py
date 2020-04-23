@@ -6,7 +6,7 @@ from .common import Point, mysum
 from .multitest import mt, run, run_debug
 
 lang_pipeline = scalar_debug_pipeline.select(
-    "resources", "parse", {"resolve": steps.step_resolve}, "export"
+    "resources", "parse", {"resolve": steps.step_resolve}, "llift", "export"
 )
 
 

@@ -66,6 +66,7 @@ grad_pipeline = PipelineDefinition(
     infer=steps.step_infer,
     specialize=steps.step_specialize,
     opt=steps.step_debug_opt,
+    llift=steps.step_llift,
     validate=steps.step_validate,
     export=steps.step_debug_export,
 )
