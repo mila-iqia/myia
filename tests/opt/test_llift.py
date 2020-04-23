@@ -1,8 +1,8 @@
 from myia.ir import isomorphic
-from myia.pipeline import scalar_parse, scalar_pipeline
+from myia.pipeline import scalar_parse, scalar_pipeline, steps
 
 llift = scalar_pipeline.select(
-    "resources", "parse", "resolve", "llift",
+    "resources", "parse", {"resolve": steps.step_resolve}, "llift",
 ).make_transformer("input", "graph")
 
 
