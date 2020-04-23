@@ -33,10 +33,10 @@ def lambda_lift(root):
     todo = {}
 
     for g in graphs:
-        with untested_legacy():
-            # The manager seems to naturally sort graphs so that parents are
-            # before their children but I don't think we have any guarantee
-            if g.parent and not graphs.processed(g.parent):
+        if g.parent and not graphs.processed(g.parent):
+            with untested_legacy():
+                # The manager seems to naturally sort graphs so that parents are
+                # before their children but I don't think we have any guarantee
                 graphs.requeue(g)
                 continue
 
