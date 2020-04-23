@@ -40,10 +40,10 @@ def test_lambda_lift_chain():
         def g(z, _x):
             return _x + z
 
-        def h(_x, _y):
+        def h(_y, _x):
             return g(_y, _x)
 
-        return h(x, y)
+        return h(y, x)
 
     assert isomorphic(f1, f2)
 

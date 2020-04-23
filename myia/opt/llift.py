@@ -4,12 +4,12 @@ from types import SimpleNamespace as NS
 
 from ..info import About
 from ..ir import ANFNode, manage
-from ..utils import WorkSet
+from ..utils import OrderedSet, WorkSet
 from ..utils.errors import untested_legacy
 
 
 def _find_fvs(graph):
-    fvs = set()
+    fvs = OrderedSet()
     work = WorkSet([graph])
     for g in work:
         for fv in g.free_variables_total:
