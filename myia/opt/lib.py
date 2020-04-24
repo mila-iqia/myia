@@ -525,16 +525,6 @@ def simplify_array_map(resources, node, equiv):
 ##################################
 
 
-# uget(*make_handle(y, _)) => y
-@pattern_replacer(
-    P.universe_getitem,
-    (P.tuple_getitem, (P.make_handle, X, Y), 0),
-    (P.tuple_getitem, (P.make_handle, X, Y), 1),
-)
-def universe_get_handle(resources, node, equiv):
-    return equiv[X]
-
-
 # * uget(uset(U, h, v), h) => v
 # * uget(uset(U, h1, v), h2) => uget(U, h2) if h1 cannot possibly be h2:
 #   * if h1 and h2 have different types
