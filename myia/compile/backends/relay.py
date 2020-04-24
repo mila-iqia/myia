@@ -14,7 +14,7 @@ from ...ir import Graph, manage, sexp_to_node
 from ...operations import Primitive, primitives as P
 from ...operations.primitives import BackendPrimitive
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
-from ...utils.variables import X, Y, Z
+from ...utils.variables import X, Y
 from ...xtype import type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result
@@ -29,7 +29,6 @@ from .relay_helpers import (
     handle_wrapper,
     to_relay_type,
 )
-
 
 # Temporary primitive to replace make_handle in graphs
 make_cell = BackendPrimitive(name="make_cell", defaults={})
@@ -989,18 +988,19 @@ def make_handle_to_make_cell(g):
     """
     mng = manage(g)
     for node in list(mng.all_nodes):
-        equiv = node.match((
-            P.universe_setitem,
-            (P.tuple_getitem, X, 0),
-            (P.tuple_getitem, X, 1),
-            Y
-        ))
+        equiv = node.match(
+            (
+                P.universe_setitem,
+                (P.tuple_getitem, X, 0),
+                (P.tuple_getitem, X, 1),
+                Y,
+            )
+        )
         if equiv:
             x = equiv[X]
             if x.is_apply(P.make_handle):
                 new_handle_node = sexp_to_node(
-                    (make_cell, equiv[Y], x.inputs[2]),
-                    node.graph
+                    (make_cell, equiv[Y], x.inputs[2]), node.graph
                 )
                 mng.replace(x, new_handle_node)
                 mng.replace(node, node.inputs[1])

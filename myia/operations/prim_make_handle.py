@@ -2,14 +2,14 @@
 
 from .. import xtype
 from ..lib import (
+    ANYTHING,
+    TYPE,
+    VALUE,
     AbstractHandle,
+    AbstractScalar,
+    AbstractTuple,
     AbstractType,
     standard_prim,
-    VALUE,
-    TYPE,
-    ANYTHING,
-    AbstractTuple,
-    AbstractScalar,
 )
 from . import primitives as P
 

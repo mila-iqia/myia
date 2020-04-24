@@ -1,7 +1,6 @@
 """Operations on handles and universes."""
 
-from .. import xtype
-from ..lib import ANYTHING, TYPE, VALUE, AbstractScalar, HandleInstance, core
+from ..lib import core
 from . import make_handle, typeof, universe_getitem, universe_setitem
 from .utils import to_opdef
 

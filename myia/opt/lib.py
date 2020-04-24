@@ -582,7 +582,6 @@ def universe_set_chain(resources, node, equiv):
     while handles:
         handle = handles.pop()
         value = values.pop()
-        new = is_new.pop()
         if handle in handles:
             continue
         curr = (P.universe_setitem, curr, handle, value)
