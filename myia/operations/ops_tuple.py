@@ -58,6 +58,7 @@ class TupleReorganizer(MetaGraph):
     def generate_graph(self, args):
         """Generate the graph."""
         g = Graph()
+        g.set_flags("core")
         g.debug.name = self.gen.__name__
         for arg in args:
             g.add_parameter()

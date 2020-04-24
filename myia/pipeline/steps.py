@@ -312,6 +312,7 @@ step_opt = Optimizer.partial(
             optlib.getitem_setitem_tuple,
             optlib.setitem_tuple,
             optlib.setitem_tuple_ct,
+            optlib.cancel_tuple_reconstruction,
             optlib.elim_j_jinv,
             optlib.elim_jinv_j,
             optlib.replace_Jinv_on_graph,
