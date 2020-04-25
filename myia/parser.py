@@ -260,7 +260,8 @@ class Parser:
         tree = asttokens.ASTTokens(src, parse=True).tree
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
-        main_block = self._process_function(None, function_def)
+        main_block, _finalize = self._create_function(None, function_def)
+        _finalize()
         for node in dfs(main_block.graph.return_, succ_deeper):
             if node.is_constant_graph():
                 if node.value.return_ is None:
@@ -299,14 +300,21 @@ class Parser:
             node: The function definition.
 
         """
-        function_block = self._process_function(block, node)
+        function_block, process = self._create_function(block, node)
         block.write(node.name, Constant(function_block.graph), track=False)
+        block.add_finalizer(process)
         return block
 
-    def _process_function(
+    def _create_function(
         self, block: Optional["Block"], node: ast.FunctionDef
     ) -> Tuple["Block", "Block"]:
-        """Process a function definition and return first and final blocks."""
+        """Process a function definition and return block and finalizer.
+
+        To process the statements in the function the finalizer must be
+        called with no arguments. It should only be called after processing
+        the statements in the parent function so that mutual recursion and
+        forward references can be resolved.
+        """
         with DebugInherit(ast=node, location=self.make_location(node)):
             function_block = self.new_block()
         if block:
@@ -323,6 +331,13 @@ class Parser:
         graph = function_block.graph
         function_block.write(node.name, Constant(graph), track=False)
 
+        def _finalize():
+            return self._finalize_function(node, function_block)
+
+        return function_block, _finalize
+
+    def _finalize_function(self, node, function_block):
+        """Process a function definition."""
         # Process arguments and their defaults
         args = node.args.args
         nondefaults = [None] * (len(args) - len(node.args.defaults))
@@ -645,6 +660,7 @@ class Parser:
         """
         for node in nodes:
             block = self.process_node(block, node, used=False)
+        block.finalize()
         return block
 
     def process_Return(self, block: "Block", node: ast.Return) -> "Block":
@@ -899,6 +915,7 @@ class Block:
         """
         self.parser = parser
         self.use_universe = use_universe
+        self.finalizers = []
 
         self.matured: bool = False
         self.variables: Dict[str, ANFNode] = {}
@@ -1090,6 +1107,15 @@ class Block:
             self.graph.output = self.graph.apply(tmake, self.universe, value)
         else:
             self.graph.output = value
+
+    def add_finalizer(self, fn):
+        """Add a function to run when this block is done."""
+        self.finalizers.append(fn)
+
+    def finalize(self):
+        """Run all finalizer functions."""
+        for fn in self.finalizers:
+            fn()
 
 
 __consolidate__ = True

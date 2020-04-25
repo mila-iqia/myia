@@ -97,6 +97,30 @@ def test_global_nested():
     parse(g)
 
 
+def test_forward_reference_in_closure():
+    def g(x):
+        def h():
+            return a * a
+
+        a = x * x
+        return h()
+
+    parse(g)
+
+
+def test_mutual_recursion():
+    def g(x):
+        def rec1(y):
+            return rec2(y - 1)
+
+        def rec2(y):
+            return rec1(y - 1)
+
+        return rec1(x)
+
+    parse(g)
+
+
 def test_forward_reference():
     def g():
         return h()
