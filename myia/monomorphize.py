@@ -692,6 +692,7 @@ class Monomorphizer:
 
         for node in all_nodes:
             old_ref = self.invmap.get(node, None)
+            old_ref = _normalize_context(old_ref)
             if old_ref is None:
                 assert node.abstract is not None
             elif getattr(old_ref.node, "force_abstract", False):
