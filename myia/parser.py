@@ -648,7 +648,7 @@ class Parser:
     # Statement implementations
 
     def process_statements(
-        self, block: "Block", nodes: List[ast.stmt]
+        self, starting_block: "Block", nodes: List[ast.stmt]
     ) -> "Block":
         """Process a sequence of statements.
 
@@ -658,9 +658,10 @@ class Parser:
         call the continuation from.
 
         """
+        block = starting_block
         for node in nodes:
             block = self.process_node(block, node, used=False)
-        block.finalize()
+        starting_block.finalize()
         return block
 
     def process_Return(self, block: "Block", node: ast.Return) -> "Block":
