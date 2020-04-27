@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import pytest
 
 from myia import myia
@@ -145,3 +147,56 @@ def test_return_handle():
     # to return the handle for now.
     h2 = plus2(hb)
     assert h2.state == 2
+
+
+@dataclass
+class Counter:
+    _count: object
+
+    def __init__(self):
+        self._count = HandleInstance(0)
+
+    @core(use_universe=True)
+    def increment(self, inc):
+        curr = cell_get(self._count)
+        rval = curr + inc
+        cell_set(self._count, rval)
+        return rval
+
+    @core(use_universe=True)
+    def value(self):
+        return cell_get(self._count)
+
+
+def test_count():
+    @myia(
+        use_universe=True,
+        backend="relay",
+        backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
+    )
+    def calc(counter, n):
+        for i in range(n):
+            counter.increment(i + 1)
+        return counter.value()
+
+    cnt = calc.to_device(Counter())
+    assert calc(cnt, 5) == 15
+
+
+@pytest.mark.xfail(reason="Backend does not find handles in dataclasses")
+def test_count_keepstate():
+    @myia(
+        use_universe=True,
+        backend="relay",
+        backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
+    )
+    def calc(counter, n):
+        for i in range(n):
+            counter.increment(i + 1)
+        return counter.value()
+
+    cnt = calc.to_device(Counter())
+    assert calc(cnt, 5) == 15
+    assert calc(cnt, 5) == 30
