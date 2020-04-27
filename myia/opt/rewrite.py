@@ -64,7 +64,7 @@ class RewriteGraphs(Partializable):
             chg = rewrite_graphs(root, self.resources.opt_manager)
             if chg:
                 tracer().emit_success(**args, new_node=None)
-            return chg and self.report_changes
+            return chg
 
 
 __all__ = ["RewriteGraphs", "rewrite_graphs"]
