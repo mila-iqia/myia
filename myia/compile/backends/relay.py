@@ -982,7 +982,7 @@ class RelayOutputConverter(Converter):
 
 
 def make_handle_to_make_cell(g):
-    """Replace uset(*make_handle(typ), value) by make_cell(value, U)
+    """Replace uset(*make_handle(typ), value) by make_cell(value, U).
 
     This is because RefCreate both creates the reference and sets it.
     """

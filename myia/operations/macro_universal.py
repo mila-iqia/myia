@@ -6,6 +6,7 @@ from ..lib import Constant, MetaGraph, core, macro, overload
 
 @core(universal=True)
 def universal_wrapper(fn):
+    """Create a version of fn that passes the universe through."""
     def wrapped(*args):
         U = args[-1]
         args = args[:-1]

@@ -532,6 +532,7 @@ def simplify_array_map(resources, node, equiv):
 #   * if h2 is a call to handle and is not h1
 @pattern_replacer(P.universe_getitem, (P.universe_setitem, X1, X2, X3), X4)
 def universe_get_set(resources, node, equiv):
+    """Simplify getting the value for a handle right after setting it."""
     h_inner = equiv[X2]
     h_outer = equiv[X4]
     if h_inner is h_outer:
