@@ -547,38 +547,6 @@ def universe_get_set(resources, node, equiv):
         return None
 
 
-def _analyze_universe_chain(node):
-    curr = node
-    handles = []
-    values = []
-    is_new = []
-    while curr.is_apply(P.universe_setitem):
-        assert curr.graph is node.graph
-        h = curr.inputs[2]
-        handles.append(h)
-        values.append(curr.inputs[3])
-        is_new.append(h.is_apply(P.make_handle) and h.graph in node.graph.scope)
-        curr = curr.inputs[1]
-    return curr, handles, values, is_new
-
-
-@pattern_replacer(P.universe_setitem, X, Y, Z)
-def universe_set_chain(resources, node, equiv):
-    curr, handles, values, is_new = _analyze_universe_chain(node)
-    if len(handles) == len(set(handles)):
-        return None
-
-    # curr is the root universe
-    while handles:
-        handle = handles.pop()
-        value = values.pop()
-        if handle in handles:
-            continue
-        curr = (P.universe_setitem, curr, handle, value)
-
-    return sexp_to_node(curr, node.graph)
-
-
 #############################
 # Env-related optimizations #
 #############################
