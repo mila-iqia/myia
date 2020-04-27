@@ -173,6 +173,28 @@ class GraphConstantsStatistic(CounterStatistic):
             self.mod(inp.value, inp, direction)
 
 
+class CallSitesStatistic(CounterStatistic):
+    """Implements `GraphManager.call_sites`."""
+
+    def constructor(self):
+        return defaultdict(OrderedSet)
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        if key == 0 and inp.is_constant_graph():
+            self.mod(inp.value, node, direction)
+
+
+class HigherOrderSitesStatistic(CounterStatistic):
+    """Implements `GraphManager.higher_order_sites`."""
+
+    def constructor(self):
+        return defaultdict(OrderedSet)
+
+    def _on_mod_edge(self, event, node, key, inp, direction):
+        if key > 0 and inp.is_constant_graph():
+            self.mod(inp.value, (node, key), direction)
+
+
 class FVDirectStatistic(CounterStatistic):
     """Implements `GraphManager.free_variables_direct`."""
 
@@ -585,6 +607,8 @@ class GraphManager(Partializable):
         self.uses = defaultdict(OrderedSet)
 
         self.nodes = NodesStatistic(self)
+        self.call_sites = CallSitesStatistic(self)
+        self.higher_order_sites = HigherOrderSitesStatistic(self)
         self.constants = ConstantsStatistic(self)
         self.free_variables_direct = FVDirectStatistic(self)
         self.graph_constants = GraphConstantsStatistic(self)

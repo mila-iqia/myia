@@ -48,26 +48,22 @@ def lambda_lift(root):
         if not g.free_variables_total:
             continue
 
-        gcalls = [
-            (node, idx)
-            for ct in mng.graph_constants[g]
-            for node, idx in mng.uses[ct]
-        ]
-        if all(idx == 0 for node, idx in gcalls):
+        if not g.all_direct_calls:
+            continue
 
-            def _param(fv):
-                with About(fv.debug, "llift"):
-                    param = g.add_parameter()
-                    param.abstract = fv.abstract
-                    return param
+        def _param(fv):
+            with About(fv.debug, "llift"):
+                param = g.add_parameter()
+                param.abstract = fv.abstract
+                return param
 
-            todo.append(
-                NS(
-                    graph=g,
-                    calls=gcalls,
-                    fvs={fv: _param(fv) for fv in _find_fvs(g)},
-                )
+        todo.append(
+            NS(
+                graph=g,
+                calls=g.call_sites,
+                fvs={fv: _param(fv) for fv in _find_fvs(g)},
             )
+        )
 
     # Reverse the order so that children are processed before parents. This is
     # important for step 3, because children that are lambda lifted must
@@ -80,7 +76,7 @@ def lambda_lift(root):
     # arguments that are added are the original free variables.
     for entry in todo:
         with mng.transact() as tr:
-            for node, _ in entry.calls:
+            for node in entry.calls:
                 new_node = node.graph.apply(*node.inputs, *entry.fvs)
                 new_node.abstract = node.abstract
                 tr.replace(node, new_node)

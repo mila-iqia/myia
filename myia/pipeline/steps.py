@@ -13,6 +13,7 @@ from ..opt import (
     DeadDataElimination,
     LocalPassOptimizer,
     NodeMap,
+    RewriteGraphs,
     lambda_lift,
     lib as optlib,
 )
@@ -346,6 +347,7 @@ step_opt = Optimizer.partial(
 
 step_opt2 = Optimizer.partial(
     phases=dict(
+        rewrite=RewriteGraphs.partial(),
         dde=DeadDataElimination.partial(),
         main=[
             optlib.force_constants,
