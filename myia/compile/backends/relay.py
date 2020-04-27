@@ -361,7 +361,7 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
     conv_sh1 = grad_sh0 * grad_sh1 * (in_channel // groups.value)
     d = relay.reshape(
         d,
-        [batch, conv_sh1 // batch, padded_weight_grad_h, padded_weight_grad_w,],
+        [batch, conv_sh1 // batch, padded_weight_grad_h, padded_weight_grad_w],
     )
     d = relay.sum(d, axis=0)
 
