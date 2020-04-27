@@ -314,6 +314,9 @@ def relay_conv2d(c, img, w, stride, pad, dil, groups):
 
 
 def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
+    # This implementation should match the one in pytorch backend
+    # (myia.compile.backends.pytorch_conv_grad.conv2d_weight)
+
     assert wsize.is_constant(tuple)
     assert stride.is_constant(tuple)
     assert pad.is_constant(tuple)
@@ -322,7 +325,7 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
 
     batch, in_channel, in_h, in_w = data.abstract.xshape()
     out_channel, _, filter_h, filter_w = wsize.value
-    _, _, grad_h, grad_w = dout.abstract.xshape()
+    grad_sh0, grad_sh1, grad_h, grad_w = dout.abstract.xshape()
     pad_h, pad_w = pad.value
 
     data = c.ref(data)
@@ -354,18 +357,36 @@ def relay_conv2d_weight_grad(c, data, wsize, dout, stride, pad, dil, groups):
         dilation=stride.value,
         groups=batch * in_channel,
     )
+
+    conv_sh1 = grad_sh0 * grad_sh1 * (in_channel // groups.value)
     d = relay.reshape(
         d,
-        [
-            batch,
-            in_channel // groups.value,
-            out_channel,
-            padded_weight_grad_h,
-            padded_weight_grad_w,
-        ],
+        [batch, conv_sh1 // batch, padded_weight_grad_h, padded_weight_grad_w,],
     )
     d = relay.sum(d, axis=0)
-    d = relay.transpose(d, [1, 0, 2, 3])
+
+    if groups.value > 1:
+        d = relay.reshape(
+            d,
+            [
+                grad_sh1,
+                in_channel // groups.value,
+                padded_weight_grad_h,
+                padded_weight_grad_w,
+            ],
+        )
+    else:
+        d = relay.reshape(
+            d,
+            [
+                in_channel // groups.value,
+                grad_sh1,
+                padded_weight_grad_h,
+                padded_weight_grad_w,
+            ],
+        )
+        d = relay.transpose(d, [1, 0, 2, 3])
+
     if padded_weight_grad_h > filter_h or padded_weight_grad_w > filter_w:
         d = relay.strided_slice(
             d, begin=[0, 0, 0, 0], end=[None, None, filter_h, filter_w]
