@@ -21,7 +21,7 @@ from .abstract import (
 )
 from .operations import Primitive
 from .operations.primitives import BackendPrimitive
-from .utils import ErrorPool, Partializable, overload
+from .utils import ErrorPool, Partializable, overload, untested_legacy
 
 
 class ValidationError(Exception):
@@ -43,9 +43,11 @@ def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
 def validate_abstract(self, a: AbstractError, uses):
     kind = a.xvalue()
     if kind is DEAD:
-        return True
+        with untested_legacy():
+            return True
     elif kind is POLY:
-        return not any(key == 0 for node, key in uses)
+        with untested_legacy():
+            return not any(key == 0 for node, key in uses)
     else:  # pragma: no cover
         # As it turns out, the inferrer now catches this error before we get to
         # validation.
