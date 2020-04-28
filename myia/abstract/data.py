@@ -352,8 +352,12 @@ class AbstractExternal(AbstractAtom):
         return rval
 
 
+class AbstractFunctionBase(AbstractAtom):
+    """Base for function types."""
+
+
 @serializable("AbstractFunction")
-class AbstractFunction(AbstractAtom):
+class AbstractFunction(AbstractFunctionBase):
     """Represents a function or set of functions.
 
     The VALUE track for an AbstractFunction contains a Possibilities object
@@ -433,12 +437,8 @@ class AbstractFunction(AbstractAtom):
         return pretty_join(fns, sep=" | ")
 
 
-class AbstractStructure(AbstractValue):
-    """Base class for abstract values that are structures."""
-
-
 @serializable("VirtualFunction2")
-class VirtualFunction2(AbstractStructure):
+class VirtualFunction2(AbstractFunctionBase):
     def __init__(self, args, output, values={}):
         super().__init__(values)
         self.args = list(args)
@@ -462,10 +462,6 @@ class VirtualFunction2(AbstractStructure):
         except StopIteration:
             pass
 
-    def children(self):
-        """Return all elements in the tuple."""
-        return [*self.args, self.output]
-
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
         return AttrEK(self, (v, "args", "output"))
@@ -484,6 +480,10 @@ class AbstractRandomState(AbstractAtom):
     def __init__(self):
         """Initialize an AbstractRandomState."""
         super().__init__({})
+
+
+class AbstractStructure(AbstractValue):
+    """Base class for abstract values that are structures."""
 
 
 class AbstractWrapper(AbstractStructure):
@@ -1043,6 +1043,7 @@ __all__ = [
     "AbstractError",
     "AbstractExternal",
     "AbstractFunction",
+    "AbstractFunctionBase",
     "AbstractHandle",
     "AbstractJTagged",
     "AbstractKeywordArgument",

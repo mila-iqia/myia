@@ -774,11 +774,10 @@ class JInferrer(Inferrer):
         self.orig_fn = orig_fn
 
     async def _jtag(self, x):
+        assert not isinstance(x, VirtualFunction2)
         if isinstance(x, AbstractFunction):
             v = await x.get()
             return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
-        elif isinstance(x, VirtualFunction2):
-            assert False
         return AbstractJTagged(x)
 
     async def run(self, engine, outref, argrefs):
