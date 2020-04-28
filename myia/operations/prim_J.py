@@ -5,6 +5,7 @@ from ..lib import (
     AbstractJTagged,
     JTransformedFunction,
     VirtualFunction,
+    VirtualFunction2,
     bprop_to_grad_transform,
     standard_prim,
 )
@@ -26,7 +27,14 @@ async def infer_J(self, engine, x):
                 vfn = type_fixer(None)(JTransformedFunction(vfn))
                 return AbstractFunction(vfn)
         return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
-    return AbstractJTagged(x)
+    elif isinstance(x, VirtualFunction2):
+        vfn = type_fixer(None)(JTransformedFunction(VirtualFunction(
+            x.args, x.output
+        )))
+        assert isinstance(vfn, VirtualFunction2)
+        return vfn
+    else:
+        return AbstractJTagged(x)
 
 
 @bprop_to_grad_transform(P.J)

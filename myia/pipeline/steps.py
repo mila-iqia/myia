@@ -484,7 +484,7 @@ def step_wrap(
     fn = output
     orig_arg_t = argspec if orig_argspec is None else orig_argspec
     orig_out_t = outspec if orig_outspec is None else orig_outspec
-    vm_arg_t = graph.abstract.get_sync()[0].args
+    vm_arg_t = graph.abstract.args
     vm_out_t = graph.return_.abstract
     if resources.universal:
         vm_unv_in_t, vm_arg_t = vm_arg_t[0], vm_arg_t[1:]

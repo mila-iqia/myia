@@ -1468,3 +1468,13 @@ class _VirtualFunction:
             (("args", self.args), ("output", self.output)),
             delimiter="↦",
         )
+
+
+@mixin(abstract.VirtualFunction2)
+class _VirtualFunction2:
+    def __hrepr__(self, H, hrepr):
+        return hrepr.stdrepr_object(
+            "★Function2",
+            (("args", self.args), ("output", self.output)),
+            delimiter="↦",
+        )

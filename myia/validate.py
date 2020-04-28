@@ -92,15 +92,7 @@ def validate_abstract(self, a: AbstractType, uses):
 
 @overload  # noqa: F811
 def validate_abstract(self, a: AbstractFunction, uses):
-    fns = a.get_sync()
-    if len(fns) != 1:
-        raise ValidationError(f"Only one function type should be here: {a}")
-    (fn,) = fns
-    if not isinstance(fn, (VirtualFunction, DummyFunction)):
-        raise ValidationError(
-            f"All function types should be VirtualFunction, not {fn}"
-        )
-    return self(a.values, uses)
+    raise ValidationError("Only VirtualFunction is allowed in the final graph")
 
 
 class NodeValidator:

@@ -8,6 +8,7 @@ from ..abstract import (
     CheckState,
     CloneState,
     VirtualFunction,
+    VirtualFunction2,
     abstract_check,
     abstract_clone,
     build_value,
@@ -900,7 +901,7 @@ def specialize_on_graph_arguments(resources, node, equiv):
 def _set_out_abstract(g, a):
     g.output.abstract = a
     g.return_.abstract = a
-    g.return_.inputs[0].abstract = AbstractFunction(VirtualFunction([a], a))
+    g.return_.inputs[0].abstract = VirtualFunction2([a], a)
 
 
 @GraphTransform
@@ -1019,7 +1020,7 @@ def call_output_transform(orig_graph, abstracts):
         p.abstract = a
         newp.append(p)
     graph.output = graph.apply(graph.output, *newp)
-    _set_out_abstract(graph, orig_graph.return_.abstract.get_unique().output)
+    _set_out_abstract(graph, orig_graph.return_.abstract.output)
     return graph
 
 
@@ -1121,7 +1122,7 @@ def expand_J(resources, node, equiv):
     except NotImplementedError:
         return None
 
-    vfn = node.abstract.get_unique()
+    vfn = node.abstract
     newg = resources.incorporate(newg, vfn.args, vfn.output)
 
     if isinstance(arg, Graph):
@@ -1147,7 +1148,7 @@ def _jelim_retype(self, j: AbstractJTagged):
 
 
 @abstract_check.variant(initial_state=lambda: CheckState({}, "_nofunc"))
-def _jelim_nofunc(self, f: AbstractFunction):
+def _jelim_nofunc(self, f: (AbstractFunction, VirtualFunction2)):
     return False
 
 

@@ -34,6 +34,7 @@ from .data import (
     TaggedPossibilities,
     TrackDict,
     VirtualFunction,
+    VirtualFunction2,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -386,6 +387,13 @@ def abstract_clone(self, x: VirtualFunction, *args):
 
 
 @overload  # noqa: F811
+def abstract_clone(self, x: VirtualFunction2, *args):
+    return (yield VirtualFunction2)(
+        [self(arg, *args) for arg in x.args], self(x.output, *args)
+    )
+
+
+@overload  # noqa: F811
 def abstract_clone(self, x: Pending, *args):
     if x.done():
         return self(x.result(), *args)
@@ -489,7 +497,7 @@ def broaden(self, d: TrackDict, *args):  # noqa: D417
 
 
 @abstract_clone.variant
-def sensitivity_transform(self, x: AbstractFunction):
+def sensitivity_transform(self, x: (AbstractFunction, VirtualFunction2)):
     """Return an abstract value for the sensitivity of x.
 
     * The sensitivity of a function is an Env

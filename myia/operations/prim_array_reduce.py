@@ -10,6 +10,7 @@ from ..lib import (
     AbstractFunction,
     MetaGraph,
     MyiaShapeError,
+    VirtualFunction2,
     bprop_to_grad_transform,
     build_value,
     force_pending,
@@ -68,9 +69,12 @@ def debugvm_array_reduce(vm, fn, array, shp):
 
 @standard_prim(P.array_reduce)
 async def infer_array_reduce(
-    self, engine, fn: AbstractFunction, a: AbstractArray, shp: u64tup_typecheck
+    self, engine, fn, a: AbstractArray, shp: u64tup_typecheck
 ):
     """Infer the return type of primitive `array_reduce`."""
+    if not isinstance(fn, (AbstractFunction, VirtualFunction2)):
+        raise MyiaTypeError("Expected function for array_map")
+
     shp_i = await force_pending(a.xshape())
     shp_v = build_value(shp, default=ANYTHING)
     if shp_v == ANYTHING:

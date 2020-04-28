@@ -10,6 +10,7 @@ from ..lib import (
     TYPE,
     AbstractArray,
     AbstractFunction,
+    VirtualFunction2,
     Graph,
     MetaGraph,
     MyiaShapeError,
@@ -35,12 +36,15 @@ def debugvm_array_map(vm, fn, *arrays):
 
 
 @standard_prim(P.array_map)
-async def infer_array_map(self, engine, fn: AbstractFunction, *arrays):
+async def infer_array_map(self, engine, fn, *arrays):
     """Infer the return type of primitive `array_map`."""
     if len(arrays) < 1:
         raise MyiaTypeError("array_map requires at least one array")
     for arr in arrays:
         await engine.check_immediate(AbstractArray, arr)
+
+    if not isinstance(fn, (AbstractFunction, VirtualFunction2)):
+        raise MyiaTypeError("Expected function for array_map")
 
     subargs = [a.element for a in arrays]
     result = await engine.execute(fn, *subargs)

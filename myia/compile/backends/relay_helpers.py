@@ -20,6 +20,7 @@ from ...abstract import (
     AbstractType,
     TypedPrimitive,
     VirtualFunction,
+    VirtualFunction2,
 )
 from ...operations import primitives as P
 from ...utils import overload
@@ -198,7 +199,7 @@ def to_relay_type(self, a: AbstractFunction):
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
+def to_relay_type(self, a: (VirtualFunction, VirtualFunction2, TypedPrimitive)):
     return relay.ty.FuncType([self(aa) for aa in a.args], self(a.output))
 
 

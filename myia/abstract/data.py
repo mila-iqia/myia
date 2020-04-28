@@ -38,6 +38,8 @@ VOID = Named("VOID")
 # Represents specialization problems
 DEAD = Named("DEAD")
 register_serialize(DEAD, "DEAD")
+DUMMY = Named("DUMMY")
+register_serialize(DUMMY, "DUMMY")
 POLY = Named("POLY")
 
 
@@ -453,6 +455,46 @@ class AbstractFunction(AbstractAtom):
 
 class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""
+
+
+@serializable("VirtualFunction2")
+class VirtualFunction2(AbstractStructure):
+    def __init__(self, args, output, values={}):
+        super().__init__(values)
+        self.args = list(args)
+        self.output = output
+
+    def _serialize(self):
+        data = super()._serialize()
+        data["args"] = self.args
+        data["output"] = self.output
+        return data
+
+    @classmethod
+    def _construct(cls):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.args = data.pop("args")
+        res.output = data.pop("output")
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
+
+    def children(self):
+        """Return all elements in the tuple."""
+        return [*self.args, self.output]
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, "args", "output"))
+
+    def __pretty__(self, ctx):
+        return pretty_call(ctx, "Fn", (self.args, self.output))
+
+    def get_prim(self):
+        return None
 
 
 @serializable("AbstractRandomState")
@@ -1005,6 +1047,7 @@ __all__ = [
     "ANYTHING",
     "DATA",
     "DEAD",
+    "DUMMY",
     "POLY",
     "SHAPE",
     "TYPE",
@@ -1045,6 +1088,7 @@ __all__ = [
     "TrackDict",
     "TypedPrimitive",
     "VirtualFunction",
+    "VirtualFunction2",
     "empty",
     "format_abstract",
     "i64tup_typecheck",

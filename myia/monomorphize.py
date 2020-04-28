@@ -13,6 +13,7 @@ from warnings import warn
 
 from .abstract import (
     DEAD,
+    DUMMY,
     POLY,
     AbstractError,
     AbstractFunction,
@@ -32,6 +33,7 @@ from .abstract import (
     TrackedInferrer,
     TypedPrimitive,
     VirtualFunction,
+    VirtualFunction2,
     VirtualReference,
     abstract_check,
     abstract_clone,
@@ -94,27 +96,28 @@ def _fix_type(self, a: GraphFunction, finder, monomorphizer):
     if a.tracking_id in monomorphizer.ctcache:
         ctx = monomorphizer.ctcache[a.tracking_id]
         g = monomorphizer.results[ctx]
-        return VirtualFunction(
+        return VirtualFunction2(
             tuple(
                 self(p.abstract, finder, monomorphizer) for p in g.parameters
             ),
             self(g.return_.abstract, finder, monomorphizer),
         )
     else:
-        return DummyFunction()
+        # return DummyFunction()
+        return AbstractError(DUMMY)
 
 
 @overload  # noqa: F811
 def _fix_type(self, a: PartialApplication, finder, monomorphizer):
     vfn = self(a.fn, finder, monomorphizer)
-    if isinstance(vfn, VirtualFunction):
-        vfn = VirtualFunction(vfn.args[len(a.args) :], vfn.output)
+    assert isinstance(vfn, VirtualFunction2)
+    vfn = VirtualFunction2(vfn.args[len(a.args) :], vfn.output)
     return vfn
 
 
 @overload  # noqa: F811
 def _fix_type(self, a: VirtualFunction, finder, monomorphizer):
-    return (yield VirtualFunction)(
+    return (yield VirtualFunction2)(
         tuple(self(arg, finder, monomorphizer) for arg in a.args),
         self(a.output, finder, monomorphizer),
     )
@@ -131,6 +134,8 @@ def _fix_type(self, a: JTransformedFunction, finder, monomorphizer):
                     for poss in v
                 ]
             )
+        elif isinstance(x, VirtualFunction2):
+            return self(JTransformedFunction(x), finder, monomorphizer)
         else:
             rval = AbstractJTagged(self(x, finder, monomorphizer))
         return rval
@@ -138,9 +143,9 @@ def _fix_type(self, a: JTransformedFunction, finder, monomorphizer):
     vfn = self(a.fn, finder, monomorphizer)
     jargs = tuple(_jtag(arg) for arg in vfn.args)
     jres = _jtag(vfn.output)
-    bprop = compute_bprop_type(vfn, vfn.args, vfn.output)
+    bprop = compute_bprop_type(vfn, vfn.args, vfn.output, vfn2=True)
     out = AbstractTuple([jres, bprop])
-    return VirtualFunction(jargs, out)
+    return VirtualFunction2(jargs, out)
 
 
 @overload  # noqa: F811
@@ -149,13 +154,13 @@ def _fix_type(self, a: AbstractFunction, finder, monomorphizer):
     if len(vfns) == 1:
         (vfn,) = vfns
     else:
-        vfns = [v for v in vfns if not isinstance(v, DummyFunction)]
-        assert vfns and all(isinstance(v, VirtualFunction) for v in vfns)
-        vfn = VirtualFunction(
+        vfns = [v for v in vfns if not isinstance(v, (DummyFunction, AbstractError))]
+        assert vfns and all(isinstance(v, VirtualFunction2) for v in vfns)
+        vfn = VirtualFunction2(
             reduce(amerge, [v.args for v in vfns]),
             reduce(amerge, [v.output for v in vfns]),
         )
-    return (yield AbstractFunction)(vfn)
+    return vfn
 
 
 @overload  # noqa: F811
@@ -165,19 +170,20 @@ def _fix_type(self, a: PrimitiveFunction, finder, monomorphizer):
             finder.analyze_function(None, a, None)[0], finder, monomorphizer
         )
     except Unspecializable:
-        return DummyFunction()
+        # return DummyFunction()
+        return AbstractError(DUMMY)
 
 
 @overload  # noqa: F811
 def _fix_type(self, a: MetaGraphFunction, finder, monomorphizer):
     inf = finder.engine.get_inferrer_for(a)
     argvals, outval = finder._find_unique_argvals(None, inf, None)
-    return VirtualFunction(tuple(argvals), outval)
+    return VirtualFunction2(tuple(argvals), outval)
 
 
 @overload  # noqa: F811
 def _fix_type(self, a: TypedPrimitive, finder, monomorphizer):
-    return VirtualFunction(
+    return VirtualFunction2(
         tuple(self(ar, finder, monomorphizer) for ar in a.args),
         self(a.output, finder, monomorphizer),
     )
@@ -515,9 +521,9 @@ class Monomorphizer:
                 else:
                     ctabs = ref.node.abstract
 
-                if ctabs is None or not isinstance(
+                if ctabs is None or not (isinstance(ctabs, VirtualFunction2) or isinstance(
                     ctabs.get_unique(), VirtualFunction
-                ):
+                )):
                     fn = a.get_unique()
                     with About(ref.node.debug, "equiv"):
                         try:

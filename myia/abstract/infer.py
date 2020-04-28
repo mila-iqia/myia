@@ -42,6 +42,7 @@ from .data import (
     PrimitiveFunction,
     TypedPrimitive,
     VirtualFunction,
+    VirtualFunction2,
 )
 from .loop import InferenceLoop, Pending, force_pending
 from .macro import AnnotationBasedChecker
@@ -265,7 +266,7 @@ class InferenceEngine:
         return JInferrer(self.get_inferrer_for(j.fn), j.fn)
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
+    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive, VirtualFunction2)):
         return VirtualInferrer(vf.args, vf.output)
 
     @get_inferrer_for.register
@@ -282,7 +283,10 @@ class InferenceEngine:
 
     async def execute(self, fn, *args):
         r"""Infer the result of fn(\*args)."""
-        infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
+        if isinstance(fn, VirtualFunction2):
+            infs = [self.get_inferrer_for(fn)]
+        else:
+            infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
         argrefs = [VirtualReference(a) for a in args]
         return await execute_inferrers(self, infs, None, argrefs)
 
@@ -295,17 +299,24 @@ class InferenceEngine:
         fn = await fn_ref.get()
         argrefs = [self.ref(node, ctx) for node in n_args]
 
-        if not isinstance(fn, AbstractFunction):
+        if isinstance(fn, AbstractFunction):
+            infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
+            return await self.loop.schedule(
+                execute_inferrers(self, infs, ref, argrefs),
+                context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
+            )
+
+        elif isinstance(fn, VirtualFunction2):
+            infs = [self.get_inferrer_for(fn)]
+            return await self.loop.schedule(
+                execute_inferrers(self, infs, ref, argrefs),
+                context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
+            )
+
+        else:
             g = ref.node.graph
             newcall = g.apply(operations.call_object, n_fn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
-
-        infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
-
-        return await self.loop.schedule(
-            execute_inferrers(self, infs, ref, argrefs),
-            context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
-        )
 
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
@@ -698,15 +709,18 @@ class VirtualInferrer(Inferrer):
         return self.output
 
 
-def compute_bprop_type(orig_fn, args, out):
+def compute_bprop_type(orig_fn, args, out, vfn2=True):
     """Compute the abstract type of the bprop for orig_fn."""
     fn = AbstractFunction(orig_fn)
     bparams = [sensitivity_transform(fn)]
     bparams += [sensitivity_transform(a) for a in args]
     bparams_final = AbstractTuple(bparams)
-    return AbstractFunction(
-        VirtualFunction((sensitivity_transform(out),), bparams_final)
-    )
+    if vfn2:
+        return VirtualFunction2((sensitivity_transform(out),), bparams_final)
+    else:
+        return AbstractFunction(
+            VirtualFunction((sensitivity_transform(out),), bparams_final)
+        )
 
 
 async def compute_jinv_type(x):
@@ -715,6 +729,11 @@ async def compute_jinv_type(x):
         return x.element
     elif isinstance(x, VirtualFunction):
         return VirtualFunction(
+            tuple([await compute_jinv_type(arg) for arg in x.args]),
+            await compute_jinv_type(x.output.elements[0]),
+        )
+    elif isinstance(x, VirtualFunction2):
+        return VirtualFunction2(
             tuple([await compute_jinv_type(arg) for arg in x.args]),
             await compute_jinv_type(x.output.elements[0]),
         )
@@ -768,6 +787,8 @@ class JInferrer(Inferrer):
         if isinstance(x, AbstractFunction):
             v = await x.get()
             return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
+        elif isinstance(x, VirtualFunction2):
+            assert False
         return AbstractJTagged(x)
 
     async def run(self, engine, outref, argrefs):
