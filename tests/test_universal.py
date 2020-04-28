@@ -16,6 +16,12 @@ except Exception:
 
 upipeline = standard_pipeline.insert_after("parse", resolve=steps.step_resolve)
 
+umyia = myia(
+    use_universe=True,
+    backend="relay",
+    backend_options={"exec_kind": "debug"},
+    pipeline=upipeline,
+)
 
 def add_one(x):
     # Not universal, but should work from universal function
@@ -28,12 +34,7 @@ def increment(h):
 
 
 def test_increment():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def plus4(x):
         h = make_cell(x)
         increment(h)
@@ -47,12 +48,7 @@ def test_increment():
 
 
 def test_increment_interleave():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def plus2(x, y):
         h1 = make_cell(x)
         h2 = make_cell(y)
@@ -67,12 +63,7 @@ def test_increment_interleave():
 
 
 def test_increment_loop():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def plus(x, y):
         h = make_cell(x)
         i = y
@@ -86,12 +77,7 @@ def test_increment_loop():
 
 
 def test_increment_recursion():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def length(h, xs):
         if not isinstance(xs, Empty):
             increment(h)
@@ -104,12 +90,7 @@ def test_increment_recursion():
 
 
 def test_give_handle():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def plus(h, y):
         i = y
         while i > 0:
@@ -133,12 +114,7 @@ def test_give_handle():
 def test_handle_free_variable():
     h = HandleInstance(0)
 
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def plus(y):
         i = y
         while i > 0:
@@ -152,12 +128,7 @@ def test_handle_free_variable():
 
 
 def test_return_handle():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def plus2(h):
         increment(h)
         increment(h)
@@ -191,12 +162,7 @@ class Counter:
 
 
 def test_count():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def calc(counter, n):
         for i in range(n):
             counter.increment(i + 1)
@@ -208,12 +174,7 @@ def test_count():
 
 @pytest.mark.xfail(reason="Backend does not find handles in dataclasses")
 def test_count_keepstate():
-    @myia(
-        use_universe=True,
-        backend="relay",
-        backend_options={"exec_kind": "debug"},
-        pipeline=upipeline,
-    )
+    @umyia
     def calc(counter, n):
         for i in range(n):
             counter.increment(i + 1)
