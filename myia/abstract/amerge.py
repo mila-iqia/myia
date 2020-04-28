@@ -368,11 +368,7 @@ def amerge(self, x1: AbstractFunctionBase, x2, forced, bp):
         eng = amerge_engine.get()
 
         for entry in poss:
-            eng.loop.schedule(
-                eng.infer_function(
-                    entry, vfn.args, vfn.output
-                )
-            )
+            eng.loop.schedule(eng.infer_function(entry, vfn.args, vfn.output))
 
         return vfn
 

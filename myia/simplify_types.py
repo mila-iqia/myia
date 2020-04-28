@@ -260,7 +260,8 @@ def simplify_types(root, manager):
             node.is_constant()
             and node.abstract
             and not isinstance(
-                node.abstract, (VirtualFunction2, AbstractFunction, AbstractExternal)
+                node.abstract,
+                (VirtualFunction2, AbstractFunction, AbstractExternal),
             )
         ):
             node.value = to_canonical(node.value, node.abstract, coerce=True)

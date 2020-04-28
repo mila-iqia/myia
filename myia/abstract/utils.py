@@ -180,7 +180,11 @@ def abstract_check(self, x: AbstractFunction, *args):
 
 @overload  # noqa: F811
 def abstract_check(self, x: VirtualFunction2, *args):
-    return self(x.values, *args) and all(self(v, *args) for v in x.args) and self(x.output, *args)
+    return (
+        self(x.values, *args)
+        and all(self(v, *args) for v in x.args)
+        and self(x.output, *args)
+    )
 
 
 @overload  # noqa: F811

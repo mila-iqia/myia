@@ -20,9 +20,9 @@ async def infer_J(self, engine, x):
         v = await x.get()
         return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
     elif isinstance(x, VirtualFunction2):
-        vfn = type_fixer(None)(JTransformedFunction(VirtualFunction2(
-            x.args, x.output
-        )))
+        vfn = type_fixer(None)(
+            JTransformedFunction(VirtualFunction2(x.args, x.output))
+        )
         assert isinstance(vfn, VirtualFunction2)
         return vfn
     else:
