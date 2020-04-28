@@ -211,11 +211,6 @@ class TypedPrimitive(Function):
     output: "AbstractValue"
 
 
-@dataclass(frozen=True)
-class DummyFunction(Function):
-    """Represents a function that can't be called."""
-
-
 #################
 # Abstract data #
 #################
@@ -1032,7 +1027,6 @@ __all__ = [
     "AbstractType",
     "AbstractUnion",
     "AbstractValue",
-    "DummyFunction",
     "Function",
     "GraphFunction",
     "JTransformedFunction",

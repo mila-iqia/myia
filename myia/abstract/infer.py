@@ -23,15 +23,16 @@ from ..utils import (
 from .amerge import amerge, bind
 from .data import (
     ANYTHING,
+    DUMMY,
     TYPE,
     VALUE,
+    AbstractError,
     AbstractFunction,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTuple,
     AbstractValue,
-    DummyFunction,
     Function,
     GraphFunction,
     JTransformedFunction,
@@ -740,7 +741,7 @@ async def compute_jinv_type(x):
                     # point to the transformed nodes of the
                     # parent. This is fixable, and will need
                     # to be fixed to support a few edge cases.
-                    res = DummyFunction()
+                    res = AbstractError(DUMMY)
                 else:
                     with untested_legacy():
                         # Not sure why this never happens anymore

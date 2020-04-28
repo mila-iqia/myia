@@ -22,7 +22,6 @@ from .abstract import (
     CheckState,
     CloneState,
     Context,
-    DummyFunction,
     GraphFunction,
     GraphInferrer,
     JTransformedFunction,
@@ -102,7 +101,6 @@ def _fix_type(self, a: GraphFunction, finder, monomorphizer):
             self(g.return_.abstract, finder, monomorphizer),
         )
     else:
-        # return DummyFunction()
         return AbstractError(DUMMY)
 
 
@@ -155,7 +153,7 @@ def _fix_type(self, a: AbstractFunction, finder, monomorphizer):
     if len(vfns) == 1:
         (vfn,) = vfns
     else:
-        vfns = [v for v in vfns if not isinstance(v, (DummyFunction, AbstractError))]
+        vfns = [v for v in vfns if not isinstance(v, AbstractError)]
         assert vfns and all(isinstance(v, VirtualFunction2) for v in vfns)
         vfn = VirtualFunction2(
             reduce(amerge, [v.args for v in vfns]),
@@ -171,7 +169,6 @@ def _fix_type(self, a: PrimitiveFunction, finder, monomorphizer):
             finder.analyze_function(None, a, None)[0], finder, monomorphizer
         )
     except Unspecializable:
-        # return DummyFunction()
         return AbstractError(DUMMY)
 
 
