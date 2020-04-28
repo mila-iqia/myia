@@ -129,6 +129,28 @@ def test_give_handle():
     assert plus(hb1, 30) == 34
 
 
+@pytest.mark.xfail(reason="Backend does not properly update free handles")
+def test_handle_free_variable():
+    h = HandleInstance(0)
+
+    @myia(
+        use_universe=True,
+        backend="relay",
+        backend_options={"exec_kind": "debug"},
+        pipeline=upipeline,
+    )
+    def plus(y):
+        i = y
+        while i > 0:
+            increment(h)
+            i = i - 1
+        return cell_get(h)
+
+    # handle is updated automatically
+    assert plus(4) == 4
+    assert plus(30) == 34
+
+
 def test_return_handle():
     @myia(
         use_universe=True,
