@@ -95,13 +95,13 @@ class Graph:
     @property
     def abstract(self):
         """Return the graph's type based on parameter/output types."""
-        from ..abstract import VirtualFunction2
+        from ..abstract import AbstractFunctionUnique
 
         if any(p.abstract is None for p in self.parameters):
             return None
         if self.return_.abstract is None:
             return None
-        return VirtualFunction2(
+        return AbstractFunctionUnique(
             tuple(p.abstract for p in self.parameters), self.return_.abstract
         )
 

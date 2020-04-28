@@ -409,8 +409,8 @@ class AbstractFunction(AbstractFunctionBase):
         return pretty_join(fns, sep=" | ")
 
 
-@serializable("VirtualFunction2")
-class VirtualFunction2(AbstractFunctionBase):
+@serializable("AbstractFunctionUnique")
+class AbstractFunctionUnique(AbstractFunctionBase):
     def __init__(self, args, output, values={}):
         super().__init__(values)
         self.args = list(args)
@@ -1039,7 +1039,7 @@ __all__ = [
     "Track",
     "TrackDict",
     "TypedPrimitive",
-    "VirtualFunction2",
+    "AbstractFunctionUnique",
     "empty",
     "format_abstract",
     "i64tup_typecheck",

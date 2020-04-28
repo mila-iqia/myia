@@ -15,6 +15,7 @@ from .data import (
     AbstractError,
     AbstractFunction,
     AbstractFunctionBase,
+    AbstractFunctionUnique,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
@@ -23,7 +24,6 @@ from .data import (
     Possibilities,
     TaggedPossibilities,
     TrackDict,
-    VirtualFunction2,
 )
 from .loop import (
     Pending,
@@ -202,7 +202,7 @@ def amerge(
                 raise TypeMismatchError(x1, x2)
             return x2
         elif type(x1) is not type(x2) and not isinstance(
-            x1, (int, float, bool, AbstractFunction, VirtualFunction2)
+            x1, (int, float, bool, AbstractFunctionBase)
         ):
             raise MyiaTypeError(
                 f"Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}"
@@ -340,23 +340,25 @@ def amerge(self, x1: AbstractFunctionBase, x2, forced, bp):
             return x1
         return AbstractFunction(*values)
 
-    elif isinstance(x1, VirtualFunction2) and isinstance(x2, VirtualFunction2):
+    elif isinstance(x1, AbstractFunctionUnique) and isinstance(
+        x2, AbstractFunctionUnique
+    ):
         args1 = (x1.args, x1.output, x1.values)
         args2 = (x2.args, x2.output, x2.values)
         merged = self(args1, args2, forced, bp)
         if forced or merged is args1:
             return x1
-        return VirtualFunction2(*merged)
+        return AbstractFunctionUnique(*merged)
 
     else:
-        if isinstance(x1, VirtualFunction2):
+        if isinstance(x1, AbstractFunctionUnique):
             with untested_legacy():
                 assert isinstance(x2, AbstractFunction)
                 vfn = x1
                 poss = x2.get_sync()
 
         else:
-            assert isinstance(x2, VirtualFunction2)
+            assert isinstance(x2, AbstractFunctionUnique)
             assert isinstance(x1, AbstractFunction)
             vfn = x2
             poss = x1.get_sync()

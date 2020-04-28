@@ -4,10 +4,10 @@ from .. import operations
 from ..abstract import (
     DEAD,
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractJTagged,
     CheckState,
     CloneState,
-    VirtualFunction2,
     abstract_check,
     abstract_clone,
     build_value,
@@ -900,7 +900,7 @@ def specialize_on_graph_arguments(resources, node, equiv):
 def _set_out_abstract(g, a):
     g.output.abstract = a
     g.return_.abstract = a
-    g.return_.inputs[0].abstract = VirtualFunction2([a], a)
+    g.return_.inputs[0].abstract = AbstractFunctionUnique([a], a)
 
 
 @GraphTransform
@@ -1147,7 +1147,7 @@ def _jelim_retype(self, j: AbstractJTagged):
 
 
 @abstract_check.variant(initial_state=lambda: CheckState({}, "_nofunc"))
-def _jelim_nofunc(self, f: (AbstractFunction, VirtualFunction2)):
+def _jelim_nofunc(self, f: (AbstractFunction, AbstractFunctionUnique)):
     return False
 
 

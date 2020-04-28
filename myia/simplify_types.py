@@ -13,7 +13,7 @@ from .abstract import (
     AbstractDict,
     AbstractError,
     AbstractExternal,
-    AbstractFunction,
+    AbstractFunctionBase,
     AbstractHandle,
     AbstractKeywordArgument,
     AbstractRandomState,
@@ -23,7 +23,6 @@ from .abstract import (
     AbstractType,
     AbstractUnion,
     AbstractValue,
-    VirtualFunction2,
     abstract_clone,
     empty,
     from_value,
@@ -260,8 +259,7 @@ def simplify_types(root, manager):
             node.is_constant()
             and node.abstract
             and not isinstance(
-                node.abstract,
-                (VirtualFunction2, AbstractFunction, AbstractExternal),
+                node.abstract, (AbstractFunctionBase, AbstractExternal),
             )
         ):
             node.value = to_canonical(node.value, node.abstract, coerce=True)

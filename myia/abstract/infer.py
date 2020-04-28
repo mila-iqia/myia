@@ -28,6 +28,7 @@ from .data import (
     VALUE,
     AbstractError,
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
@@ -42,7 +43,6 @@ from .data import (
     Primitive,
     PrimitiveFunction,
     TypedPrimitive,
-    VirtualFunction2,
 )
 from .loop import InferenceLoop, Pending, force_pending
 from .macro import AnnotationBasedChecker
@@ -108,7 +108,7 @@ class InferenceEngine:
         """Infer a function call on the given argspec/outspec."""
         if not isinstance(fn, Function):
             fn = to_abstract(fn).get_unique()
-        vfn = VirtualFunction2(argspec, outspec)
+        vfn = AbstractFunctionUnique(argspec, outspec)
         out = await execute_inferrers(
             self,
             [self.get_inferrer_for(fn)],
@@ -266,7 +266,7 @@ class InferenceEngine:
         return JInferrer(self.get_inferrer_for(j.fn), j.fn)
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, vf: (TypedPrimitive, VirtualFunction2)):
+    def get_inferrer_for(self, vf: (TypedPrimitive, AbstractFunctionUnique)):
         return VirtualInferrer(vf.args, vf.output)
 
     @get_inferrer_for.register
@@ -283,7 +283,7 @@ class InferenceEngine:
 
     async def execute(self, fn, *args):
         r"""Infer the result of fn(\*args)."""
-        if isinstance(fn, VirtualFunction2):
+        if isinstance(fn, AbstractFunctionUnique):
             infs = [self.get_inferrer_for(fn)]
         else:
             infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
@@ -306,7 +306,7 @@ class InferenceEngine:
                 context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
             )
 
-        elif isinstance(fn, VirtualFunction2):
+        elif isinstance(fn, AbstractFunctionUnique):
             infs = [self.get_inferrer_for(fn)]
             return await self.loop.schedule(
                 execute_inferrers(self, infs, ref, argrefs),
@@ -715,15 +715,15 @@ def compute_bprop_type(orig_fn, args, out, vfn2=True):
     bparams = [sensitivity_transform(fn)]
     bparams += [sensitivity_transform(a) for a in args]
     bparams_final = AbstractTuple(bparams)
-    return VirtualFunction2((sensitivity_transform(out),), bparams_final)
+    return AbstractFunctionUnique((sensitivity_transform(out),), bparams_final)
 
 
 async def compute_jinv_type(x):
     """Compute the abstract type of jinv(_ :: x)."""
     if isinstance(x, AbstractJTagged):
         return x.element
-    elif isinstance(x, VirtualFunction2):
-        return VirtualFunction2(
+    elif isinstance(x, AbstractFunctionUnique):
+        return AbstractFunctionUnique(
             tuple([await compute_jinv_type(arg) for arg in x.args]),
             await compute_jinv_type(x.output.elements[0]),
         )
@@ -774,7 +774,7 @@ class JInferrer(Inferrer):
         self.orig_fn = orig_fn
 
     async def _jtag(self, x):
-        assert not isinstance(x, VirtualFunction2)
+        assert not isinstance(x, AbstractFunctionUnique)
         if isinstance(x, AbstractFunction):
             v = await x.get()
             return AbstractFunction(*[JTransformedFunction(poss) for poss in v])

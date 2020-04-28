@@ -17,6 +17,7 @@ from .abstract import (
     POLY,
     AbstractError,
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractJTagged,
     AbstractTuple,
     CheckState,
@@ -31,7 +32,6 @@ from .abstract import (
     Reference,
     TrackedInferrer,
     TypedPrimitive,
-    VirtualFunction2,
     VirtualReference,
     abstract_check,
     abstract_clone,
@@ -94,7 +94,7 @@ def _fix_type(self, a: GraphFunction, finder, monomorphizer):
     if a.tracking_id in monomorphizer.ctcache:
         ctx = monomorphizer.ctcache[a.tracking_id]
         g = monomorphizer.results[ctx]
-        return VirtualFunction2(
+        return AbstractFunctionUnique(
             tuple(
                 self(p.abstract, finder, monomorphizer) for p in g.parameters
             ),
@@ -109,14 +109,14 @@ def _fix_type(self, a: PartialApplication, finder, monomorphizer):
     vfn = self(a.fn, finder, monomorphizer)
     if isinstance(vfn, AbstractError) and vfn.xvalue() is DUMMY:
         return vfn
-    assert isinstance(vfn, VirtualFunction2)
-    vfn = VirtualFunction2(vfn.args[len(a.args) :], vfn.output)
+    assert isinstance(vfn, AbstractFunctionUnique)
+    vfn = AbstractFunctionUnique(vfn.args[len(a.args) :], vfn.output)
     return vfn
 
 
 @overload  # noqa: F811
-def _fix_type(self, a: VirtualFunction2, finder, monomorphizer):
-    return (yield VirtualFunction2)(
+def _fix_type(self, a: AbstractFunctionUnique, finder, monomorphizer):
+    return (yield AbstractFunctionUnique)(
         tuple(self(arg, finder, monomorphizer) for arg in a.args),
         self(a.output, finder, monomorphizer),
     )
@@ -126,7 +126,7 @@ def _fix_type(self, a: VirtualFunction2, finder, monomorphizer):
 def _fix_type(self, a: JTransformedFunction, finder, monomorphizer):
     def _jtag(x):
         assert not isinstance(x, AbstractFunction)
-        if isinstance(x, VirtualFunction2):
+        if isinstance(x, AbstractFunctionUnique):
             return self(JTransformedFunction(x), finder, monomorphizer)
         else:
             rval = AbstractJTagged(self(x, finder, monomorphizer))
@@ -137,7 +137,7 @@ def _fix_type(self, a: JTransformedFunction, finder, monomorphizer):
     jres = _jtag(vfn.output)
     bprop = compute_bprop_type(vfn, vfn.args, vfn.output)
     out = AbstractTuple([jres, bprop])
-    return VirtualFunction2(jargs, out)
+    return AbstractFunctionUnique(jargs, out)
 
 
 @overload  # noqa: F811
@@ -147,8 +147,8 @@ def _fix_type(self, a: AbstractFunction, finder, monomorphizer):
         (vfn,) = vfns
     else:
         vfns = [v for v in vfns if not isinstance(v, AbstractError)]
-        assert vfns and all(isinstance(v, VirtualFunction2) for v in vfns)
-        vfn = VirtualFunction2(
+        assert vfns and all(isinstance(v, AbstractFunctionUnique) for v in vfns)
+        vfn = AbstractFunctionUnique(
             reduce(amerge, [v.args for v in vfns]),
             reduce(amerge, [v.output for v in vfns]),
         )
@@ -169,12 +169,12 @@ def _fix_type(self, a: PrimitiveFunction, finder, monomorphizer):
 def _fix_type(self, a: MetaGraphFunction, finder, monomorphizer):
     inf = finder.engine.get_inferrer_for(a)
     argvals, outval = finder._find_unique_argvals(None, inf, None)
-    return VirtualFunction2(tuple(argvals), outval)
+    return AbstractFunctionUnique(tuple(argvals), outval)
 
 
 @overload  # noqa: F811
 def _fix_type(self, a: TypedPrimitive, finder, monomorphizer):
-    return VirtualFunction2(
+    return AbstractFunctionUnique(
         tuple(self(ar, finder, monomorphizer) for ar in a.args),
         self(a.output, finder, monomorphizer),
     )
@@ -512,7 +512,9 @@ class Monomorphizer:
                 else:
                     ctabs = ref.node.abstract
 
-                if ctabs is None or not isinstance(ctabs, VirtualFunction2):
+                if ctabs is None or not isinstance(
+                    ctabs, AbstractFunctionUnique
+                ):
                     fn = a.get_unique()
                     with About(ref.node.debug, "equiv"):
                         try:

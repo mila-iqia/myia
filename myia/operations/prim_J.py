@@ -2,9 +2,9 @@
 
 from ..lib import (
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractJTagged,
     JTransformedFunction,
-    VirtualFunction2,
     bprop_to_grad_transform,
     standard_prim,
 )
@@ -19,11 +19,11 @@ async def infer_J(self, engine, x):
     if isinstance(x, AbstractFunction):
         v = await x.get()
         return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
-    elif isinstance(x, VirtualFunction2):
+    elif isinstance(x, AbstractFunctionUnique):
         vfn = type_fixer(None)(
-            JTransformedFunction(VirtualFunction2(x.args, x.output))
+            JTransformedFunction(AbstractFunctionUnique(x.args, x.output))
         )
-        assert isinstance(vfn, VirtualFunction2)
+        assert isinstance(vfn, AbstractFunctionUnique)
         return vfn
     else:
         return AbstractJTagged(x)

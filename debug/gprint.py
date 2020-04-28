@@ -1460,8 +1460,8 @@ class _JTransformedFunction:
         )
 
 
-@mixin(abstract.VirtualFunction2)
-class _VirtualFunction2:
+@mixin(abstract.AbstractFunctionUnique)
+class _AbstractFunctionUnique:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
             "★Function2",

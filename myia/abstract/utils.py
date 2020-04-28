@@ -17,6 +17,7 @@ from .data import (
     AbstractClassBase,
     AbstractDict,
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
@@ -33,7 +34,6 @@ from .data import (
     Possibilities,
     TaggedPossibilities,
     TrackDict,
-    VirtualFunction2,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -179,7 +179,7 @@ def abstract_check(self, x: AbstractFunction, *args):
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: VirtualFunction2, *args):
+def abstract_check(self, x: AbstractFunctionUnique, *args):
     return (
         self(x.values, *args)
         and all(self(v, *args) for v in x.args)
@@ -383,8 +383,8 @@ def abstract_clone(self, x: JTransformedFunction, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: VirtualFunction2, *args):
-    return (yield VirtualFunction2)(
+def abstract_clone(self, x: AbstractFunctionUnique, *args):
+    return (yield AbstractFunctionUnique)(
         [self(arg, *args) for arg in x.args], self(x.output, *args)
     )
 
@@ -493,7 +493,7 @@ def broaden(self, d: TrackDict, *args):  # noqa: D417
 
 
 @abstract_clone.variant
-def sensitivity_transform(self, x: (AbstractFunction, VirtualFunction2)):
+def sensitivity_transform(self, x: (AbstractFunction, AbstractFunctionUnique)):
     """Return an abstract value for the sensitivity of x.
 
     * The sensitivity of a function is an Env
