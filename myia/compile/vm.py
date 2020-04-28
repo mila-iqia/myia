@@ -87,9 +87,7 @@ class FinalVM:
 
     def __call__(self, *args):
         """Shortcut to eval()."""
-        from .transform import wrap_result
-
-        return wrap_result(self.eval(args))
+        return self.eval(args)
 
     def eval(self, args):
         """Evaluate the code for this vm with the passed-in arguments."""

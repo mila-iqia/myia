@@ -4,8 +4,7 @@ from .. import xtype
 from ..abstract import AbstractHandle, AbstractTuple, to_abstract
 from ..ir import Apply, Constant, Graph, toposort
 from ..operations import Primitive, primitives as P
-from ..utils import SymbolicKeyInstance, overload
-from .channel import handle
+from ..utils import SymbolicKeyInstance
 from .vm import FinalVM
 
 i64 = xtype.Int[64]
@@ -127,21 +126,6 @@ def return_handles(graph):
         )
 
     return graph, handle_idx
-
-
-@overload
-def wrap_result(data: tuple):
-    """Function to wrap final results in a handle.
-
-    This leaves first-level tuples alone so that we support multiple
-    value returns more naturally.
-    """
-    return tuple(handle(d) for d in data)
-
-
-@overload  # noqa: F811
-def wrap_result(data: object):
-    return handle(data)
 
 
 nonlinear_ops = (
@@ -465,7 +449,7 @@ class CompileGraphs:
         self.compile(graph)
 
         graphs = graph.manager.graphs
-        for g in graphs - set([graph]):
+        for g in graphs - {graph}:
             self.compile(g)
 
         self.link()
@@ -480,6 +464,5 @@ __all__ = [
     "CompileGraphs",
     "convert_grad",
     "wrap_primitives",
-    "wrap_result",
     "return_handles",
 ]
