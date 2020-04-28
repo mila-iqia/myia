@@ -110,6 +110,8 @@ def _fix_type(self, a: GraphFunction, finder, monomorphizer):
 @overload  # noqa: F811
 def _fix_type(self, a: PartialApplication, finder, monomorphizer):
     vfn = self(a.fn, finder, monomorphizer)
+    if isinstance(vfn, AbstractError) and vfn.xvalue() is DUMMY:
+        return vfn
     assert isinstance(vfn, VirtualFunction2)
     vfn = VirtualFunction2(vfn.args[len(a.args) :], vfn.output)
     return vfn
