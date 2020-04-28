@@ -65,15 +65,6 @@ class Possibilities(list):
         # list is different.
         super().__init__(OrderedSet(options))
 
-    def _serialize(self):
-        return self
-
-    @classmethod
-    def _construct(cls):
-        p = Possibilities([])
-        data = yield p
-        p[:] = data
-
     def __hash__(self):
         return hash(tuple(self))
 
@@ -224,17 +215,6 @@ class VirtualFunction(Function, Interned, PossiblyRecursive):
 
     def __eqkey__(self):
         return AttrEK(self, ["args", "output"])
-
-    def _serialize(self):
-        return {"args": self.args, "output": self.output}
-
-    @classmethod
-    def _construct(cls):
-        obj = cls.empty()
-        data = yield obj
-        obj.args = data["args"]
-        obj.output = data["output"]
-        obj._incomplete = False
 
 
 @serializable("TypedPrimitive")

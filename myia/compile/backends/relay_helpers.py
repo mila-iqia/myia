@@ -191,11 +191,11 @@ def to_relay_type(self, a: AbstractArray):
     return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
 
 
-@overload  # noqa: F811
-def to_relay_type(self, a: AbstractFunction):
-    sings = list(self(sing) for sing in a.get_sync())
-    assert len(sings) == 1
-    return sings[0]
+# @overload  # noqa: F811
+# def to_relay_type(self, a: AbstractFunction):
+#     sings = list(self(sing) for sing in a.get_sync())
+#     assert len(sings) == 1
+#     return sings[0]
 
 
 @overload  # noqa: F811

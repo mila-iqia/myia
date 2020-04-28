@@ -108,7 +108,7 @@ class InferenceEngine:
         """Infer a function call on the given argspec/outspec."""
         if not isinstance(fn, Function):
             fn = to_abstract(fn).get_unique()
-        vfn = VirtualFunction(argspec, outspec)
+        vfn = VirtualFunction2(argspec, outspec)
         out = await execute_inferrers(
             self,
             [self.get_inferrer_for(fn)],
@@ -715,23 +715,13 @@ def compute_bprop_type(orig_fn, args, out, vfn2=True):
     bparams = [sensitivity_transform(fn)]
     bparams += [sensitivity_transform(a) for a in args]
     bparams_final = AbstractTuple(bparams)
-    if vfn2:
-        return VirtualFunction2((sensitivity_transform(out),), bparams_final)
-    else:
-        return AbstractFunction(
-            VirtualFunction((sensitivity_transform(out),), bparams_final)
-        )
+    return VirtualFunction2((sensitivity_transform(out),), bparams_final)
 
 
 async def compute_jinv_type(x):
     """Compute the abstract type of jinv(_ :: x)."""
     if isinstance(x, AbstractJTagged):
         return x.element
-    elif isinstance(x, VirtualFunction):
-        return VirtualFunction(
-            tuple([await compute_jinv_type(arg) for arg in x.args]),
-            await compute_jinv_type(x.output.elements[0]),
-        )
     elif isinstance(x, VirtualFunction2):
         return VirtualFunction2(
             tuple([await compute_jinv_type(arg) for arg in x.args]),

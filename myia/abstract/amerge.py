@@ -222,16 +222,16 @@ def amerge(
 def amerge(self, x1: Possibilities, x2, forced, bp):
     eng = amerge_engine.get()
     poss = x1 + x2
-    if all(isinstance(x, VirtualFunction) for x in poss):
-        assert not forced
-        return Possibilities(
-            [
-                VirtualFunction(
-                    reduce(self, [x.args for x in poss]),
-                    reduce(self, [x.output for x in poss]),
-                )
-            ]
-        )
+    # if all(isinstance(x, VirtualFunction) for x in poss):
+    #     assert not forced
+    #     return Possibilities(
+    #         [
+    #             VirtualFunction(
+    #                 reduce(self, [x.args for x in poss]),
+    #                 reduce(self, [x.output for x in poss]),
+    #             )
+    #         ]
+    #     )
 
     for standard in poss:
         # TODO: This is a hack of sorts until we replace Possibilities

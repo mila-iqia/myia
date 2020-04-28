@@ -118,7 +118,7 @@ def _fix_type(self, a: PartialApplication, finder, monomorphizer):
 
 
 @overload  # noqa: F811
-def _fix_type(self, a: VirtualFunction, finder, monomorphizer):
+def _fix_type(self, a: (VirtualFunction, VirtualFunction2), finder, monomorphizer):
     return (yield VirtualFunction2)(
         tuple(self(arg, finder, monomorphizer) for arg in a.args),
         self(a.output, finder, monomorphizer),
@@ -145,7 +145,7 @@ def _fix_type(self, a: JTransformedFunction, finder, monomorphizer):
     vfn = self(a.fn, finder, monomorphizer)
     jargs = tuple(_jtag(arg) for arg in vfn.args)
     jres = _jtag(vfn.output)
-    bprop = compute_bprop_type(vfn, vfn.args, vfn.output, vfn2=True)
+    bprop = compute_bprop_type(vfn, vfn.args, vfn.output)
     out = AbstractTuple([jres, bprop])
     return VirtualFunction2(jargs, out)
 

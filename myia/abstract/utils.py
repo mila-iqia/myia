@@ -199,9 +199,9 @@ def abstract_check(self, x: TaggedPossibilities, *args):
     return all(self(v, *args) for _, v in x)
 
 
-@overload  # noqa: F811
-def abstract_check(self, t: VirtualFunction, *args):
-    return all(self(v, *args) for v in t.args) and self(t.output, *args)
+# @overload  # noqa: F811
+# def abstract_check(self, t: VirtualFunction, *args):
+#     return all(self(v, *args) for v in t.args) and self(t.output, *args)
 
 
 @overload  # noqa: F811
