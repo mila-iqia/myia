@@ -67,7 +67,6 @@ async def conv2d_grad_input(
         P.conv_transpose2d,
         r_grad_output.node,
         r_weight.node,
-        Constant(None),
         r_stride.node,
         r_padding.node,
         Constant(grad_input_padding),

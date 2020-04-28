@@ -46,7 +46,34 @@ activate_frontend("pytorch")
 
 @eqtest.register
 def eqtest(t1: torch.Tensor, t2, rtol=1e-5, atol=1e-8, **kwargs):
-    return torch.allclose(t1, t2, equal_nan=True, atol=atol, rtol=rtol)
+    """ New version of eqtest using np.testing.assert_allclose.
+    If comparison fails, this version will raise an exception
+    and display a more informative log if comparison fail,
+    especially max absolute and relative difference.
+    """
+    # Quick debug code to display mismatching values
+    shape = t1.shape
+    if len(shape) > 1:
+        x1 = t1.flatten()
+        x2 = t2.flatten()
+        s = x1.shape[0]
+        c = 0
+        for i in range(s):
+            v1 = x1[i].item()
+            v2 = x2[i].item()
+            if abs(v1 - v2) > atol:
+                c += 1
+                print("diff", c, i + 1, v1, v2)
+    # End debug code
+
+    np.testing.assert_allclose(
+        t1.detach().numpy(),
+        t2.detach().numpy(),
+        rtol=rtol,
+        atol=atol,
+        verbose=True,
+    )
+    return True
 
 
 @eqtest.register
@@ -241,6 +268,7 @@ def _run(
     pipeline=standard_pipeline,
     backend=None,
     numpy_compat=True,
+    **kwargs,
 ):
     """Test a Myia function.
 
@@ -290,7 +318,7 @@ def _run(
     if result is None:
         result = fn(*args)
 
-    self.check(out, args, result)
+    self.check(out, args, result, **kwargs)
 
     if numpy_compat:
         args_torch = args
@@ -476,7 +504,6 @@ def test_conv2d_no_dil_stride(inp, w):
         nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
         None,
     ),
-    backend=backend_no_relay,
 )
 def test_torch_conv2d(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, (2, 3), (3, 2), (3, 4), 3)
@@ -494,14 +521,13 @@ def test_torch_conv2d(inp, w, b):
         nn.Parameter(torch.randn(3, 2, 3, 3, dtype=torch.float32)),
         None,
     ),
-    backend=backend_no_relay,
 )
 def test_torch_conv2d__non_tuple_args(inp, w, b):
     value = torch.nn.functional.conv2d(inp, w, b, 2, 3, 4, 3)
     return torch.sum(value)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.randn(2, 1, 4, 5, dtype=torch.float32)),
     nn.Parameter(torch.randn(3, 1, 3, 3, dtype=torch.float32)),
     nn.Parameter(torch.randn(3, dtype=torch.float32)),
@@ -512,7 +538,8 @@ def test_torch_conv2d__group3(inp, w, b):
 
 
 @mt(
-    run_no_relay(
+    # with bias
+    run(
         torch.randn(1, 2, 4, 4),
         torch.randn(2, 3, 2, 2),
         torch.randn(6),
@@ -522,7 +549,30 @@ def test_torch_conv2d__group3(inp, w, b):
         2,
         (1, 1),
     ),
-    run_no_relay(
+    # no bias
+    run(
+        torch.randn(1, 2, 4, 4),
+        torch.randn(2, 3, 2, 2),
+        None,
+        (1, 1),
+        (1, 1),
+        (0, 0),
+        2,
+        (1, 1),
+    ),
+    # with bias
+    run(
+        torch.randn(1, 2, 5, 4),
+        torch.randn(2, 4, 1, 3),
+        torch.randn(8),
+        (2, 3),
+        (4, 5),
+        (3, 2),
+        2,
+        (5, 4),
+    ),
+    # no bias
+    run(
         torch.randn(1, 2, 5, 4),
         torch.randn(2, 4, 1, 3),
         None,
@@ -532,7 +582,19 @@ def test_torch_conv2d__group3(inp, w, b):
         2,
         (5, 4),
     ),
-    run_no_relay(
+    # with bias
+    run(
+        torch.randn(5, 2, 5, 6),
+        torch.randn(2, 2, 4, 4),
+        torch.randn(2),
+        (1, 1),
+        (0, 0),
+        (0, 0),
+        1,
+        (1, 1),
+    ),
+    # no bias
+    run(
         torch.randn(5, 2, 5, 6),
         torch.randn(2, 2, 4, 4),
         None,
@@ -542,7 +604,19 @@ def test_torch_conv2d__group3(inp, w, b):
         1,
         (1, 1),
     ),
-    run_no_relay(
+    # with bias
+    run(
+        torch.randn(1, 1, 4, 4),
+        torch.randn(1, 3, 2, 2),
+        torch.randn(3),
+        (1, 1),
+        (1, 1),
+        (0, 0),
+        1,
+        (1, 1),
+    ),
+    # no bias
+    run(
         torch.randn(1, 1, 4, 4),
         torch.randn(1, 3, 2, 2),
         None,
@@ -553,6 +627,7 @@ def test_torch_conv2d__group3(inp, w, b):
         (1, 1),
     ),
     broad_specs=(True, True, False, False, False, False, False, False),
+    atol=1e-5,
 )
 def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
     return torch.nn.functional.conv_transpose2d(i, w, b, s, p, o_p, g, d)

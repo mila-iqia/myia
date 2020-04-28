@@ -18,7 +18,6 @@ async def infer_conv_transpose2d(
     engine,
     input: AbstractArray,
     weight: AbstractArray,
-    bias,  # un-typed, because it may be either None or an abstract array.
     stride: AbstractTuple,
     padding: AbstractTuple,
     output_padding: AbstractTuple,
