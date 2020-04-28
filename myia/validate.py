@@ -43,13 +43,14 @@ def validate_abstract(self, a: AbstractError, uses):
     kind = a.xvalue()
     if kind is DEAD or kind is DUMMY:
         return True
-    elif kind is POLY:
+    else:
         with untested_legacy():
-            return not any(key == 0 for node, key in uses)
-    else:  # pragma: no cover
-        # As it turns out, the inferrer now catches this error before we get to
-        # validation.
-        raise ValidationError(f"Illegal type in the graph: {a}", type=a)
+            if kind is POLY:
+                return not any(key == 0 for node, key in uses)
+            else:  # pragma: no cover
+                # As it turns out, the inferrer now catches this error before we get to
+                # validation.
+                raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
 @overload  # noqa: F811

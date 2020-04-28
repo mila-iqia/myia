@@ -258,6 +258,9 @@ def test_repr():
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == "AbstractFunction(scalar_mul)"
 
+    fa = AbstractFunction(value=ANYTHING)
+    assert repr(fa) == "AbstractFunction(ANYTHING)"
+
     tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
     assert repr(tu1) == "AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))"
 

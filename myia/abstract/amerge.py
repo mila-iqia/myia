@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import chain
 
 from .. import xtype
-from ..utils import MyiaTypeError, TypeMismatchError, overload
+from ..utils import MyiaTypeError, TypeMismatchError, overload, untested_legacy
 from .data import (
     ABSENT,
     ANYTHING,
@@ -350,9 +350,10 @@ def amerge(self, x1: AbstractFunctionBase, x2, forced, bp):
 
     else:
         if isinstance(x1, VirtualFunction2):
-            assert isinstance(x2, AbstractFunction)
-            vfn = x1
-            poss = x2.get_sync()
+            with untested_legacy():
+                assert isinstance(x2, AbstractFunction)
+                vfn = x1
+                poss = x2.get_sync()
 
         else:
             assert isinstance(x2, VirtualFunction2)
@@ -363,7 +364,7 @@ def amerge(self, x1: AbstractFunctionBase, x2, forced, bp):
         if poss is ANYTHING:
             return x1 if forced else vfn
 
-        assert not forced
+        assert vfn is x1 or not forced
         eng = amerge_engine.get()
 
         for entry in poss:

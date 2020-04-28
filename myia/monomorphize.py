@@ -125,15 +125,8 @@ def _fix_type(self, a: VirtualFunction2, finder, monomorphizer):
 @overload  # noqa: F811
 def _fix_type(self, a: JTransformedFunction, finder, monomorphizer):
     def _jtag(x):
-        if isinstance(x, AbstractFunction):
-            v = x.get_sync()
-            rval = AbstractFunction(
-                *[
-                    self(JTransformedFunction(poss), finder, monomorphizer)
-                    for poss in v
-                ]
-            )
-        elif isinstance(x, VirtualFunction2):
+        assert not isinstance(x, AbstractFunction)
+        if isinstance(x, VirtualFunction2):
             return self(JTransformedFunction(x), finder, monomorphizer)
         else:
             rval = AbstractJTagged(self(x, finder, monomorphizer))
