@@ -41,7 +41,6 @@ from .data import (
     Primitive,
     PrimitiveFunction,
     TypedPrimitive,
-    VirtualFunction,
     VirtualFunction2,
 )
 from .loop import InferenceLoop, Pending, force_pending
@@ -266,7 +265,7 @@ class InferenceEngine:
         return JInferrer(self.get_inferrer_for(j.fn), j.fn)
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive, VirtualFunction2)):
+    def get_inferrer_for(self, vf: (TypedPrimitive, VirtualFunction2)):
         return VirtualInferrer(vf.args, vf.output)
 
     @get_inferrer_for.register

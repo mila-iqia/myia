@@ -10,7 +10,6 @@ from ..lib import (
     AbstractFunctionBase,
     MetaGraph,
     MyiaShapeError,
-    VirtualFunction2,
     bprop_to_grad_transform,
     build_value,
     force_pending,

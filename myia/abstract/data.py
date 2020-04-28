@@ -194,29 +194,6 @@ class JTransformedFunction(Function):
     fn: object
 
 
-@serializable("VirtualFunction")
-class VirtualFunction(Function, Interned, PossiblyRecursive):
-    """Represents some function with an explicitly given type signature.
-
-    Attributes:
-        args: The abstract arguments given to the function
-        output: The abstract output
-
-    """
-
-    args: List["AbstractValue"]
-    output: "AbstractValue"
-
-    def __init__(self, args, output):
-        """Initialize a VirtualFunction."""
-        self.args = list(args)
-        self.output = output
-        self._incomplete = False
-
-    def __eqkey__(self):
-        return AttrEK(self, ["args", "output"])
-
-
 @serializable("TypedPrimitive")
 @dataclass(frozen=True)
 class TypedPrimitive(Function):
@@ -1068,7 +1045,6 @@ __all__ = [
     "Track",
     "TrackDict",
     "TypedPrimitive",
-    "VirtualFunction",
     "VirtualFunction2",
     "empty",
     "format_abstract",

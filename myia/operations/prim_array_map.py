@@ -10,7 +10,6 @@ from ..lib import (
     TYPE,
     AbstractArray,
     AbstractFunctionBase,
-    VirtualFunction2,
     Graph,
     MetaGraph,
     MyiaShapeError,

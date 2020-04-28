@@ -23,7 +23,6 @@ from .data import (
     Possibilities,
     TaggedPossibilities,
     TrackDict,
-    VirtualFunction,
     VirtualFunction2,
 )
 from .loop import (

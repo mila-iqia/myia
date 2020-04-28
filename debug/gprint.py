@@ -1460,16 +1460,6 @@ class _JTransformedFunction:
         )
 
 
-@mixin(abstract.VirtualFunction)
-class _VirtualFunction:
-    def __hrepr__(self, H, hrepr):
-        return hrepr.stdrepr_object(
-            "VirtualFunction",
-            (("args", self.args), ("output", self.output)),
-            delimiter="↦",
-        )
-
-
 @mixin(abstract.VirtualFunction2)
 class _VirtualFunction2:
     def __hrepr__(self, H, hrepr):

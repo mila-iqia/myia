@@ -32,7 +32,6 @@ from .abstract import (
     Reference,
     TrackedInferrer,
     TypedPrimitive,
-    VirtualFunction,
     VirtualFunction2,
     VirtualReference,
     abstract_check,
@@ -118,7 +117,7 @@ def _fix_type(self, a: PartialApplication, finder, monomorphizer):
 
 
 @overload  # noqa: F811
-def _fix_type(self, a: (VirtualFunction, VirtualFunction2), finder, monomorphizer):
+def _fix_type(self, a: VirtualFunction2, finder, monomorphizer):
     return (yield VirtualFunction2)(
         tuple(self(arg, finder, monomorphizer) for arg in a.args),
         self(a.output, finder, monomorphizer),
@@ -523,9 +522,7 @@ class Monomorphizer:
                 else:
                     ctabs = ref.node.abstract
 
-                if ctabs is None or not (isinstance(ctabs, VirtualFunction2) or isinstance(
-                    ctabs.get_unique(), VirtualFunction
-                )):
+                if ctabs is None or not isinstance(ctabs, VirtualFunction2):
                     fn = a.get_unique()
                     with About(ref.node.debug, "equiv"):
                         try:

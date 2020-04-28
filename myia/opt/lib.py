@@ -7,7 +7,6 @@ from ..abstract import (
     AbstractJTagged,
     CheckState,
     CloneState,
-    VirtualFunction,
     VirtualFunction2,
     abstract_check,
     abstract_clone,

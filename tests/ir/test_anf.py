@@ -1,6 +1,6 @@
 import pytest
 
-from myia.abstract import AbstractFunction, VirtualFunction2
+from myia.abstract import VirtualFunction2
 from myia.ir.anf import PARAMETER, Apply, Constant, Graph, Parameter
 from myia.operations import primitives as primops
 

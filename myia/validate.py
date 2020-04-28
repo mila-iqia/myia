@@ -16,8 +16,6 @@ from .abstract import (
     AbstractJTagged,
     AbstractScalar,
     AbstractType,
-    DummyFunction,
-    VirtualFunction,
     abstract_check,
 )
 from .operations import Primitive
@@ -167,7 +165,7 @@ class CallValidator(NodeValidator):  # pragma: no cover
                     raise ValidationError(f"None in call")
                 else:
                     return
-            vfn = fn.abstract.get_unique()
+            vfn = fn.abstract
             argv = [broaden(arg) for arg in vfn.args]
             argt = [broaden(arg.abstract) for arg in args]
             if argv != argt:
