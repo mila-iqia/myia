@@ -811,15 +811,6 @@ def test_torch_scatter_add(x, index, src):
 
 
 @fwd_and_bwd_no_relay(
-    nn.Parameter(torch.Tensor(MA(3, 4))),
-    torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
-    nn.Parameter(torch.Tensor([2.1]).reshape(())),
-)
-def test_torch_scatter_broadcast_source(x, index, src):
-    return torch.scatter(x, 0, index, src)
-
-
-@fwd_and_bwd_no_relay(
     nn.Parameter(torch.randn(3, 4, dtype=torch.float64)),
     torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
     1.23,
