@@ -25,12 +25,12 @@ from .abstract import (
     Context,
     GraphFunction,
     GraphInferrer,
-    JTransformedFunction,
     MetaGraphFunction,
     PartialApplication,
     PrimitiveFunction,
     Reference,
     TrackedInferrer,
+    TransformedFunction,
     TypedPrimitive,
     VirtualReference,
     abstract_check,
@@ -55,7 +55,7 @@ from .ir import (
     MetaGraph,
     succ_incoming,
 )
-from .operations import Primitive
+from .operations import Primitive, primitives as P
 from .utils import InferenceError, MyiaTypeError, OrderedSet, overload
 
 
@@ -75,7 +75,7 @@ def _chk(
     a: (
         GraphFunction,
         PartialApplication,
-        JTransformedFunction,
+        TransformedFunction,
         PrimitiveFunction,
         MetaGraphFunction,
         TypedPrimitive,
@@ -123,15 +123,16 @@ def _fix_type(self, a: AbstractFunctionUnique, finder, monomorphizer):
 
 
 @overload  # noqa: F811
-def _fix_type(self, a: JTransformedFunction, finder, monomorphizer):
+def _fix_type(self, a: TransformedFunction, finder, monomorphizer):
     def _jtag(x):
         assert not isinstance(x, AbstractFunction)
         if isinstance(x, AbstractFunctionUnique):
-            return self(JTransformedFunction(x), finder, monomorphizer)
+            return self(TransformedFunction(x, P.J), finder, monomorphizer)
         else:
             rval = AbstractJTagged(self(x, finder, monomorphizer))
         return rval
 
+    assert a.transform is P.J
     vfn = self(a.fn, finder, monomorphizer)
     jargs = tuple(_jtag(arg) for arg in vfn.args)
     jres = _jtag(vfn.output)

@@ -36,12 +36,12 @@ from .data import (
     AbstractValue,
     Function,
     GraphFunction,
-    JTransformedFunction,
     MacroFunction,
     MetaGraphFunction,
     PartialApplication,
     Primitive,
     PrimitiveFunction,
+    TransformedFunction,
     TypedPrimitive,
 )
 from .loop import InferenceLoop, Pending, force_pending
@@ -262,8 +262,13 @@ class InferenceEngine:
         return PartialInferrer(self.get_inferrer_for(part.fn), part.args)
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, j: JTransformedFunction):
-        return JInferrer(self.get_inferrer_for(j.fn), j.fn)
+    def get_inferrer_for(self, tf: TransformedFunction):
+        if tf.transform is P.J:
+            return JInferrer(self.get_inferrer_for(tf.fn), tf.fn)
+        else:
+            raise NotImplementedError(
+                f"No available transform for {tf.transform}"
+            )
 
     @get_inferrer_for.register
     def get_inferrer_for(self, vf: (TypedPrimitive, AbstractFunctionUnique)):
@@ -727,7 +732,7 @@ async def compute_jinv_type(x):
             tuple([await compute_jinv_type(arg) for arg in x.args]),
             await compute_jinv_type(x.output.elements[0]),
         )
-    elif isinstance(x, JTransformedFunction):
+    elif isinstance(x, TransformedFunction) and x.transform is P.J:
         return x.fn
     elif isinstance(x, GraphFunction):
         g = x.graph
@@ -777,7 +782,9 @@ class JInferrer(Inferrer):
         assert not isinstance(x, AbstractFunctionUnique)
         if isinstance(x, AbstractFunction):
             v = await x.get()
-            return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
+            return AbstractFunction(
+                *[TransformedFunction(poss, P.J) for poss in v]
+            )
         return AbstractJTagged(x)
 
     async def run(self, engine, outref, argrefs):

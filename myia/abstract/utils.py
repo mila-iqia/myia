@@ -29,11 +29,11 @@ from .data import (
     AbstractValue,
     AbstractWrapper,
     GraphFunction,
-    JTransformedFunction,
     PartialApplication,
     Possibilities,
     TaggedPossibilities,
     TrackDict,
+    TransformedFunction,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -213,7 +213,7 @@ def abstract_check(self, t: PartialApplication, *args):
 
 
 @overload  # noqa: F811
-def abstract_check(self, t: JTransformedFunction, *args):
+def abstract_check(self, t: TransformedFunction, *args):
     return self(t.fn, *args)
 
 
@@ -378,8 +378,8 @@ def abstract_clone(self, x: PartialApplication, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: JTransformedFunction, *args):
-    return JTransformedFunction(self(x.fn, *args))
+def abstract_clone(self, x: TransformedFunction, *args):
+    return TransformedFunction(self(x.fn, *args), x.transform)
 
 
 @overload  # noqa: F811

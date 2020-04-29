@@ -183,15 +183,17 @@ class PartialApplication(Function):
 
 
 @dataclass(frozen=True)
-class JTransformedFunction(Function):
-    """Represents a Function transformed through the application of J.
+class TransformedFunction(Function):
+    """Represents a Function processed through some transform.
 
     Attributes:
         fn: A Function
+        transform: The applied transform
 
     """
 
     fn: object
+    transform: object
 
 
 @serializable("TypedPrimitive")
@@ -1029,7 +1031,6 @@ __all__ = [
     "AbstractValue",
     "Function",
     "GraphFunction",
-    "JTransformedFunction",
     "MacroFunction",
     "MetaGraphFunction",
     "PartialApplication",
@@ -1038,6 +1039,7 @@ __all__ = [
     "TaggedPossibilities",
     "Track",
     "TrackDict",
+    "TransformedFunction",
     "TypedPrimitive",
     "AbstractFunctionUnique",
     "empty",

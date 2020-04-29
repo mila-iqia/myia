@@ -26,12 +26,12 @@ from myia.abstract import (
     AbstractUnion,
     Context,
     InferenceLoop,
-    JTransformedFunction,
     Pending,
     PendingFromList,
     Possibilities,
     TaggedPossibilities,
     TrackDict,
+    TransformedFunction,
     abstract_clone,
     amerge,
     broaden,
@@ -292,7 +292,7 @@ def test_abstract_clone():
     a2 = T([s2, AbstractClass(object, {"field": s2})])
     assert upcast(a1, 64) is a2
 
-    jt = JTransformedFunction(AbstractFunctionUnique((s1,), s1))
+    jt = TransformedFunction(AbstractFunctionUnique((s1,), s1), P.J)
     assert upcast(jt, 64).fn.args == [s2]
     assert upcast(jt, 64).fn.output is s2
 

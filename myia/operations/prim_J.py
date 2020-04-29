@@ -4,7 +4,7 @@ from ..lib import (
     AbstractFunction,
     AbstractFunctionUnique,
     AbstractJTagged,
-    JTransformedFunction,
+    TransformedFunction,
     bprop_to_grad_transform,
     standard_prim,
 )
@@ -18,10 +18,10 @@ async def infer_J(self, engine, x):
     """Infer the return type of primitive `J`."""
     if isinstance(x, AbstractFunction):
         v = await x.get()
-        return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
+        return AbstractFunction(*[TransformedFunction(poss, P.J) for poss in v])
     elif isinstance(x, AbstractFunctionUnique):
         vfn = type_fixer(None)(
-            JTransformedFunction(AbstractFunctionUnique(x.args, x.output))
+            TransformedFunction(AbstractFunctionUnique(x.args, x.output), P.J)
         )
         assert isinstance(vfn, AbstractFunctionUnique)
         return vfn
