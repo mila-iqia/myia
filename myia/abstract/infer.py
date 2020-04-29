@@ -738,30 +738,14 @@ async def compute_jinv_type(x):
         g = x.graph
         primal = g and g.transforms.get("primal", None)
         if primal:
-            if isinstance(primal, Graph):
-                if primal.parent:
-                    # The primal for a closure can't be used
-                    # because it points to the original nodes
-                    # of its parent, whereas we would like to
-                    # point to the transformed nodes of the
-                    # parent. This is fixable, and will need
-                    # to be fixed to support a few edge cases.
-                    res = AbstractError(DUMMY)
-                else:
-                    with untested_legacy():
-                        # Not sure why this never happens anymore
-                        # primal = engine.resources.convert(primal)
-                        res = GraphFunction(primal, Context.empty())
-            else:
-                with untested_legacy():
-                    # Not sure why this never happens either
-                    res = primal
-                    if isinstance(res, Primitive):
-                        tid = getattr(x, "tracking_id", None)
-                        res = PrimitiveFunction(res, tracking_id=tid)
+            # When this happens, primal is usually (currently, always) a
+            # closure. Note that the primal for a closure can't be used because
+            # it points to the original nodes of its parent, whereas we would
+            # like to point to the transformed nodes of the parent, so to keep
+            # things simple we represent this as a transform.
+            return TransformedFunction(x, P.Jinv)
         else:
             raise MyiaTypeError(f"Bad input type for Jinv: {x}")
-        return res
     elif isinstance(x, AbstractFunction):
         fns = [await compute_jinv_type(f) for f in await x.get()]
         return AbstractFunction(*fns)
