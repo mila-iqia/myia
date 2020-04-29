@@ -400,6 +400,18 @@ def test_nested_closure(x):
     return f()()
 
 
+@mark.xfail(reason="Recursive closures do not work at the moment")
+@gradient(4.0)
+def test_recursive_closure(x):
+    def f(y):
+        if y <= 0:
+            return x
+        else:
+            return f(y - 1)
+
+    return f(7)
+
+
 @gradient(4.5, 6.7)
 def test_functions_in_tuples(x, y):
     tup = scalar_add, scalar_mul
