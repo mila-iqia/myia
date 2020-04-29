@@ -185,18 +185,14 @@ class FPropRemapper(GradRemapper):
 
         Remapped free variables are remapped elsewhere.
         """
-        if fv.graph not in self.graphs:  # pragma: no cover
-            # TODO: should be covered when supported for grad on closures
-            # is supported again.
+        if fv.graph not in self.graphs:
             return self.gen_constant(g, ng, fv)
 
     def gen_fv_graph(self, g, ng, fvg):
         """Free variables that are graphs are handled like constants."""
         if fvg in self.graphs:
             return self.gen_constant_graph(g, ng, Constant(fvg))
-        else:  # pragma: no cover
-            # TODO: should be covered when supported for grad on closures
-            # is supported again.
+        else:
             return self.gen_constant(g, ng, fvg)
 
     def link_apply(self, link):
@@ -224,9 +220,7 @@ class FPropRemapper(GradRemapper):
         """Generate Jinv(B:node)."""
         if (node, "jinv") not in self.repl:
             if isinstance(node, Graph):
-                if node not in self.graphs:  # pragma: no cover
-                    # TODO: should be covered when supported for grad on
-                    # closures is supported again.
+                if node not in self.graphs:
                     new_node = Constant(node)
                 else:
                     assert node.parent is not None
@@ -235,9 +229,7 @@ class FPropRemapper(GradRemapper):
                     with About(node.debug, "equiv"):
                         new_node = ng.apply(P.Jinv, ct)
             else:
-                if node.graph not in self.graphs:  # pragma: no cover
-                    # TODO: should be covered when supported for grad on
-                    # closures is supported again.
+                if node.graph not in self.graphs:
                     new_node = node
                 else:
                     ng = self.get_graph(node.graph)
