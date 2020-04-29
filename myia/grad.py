@@ -441,8 +441,9 @@ class SensRemapper(GradRemapper):
         fv_sens = Constant(newenv)
         for fv in g.free_variables_total:
             sens = self.get(g, fv)
-            # NOTE: If sens is an application of zeros_like, it would be
-            # possible to skip adding it to the env.
+            if sens.is_apply(zeros_like):
+                # Skip if there is no gradient
+                continue
             fv_sens = ng.apply(
                 P.env_setitem,
                 fv_sens,
