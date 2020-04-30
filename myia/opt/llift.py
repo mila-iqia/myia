@@ -3,24 +3,8 @@
 from types import SimpleNamespace as NS
 
 from ..info import About
-from ..ir import ANFNode, manage
+from ..ir import manage
 from ..utils import OrderedSet, WorkSet
-
-
-def _find_fvs(graph):
-    """Return all the non-graph free variables for the given graph.
-
-    This includes those that are needed by graphs that are free variables.
-    """
-    fvs = OrderedSet()
-    work = WorkSet([graph])
-    for g in work:
-        for fv in g.free_variables_total:
-            if isinstance(fv, ANFNode):
-                fvs.add(fv)
-            else:
-                work.queue(fv)
-    return [fv for fv in fvs if fv.graph not in graph.scope]
 
 
 def lambda_lift(root):
@@ -61,7 +45,7 @@ def lambda_lift(root):
             NS(
                 graph=g,
                 calls=g.call_sites,
-                fvs={fv: _param(fv) for fv in _find_fvs(g)},
+                fvs={fv: _param(fv) for fv in g.free_variables_extended},
             )
         )
 
