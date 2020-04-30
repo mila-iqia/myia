@@ -1,4 +1,5 @@
 from myia.ir import isomorphic
+from myia.operations import switch
 from myia.pipeline import scalar_parse, scalar_pipeline, steps
 
 llift = scalar_pipeline.select(
@@ -68,6 +69,41 @@ def test_lambda_lift_chain():
             return g(_y, _x)
 
         return h(y, x)
+
+    assert isomorphic(f1, f2)
+
+
+def test_lambda_change_nesting():
+    # Originally g and h are not nested in i, and since they cannot be lambda
+    # lifted because they are not in call position, they must be moved into the
+    # scope of i so that they can point to i's new parameter instead of the top
+    # level one.
+
+    @llift
+    def f1(x):
+        def g():
+            return x
+
+        def h():
+            return -x
+
+        def i():
+            return switch(x > 0, g, h)
+
+        return i()()
+
+    @scalar_parse
+    def f2(x):
+        def i(_x):
+            def g():
+                return _x
+
+            def h():
+                return -_x
+
+            return switch(_x > 0, g, h)
+
+        return i(x)()
 
     assert isomorphic(f1, f2)
 
