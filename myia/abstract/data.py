@@ -38,8 +38,6 @@ VOID = Named("VOID")
 # Represents specialization problems
 DEAD = Named("DEAD")
 register_serialize(DEAD, "DEAD")
-DUMMY = Named("DUMMY")
-register_serialize(DUMMY, "DUMMY")
 POLY = Named("POLY")
 
 
@@ -1001,7 +999,6 @@ __all__ = [
     "ANYTHING",
     "DATA",
     "DEAD",
-    "DUMMY",
     "POLY",
     "SHAPE",
     "TYPE",

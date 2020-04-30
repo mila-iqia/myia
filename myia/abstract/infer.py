@@ -23,7 +23,6 @@ from ..utils import (
 from .amerge import amerge, bind
 from .data import (
     ANYTHING,
-    DUMMY,
     TYPE,
     VALUE,
     AbstractError,

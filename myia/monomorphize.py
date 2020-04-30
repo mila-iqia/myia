@@ -13,7 +13,6 @@ from warnings import warn
 
 from .abstract import (
     DEAD,
-    DUMMY,
     POLY,
     AbstractError,
     AbstractFunction,
@@ -101,13 +100,13 @@ def _fix_type(self, a: GraphFunction, finder, monomorphizer):
             self(g.return_.abstract, finder, monomorphizer),
         )
     else:
-        return AbstractError(DUMMY)
+        return AbstractError(DEAD)
 
 
 @overload  # noqa: F811
 def _fix_type(self, a: PartialApplication, finder, monomorphizer):
     vfn = self(a.fn, finder, monomorphizer)
-    if isinstance(vfn, AbstractError) and vfn.xvalue() is DUMMY:
+    if isinstance(vfn, AbstractError) and vfn.xvalue() is DEAD:
         return vfn
     assert isinstance(vfn, AbstractFunctionUnique)
     vfn = AbstractFunctionUnique(vfn.args[len(a.args) :], vfn.output)
@@ -162,8 +161,8 @@ def _fix_type(self, a: PrimitiveFunction, finder, monomorphizer):
         return self(
             finder.analyze_function(None, a, None)[0], finder, monomorphizer
         )
-    except Unspecializable:
-        return AbstractError(DUMMY)
+    except Unspecializable as err:
+        return AbstractError(err.problem)
 
 
 @overload  # noqa: F811
