@@ -98,6 +98,7 @@ class GraphRemapper(Partializable):
     gen_fv_direct = NotImplemented
     gen_fv = NotImplemented
     gen_fv_graph = NotImplemented
+    gen_fv_extended = NotImplemented
 
     def gen_rogue_parameter(self, graph, new_graph, p):  # pragma: no cover
         """Generate something for a parameter not in the parameter list."""
@@ -179,6 +180,10 @@ class GraphRemapper(Partializable):
                 for node in mng.free_variables_total[graph]:
                     if isinstance(node, Graph):
                         self.gen_fv_graph(graph, target_graph, node)
+
+            if self.gen_fv_extended is not NotImplemented:
+                for node in mng.free_variables_extended[graph]:
+                    self.gen_fv_extended(graph, target_graph, node)
 
             for ct in mng.constants[graph]:
                 if ct.is_constant_graph():

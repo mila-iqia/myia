@@ -319,7 +319,7 @@ class SensRemapper(GradRemapper):
         with About(child.debug, self.relation):
             self.remap_node((g, child), g, child, ng, ng.apply())
 
-    def gen_fv(self, g, ng, node):
+    def gen_fv_extended(self, g, ng, node):
         """Generate sensitivities for free variables.
 
         Note that the default gen_fv does nothing, so this is different
@@ -394,7 +394,7 @@ class SensRemapper(GradRemapper):
         children = {
             g2
             for g2 in self.graphs
-            if g2.parent is g and node in g2.free_variables_total
+            if (g, g2) in self.repl and node in g2.free_variables_extended
         }
 
         # This is equivalent to the original node. Note that we aren't really
@@ -439,7 +439,7 @@ class SensRemapper(GradRemapper):
           all parameter sensitivities.
         """
         fv_sens = Constant(newenv)
-        for fv in g.free_variables_total:
+        for fv in g.free_variables_extended:
             sens = self.get(g, fv)
             if sens.is_apply(zeros_like):
                 # Skip if there is no gradient
