@@ -19,7 +19,7 @@ from .abstract import (
 )
 from .operations import Primitive
 from .operations.primitives import BackendPrimitive
-from .utils import ErrorPool, Partializable, overload, untested_legacy
+from .utils import ErrorPool, Partializable, overload
 
 
 class ValidationError(Exception):

@@ -18,14 +18,12 @@ from ..utils import (
     infer_trace,
     tracer,
     type_error_nargs,
-    untested_legacy,
 )
 from .amerge import amerge, bind
 from .data import (
     ANYTHING,
     TYPE,
     VALUE,
-    AbstractError,
     AbstractFunction,
     AbstractFunctionUnique,
     AbstractJTagged,
@@ -38,7 +36,6 @@ from .data import (
     MacroFunction,
     MetaGraphFunction,
     PartialApplication,
-    Primitive,
     PrimitiveFunction,
     TransformedFunction,
     TypedPrimitive,
