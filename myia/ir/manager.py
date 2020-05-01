@@ -605,6 +605,17 @@ class GraphManager(Partializable):
         self.check_opaque = None
         self.reset()
 
+    def gc(self):
+        """Garbage-collect disconnected graphs.
+
+        Normally this is done incrementally through reference counting, but
+        because of circular references, some graphs might remain.
+        """
+        reach = set(self.roots)
+        for root in self.roots:
+            reach.update(self.graphs_reachable[root])
+        self._drop_all(self.graphs - reach, drop_nodes=True)
+
     def reset(self):
         """Reset the manager's state.
 
@@ -715,6 +726,13 @@ class GraphManager(Partializable):
             if recursive:
                 todo |= other_graphs
 
+        self._drop_all(dropped, drop_nodes=False)
+
+    def _drop_all(self, dropped, drop_nodes=True):
+        if drop_nodes:
+            for g in dropped:
+                self._maybe_drop_nodes(OrderedSet([g.return_]))
+
         for g in dropped:
             self.events.drop_graph(g)
             self.all_nodes.difference_update(g.parameters)
@@ -743,7 +761,12 @@ class GraphManager(Partializable):
                 # dropped a graph.
                 return  # pragma: no cover
             self.uses[inp].remove((node, key))
-            self.events.drop_edge(node, key, inp)
+            if inp.graph in self.graphs:
+                # This seems to happen sometimes when there is a cycle that
+                # must be reclaimed with self.gc(), possibly because the cycle
+                # has a free variable from a graph that's already been
+                # reclaimed
+                self.events.drop_edge(node, key, inp)
         else:
             if inp.graph is not None:
                 self.add_graph(inp.graph)

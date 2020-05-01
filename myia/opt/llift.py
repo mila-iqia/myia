@@ -16,6 +16,7 @@ def lambda_lift(root):
     This is a destructive operation.
     """
     mng = manage(root)
+    mng.gc()
     graphs = WorkSet(mng.graphs)
     candidates = []
 

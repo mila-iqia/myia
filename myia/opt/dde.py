@@ -479,6 +479,7 @@ class DeadDataElimination(Partializable):
 
     def __call__(self, root):
         """Apply dead data elimination."""
+        self.resources.opt_manager.gc()
         args = dict(opt=self, node=None, manager=root.manager, profile=False)
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
