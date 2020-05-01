@@ -612,7 +612,7 @@ class GraphManager(Partializable):
         Normally this is done incrementally through reference counting, but
         because of circular references, some graphs might remain.
         """
-        reach = set(self.roots)
+        reach = OrderedSet(self.roots)
         for root in self.roots:
             reach.update(self.graphs_reachable[root])
         # TODO: Ideally the two lines below should be replaced by the commented
