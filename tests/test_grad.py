@@ -382,7 +382,7 @@ def test_list_for(xs):
     return y
 
 
-@gradient(4.5)
+@mt(gradient(4.5), gradient(-7.9))
 def test_nested_closure(x):
     a = x * x
 
@@ -400,8 +400,7 @@ def test_nested_closure(x):
     return f()()
 
 
-@mark.xfail(reason="Recursive closures do not work at the moment")
-@gradient(4.0)
+@gradient(4.3, pipeline=standard_pipeline)
 def test_recursive_closure(x):
     def f(y):
         if y <= 0:
