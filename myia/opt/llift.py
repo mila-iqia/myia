@@ -4,7 +4,7 @@ from types import SimpleNamespace as NS
 
 from ..info import About
 from ..ir import Graph, manage
-from ..utils import OrderedSet, WorkSet
+from ..utils import WorkSet
 
 
 def lambda_lift(root):
