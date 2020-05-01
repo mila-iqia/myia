@@ -18,6 +18,7 @@ from ..utils import (
     infer_trace,
     tracer,
     type_error_nargs,
+    untested_legacy,
 )
 from .amerge import amerge, bind
 from .data import (
@@ -140,7 +141,8 @@ class InferenceEngine:
             return Reference(self, node, CONTEXTLESS)
         if node.is_constant_graph():
             if node.value.abstract is not None:
-                return Reference(self, node, CONTEXTLESS)
+                with untested_legacy():
+                    return Reference(self, node, CONTEXTLESS)
             graph = node.value.parent
         else:
             graph = node.graph
