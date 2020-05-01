@@ -38,6 +38,7 @@ def group_nodes(root, manager):
 
 def cse(root, manager):
     """Apply CSE on root."""
+    manager.gc()
     groups = group_nodes(root, manager)
     changes = False
 
