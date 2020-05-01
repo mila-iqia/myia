@@ -131,14 +131,17 @@ class Tracker(Partializable):
         self.manager = resources.opt_manager
         self.activated = False
 
-    def activate(self):
+    def activate(self, force=False):
         """Activate the tracker.
 
         If the tracker is already activated, this does nothing.
         """
-        if not self.activated:
+        if force or not self.activated:
             self.manager.events.add_node.register(self._on_add_node)
             self.manager.events.drop_node.register(self._on_drop_node)
+            self.manager.events.post_reset.register(
+                lambda evt: self.activate(force=True)
+            )
             self.activated = True
 
     def _on_add_node(self, event, node):

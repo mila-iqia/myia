@@ -603,6 +603,7 @@ class GraphManager(Partializable):
             allow_changes = self.manage
         self.allow_changes = allow_changes
         self.check_opaque = None
+        self.events = None
         self.reset()
 
     def gc(self):
@@ -614,13 +615,19 @@ class GraphManager(Partializable):
         reach = set(self.roots)
         for root in self.roots:
             reach.update(self.graphs_reachable[root])
-        self._drop_all(self.graphs - reach, drop_nodes=True)
+        # TODO: Ideally the two lines below should be replaced by the commented
+        # out line, but it causes an error in
+        # tests/test_grad.py::test_recursive_closure
+        # # self._drop_all(self.graphs - reach, drop_nodes=True)
+        if reach != self.graphs:
+            self.reset()
 
     def reset(self):
         """Reset the manager's state.
 
         Recompute everything from the roots.
         """
+        old_events = self.events
         self.events = Events(
             add_node=None,
             drop_node=None,
@@ -630,7 +637,12 @@ class GraphManager(Partializable):
             drop_edge=None,
             invalidate_nesting=None,
             invalidate_uses=None,
+            reset=None,
+            post_reset=None,
         )
+        if old_events:
+            old_events.reset()
+
         roots = OrderedSet(self.roots) if self.roots else OrderedSet()
         self.roots = OrderedSet()
         self.graphs = OrderedSet()
@@ -660,6 +672,9 @@ class GraphManager(Partializable):
 
         for root in roots:
             self.add_graph(root, root=True)
+
+        if old_events:
+            old_events.post_reset()
 
     def set_opaque_condition(self, fn):
         """Set a condition on nodes that should not be included."""
@@ -761,12 +776,7 @@ class GraphManager(Partializable):
                 # dropped a graph.
                 return  # pragma: no cover
             self.uses[inp].remove((node, key))
-            if inp.graph in self.graphs:
-                # This seems to happen sometimes when there is a cycle that
-                # must be reclaimed with self.gc(), possibly because the cycle
-                # has a free variable from a graph that's already been
-                # reclaimed
-                self.events.drop_edge(node, key, inp)
+            self.events.drop_edge(node, key, inp)
         else:
             if inp.graph is not None:
                 self.add_graph(inp.graph)
