@@ -291,6 +291,23 @@ def test_hyper_map_polymorphic_2(c, xs, ys):
     return hyper_map(f, xs), hyper_map(f, ys)
 
 
+@mono_scalar(0, 8)
+def test_mutual_recursion_closure(start, n):
+    def _even(n):
+        if n == start:
+            return True
+        else:
+            return _odd(n - 1)
+
+    def _odd(n):
+        if n == start:
+            return False
+        else:
+            return _even(n - 1)
+
+    return _even(n)
+
+
 @mono_scalar(int1, int2)
 def test_unused_parameter(x, y):
     return x * x
