@@ -47,9 +47,7 @@ def validate_abstract(self, a: AbstractError, uses):
             return True
         elif kind is POLY:
             return not any(key == 0 for node, key in uses)
-        else:  # pragma: no cover
-            # As it turns out, the inferrer now catches this error before
-            # we get to validation.
+        else:
             raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
