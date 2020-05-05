@@ -3,11 +3,18 @@
 
 from types import FunctionType
 
+from ..abstract import AbstractValue
 from ..info import DebugInfo
 from ..ir import MetaGraph
 from ..ir.anf import ANFNode, Graph
-from ..operations import Primitive
-from ..utils import EnvInstance, Named, Namespace, SymbolicKeyInstance
+from ..operations import Operation, Primitive
+from ..utils import (
+    EnvInstance,
+    HandleInstance,
+    Named,
+    Namespace,
+    SymbolicKeyInstance,
+)
 
 short_relation_symbols = {
     "copy": "",
@@ -107,7 +114,19 @@ class NodeLabeler:
             v = node.value
             if v is None or (isinstance(v, tuple) and v == ()):
                 return repr(v)
-            elif isinstance(v, (int, float, str, Named, Namespace)):
+            elif isinstance(
+                v,
+                (
+                    int,
+                    float,
+                    str,
+                    Named,
+                    Namespace,
+                    HandleInstance,
+                    AbstractValue,
+                    Operation,
+                ),
+            ):
                 return repr(v)
             elif isinstance(v, FunctionType):
                 return f"{v.__name__}::function"

@@ -185,18 +185,14 @@ class FPropRemapper(GradRemapper):
 
         Remapped free variables are remapped elsewhere.
         """
-        if fv.graph not in self.graphs:  # pragma: no cover
-            # TODO: should be covered when supported for grad on closures
-            # is supported again.
+        if fv.graph not in self.graphs:
             return self.gen_constant(g, ng, fv)
 
     def gen_fv_graph(self, g, ng, fvg):
         """Free variables that are graphs are handled like constants."""
         if fvg in self.graphs:
             return self.gen_constant_graph(g, ng, Constant(fvg))
-        else:  # pragma: no cover
-            # TODO: should be covered when supported for grad on closures
-            # is supported again.
+        else:
             return self.gen_constant(g, ng, fvg)
 
     def link_apply(self, link):
@@ -224,9 +220,7 @@ class FPropRemapper(GradRemapper):
         """Generate Jinv(B:node)."""
         if (node, "jinv") not in self.repl:
             if isinstance(node, Graph):
-                if node not in self.graphs:  # pragma: no cover
-                    # TODO: should be covered when supported for grad on
-                    # closures is supported again.
+                if node not in self.graphs:
                     new_node = Constant(node)
                 else:
                     assert node.parent is not None
@@ -235,9 +229,7 @@ class FPropRemapper(GradRemapper):
                     with About(node.debug, "equiv"):
                         new_node = ng.apply(P.Jinv, ct)
             else:
-                if node.graph not in self.graphs:  # pragma: no cover
-                    # TODO: should be covered when supported for grad on
-                    # closures is supported again.
+                if node.graph not in self.graphs:
                     new_node = node
                 else:
                     ng = self.get_graph(node.graph)
@@ -393,12 +385,6 @@ class SensRemapper(GradRemapper):
                     sexp = (P.tuple_getitem, src, key)
                     contribs.append(sexp)
 
-        # This is equivalent to the original node. Note that we aren't really
-        # interested in the node's value: jinv is used along with embed and
-        # zeros_like, which only care about the original node's inferred type
-        # and shape.
-        jinv = self.get_jinv(node)
-
         # TODO: deconstruct nested graphs
         # TODO: figure out what I meant by "deconstruct nested graphs" :(
 
@@ -411,21 +397,26 @@ class SensRemapper(GradRemapper):
             if g2.parent is g and node in g2.free_variables_total
         }
 
+        # This is equivalent to the original node. Note that we aren't really
+        # interested in the node's value: jinv is used along with embed and
+        # zeros_like, which only care about the original node's inferred type
+        # and shape.
+        jinv = self.grad_fprop.get_jinv(node)
+
+        # This represents the node's "key" into the env.
+        embed = sexp_to_node((operations.embed, jinv), ng)
+
+        # This is the default, if there is no entry for this key.
+        zl = sexp_to_node((zeros_like, jinv), ng)
+
         for child in children:
             assert (g, child) in self.repl
-            sexp = (
-                P.env_getitem,
-                self.get(g, child),
-                # This represents the node's "key" into the env.
-                (operations.embed, jinv),
-                # This is the default, if there is no entry for this key.
-                (zeros_like, jinv),
-            )
+            sexp = (P.env_getitem, self.get(g, child), embed, zl)
             contribs.append(sexp)
 
         n = len(contribs)
         if n == 0:
-            sexp = (zeros_like, jinv)
+            sexp = zl
         else:
             # All contributions are added together with gadd.
             def mkadd(x, y):
@@ -435,14 +426,9 @@ class SensRemapper(GradRemapper):
 
         new_node.inputs = sexp_to_node(sexp, ng).inputs
 
-    def get_jinv(self, node):
-        """Generate Jinv(B:node) (shortcut).
-
-        This is essentially equivalent to the original node. We can't use the
-        original node directly because the graph it belongs to is not available
-        any more after the transform.
-        """
-        return self.remappers["grad_fprop"].get_jinv(node)
+    @property
+    def grad_fprop(self):
+        return self.remappers["grad_fprop"]
 
     def finalize_graph(self, g, ng):
         """Generate the output of the backprop graph.
@@ -460,7 +446,7 @@ class SensRemapper(GradRemapper):
             fv_sens = ng.apply(
                 P.env_setitem,
                 fv_sens,
-                ng.apply(operations.embed, self.get_jinv(fv)),
+                ng.apply(operations.embed, self.grad_fprop.get_jinv(fv)),
                 sens,
             )
         in_sens = [self.get(g, p) for p in g.parameters]

@@ -339,7 +339,7 @@ class Parser:
             with DebugInherit(ast=arg, location=self.make_location(arg)):
                 param_node = Parameter(function_block.graph)
             param_node.debug.name = arg.arg
-            function_block.graph.parameters.append(param_node)
+            function_block.add_parameter(param_node)
             function_block.write(arg.arg, param_node, track=False)
             if dflt:
                 dflt_node = self.process_node(function_block, dflt)
@@ -353,7 +353,7 @@ class Parser:
                 vararg_node = Parameter(function_block.graph)
             vname = arg.arg
             vararg_node.debug.name = vname
-            function_block.graph.parameters.append(vararg_node)
+            function_block.add_parameter(vararg_node)
             function_block.write(vname, vararg_node, track=False)
         else:
             vararg_node = None
@@ -365,7 +365,7 @@ class Parser:
                 kwarg_node = Parameter(function_block.graph)
             vname = arg.arg
             kwarg_node.debug.name = vname
-            function_block.graph.parameters.append(kwarg_node)
+            function_block.add_parameter(kwarg_node)
             function_block.write(vname, kwarg_node, track=False)
         else:
             kwarg_node = None
@@ -489,7 +489,7 @@ class Parser:
             with DebugInherit(ast=arg, location=self.make_location(arg)):
                 anf_node = Parameter(function_block.graph)
             anf_node.debug.name = arg.arg
-            function_block.graph.parameters.append(anf_node)
+            function_block.add_parameter(anf_node)
             function_block.write(arg.arg, anf_node)
 
         function_block.graph.output = self.process_node(
@@ -814,7 +814,7 @@ class Parser:
         with About(block.graph.debug, "for_header"):
             header_block = self.new_block(auxiliary=True)
         # We explicitly add the iterator as the first argument
-        it = header_block.graph.add_parameter()
+        it = header_block.add_parameter()
         cond = header_block.apply(op_hasnext, it)
 
         # Body of the iterator.
@@ -958,6 +958,12 @@ class Block:
         else:
             return self.graph.apply(fn, *args)
 
+    def add_parameter(self, parameter=None):
+        """Add a parameter to the graph."""
+        p = parameter or Parameter(self.graph)
+        self.graph.parameters.append(p)
+        return p
+
     def make_resolve(self, module_name, symbol_name):
         """Return a subtree that resolves a name in a module."""
         return self.graph.apply(
@@ -1014,7 +1020,7 @@ class Block:
         # TODO: point to the original definition
         with About(NamedDebugInfo(name=varnum), "phi"):
             phi = Parameter(self.graph)
-        self.graph.parameters.append(phi)
+        self.add_parameter(phi)
         self.phi_nodes[phi] = varnum
         self.write(varnum, phi)
         if self.matured:

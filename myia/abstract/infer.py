@@ -347,7 +347,7 @@ class InferenceEngine:
                 x = x.xtype()
                 if x is None:
                     return False
-            return issubclass(x, predicate)
+            return isinstance(x, type) and issubclass(x, predicate)
         elif isinstance(predicate, type):
             return isinstance(x, predicate)
         elif callable(predicate):
