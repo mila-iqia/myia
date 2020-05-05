@@ -710,7 +710,7 @@ class VirtualInferrer(Inferrer):
         return self.output
 
 
-def compute_bprop_type(orig_fn, args, out, vfn2=True):
+def compute_bprop_type(orig_fn, args, out):
     """Compute the abstract type of the bprop for orig_fn."""
     fn = AbstractFunction(orig_fn)
     bparams = [sensitivity_transform(fn)]
