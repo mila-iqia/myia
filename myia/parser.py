@@ -914,8 +914,8 @@ class Block:
             parser: The Parser object.
             use_universe: Make all operations in the graph serialized
                 with universe
+            type: "function" if the block was directly produced by a function
             flags: Flags to give to that Block's graph.
-
         """
         self.parser = parser
         self.use_universe = use_universe
@@ -1011,7 +1011,8 @@ class Block:
             varnum: The name of the variable to read.
             resolve_globals: If the name is not resolvable,
                 assume it is a global
-
+            lock: Either False or the Graph that is reading this variable and
+                for which it should be locked.
         """
         if varnum in self.variables:
             self.parser.read_cache.add((self, varnum, self.variables[varnum]))
