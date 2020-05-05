@@ -177,6 +177,18 @@ def bubble_op_tuple_binary(resources, node, equiv):
     return sexp_to_node((P.make_tuple, *elems), node.graph)
 
 
+@pattern_replacer(P.make_tuple, (P.tuple_getitem, X, 0), Xs)
+def cancel_tuple_reconstruction(resources, node, equiv):
+    """Replace (xs[0], xs[1], ..., xs[len(xs) - 1]) by xs."""
+    xs = equiv[X]
+    others = equiv[Xs]
+    if len(others) == len(xs.abstract.elements) - 1 and all(
+        node.match((P.tuple_getitem, xs, i + 1)) is not None
+        for i, node in enumerate(others)
+    ):
+        return xs
+
+
 ###########################
 # gadd optimizations #
 ###########################

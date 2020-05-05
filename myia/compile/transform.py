@@ -96,8 +96,22 @@ def return_handles(graph):
             handle_idx.append(i)
 
     if len(handle_nodes) != 0:
+        ct0 = Constant(0)
+        ct1 = Constant(1)
+        ct0.abstract = to_abstract(0)
+        ct1.abstract = to_abstract(1)
+        old_a = graph.output.abstract
         with mng.transact() as tr:
-            universe_out = graph.output.inputs[1]
+            if graph.output.is_apply(P.make_tuple):
+                universe_out = graph.output.inputs[1]
+                normal_out = graph.output.inputs[2]
+            else:
+                assert isinstance(graph.output.abstract, AbstractTuple)
+                assert len(graph.output.abstract.elements) == 2
+                universe_out = graph.apply(P.tuple_getitem, graph.output, ct0)
+                universe_out.abstract = graph.output.abstract.elements[0]
+                normal_out = graph.apply(P.tuple_getitem, graph.output, ct1)
+                normal_out.abstract = graph.output.abstract.elements[1]
             vals = [
                 graph.apply(P.universe_getitem, universe_out, n)
                 for n in handle_nodes
@@ -105,12 +119,12 @@ def return_handles(graph):
             types = [n.abstract.element for n in handle_nodes]
             for v, a in zip(vals, types):
                 v.abstract = a
-            out_node = graph.apply(P.make_tuple, *vals)
-            out_node.abstract = AbstractTuple(types)
-            tr.set_edge(graph.output, 1, out_node)
-        old_a = graph.output.abstract
+            handles = graph.apply(P.make_tuple, *vals)
+            handles.abstract = AbstractTuple(types)
+            new_out_node = graph.apply(P.make_tuple, handles, normal_out)
+            tr.replace(graph.output, new_out_node)
         graph.output.abstract = AbstractTuple(
-            [out_node.abstract] + old_a.elements[1:]
+            [handles.abstract] + old_a.elements[1:]
         )
 
     return graph, handle_idx
