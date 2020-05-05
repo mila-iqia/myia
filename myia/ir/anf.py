@@ -380,6 +380,21 @@ class Graph:
         return self.manager.nodes[self]
 
     @property
+    def call_sites(self):
+        """Return all nodes that call this graph."""
+        return self.manager.call_sites[self]
+
+    @property
+    def higher_order_sites(self):
+        """Return all nodes that have this graph as input."""
+        return self.manager.higher_order_sites[self]
+
+    @property
+    def all_direct_calls(self):
+        """Return whether this graph is always in call position."""
+        return not self.higher_order_sites
+
+    @property
     def constants(self):
         """Return all constants used by this graph."""
         return self.manager.constants[self]
