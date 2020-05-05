@@ -41,7 +41,7 @@ import asttokens
 
 from . import operations
 from .graph_utils import dfs
-from .info import About, DebugInherit, NamedDebugInfo
+from .info import About, DebugInherit, NamedDebugInfo, current_info
 from .ir import ANFNode, Apply, Constant, Graph, Parameter
 from .ir.utils import succ_deeper
 from .operations import primitives as primops
@@ -209,6 +209,8 @@ class Parser:
         self.write_cache = OrderedSet()
         # Cache of all nodes that are read
         self.read_cache = OrderedSet()
+        # Finalizers for functions
+        self.finalizers = {}
 
     def new_block(self, **kwargs) -> "Block":
         """Create a new block."""
@@ -302,7 +304,7 @@ class Parser:
         """
         function_block, process = self._create_function(block, node)
         block.write(node.name, Constant(function_block.graph), track=False)
-        block.add_finalizer(process)
+        self.finalizers[function_block.graph] = process
         return block
 
     def _create_function(
@@ -316,7 +318,7 @@ class Parser:
         forward references can be resolved.
         """
         with DebugInherit(ast=node, location=self.make_location(node)):
-            function_block = self.new_block()
+            function_block = self.new_block(type="function")
         if block:
             function_block.preds.append(block)
         else:
@@ -661,7 +663,6 @@ class Parser:
         block = starting_block
         for node in nodes:
             block = self.process_node(block, node, used=False)
-        starting_block.finalize()
         return block
 
     def process_Return(self, block: "Block", node: ast.Return) -> "Block":
@@ -901,7 +902,9 @@ class Block:
 
     """
 
-    def __init__(self, parser: Parser, use_universe=False, **flags) -> None:
+    def __init__(
+        self, parser: Parser, use_universe=False, type=None, **flags
+    ) -> None:
         """Construct a basic block.
 
         Constructing a basic block also constructs a corresponding function,
@@ -916,10 +919,11 @@ class Block:
         """
         self.parser = parser
         self.use_universe = use_universe
-        self.finalizers = []
+        self.type = type
 
         self.matured: bool = False
         self.variables: Dict[str, ANFNode] = {}
+        self.lock = {}
         self.preds: List[Block] = []
         self.phi_nodes: Dict[Parameter, str] = {}
         self.jumps: Dict[Block, Apply] = {}
@@ -992,7 +996,7 @@ class Block:
         """Return a subtree that resolves a name in the operations module."""
         return self.make_resolve(operations_ns, symbol_name)
 
-    def read(self, varnum: str, resolve_globals=True) -> ANFNode:
+    def read(self, varnum: str, resolve_globals=True, lock=False) -> ANFNode:
         """Read a variable.
 
         If this name has defined given in one of the previous statements, it
@@ -1011,7 +1015,16 @@ class Block:
         """
         if varnum in self.variables:
             self.parser.read_cache.add((self, varnum, self.variables[varnum]))
-            return _fresh(self.variables[varnum])
+            node = self.variables[varnum]
+            if (
+                node.is_constant_graph()
+                and node.value in self.parser.finalizers
+            ):
+                fin = self.parser.finalizers.pop(node.value)
+                fin()
+            if lock:
+                self.lock[varnum] = lock
+            return _fresh(node)
         if self.matured:
 
             def _resolve():
@@ -1025,7 +1038,12 @@ class Block:
                     return self.make_resolve(ns, varnum)
 
             if len(self.preds) == 1:
-                result = self.preds[0].read(varnum, resolve_globals=False)
+                result = self.preds[0].read(
+                    varnum,
+                    resolve_globals=False,
+                    lock=lock
+                    or (self.type == "function" and self.graph.debug.name),
+                )
                 return result or _resolve()
             if not self.preds:
                 return _resolve()
@@ -1051,6 +1069,12 @@ class Block:
             track: True if we want to warn about this variable not being used.
 
         """
+        if varnum in self.lock:
+            raise MyiaSyntaxError(
+                f"Trying to modify variable '{varnum}'"
+                f" after it was captured by function '{self.lock[varnum]}'.",
+                loc=current_info().location,
+            )
         self.variables[varnum] = node
         if track and not node.is_parameter():
             self.parser.write_cache.add((self, varnum, node))
@@ -1108,15 +1132,6 @@ class Block:
             self.graph.output = self.graph.apply(tmake, self.universe, value)
         else:
             self.graph.output = value
-
-    def add_finalizer(self, fn):
-        """Add a function to run when this block is done."""
-        self.finalizers.append(fn)
-
-    def finalize(self):
-        """Run all finalizer functions."""
-        for fn in self.finalizers:
-            fn()
 
 
 __consolidate__ = True

@@ -108,6 +108,20 @@ def test_forward_reference_in_closure():
     parse(g)
 
 
+def test_modifying_forward_reference():
+    def g(x):
+        def h():
+            return a * a
+
+        a = x * x
+        b = h()
+        a = a * a
+        return b, h()
+
+    with pytest.raises(MyiaSyntaxError):
+        parse(g)
+
+
 def test_mutual_recursion():
     def g(x):
         def rec1(y):
