@@ -327,6 +327,13 @@ class AbstractExternal(AbstractAtom):
 class AbstractFunctionBase(AbstractAtom):
     """Base for function types."""
 
+    def get_prim(self):
+        """If this AbstractFunction represents a a Primitive, return it.
+
+        Otherwise, return None.
+        """
+        return None
+
 
 @serializable("AbstractFunction")
 class AbstractFunction(AbstractFunctionBase):
@@ -411,7 +418,18 @@ class AbstractFunction(AbstractFunctionBase):
 
 @serializable("AbstractFunctionUnique")
 class AbstractFunctionUnique(AbstractFunctionBase):
+    """Represents some function with an explicitly given type signature.
+
+    Unlike AbstractFunction, this represents the type of a single function
+    rather than a set of possible functions.
+
+    Attributes:
+        args: The abstract arguments given to the function
+        output: The abstract output
+    """
+
     def __init__(self, args, output, values={}):
+        """Initialize the AbstractFunctionUnique."""
         super().__init__(values)
         self.args = list(args)
         self.output = output
@@ -440,9 +458,6 @@ class AbstractFunctionUnique(AbstractFunctionBase):
 
     def __pretty__(self, ctx):
         return pretty_call(ctx, "Fn", (self.args, self.output))
-
-    def get_prim(self):
-        return None
 
 
 @serializable("AbstractRandomState")
