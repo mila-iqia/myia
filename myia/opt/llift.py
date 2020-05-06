@@ -3,24 +3,8 @@
 from types import SimpleNamespace as NS
 
 from ..info import About
-from ..ir import ANFNode, manage
-from ..utils import OrderedSet, WorkSet
-
-
-def _find_fvs(graph):
-    """Return all the non-graph free variables for the given graph.
-
-    This includes those that are needed by graphs that are free variables.
-    """
-    fvs = OrderedSet()
-    work = WorkSet([graph])
-    for g in work:
-        for fv in g.free_variables_total:
-            if isinstance(fv, ANFNode):
-                fvs.add(fv)
-            else:
-                work.queue(fv)
-    return [fv for fv in fvs if fv.graph not in graph.scope]
+from ..ir import Graph, manage
+from ..utils import WorkSet
 
 
 def lambda_lift(root):
@@ -33,23 +17,27 @@ def lambda_lift(root):
     """
     mng = manage(root)
     graphs = WorkSet(mng.graphs)
-    todo = []
+    candidates = []
 
-    # Step 1: Figure out what to do
-    # For each graph that is a closure, we collect all uses. If all uses are in
-    # call position, this means we can easily modify the function's interface,
-    # so we collect all the free variables and create new parameters for them.
+    # Step 1a: Figure out what to do. We will try to lift all functions that
+    # have free variables and are only used in call position.
     for g in graphs:
         if g.parent and not graphs.processed(g.parent):
             # Process parents first (we will reverse the order later)
             graphs.requeue(g)
             continue
 
-        if not g.free_variables_total:
-            continue
+        if g.free_variables_total and g.all_direct_calls:
+            candidates.append(g)
 
-        if not g.all_direct_calls:
-            continue
+    # Step 1b: We try to complete the scope of each candidate with the graphs
+    # that are free variables for that candidate. If they are also candidates,
+    # there is nothing more to do, but if they are not candidates, they must
+    # be moved inside the scope. We only do this if all uses for the graph
+    # that's a free variable of the candidate is in the genuine scope of the
+    # candidate.
+    todo = []
+    for g in candidates:
 
         def _param(fv):
             with About(fv.debug, "llift"):
@@ -57,18 +45,30 @@ def lambda_lift(root):
                 param.abstract = fv.abstract
                 return param
 
+        fvg = {
+            g2
+            for g2 in g.free_variables_total
+            if isinstance(g2, Graph) and g2 not in candidates
+        }
+
+        if not all(
+            all(user in g.scope for user in g2.graph_users) for g2 in fvg
+        ):
+            continue
+
         todo.append(
             NS(
                 graph=g,
                 calls=g.call_sites,
-                fvs={fv: _param(fv) for fv in _find_fvs(g)},
+                fvs={fv: _param(fv) for fv in g.free_variables_extended},
+                scope={*g.scope, *fvg},
             )
         )
 
-    # Reverse the order so that children are processed before parents. This is
-    # important for step 3, because children that are lambda lifted must
-    # replace their uses first (otherwise the original fvs would be replaced
-    # by their parent's parameters, which is not what we want)
+    # Step 1c: Reverse the order so that children are processed before parents.
+    # This is important for step 3, because children that are lambda lifted
+    # must replace their uses first (otherwise the original fvs would be
+    # replaced by their parent's parameters, which is not what we want)
     todo.reverse()
 
     # Step 2: Add arguments to call sites.
@@ -90,7 +90,7 @@ def lambda_lift(root):
             # Redirect the fvs to the parameter (those in scope)
             for fv, param in entry.fvs.items():
                 for node, idx in mng.uses[fv]:
-                    if node.graph in entry.graph.scope:
+                    if node.graph in entry.scope:
                         tr.set_edge(node, idx, param)
 
     return root

@@ -406,8 +406,19 @@ class Graph:
 
     @property
     def free_variables_total(self):
-        """Return all free variables required by this graph's scope."""
+        """Return all free variables required by this graph's scope.
+
+        Some of the free variables may be graphs.
+        """
         return self.manager.free_variables_total[self]
+
+    @property
+    def free_variables_extended(self):
+        """Return all free variables required by this graph's scope.
+
+        None of the free variables are graphs.
+        """
+        return self.manager.free_variables_extended[self]
 
     @property
     def graphs_used(self):

@@ -3,7 +3,8 @@
 from collections import Counter, defaultdict
 
 from ..graph_utils import EXCLUDE, FOLLOW, dfs
-from ..utils import Events, OrderedSet, Partializable
+from ..utils import Events, OrderedSet, Partializable, WorkSet
+from .anf import ANFNode
 from .utils import succ_deeper
 
 
@@ -476,6 +477,25 @@ class FVTotalStatistic(NestingStatisticWholesale, CounterStatistic):
             _update(g2, inp)
 
 
+class FVExtendedStatistic(dict):
+    """Implements `GraphManager.free_variables_extended`."""
+
+    def __init__(self, manager):
+        """Initialize a FVExtendedStatistic."""
+        self.manager = manager
+
+    def __getitem__(self, graph):
+        fvs = OrderedSet()
+        work = WorkSet([graph])
+        for g in work:
+            for fv in self.manager.free_variables_total[g]:
+                if isinstance(fv, ANFNode):
+                    fvs.add(fv)
+                else:
+                    work.queue(fv)
+        return [fv for fv in fvs if fv.graph not in self.manager.scopes[graph]]
+
+
 class GraphsReachableStatistic(UsesStatistic):
     """Implements `GraphManager.graphs_reachable`."""
 
@@ -623,6 +643,7 @@ class GraphManager(Partializable):
         self.children = ChildrenStatistic(self)
         self.scopes = ScopeStatistic(self)
         self._free_variables_total = FVTotalStatistic(self)
+        self.free_variables_extended = FVExtendedStatistic(self)
         self.graphs_reachable = GraphsReachableStatistic(self)
         self.recursive = RecursiveStatistic(self)
 
