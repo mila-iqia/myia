@@ -18,7 +18,7 @@ def lambda_lift(root):
     mng = manage(root)
     mng.gc()
     graphs = WorkSet(mng.graphs)
-    candidates = []
+    candidates = {}
 
     # Step 1a: Figure out what to do. We will try to lift all functions that
     # have free variables and are only used in call position.
@@ -29,7 +29,11 @@ def lambda_lift(root):
             continue
 
         if g.free_variables_total and g.all_direct_calls:
-            candidates.append(g)
+            candidates[g] = NS(
+                graph=g,
+                calls=g.call_sites,
+                fvs=g.free_variables_extended,
+            )
 
     # Step 1b: We try to complete the scope of each candidate with the graphs
     # that are free variables for that candidate. If they are also candidates,
@@ -38,7 +42,7 @@ def lambda_lift(root):
     # that's a free variable of the candidate is in the genuine scope of the
     # candidate.
     todo = []
-    for g in candidates:
+    for g, entry in candidates.items():
 
         def _param(fv):
             with About(fv.debug, "llift"):
@@ -57,14 +61,9 @@ def lambda_lift(root):
         ):
             continue
 
-        todo.append(
-            NS(
-                graph=g,
-                calls=g.call_sites,
-                fvs={fv: _param(fv) for fv in g.free_variables_extended},
-                scope={*g.scope, *fvg},
-            )
-        )
+        entry.scope = {*g.scope, *fvg}
+        entry.new_params = {fv: _param(fv) for fv in entry.fvs}
+        todo.append(entry)
 
     # Step 1c: Reverse the order so that children are processed before parents.
     # This is important for step 3, because children that are lambda lifted
@@ -89,7 +88,7 @@ def lambda_lift(root):
     for entry in todo:
         with mng.transact() as tr:
             # Redirect the fvs to the parameter (those in scope)
-            for fv, param in entry.fvs.items():
+            for fv, param in entry.new_params.items():
                 for node, idx in mng.uses[fv]:
                     if node.graph in entry.scope:
                         tr.set_edge(node, idx, param)
