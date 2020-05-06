@@ -3,7 +3,7 @@
 from collections import Counter, defaultdict
 
 from ..graph_utils import EXCLUDE, FOLLOW, dfs
-from ..utils import Events, OrderedSet, Partializable, WorkSet
+from ..utils import Events, OrderedSet, Partializable, WorkSet, untested_legacy
 from .anf import ANFNode
 from .utils import succ_deeper
 
@@ -745,8 +745,9 @@ class GraphManager(Partializable):
 
     def _drop_all(self, dropped, drop_nodes=True):
         if drop_nodes:
-            for g in dropped:
-                self._maybe_drop_nodes(OrderedSet([g.return_]))
+            with untested_legacy():
+                for g in dropped:
+                    self._maybe_drop_nodes(OrderedSet([g.return_]))
 
         for g in dropped:
             self.events.drop_graph(g)
