@@ -1100,6 +1100,7 @@ def expand_J(resources, node, equiv):
     This will not replace J(x) when x is not a constant graph.
     """
     from ..grad import Jimpl
+
     resources.opt_manager.gc()
     arg = equiv[C].value
 
