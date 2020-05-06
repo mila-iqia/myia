@@ -46,7 +46,6 @@ POLY = Named("POLY")
 #####################
 
 
-@serializable("Possibilities", sequence=True)
 class Possibilities(list):
     """Represents a set of possible values.
 
