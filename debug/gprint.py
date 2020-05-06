@@ -1457,8 +1457,7 @@ class _TransformedFunction:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
             "TransformedFunction",
-            (("fn", self.fn),
-             ("transform", self.transform)),
+            (("fn", self.fn), ("transform", self.transform)),
             delimiter="↦",
         )
 
