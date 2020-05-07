@@ -2,14 +2,14 @@ python>=3.7,<3.8a0
 colorama
 numpy
 opt_einsum
-cudatoolkit=10.0.*
+cudatoolkit=10.2.*
 cudnn
 abergeron::tvm==0.7dev1+1.*
 pytest
 pytest-cov
 yaml
 flake8==3.7.7
-pytorch::pytorch==1.1.0
+pytorch::pytorch==1.5.0
 isort==4.3.21
 docopt==0.6.2
 sphinx==2.2.2

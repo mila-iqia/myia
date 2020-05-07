@@ -25,6 +25,7 @@ from myia.operations import (
     broadcast_shape,
     casttag,
     conv2d_grad_input,
+    dict_values,
     distribute,
     dot,
     embed,
@@ -386,6 +387,11 @@ def test_dict_merge(c, x, y):
         return {"x": 2, "y": 4}
     else:
         return {"x": x, "y": y}
+
+
+@infer_scalar(i64, f32, result=(i64, f32))
+def test_dict_values(x, y):
+    return dict_values({"x": x, "y": y})
 
 
 @infer_scalar(B, i64, f32, result=MyiaTypeError)
