@@ -41,18 +41,12 @@ def lambda_lift(root, lift_switch=True):
     """
     mng = manage(root)
     mng.gc()
-    graphs = WorkSet(mng.graphs)
     candidates = {}
 
     # Step 1a: Figure out what to do. We will try to lift all functions that
     # have free variables and are only used in call position.
-    for g in graphs:
+    for g in mng.graphs:
         if g in candidates:
-            continue
-
-        if g.parent and not graphs.processed(g.parent):
-            # Process parents first (we will reverse the order later)
-            graphs.requeue(g)
             continue
 
         if g.free_variables_total and g.all_direct_calls:
@@ -88,8 +82,7 @@ def lambda_lift(root, lift_switch=True):
     # be moved inside the scope. We only do this if all uses for the graph
     # that's a free variable of the candidate is in the genuine scope of the
     # candidate.
-    todo = []
-    for g, entry in candidates.items():
+    for g, entry in list(candidates.items()):
 
         def _param(fv):
             with About(fv.debug, "llift"):
@@ -106,16 +99,24 @@ def lambda_lift(root, lift_switch=True):
         if not all(
             all(user in g.scope for user in g2.graph_users) for g2 in fvg
         ):
+            del candidates[g]
             continue
 
         entry.scope = {*g.scope, *fvg}
         entry.new_params = {fv: _param(fv) for fv in entry.fvs}
-        todo.append(entry)
 
     # Step 1c: Reverse the order so that children are processed before parents.
     # This is important for step 3, because children that are lambda lifted
     # must replace their uses first (otherwise the original fvs would be
     # replaced by their parent's parameters, which is not what we want)
+    todo = []
+    ws = WorkSet(candidates.keys())
+    for g in ws:
+        if g.parent and g.parent in candidates and not ws.processed(g.parent):
+            # Add parents first (we will reverse the order later)
+            graphs.requeue(g)
+            continue
+        todo.append(candidates[g])
     todo.reverse()
 
     # Step 2: Add arguments to call sites.
