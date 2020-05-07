@@ -125,3 +125,24 @@ def test_cannot_lambda_lift():
     f2 = scalar_parse(f)
 
     assert isomorphic(f1, f2)
+
+
+def test_lift_switch():
+    @llift
+    def f1(x, y, z):
+        if x < 0:
+            return y
+        else:
+            return z
+
+    @scalar_parse
+    def f2(x, y, z):
+        def true_branch(_y, _z):
+            return _y
+
+        def false_branch(_y, _z):
+            return _z
+
+        return switch(x < 0, true_branch, false_branch)(y, z)
+
+    assert isomorphic(f1, f2)

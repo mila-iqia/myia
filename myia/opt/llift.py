@@ -4,16 +4,40 @@ from types import SimpleNamespace as NS
 
 from ..info import About
 from ..ir import Graph, manage
-from ..utils import WorkSet
+from ..operations import primitives as P
+from ..utils import OrderedSet, WorkSet
 
 
-def lambda_lift(root):
+def _get_switch_sibling(g):
+    """Returns the other graph of a switch statement.
+
+    Given g, return (x, g2) if g is only used in an expression of the form
+    `x = switch(cond, g, g2)`. Otherwise, return None, None.
+    """
+    hos = g.higher_order_sites
+    if g.call_sites or len(hos) != 1:
+        return None, None
+    ((site, key),) = hos
+    if site.is_apply(P.switch) and (key == 2 or key == 3):
+        g2 = site.inputs[5 - key]
+        if g2.is_constant_graph():
+            return site, g2.value
+    return None, None
+
+
+def lambda_lift(root, lift_switch=True):
     """Lambda-lift the graphs that can be lifted.
 
     Graphs with free variables for which we can identify all calls will be
     modified to take these free variables as extra arguments.
 
     This is a destructive operation.
+
+    Arguments:
+        root: The root graph from which to proceed.
+        lift_switch: If True, expressions of the form
+            switch(test, f, g)(...) may lead to f and g to be lifted
+            if f and g are only used in the switch statement.
     """
     mng = manage(root)
     mng.gc()
@@ -23,6 +47,9 @@ def lambda_lift(root):
     # Step 1a: Figure out what to do. We will try to lift all functions that
     # have free variables and are only used in call position.
     for g in graphs:
+        if g in candidates:
+            continue
+
         if g.parent and not graphs.processed(g.parent):
             # Process parents first (we will reverse the order later)
             graphs.requeue(g)
@@ -30,10 +57,30 @@ def lambda_lift(root):
 
         if g.free_variables_total and g.all_direct_calls:
             candidates[g] = NS(
-                graph=g,
-                calls=g.call_sites,
-                fvs=g.free_variables_extended,
+                graph=g, calls=g.call_sites, fvs=g.free_variables_extended,
             )
+
+        if lift_switch:
+            switch_node, g2 = _get_switch_sibling(g)
+            if g2 and _get_switch_sibling(g2)[1] is g:
+                switch_uses = mng.uses[switch_node]
+                if len(switch_uses) == 1:
+                    ((switch_caller, key),) = switch_uses
+                    if key == 0:
+                        all_fvs = list(
+                            OrderedSet(
+                                [
+                                    *g.free_variables_extended,
+                                    *g2.free_variables_extended,
+                                ]
+                            )
+                        )
+                        candidates[g] = NS(
+                            graph=g, calls=[switch_caller], fvs=all_fvs,
+                        )
+                        # switch_caller is already in the calls list for g,
+                        # so we don't include it for g2
+                        candidates[g2] = NS(graph=g2, calls=[], fvs=all_fvs,)
 
     # Step 1b: We try to complete the scope of each candidate with the graphs
     # that are free variables for that candidate. If they are also candidates,
@@ -151,6 +198,31 @@ def lambda_lift(root):
 #         return g(_y, _x)   # <- Swap fvs for parameters
 
 #     return h(y, x)
+
+
+###########################
+# If llift_switch is True #
+###########################
+
+# def f(x, y, z):
+#     def true_branch():
+#         return y
+
+#     def false_branch():
+#         return z
+
+#     return switch(x < 0, true_branch, false_branch)()
+
+# ==>
+
+# def f(x, y, z):
+#     def true_branch(_y, _z):    # <- Add free variables of both branches
+#         return _y
+
+#     def false_branch(_y, _z):   # <- Add free variables of both branches
+#         return _z
+
+#     return switch(x < 0, true_branch, false_branch)(y, z)   # <- Add args
 
 
 __consolidate__ = True
