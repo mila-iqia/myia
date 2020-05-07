@@ -6,7 +6,7 @@ import torch
 from ... import abstract, xtype
 from ...ir import manage
 from ...operations import Primitive, primitives as P
-from ...utils import RandomStateWrapper, TaggedValue
+from ...utils import RandomStateWrapper, TaggedValue, untested_legacy
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..cconv import closure_convert
 from ..transform import CompileGraphs, nonlinear_ops
@@ -538,7 +538,8 @@ class PyTorchBackend(Backend):
     def to_numpy(self, v):
         """Make a numpy array from a torch tensor."""
         if v.is_cuda:
-            v = v.cpu()
+            with untested_legacy():
+                v = v.cpu()
         return v.detach().numpy()
 
     def from_numpy(self, a):
