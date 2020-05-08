@@ -1,3 +1,4 @@
+from myia.abstract import DEAD
 from myia.ir import isomorphic
 from myia.operations import switch
 from myia.pipeline import scalar_parse, scalar_pipeline, steps
@@ -177,6 +178,6 @@ def test_lift_switch2():
 
         a = switch(x < 0, g1, g3)
         b = switch(x > 0, g2, g3)
-        return a(z, y) + b(z, y)
+        return a(DEAD, y) + b(z, DEAD)
 
     assert isomorphic(f1, f2)

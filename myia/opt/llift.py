@@ -4,8 +4,9 @@ import operator
 from functools import reduce
 from types import SimpleNamespace as NS
 
+from .dde import make_dead
 from ..info import About
-from ..ir import Graph, manage
+from ..ir import Constant, Graph, manage
 from ..operations import primitives as P
 from ..utils import OrderedSet, WorkSet
 
@@ -22,7 +23,7 @@ def _get_call_sites(g, mng):
     """
 
     call_sites = list(g.call_sites)
-    eqv = OrderedSet()
+    eqv = OrderedSet([g])
 
     for node, key in g.higher_order_sites:
         if not (node.is_apply(P.switch) and (key == 2 or key == 3)):
@@ -57,6 +58,8 @@ def lambda_lift(root):
     mng = manage(root)
     mng.gc()
     candidates = {}
+    # Graphs that may be called at a given call site
+    call_site_poss = {}
 
     # Step 1a: Figure out what to do. We will try to lift all functions that
     # have free variables and are only used in call position, or as a branch
@@ -78,6 +81,8 @@ def lambda_lift(root):
             if new_call_sites is None:
                 valid = False
                 break
+            for cs in new_call_sites:
+                call_site_poss[cs] = new_eqv
             call_sites.update(new_call_sites)
             ws.queue_all(new_eqv)
 
@@ -143,7 +148,16 @@ def lambda_lift(root):
     for entry in todo:
         with mng.transact() as tr:
             for node in entry.calls:
-                new_node = node.graph.apply(*node.inputs, *entry.fvs)
+                fvs = [
+                    fv
+                    if any(
+                        fv in gg.free_variables_extended
+                        for gg in call_site_poss[node]
+                    )
+                    else make_dead(fv)
+                    for fv in entry.fvs
+                ]
+                new_node = node.graph.apply(*node.inputs, *fvs)
                 new_node.abstract = node.abstract
                 tr.replace(node, new_node)
 

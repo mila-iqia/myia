@@ -455,6 +455,21 @@ def _vprop_generic(vprop, need, inputs, out):
 #######################
 
 
+def make_dead(node):
+    """Create a dead version of the node."""
+    a = node.abstract
+    val = DEAD
+    if isinstance(a, abstract.AbstractScalar):
+        if a.xtype() == xtype.EnvType:
+            val = newenv
+        elif a.xtype() == xtype.UniverseType:
+            with untested_legacy():
+                return None
+    repl = Constant(val)
+    repl.abstract = node.abstract
+    return repl
+
+
 class DeadDataElimination(Partializable):
     """Eliminate expressions that compute unretrieved data."""
 
@@ -462,20 +477,6 @@ class DeadDataElimination(Partializable):
         """Initialize a DeadDataElimination."""
         self.resources = resources
         self.name = "dde"
-
-    def make_dead(self, node):
-        """Create a dead version of the node."""
-        a = node.abstract
-        val = DEAD
-        if isinstance(a, abstract.AbstractScalar):
-            if a.xtype() == xtype.EnvType:
-                val = newenv
-            elif a.xtype() == xtype.UniverseType:
-                with untested_legacy():
-                    return None
-        repl = Constant(val)
-        repl.abstract = node.abstract
-        return repl
 
     def __call__(self, root):
         """Apply dead data elimination."""
@@ -494,11 +495,11 @@ class DeadDataElimination(Partializable):
                     continue
                 if g and node is g.return_:
                     continue
-                repl = self.make_dead(node)
+                repl = make_dead(node)
                 if repl is not None:
                     mng.replace(node, repl)
             tracer().emit_success(**args, new_node=None)
             return False  # Pretend there are no changes, for now
 
 
-__all__ = ["ValuePropagator", "DeadDataElimination"]
+__all__ = ["ValuePropagator", "DeadDataElimination", "make_dead"]
