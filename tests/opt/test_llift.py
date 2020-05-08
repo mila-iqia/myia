@@ -146,3 +146,37 @@ def test_lift_switch():
         return switch(x < 0, true_branch, false_branch)(y, z)
 
     assert isomorphic(f1, f2)
+
+
+def test_lift_switch2():
+    @llift
+    def f1(x, y, z):
+        def g1():
+            return y
+
+        def g2():
+            return z
+
+        def g3():
+            return 0
+
+        a = switch(x < 0, g1, g3)
+        b = switch(x > 0, g2, g3)
+        return a() + b()
+
+    @scalar_parse
+    def f2(x, y, z):
+        def g1(_z, _y):
+            return _y
+
+        def g2(_z, _y):
+            return _z
+
+        def g3(_z, _y):
+            return 0
+
+        a = switch(x < 0, g1, g3)
+        b = switch(x > 0, g2, g3)
+        return a(z, y) + b(z, y)
+
+    assert isomorphic(f1, f2)

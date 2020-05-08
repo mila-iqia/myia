@@ -1,5 +1,7 @@
 """Lambda lifting."""
 
+import operator
+from functools import reduce
 from types import SimpleNamespace as NS
 
 from ..info import About
@@ -8,73 +10,88 @@ from ..operations import primitives as P
 from ..utils import OrderedSet, WorkSet
 
 
-def _get_switch_sibling(g):
-    """Returns the other graph of a switch statement.
+def _get_call_sites(g, mng):
+    """Returns (call_sites, eqv).
 
-    Given g, return (x, g2) if g is only used in an expression of the form
-    `x = switch(cond, g, g2)`. Otherwise, return None, None.
+    A call site C is either:
+
+    * C = g(...)
+      * Contributes nothing to eqv
+    * C = switch(cond, g, g2)(...)
+      * Contributes g2 to eqv
     """
-    hos = g.higher_order_sites
-    if g.call_sites or len(hos) != 1:
-        return None, None
-    ((site, key),) = hos
-    if site.is_apply(P.switch) and (key == 2 or key == 3):
-        g2 = site.inputs[5 - key]
-        if g2.is_constant_graph():
-            return site, g2.value
-    return None, None
+
+    call_sites = list(g.call_sites)
+    eqv = OrderedSet()
+
+    for node, key in g.higher_order_sites:
+        if not (node.is_apply(P.switch) and (key == 2 or key == 3)):
+            return None, None
+
+        g2_node = node.inputs[5 - key]
+        if not g2_node.is_constant_graph():
+            return None, None
+
+        g2 = g2_node.value
+        uses = mng.uses[node]
+        if not all(key2 == 0 for site, key2 in uses):
+            return None, None
+
+        call_sites += [site for site, _ in uses]
+        eqv.add(g2)
+
+    return call_sites, eqv
 
 
-def lambda_lift(root, lift_switch=True):
+def lambda_lift(root):
     """Lambda-lift the graphs that can be lifted.
 
-    Graphs with free variables for which we can identify all calls will be
+    Graphs with free variables for which we can identify all call sites will be
     modified to take these free variables as extra arguments.
 
     This is a destructive operation.
 
     Arguments:
         root: The root graph from which to proceed.
-        lift_switch: If True, expressions of the form
-            switch(test, f, g)(...) may lead to f and g to be lifted
-            if f and g are only used in the switch statement.
     """
     mng = manage(root)
     mng.gc()
     candidates = {}
 
     # Step 1a: Figure out what to do. We will try to lift all functions that
-    # have free variables and are only used in call position.
+    # have free variables and are only used in call position, or as a branch
+    # of a switch only used in call position, in which case we will merge
+    # the free variables needed by all branches.
     for g in mng.graphs:
         if g in candidates:
             continue
 
-        if g.free_variables_total and g.all_direct_calls:
-            candidates[g] = NS(
-                graph=g, calls=g.call_sites, fvs=g.free_variables_extended,
-            )
+        valid = True
+        ws = WorkSet([g])
+        # Set of graphs that must all be augmented with the same fvs
+        eqv = OrderedSet()
+        # Call sites that will have to be updated
+        call_sites = OrderedSet()
+        for currg in ws:
+            eqv.add(currg)
+            new_call_sites, new_eqv = _get_call_sites(currg, mng)
+            if new_call_sites is None:
+                valid = False
+                break
+            call_sites.update(new_call_sites)
+            ws.queue_all(new_eqv)
 
-        if lift_switch:
-            switch_node, g2 = _get_switch_sibling(g)
-            if g2 and _get_switch_sibling(g2)[1] is g:
-                switch_uses = mng.uses[switch_node]
-                if len(switch_uses) == 1:
-                    ((switch_caller, key),) = switch_uses
-                    if key == 0:
-                        all_fvs = list(
-                            OrderedSet(
-                                [
-                                    *g.free_variables_extended,
-                                    *g2.free_variables_extended,
-                                ]
-                            )
-                        )
-                        candidates[g] = NS(
-                            graph=g, calls=[switch_caller], fvs=all_fvs,
-                        )
-                        # switch_caller is already in the calls list for g,
-                        # so we don't include it for g2
-                        candidates[g2] = NS(graph=g2, calls=[], fvs=all_fvs,)
+        if valid and any(gg.free_variables_total for gg in eqv):
+            all_fvs = reduce(
+                operator.or_,
+                [gg.free_variables_extended for gg in eqv],
+                OrderedSet(),
+            )
+            for gg in eqv:
+                candidates[gg] = NS(
+                    graph=g, calls=call_sites, fvs=all_fvs, eqv=eqv,
+                )
+                call_sites = []
 
     # Step 1b: We try to complete the scope of each candidate with the graphs
     # that are free variables for that candidate. If they are also candidates,
@@ -99,7 +116,8 @@ def lambda_lift(root, lift_switch=True):
         if not all(
             all(user in g.scope for user in g2.graph_users) for g2 in fvg
         ):
-            del candidates[g]
+            for g2 in entry.eqv:
+                del candidates[g2]
             continue
 
         entry.scope = {*g.scope, *fvg}
@@ -114,7 +132,7 @@ def lambda_lift(root, lift_switch=True):
     for g in ws:
         if g.parent and g.parent in candidates and not ws.processed(g.parent):
             # Add parents first (we will reverse the order later)
-            graphs.requeue(g)
+            ws.requeue(g)
             continue
         todo.append(candidates[g])
     todo.reverse()
@@ -201,9 +219,9 @@ def lambda_lift(root, lift_switch=True):
 #     return h(y, x)
 
 
-###########################
-# If llift_switch is True #
-###########################
+######################################################
+# Lambda lifting when switch statements are involved #
+######################################################
 
 # def f(x, y, z):
 #     def true_branch():
