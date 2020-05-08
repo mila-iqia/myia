@@ -91,7 +91,7 @@ def lambda_lift(root):
             )
             for gg in eqv:
                 candidates[gg] = NS(
-                    graph=g, calls=call_sites, fvs=all_fvs, eqv=eqv,
+                    graph=gg, calls=call_sites, fvs=all_fvs, eqv=eqv,
                 )
                 call_sites = []
 
@@ -123,7 +123,10 @@ def lambda_lift(root):
             continue
 
         entry.scope = {*g.scope, *fvg}
-        entry.new_params = {fv: _param(fv) for fv in entry.fvs}
+        entry.new_params = {
+            fv: (_param(fv), fv in g.free_variables_extended)
+            for fv in entry.fvs
+        }
 
     # Step 1c: Reverse the order so that children are processed before parents.
     # This is important for step 3, because children that are lambda lifted
@@ -165,7 +168,9 @@ def lambda_lift(root):
     for entry in todo:
         with mng.transact() as tr:
             # Redirect the fvs to the parameter (those in scope)
-            for fv, param in entry.new_params.items():
+            for fv, (param, active) in entry.new_params.items():
+                if not active:
+                    continue
                 for node, idx in mng.uses[fv]:
                     if node.graph in entry.scope:
                         tr.set_edge(node, idx, param)
