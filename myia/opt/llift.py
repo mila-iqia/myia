@@ -4,44 +4,41 @@ import operator
 from functools import reduce
 from types import SimpleNamespace as NS
 
-from .dde import make_dead
 from ..info import About
-from ..ir import Constant, Graph, manage
+from ..ir import Graph, manage
 from ..operations import primitives as P
 from ..utils import OrderedSet, WorkSet
+from .dde import make_dead
 
 
 def _get_call_sites(g, mng):
-    """Returns (call_sites, eqv).
+    """Returns {call_site: eqv}.
 
     A call site C is either:
 
     * C = g(...)
-      * Contributes nothing to eqv
+      * eqv = set()
     * C = switch(cond, g, g2)(...)
-      * Contributes g2 to eqv
+      * eqv = {g2}
     """
-
-    call_sites = list(g.call_sites)
-    eqv = OrderedSet([g])
+    call_sites = {cs: set() for cs in g.call_sites}
 
     for node, key in g.higher_order_sites:
         if not (node.is_apply(P.switch) and (key == 2 or key == 3)):
-            return None, None
+            return None
 
         g2_node = node.inputs[5 - key]
         if not g2_node.is_constant_graph():
-            return None, None
+            return None
 
         g2 = g2_node.value
         uses = mng.uses[node]
         if not all(key2 == 0 for site, key2 in uses):
-            return None, None
+            return None
 
-        call_sites += [site for site, _ in uses]
-        eqv.add(g2)
+        call_sites.update({site: {g2} for site, _ in uses})
 
-    return call_sites, eqv
+    return call_sites
 
 
 def lambda_lift(root):
@@ -77,14 +74,14 @@ def lambda_lift(root):
         call_sites = OrderedSet()
         for currg in ws:
             eqv.add(currg)
-            new_call_sites, new_eqv = _get_call_sites(currg, mng)
-            if new_call_sites is None:
+            new_results = _get_call_sites(currg, mng)
+            if new_results is None:
                 valid = False
                 break
-            for cs in new_call_sites:
-                call_site_poss[cs] = new_eqv
-            call_sites.update(new_call_sites)
-            ws.queue_all(new_eqv)
+            for cs, new_eqv in new_results.items():
+                call_site_poss[cs] = OrderedSet([currg, *new_eqv])
+                call_sites.add(cs)
+                ws.queue_all(new_eqv)
 
         if valid and any(gg.free_variables_total for gg in eqv):
             all_fvs = reduce(
