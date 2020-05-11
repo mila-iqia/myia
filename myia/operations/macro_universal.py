@@ -1,17 +1,39 @@
 """Implementation of the 'universal' macro."""
 
 from .. import lib, operations
-from ..lib import Constant, MetaGraph, macro, overload
+from ..lib import Constant, MetaGraph, core, macro, overload
 
 
-@overload
-def is_universal(g: lib.GraphFunction):
+@core(universal=True)
+def universal_wrapper(fn):
+    """Create a version of fn that passes the universe through."""
+
+    def wrapped(*args):
+        U = args[-1]
+        args = args[:-1]
+        return U, fn(*args)
+
+    return wrapped
+
+
+@overload(bootstrap=True)
+def is_universal(self, g: lib.GraphFunction):
     """Check whether a function is universal or not."""
     return g.graph.has_flags("universal")
 
 
 @overload  # noqa: F811
-def is_universal(x: object):
+def is_universal(self, g: lib.PartialApplication):
+    return self(g.fn)
+
+
+@overload  # noqa: F811
+def is_universal(self, p: (lib.PrimitiveFunction, lib.TypedPrimitive)):
+    return p.prim.universal
+
+
+@overload  # noqa: F811
+def is_universal(self, x: object):
     return False
 
 
@@ -28,7 +50,7 @@ class StatePassthrough(MetaGraph):
 
     def expand(self, g, parameters):
         """Generate a graph wrapper based on the number of arguments."""
-        u, *params = parameters
+        *params, u = parameters
         res = g.apply(self.op, *params)
         return g.apply(operations.make_tuple, u, res)
 
@@ -52,10 +74,7 @@ async def universal(info, fn):
         return Constant(StatePassthrough(fn.node.value))
 
     else:
-        raise NotImplementedError(
-            'Macro "universal" does not currently work on non-constant'
-            " functions."
-        )
+        return info.graph.apply(universal_wrapper, fn.node)
 
 
 __operation_defaults__ = {

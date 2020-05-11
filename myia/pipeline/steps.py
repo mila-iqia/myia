@@ -160,7 +160,7 @@ def step_infer(resources, graph, argspec):
     """
     orig_argspec = argspec
     if resources.universal:
-        argspec = (type_to_abstract(UniverseType), *argspec)
+        argspec = (*argspec, type_to_abstract(UniverseType))
     outspec, context = resources.inferrer(graph, argspec)
     if not nobottom(outspec):
         raise InferenceError(
@@ -487,7 +487,7 @@ def step_wrap(
     vm_arg_t = graph.abstract.args
     vm_out_t = graph.return_.abstract
     if resources.universal:
-        vm_unv_in_t, vm_arg_t = vm_arg_t[0], vm_arg_t[1:]
+        vm_unv_in_t, vm_arg_t = vm_arg_t[-1], vm_arg_t[:-1]
         _, vm_out_t = vm_out_t.elements[0], vm_out_t.elements[1]
 
     def wrapped(*args):
@@ -505,9 +505,9 @@ def step_wrap(
         )
         if resources.universal:
             backend_universe = backend.to_backend_value(
-                to_canonical(new_universe, argspec[0]), vm_unv_in_t
+                to_canonical(new_universe, argspec[-1]), vm_unv_in_t
             )
-            _, res = fn(backend_universe, *args)
+            _, res = fn(*args, backend_universe)
         else:
             res = fn(*args)
         if resources.return_backend:

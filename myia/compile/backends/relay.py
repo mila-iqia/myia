@@ -10,9 +10,11 @@ from tvm.relay.backend import interpreter
 
 from ...abstract import AbstractTaggedUnion
 from ...graph_utils import toposort
-from ...ir import Graph, manage
+from ...ir import Graph, manage, sexp_to_node
 from ...operations import Primitive, primitives as P
+from ...operations.primitives import BackendPrimitive
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
+from ...utils.variables import X, Y
 from ...xtype import type_to_np_dtype
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result
@@ -27,6 +29,9 @@ from .relay_helpers import (
     handle_wrapper,
     to_relay_type,
 )
+
+# Temporary primitive to replace make_handle in graphs
+make_cell = BackendPrimitive(name="make_cell", defaults={})
 
 
 @wrap_result.register
@@ -500,8 +505,8 @@ def relay_split(c, x, sections, dim):
     return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
-def relay_handle(c, v):
-    return relay.expr.RefCreate(c.ref(v))
+def relay_make_cell(c, v, u):
+    return relay.Tuple((c.ref(u), relay.expr.RefCreate(c.ref(v))))
 
 
 # Proper sequencing is handled in convert_func() below
@@ -606,12 +611,12 @@ COMPLEX_MAP = {
     P.conv_transpose2d: relay_conv_transpose2d,
     P.concat: relay_concat,
     P.split: relay_split,
-    P.handle: relay_handle,
     P.universe_setitem: relay_universe_setitem,
     P.universe_getitem: relay_universe_getitem,
     P.take_grad_inp: relay_take_grad_inp,
     P.random_initialize: relay_random_initialize,
     P.random_uint32: relay_random_uint32,
+    make_cell: relay_make_cell,
 }
 
 
@@ -735,6 +740,9 @@ class RelayConstantConverter(Converter):
     def convert_env(self, v, t):
         assert len(v) == 0
         return self.types.build_default_env_val()
+
+    def convert_handle(self, v, t):
+        return relay.expr.RefCreate(self(v.state, v.abstract or t.element))
 
     def convert_tuple(self, v, t):
         return relay.Tuple([self(e, et) for e, et in zip(v, t.elements)])
@@ -973,6 +981,31 @@ class RelayOutputConverter(Converter):
         return RandomStateWrapper(tuple(el.asnumpy().item() for el in v))
 
 
+def make_handle_to_make_cell(g):
+    """Replace uset(*make_handle(typ), value) by make_cell(value, U).
+
+    This is because RefCreate both creates the reference and sets it.
+    """
+    mng = manage(g)
+    for node in list(mng.all_nodes):
+        equiv = node.match(
+            (
+                P.universe_setitem,
+                (P.tuple_getitem, X, 0),
+                (P.tuple_getitem, X, 1),
+                Y,
+            )
+        )
+        if equiv:
+            x = equiv[X]
+            if x.is_apply(P.make_handle):
+                new_handle_node = sexp_to_node(
+                    (make_cell, equiv[Y], x.inputs[2]), node.graph
+                )
+                mng.replace(x, new_handle_node)
+                mng.replace(node, node.inputs[1])
+
+
 class RelayBackend(Backend):
     """Backend based on Relay.
 
@@ -1007,6 +1040,7 @@ class RelayBackend(Backend):
 
     def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
+        make_handle_to_make_cell(graph)
         return self.compiler.run(
             graph, self.context, self.target, self.exec_kind
         )

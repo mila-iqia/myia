@@ -138,7 +138,7 @@ def to_abstract(self, v: Primitive, node=None, **kwargs):
 
 @overload  # noqa: F811
 def to_abstract(self, v: HandleInstance, **kwargs):
-    return AbstractHandle(self(v.state, **kwargs))
+    return AbstractHandle(v.abstract or self(v.state, **kwargs))
 
 
 @overload  # noqa: F811

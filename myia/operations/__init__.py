@@ -194,6 +194,14 @@ call_object = Operation(
 
 casttag = Operation(name="casttag", defaults="myia.operations.prim_casttag")
 
+cell_get = Operation(
+    name="cell_get", defaults="myia.operations.ops_universe.cell_get"
+)
+
+cell_set = Operation(
+    name="cell_set", defaults="myia.operations.ops_universe.cell_set"
+)
+
 concat = Operation(name="concat", defaults="myia.operations.prim_concat")
 
 conv2d = Operation(name="conv2d", defaults="myia.operations.prim_conv2d")
@@ -285,16 +293,6 @@ grad = Operation(name="grad", defaults="myia.operations.macro_grad")
 
 gt = Operation(name="gt", defaults="myia.operations.ops_dunder.gt")
 
-handle = Operation(name="handle", defaults="myia.operations.prim_handle")
-
-handle_get = Operation(
-    name="handle_get", defaults="myia.operations.ops_universe.handle_get"
-)
-
-handle_set = Operation(
-    name="handle_set", defaults="myia.operations.ops_universe.handle_set"
-)
-
 hasattr = Operation(name="hasattr", defaults="myia.operations.macro_hasattr")
 
 hastag = Operation(name="hastag", defaults="myia.operations.prim_hastag")
@@ -340,12 +338,20 @@ lshift = Operation(name="lshift", defaults="myia.operations.ops_dunder.lshift")
 
 lt = Operation(name="lt", defaults="myia.operations.ops_dunder.lt")
 
+make_cell = Operation(
+    name="make_cell", defaults="myia.operations.ops_universe.make_cell"
+)
+
 make_dict = Operation(
     name="make_dict", defaults="myia.operations.prim_make_dict"
 )
 
 make_exception = Operation(
     name="make_exception", defaults="myia.operations.prim_make_exception"
+)
+
+make_handle = Operation(
+    name="make_handle", defaults="myia.operations.prim_make_handle"
 )
 
 make_kwarg = Operation(
