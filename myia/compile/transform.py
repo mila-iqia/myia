@@ -42,15 +42,14 @@ def get_prim_graph(cache, prim, typ):
     if (prim, typ) not in cache:
         g = Graph()
         args = []
-        tp = list(typ.xvalue())[0]
-        for t in tp.args:
+        for t in typ.args:
             p = g.add_parameter()
             p.abstract = t
             args.append(p)
         primct = Constant(prim)
         primct.abstract = typ
         out = g.apply(primct, *args)
-        out.abstract = tp.output
+        out.abstract = typ.output
         g.output = out
         cache[(prim, typ)] = g
     return cache[(prim, typ)]

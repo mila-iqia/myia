@@ -11,7 +11,7 @@ from tvm.runtime.object import Object
 from ...abstract import (
     AbstractArray,
     AbstractError,
-    AbstractFunction,
+    AbstractFunctionUnique,
     AbstractHandle,
     AbstractRandomState,
     AbstractScalar,
@@ -19,7 +19,6 @@ from ...abstract import (
     AbstractTuple,
     AbstractType,
     TypedPrimitive,
-    VirtualFunction,
 )
 from ...operations import primitives as P
 from ...utils import overload
@@ -191,14 +190,7 @@ def to_relay_type(self, a: AbstractArray):
 
 
 @overload  # noqa: F811
-def to_relay_type(self, a: AbstractFunction):
-    sings = list(self(sing) for sing in a.get_sync())
-    assert len(sings) == 1
-    return sings[0]
-
-
-@overload  # noqa: F811
-def to_relay_type(self, a: (VirtualFunction, TypedPrimitive)):
+def to_relay_type(self, a: (AbstractFunctionUnique, TypedPrimitive)):
     return relay.ty.FuncType([self(aa) for aa in a.args], self(a.output))
 
 

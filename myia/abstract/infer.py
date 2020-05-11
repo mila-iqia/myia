@@ -18,7 +18,6 @@ from ..utils import (
     infer_trace,
     tracer,
     type_error_nargs,
-    untested_legacy,
 )
 from .amerge import amerge, bind
 from .data import (
@@ -26,22 +25,20 @@ from .data import (
     TYPE,
     VALUE,
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
     AbstractTuple,
     AbstractValue,
-    DummyFunction,
     Function,
     GraphFunction,
-    JTransformedFunction,
     MacroFunction,
     MetaGraphFunction,
     PartialApplication,
-    Primitive,
     PrimitiveFunction,
+    TransformedFunction,
     TypedPrimitive,
-    VirtualFunction,
 )
 from .loop import InferenceLoop, Pending, force_pending
 from .macro import AnnotationBasedChecker
@@ -107,7 +104,7 @@ class InferenceEngine:
         """Infer a function call on the given argspec/outspec."""
         if not isinstance(fn, Function):
             fn = to_abstract(fn).get_unique()
-        vfn = VirtualFunction(argspec, outspec)
+        vfn = AbstractFunctionUnique(argspec, outspec)
         out = await execute_inferrers(
             self,
             [self.get_inferrer_for(fn)],
@@ -261,11 +258,16 @@ class InferenceEngine:
         return PartialInferrer(self.get_inferrer_for(part.fn), part.args)
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, j: JTransformedFunction):
-        return JInferrer(self.get_inferrer_for(j.fn), j.fn)
+    def get_inferrer_for(self, tf: TransformedFunction):
+        if tf.transform is P.J:
+            return JInferrer(self.get_inferrer_for(tf.fn), tf.fn)
+        else:
+            raise NotImplementedError(
+                f"No available transform for {tf.transform}"
+            )
 
     @get_inferrer_for.register
-    def get_inferrer_for(self, vf: (VirtualFunction, TypedPrimitive)):
+    def get_inferrer_for(self, vf: (TypedPrimitive, AbstractFunctionUnique)):
         return VirtualInferrer(vf.args, vf.output)
 
     @get_inferrer_for.register
@@ -282,7 +284,10 @@ class InferenceEngine:
 
     async def execute(self, fn, *args):
         r"""Infer the result of fn(\*args)."""
-        infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
+        if isinstance(fn, AbstractFunctionUnique):
+            infs = [self.get_inferrer_for(fn)]
+        else:
+            infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
         argrefs = [VirtualReference(a) for a in args]
         return await execute_inferrers(self, infs, None, argrefs)
 
@@ -295,17 +300,24 @@ class InferenceEngine:
         fn = await fn_ref.get()
         argrefs = [self.ref(node, ctx) for node in n_args]
 
-        if not isinstance(fn, AbstractFunction):
+        if isinstance(fn, AbstractFunction):
+            infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
+            return await self.loop.schedule(
+                execute_inferrers(self, infs, ref, argrefs),
+                context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
+            )
+
+        elif isinstance(fn, AbstractFunctionUnique):
+            infs = [self.get_inferrer_for(fn)]
+            return await self.loop.schedule(
+                execute_inferrers(self, infs, ref, argrefs),
+                context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
+            )
+
+        else:
             g = ref.node.graph
             newcall = g.apply(operations.call_object, n_fn, *n_args)
             return await self.reroute(ref, self.ref(newcall, ctx))
-
-        infs = [self.get_inferrer_for(poss) for poss in await fn.get()]
-
-        return await self.loop.schedule(
-            execute_inferrers(self, infs, ref, argrefs),
-            context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
-        )
 
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
@@ -704,50 +716,32 @@ def compute_bprop_type(orig_fn, args, out):
     bparams = [sensitivity_transform(fn)]
     bparams += [sensitivity_transform(a) for a in args]
     bparams_final = AbstractTuple(bparams)
-    return AbstractFunction(
-        VirtualFunction((sensitivity_transform(out),), bparams_final)
-    )
+    return AbstractFunctionUnique((sensitivity_transform(out),), bparams_final)
 
 
 async def compute_jinv_type(x):
     """Compute the abstract type of jinv(_ :: x)."""
     if isinstance(x, AbstractJTagged):
         return x.element
-    elif isinstance(x, VirtualFunction):
-        return VirtualFunction(
+    elif isinstance(x, AbstractFunctionUnique):
+        return AbstractFunctionUnique(
             tuple([await compute_jinv_type(arg) for arg in x.args]),
             await compute_jinv_type(x.output.elements[0]),
         )
-    elif isinstance(x, JTransformedFunction):
+    elif isinstance(x, TransformedFunction) and x.transform is P.J:
         return x.fn
     elif isinstance(x, GraphFunction):
         g = x.graph
         primal = g and g.transforms.get("primal", None)
         if primal:
-            if isinstance(primal, Graph):
-                if primal.parent:
-                    # The primal for a closure can't be used
-                    # because it points to the original nodes
-                    # of its parent, whereas we would like to
-                    # point to the transformed nodes of the
-                    # parent. This is fixable, and will need
-                    # to be fixed to support a few edge cases.
-                    res = DummyFunction()
-                else:
-                    with untested_legacy():
-                        # Not sure why this never happens anymore
-                        # primal = engine.resources.convert(primal)
-                        res = GraphFunction(primal, Context.empty())
-            else:
-                with untested_legacy():
-                    # Not sure why this never happens either
-                    res = primal
-                    if isinstance(res, Primitive):
-                        tid = getattr(x, "tracking_id", None)
-                        res = PrimitiveFunction(res, tracking_id=tid)
+            # When this happens, primal is usually (currently, always) a
+            # closure. Note that the primal for a closure can't be used because
+            # it points to the original nodes of its parent, whereas we would
+            # like to point to the transformed nodes of the parent, so to keep
+            # things simple we represent this as a transform.
+            return TransformedFunction(x, P.Jinv)
         else:
             raise MyiaTypeError(f"Bad input type for Jinv: {x}")
-        return res
     elif isinstance(x, AbstractFunction):
         fns = [await compute_jinv_type(f) for f in await x.get()]
         return AbstractFunction(*fns)
@@ -765,9 +759,12 @@ class JInferrer(Inferrer):
         self.orig_fn = orig_fn
 
     async def _jtag(self, x):
+        assert not isinstance(x, AbstractFunctionUnique)
         if isinstance(x, AbstractFunction):
             v = await x.get()
-            return AbstractFunction(*[JTransformedFunction(poss) for poss in v])
+            return AbstractFunction(
+                *[TransformedFunction(poss, P.J) for poss in v]
+            )
         return AbstractJTagged(x)
 
     async def run(self, engine, outref, argrefs):

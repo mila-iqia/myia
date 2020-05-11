@@ -7,7 +7,7 @@ from ..lib import (
     SHAPE,
     TYPE,
     AbstractArray,
-    AbstractFunction,
+    AbstractFunctionBase,
     MetaGraph,
     MyiaShapeError,
     bprop_to_grad_transform,
@@ -68,7 +68,11 @@ def debugvm_array_reduce(vm, fn, array, shp):
 
 @standard_prim(P.array_reduce)
 async def infer_array_reduce(
-    self, engine, fn: AbstractFunction, a: AbstractArray, shp: u64tup_typecheck
+    self,
+    engine,
+    fn: AbstractFunctionBase,
+    a: AbstractArray,
+    shp: u64tup_typecheck,
 ):
     """Infer the return type of primitive `array_reduce`."""
     shp_i = await force_pending(a.xshape())

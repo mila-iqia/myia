@@ -46,7 +46,6 @@ POLY = Named("POLY")
 #####################
 
 
-@serializable("Possibilities", sequence=True)
 class Possibilities(list):
     """Represents a set of possible values.
 
@@ -62,15 +61,6 @@ class Possibilities(list):
         # equal later on, so we cannot rely on the fact that each option in the
         # list is different.
         super().__init__(OrderedSet(options))
-
-    def _serialize(self):
-        return self
-
-    @classmethod
-    def _construct(cls):
-        p = Possibilities([])
-        data = yield p
-        p[:] = data
 
     def __hash__(self):
         return hash(tuple(self))
@@ -190,49 +180,17 @@ class PartialApplication(Function):
 
 
 @dataclass(frozen=True)
-class JTransformedFunction(Function):
-    """Represents a Function transformed through the application of J.
+class TransformedFunction(Function):
+    """Represents a Function processed through some transform.
 
     Attributes:
         fn: A Function
+        transform: The applied transform
 
     """
 
     fn: object
-
-
-@serializable("VirtualFunction")
-class VirtualFunction(Function, Interned, PossiblyRecursive):
-    """Represents some function with an explicitly given type signature.
-
-    Attributes:
-        args: The abstract arguments given to the function
-        output: The abstract output
-
-    """
-
-    args: List["AbstractValue"]
-    output: "AbstractValue"
-
-    def __init__(self, args, output):
-        """Initialize a VirtualFunction."""
-        self.args = list(args)
-        self.output = output
-        self._incomplete = False
-
-    def __eqkey__(self):
-        return AttrEK(self, ["args", "output"])
-
-    def _serialize(self):
-        return {"args": self.args, "output": self.output}
-
-    @classmethod
-    def _construct(cls):
-        obj = cls.empty()
-        data = yield obj
-        obj.args = data["args"]
-        obj.output = data["output"]
-        obj._incomplete = False
+    transform: object
 
 
 @serializable("TypedPrimitive")
@@ -250,11 +208,6 @@ class TypedPrimitive(Function):
     prim: Primitive
     args: Tuple["AbstractValue"]
     output: "AbstractValue"
-
-
-@dataclass(frozen=True)
-class DummyFunction(Function):
-    """Represents a function that can't be called."""
 
 
 #################
@@ -370,8 +323,19 @@ class AbstractExternal(AbstractAtom):
         return rval
 
 
+class AbstractFunctionBase(AbstractAtom):
+    """Base for function types."""
+
+    def get_prim(self):
+        """If this AbstractFunction represents a a Primitive, return it.
+
+        Otherwise, return None.
+        """
+        return None
+
+
 @serializable("AbstractFunction")
-class AbstractFunction(AbstractAtom):
+class AbstractFunction(AbstractFunctionBase):
     """Represents a function or set of functions.
 
     The VALUE track for an AbstractFunction contains a Possibilities object
@@ -451,8 +415,48 @@ class AbstractFunction(AbstractAtom):
         return pretty_join(fns, sep=" | ")
 
 
-class AbstractStructure(AbstractValue):
-    """Base class for abstract values that are structures."""
+@serializable("AbstractFunctionUnique")
+class AbstractFunctionUnique(AbstractFunctionBase):
+    """Represents some function with an explicitly given type signature.
+
+    Unlike AbstractFunction, this represents the type of a single function
+    rather than a set of possible functions.
+
+    Attributes:
+        args: The abstract arguments given to the function
+        output: The abstract output
+    """
+
+    def __init__(self, args, output, values={}):
+        """Initialize the AbstractFunctionUnique."""
+        super().__init__(values)
+        self.args = list(args)
+        self.output = output
+
+    def _serialize(self):
+        data = super()._serialize()
+        data["args"] = self.args
+        data["output"] = self.output
+        return data
+
+    @classmethod
+    def _construct(cls):
+        it = super()._construct()
+        res = next(it)
+        data = yield res
+        res.args = data.pop("args")
+        res.output = data.pop("output")
+        try:
+            it.send(data)
+        except StopIteration:
+            pass
+
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, "args", "output"))
+
+    def __pretty__(self, ctx):
+        return pretty_call(ctx, "Fn", (self.args, self.output))
 
 
 @serializable("AbstractRandomState")
@@ -462,6 +466,10 @@ class AbstractRandomState(AbstractAtom):
     def __init__(self):
         """Initialize an AbstractRandomState."""
         super().__init__({})
+
+
+class AbstractStructure(AbstractValue):
+    """Base class for abstract values that are structures."""
 
 
 class AbstractWrapper(AbstractStructure):
@@ -1020,6 +1028,7 @@ __all__ = [
     "AbstractError",
     "AbstractExternal",
     "AbstractFunction",
+    "AbstractFunctionBase",
     "AbstractHandle",
     "AbstractJTagged",
     "AbstractKeywordArgument",
@@ -1031,10 +1040,8 @@ __all__ = [
     "AbstractType",
     "AbstractUnion",
     "AbstractValue",
-    "DummyFunction",
     "Function",
     "GraphFunction",
-    "JTransformedFunction",
     "MacroFunction",
     "MetaGraphFunction",
     "PartialApplication",
@@ -1043,8 +1050,9 @@ __all__ = [
     "TaggedPossibilities",
     "Track",
     "TrackDict",
+    "TransformedFunction",
     "TypedPrimitive",
-    "VirtualFunction",
+    "AbstractFunctionUnique",
     "empty",
     "format_abstract",
     "i64tup_typecheck",

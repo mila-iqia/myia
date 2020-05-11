@@ -15,6 +15,7 @@ from myia.abstract import (
     AbstractClass,
     AbstractError,
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractHandle,
     AbstractJTagged,
     AbstractKeywordArgument,
@@ -25,13 +26,12 @@ from myia.abstract import (
     AbstractUnion,
     Context,
     InferenceLoop,
-    JTransformedFunction,
     Pending,
     PendingFromList,
     Possibilities,
     TaggedPossibilities,
     TrackDict,
-    VirtualFunction,
+    TransformedFunction,
     abstract_clone,
     amerge,
     broaden,
@@ -258,6 +258,9 @@ def test_repr():
     f1 = AbstractFunction(P.scalar_mul)
     assert repr(f1) == "AbstractFunction(scalar_mul)"
 
+    fa = AbstractFunction(value=ANYTHING)
+    assert repr(fa) == "AbstractFunction(ANYTHING)"
+
     tu1 = AbstractTaggedUnion([[13, s2], [4, to_abstract_test(i16)]])
     assert repr(tu1) == "AbstractTaggedUnion(U(4 :: Int[16], 13 :: Float[32]))"
 
@@ -289,7 +292,7 @@ def test_abstract_clone():
     a2 = T([s2, AbstractClass(object, {"field": s2})])
     assert upcast(a1, 64) is a2
 
-    jt = JTransformedFunction(VirtualFunction((s1,), s1))
+    jt = TransformedFunction(AbstractFunctionUnique((s1,), s1), P.J)
     assert upcast(jt, 64).fn.args == [s2]
     assert upcast(jt, 64).fn.output is s2
 

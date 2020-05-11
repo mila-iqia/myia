@@ -17,6 +17,7 @@ from .data import (
     AbstractClassBase,
     AbstractDict,
     AbstractFunction,
+    AbstractFunctionUnique,
     AbstractJTagged,
     AbstractKeywordArgument,
     AbstractScalar,
@@ -28,12 +29,11 @@ from .data import (
     AbstractValue,
     AbstractWrapper,
     GraphFunction,
-    JTransformedFunction,
     PartialApplication,
     Possibilities,
     TaggedPossibilities,
     TrackDict,
-    VirtualFunction,
+    TransformedFunction,
 )
 from .loop import Pending
 from .ref import Context, Reference
@@ -179,6 +179,15 @@ def abstract_check(self, x: AbstractFunction, *args):
 
 
 @overload  # noqa: F811
+def abstract_check(self, x: AbstractFunctionUnique, *args):
+    return (
+        self(x.values, *args)
+        and all(self(v, *args) for v in x.args)
+        and self(x.output, *args)
+    )
+
+
+@overload  # noqa: F811
 def abstract_check(self, x: AbstractUnion, *args):
     return self(x.options, *args)
 
@@ -199,17 +208,12 @@ def abstract_check(self, x: TaggedPossibilities, *args):
 
 
 @overload  # noqa: F811
-def abstract_check(self, t: VirtualFunction, *args):
-    return all(self(v, *args) for v in t.args) and self(t.output, *args)
-
-
-@overload  # noqa: F811
 def abstract_check(self, t: PartialApplication, *args):
     return self(t.fn, *args) and all(self(v, *args) for v in t.args)
 
 
 @overload  # noqa: F811
-def abstract_check(self, t: JTransformedFunction, *args):
+def abstract_check(self, t: TransformedFunction, *args):
     return self(t.fn, *args)
 
 
@@ -252,7 +256,7 @@ def abstract_clone(__call__, self, x, *args):
     """Clone an abstract value."""
 
     def proceed():
-        if isinstance(x, (AbstractValue, VirtualFunction)) and x in cache:
+        if isinstance(x, AbstractValue) and x in cache:
             return cache[x]
         result = __call__(self, x, *args)
         if not isinstance(result, GeneratorType):
@@ -374,13 +378,13 @@ def abstract_clone(self, x: PartialApplication, *args):
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: JTransformedFunction, *args):
-    return JTransformedFunction(self(x.fn, *args))
+def abstract_clone(self, x: TransformedFunction, *args):
+    return TransformedFunction(self(x.fn, *args), x.transform)
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: VirtualFunction, *args):
-    return (yield VirtualFunction)(
+def abstract_clone(self, x: AbstractFunctionUnique, *args):
+    return (yield AbstractFunctionUnique)(
         [self(arg, *args) for arg in x.args], self(x.output, *args)
     )
 
@@ -489,7 +493,7 @@ def broaden(self, d: TrackDict, *args):  # noqa: D417
 
 
 @abstract_clone.variant
-def sensitivity_transform(self, x: AbstractFunction):
+def sensitivity_transform(self, x: (AbstractFunction, AbstractFunctionUnique)):
     """Return an abstract value for the sensitivity of x.
 
     * The sensitivity of a function is an Env

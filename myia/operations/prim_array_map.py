@@ -9,7 +9,7 @@ from ..lib import (
     SHAPE,
     TYPE,
     AbstractArray,
-    AbstractFunction,
+    AbstractFunctionBase,
     Graph,
     MetaGraph,
     MyiaShapeError,
@@ -35,7 +35,7 @@ def debugvm_array_map(vm, fn, *arrays):
 
 
 @standard_prim(P.array_map)
-async def infer_array_map(self, engine, fn: AbstractFunction, *arrays):
+async def infer_array_map(self, engine, fn: AbstractFunctionBase, *arrays):
     """Infer the return type of primitive `array_map`."""
     if len(arrays) < 1:
         raise MyiaTypeError("array_map requires at least one array")

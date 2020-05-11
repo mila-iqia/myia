@@ -5,7 +5,7 @@ from functools import reduce
 from itertools import chain
 
 from .. import xtype
-from ..utils import MyiaTypeError, TypeMismatchError, overload
+from ..utils import MyiaTypeError, TypeMismatchError, overload, untested_legacy
 from .data import (
     ABSENT,
     ANYTHING,
@@ -14,6 +14,8 @@ from .data import (
     AbstractDict,
     AbstractError,
     AbstractFunction,
+    AbstractFunctionBase,
+    AbstractFunctionUnique,
     AbstractScalar,
     AbstractTaggedUnion,
     AbstractTuple,
@@ -22,7 +24,6 @@ from .data import (
     Possibilities,
     TaggedPossibilities,
     TrackDict,
-    VirtualFunction,
 )
 from .loop import (
     Pending,
@@ -201,7 +202,7 @@ def amerge(
                 raise TypeMismatchError(x1, x2)
             return x2
         elif type(x1) is not type(x2) and not isinstance(
-            x1, (int, float, bool)
+            x1, (int, float, bool, AbstractFunctionBase)
         ):
             raise MyiaTypeError(
                 f"Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}"
@@ -219,33 +220,6 @@ def amerge(
 
 @overload  # noqa: F811
 def amerge(self, x1: Possibilities, x2, forced, bp):
-    eng = amerge_engine.get()
-    poss = x1 + x2
-    if all(isinstance(x, VirtualFunction) for x in poss):
-        assert not forced
-        return Possibilities(
-            [
-                VirtualFunction(
-                    reduce(self, [x.args for x in poss]),
-                    reduce(self, [x.output for x in poss]),
-                )
-            ]
-        )
-
-    for standard in poss:
-        # TODO: This is a hack of sorts until we replace Possibilities
-        # inside AbstractFunction by AbstractUnion, and AbsFunc only has
-        # one function inside it.
-        if isinstance(standard, VirtualFunction):
-            for entry in poss:
-                if not isinstance(entry, VirtualFunction):
-                    eng.loop.schedule(
-                        eng.infer_function(
-                            entry, standard.args, standard.output
-                        )
-                    )
-            break
-
     if set(x1).issuperset(set(x2)):
         return x1
     if forced:
@@ -356,11 +330,49 @@ def amerge(self, x1: AbstractError, x2, forced, bp):
 
 
 @overload  # noqa: F811
-def amerge(self, x1: AbstractFunction, x2, forced, bp):
-    values = self(x1.get_sync(), x2.get_sync(), forced, bp)
-    if forced or values is x1.values:
-        return x1
-    return AbstractFunction(*values)
+def amerge(self, x1: AbstractFunctionBase, x2, forced, bp):
+    if not isinstance(x2, AbstractFunctionBase):
+        raise MyiaTypeError(f"Expected function, but got {x2}")
+
+    elif isinstance(x1, AbstractFunction) and isinstance(x2, AbstractFunction):
+        values = self(x1.get_sync(), x2.get_sync(), forced, bp)
+        if forced or values is x1.values:
+            return x1
+        return AbstractFunction(*values)
+
+    elif isinstance(x1, AbstractFunctionUnique) and isinstance(
+        x2, AbstractFunctionUnique
+    ):
+        args1 = (x1.args, x1.output, x1.values)
+        args2 = (x2.args, x2.output, x2.values)
+        merged = self(args1, args2, forced, bp)
+        if forced or merged is args1:
+            return x1
+        return AbstractFunctionUnique(*merged)
+
+    else:
+        if isinstance(x1, AbstractFunctionUnique):
+            with untested_legacy():
+                assert isinstance(x2, AbstractFunction)
+                vfn = x1
+                poss = x2.get_sync()
+
+        else:
+            assert isinstance(x2, AbstractFunctionUnique)
+            assert isinstance(x1, AbstractFunction)
+            vfn = x2
+            poss = x1.get_sync()
+
+        if poss is ANYTHING:
+            return x1 if forced else vfn
+
+        assert vfn is x1 or not forced
+        eng = amerge_engine.get()
+
+        for entry in poss:
+            eng.loop.schedule(eng.infer_function(entry, vfn.args, vfn.output))
+
+        return vfn
 
 
 @overload  # noqa: F811

@@ -1452,19 +1452,21 @@ class _PrimitiveFunction:
         )
 
 
-@mixin(abstract.JTransformedFunction)
-class _JTransformedFunction:
+@mixin(abstract.TransformedFunction)
+class _TransformedFunction:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
-            "JTransformedFunction", (("fn", self.fn),), delimiter="↦",
+            "TransformedFunction",
+            (("fn", self.fn), ("transform", self.transform)),
+            delimiter="↦",
         )
 
 
-@mixin(abstract.VirtualFunction)
-class _VirtualFunction:
+@mixin(abstract.AbstractFunctionUnique)
+class _AbstractFunctionUnique:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_object(
-            "VirtualFunction",
+            "★Function2",
             (("args", self.args), ("output", self.output)),
             delimiter="↦",
         )

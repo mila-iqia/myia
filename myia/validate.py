@@ -15,13 +15,11 @@ from .abstract import (
     AbstractJTagged,
     AbstractScalar,
     AbstractType,
-    DummyFunction,
-    VirtualFunction,
     abstract_check,
 )
 from .operations import Primitive
 from .operations.primitives import BackendPrimitive
-from .utils import ErrorPool, Partializable, overload, untested_legacy
+from .utils import ErrorPool, Partializable, overload
 
 
 class ValidationError(Exception):
@@ -41,14 +39,15 @@ def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
 
 @overload  # noqa: F811
 def validate_abstract(self, a: AbstractError, uses):
-    with untested_legacy():
-        kind = a.xvalue()
-        if kind is DEAD:
-            return True
-        elif kind is POLY:
-            return not any(key == 0 for node, key in uses)
-        else:
-            raise ValidationError(f"Illegal type in the graph: {a}", type=a)
+    kind = a.xvalue()
+    if kind is DEAD:
+        return True
+    elif kind is POLY:
+        return not any(key == 0 for node, key in uses)
+    else:  # pragma: no cover
+        # As it turns out, the inferrer now catches this error before we get to
+        # validation.
+        raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
 @overload  # noqa: F811
@@ -92,15 +91,7 @@ def validate_abstract(self, a: AbstractType, uses):
 
 @overload  # noqa: F811
 def validate_abstract(self, a: AbstractFunction, uses):
-    fns = a.get_sync()
-    if len(fns) != 1:
-        raise ValidationError(f"Only one function type should be here: {a}")
-    (fn,) = fns
-    if not isinstance(fn, (VirtualFunction, DummyFunction)):
-        raise ValidationError(
-            f"All function types should be VirtualFunction, not {fn}"
-        )
-    return self(a.values, uses)
+    raise ValidationError("Only VirtualFunction is allowed in the final graph")
 
 
 class NodeValidator:
@@ -172,7 +163,7 @@ class CallValidator(NodeValidator):  # pragma: no cover
                     raise ValidationError(f"None in call")
                 else:
                     return
-            vfn = fn.abstract.get_unique()
+            vfn = fn.abstract
             argv = [broaden(arg) for arg in vfn.args]
             argt = [broaden(arg.abstract) for arg in args]
             if argv != argt:
