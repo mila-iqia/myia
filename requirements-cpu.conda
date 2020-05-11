@@ -2,7 +2,7 @@ python>=3.7,<3.8a0
 colorama
 numpy
 opt_einsum
-abergeron::tvm==0.7dev1+1.*
+notoraptor::tvm
 pytest
 pytest-cov
 yaml
