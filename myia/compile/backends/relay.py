@@ -1045,6 +1045,7 @@ class RelayBackend(Backend):
 
     def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
+        make_handle_to_make_cell(graph)
         graph = convert_grad(graph)
         return self.compiler.run(
             graph, self.context, self.target, self.exec_kind
