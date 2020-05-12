@@ -1,7 +1,163 @@
 from myia.abstract import DEAD
 from myia.ir import isomorphic
 from myia.operations import switch
+from myia.opt import RemoveUnusedParameters
 from myia.pipeline import scalar_parse, scalar_pipeline, steps
+
+###################################
+# Test removing unused parameters #
+###################################
+
+
+def step_rmunused(resources):
+    while RemoveUnusedParameters(resources.opt_manager).run():
+        pass
+
+
+rmunused = scalar_pipeline.select(
+    "resources",
+    "parse",
+    {"resolve": steps.step_resolve},
+    {"rmunused": step_rmunused},
+).make_transformer("input", "graph")
+
+
+def test_rmunused_simple():
+    @rmunused
+    def f1(x, y):
+        def g(z):
+            return x
+
+        return g(y)
+
+    @scalar_parse
+    def f2(x, y):
+        def g():
+            return x
+
+        return g()
+
+    assert isomorphic(f1, f2)
+
+
+def test_rmunused_cascade():
+    @rmunused
+    def f1(x, y):
+        def g(z):
+            return h(x)
+
+        def h(z):
+            return x
+
+        return g(y)
+
+    @scalar_parse
+    def f2(x, y):
+        def g():
+            return h()
+
+        def h():
+            return x
+
+        return g()
+
+    assert isomorphic(f1, f2)
+
+
+def test_rmunused_middle():
+    @rmunused
+    def f1(x, y):
+        def g(a, b, c):
+            return a + c
+
+        return g(x + 1, x + 2, x + 3)
+
+    @scalar_parse
+    def f2(x, y):
+        def g(a, c):
+            return a + c
+
+        return g(x + 1, x + 3)
+
+    assert isomorphic(f1, f2)
+
+
+def test_rmunused_switch():
+    @rmunused
+    def f1(x, y):
+        def g(a, b, c):
+            return a + c
+
+        def h(a, b, c):
+            return a + c
+
+        return switch(y < 0, g, h)(x + 1, x + 2, x + 3)
+
+    @scalar_parse
+    def f2(x, y):
+        def g(a, c):
+            return a + c
+
+        def h(a, c):
+            return a + c
+
+        return switch(y < 0, g, h)(x + 1, x + 3)
+
+    assert isomorphic(f1, f2)
+
+
+def test_rmunused_switch_mustkeep():
+    @rmunused
+    def f1(x, y):
+        def g(a, b, c):
+            return a + c
+
+        def h(a, b, c):
+            return a + b
+
+        return switch(y < 0, g, h)(x + 1, x + 2, x + 3)
+
+    @scalar_parse
+    def f2(x, y):
+        def g(a, b, c):
+            return a + c
+
+        def h(a, b, c):
+            return a + b
+
+        return switch(y < 0, g, h)(x + 1, x + 2, x + 3)
+
+    assert isomorphic(f1, f2)
+
+
+def test_rmunused_switch_drop_one():
+    @rmunused
+    def f1(x, y):
+        def g(a, b, c):
+            return a
+
+        def h(a, b, c):
+            return c
+
+        return switch(y < 0, g, h)(x + 1, x + 2, x + 3)
+
+    @scalar_parse
+    def f2(x, y):
+        def g(a, c):
+            return a
+
+        def h(a, c):
+            return c
+
+        return switch(y < 0, g, h)(x + 1, x + 3)
+
+    assert isomorphic(f1, f2)
+
+
+#######################
+# Test lambda lifting #
+#######################
+
 
 llift = scalar_pipeline.select(
     "resources", "parse", {"resolve": steps.step_resolve}, "llift",

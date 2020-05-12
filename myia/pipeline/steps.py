@@ -11,9 +11,10 @@ from ..ir import Graph, clone
 from ..opt import (
     CSE,
     DeadDataElimination,
+    GraphInterfaceRewriterOpt,
     LocalPassOptimizer,
     NodeMap,
-    RewriteGraphs,
+    RemoveUnusedParameters,
     lambda_lift,
     lib as optlib,
 )
@@ -348,7 +349,9 @@ step_opt = Optimizer.partial(
 
 step_opt2 = Optimizer.partial(
     phases=dict(
-        rewrite=RewriteGraphs.partial(),
+        rmunused=GraphInterfaceRewriterOpt.partial(
+            rewriter=RemoveUnusedParameters
+        ),
         dde=DeadDataElimination.partial(),
         main=[
             optlib.force_constants,
