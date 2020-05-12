@@ -26,6 +26,7 @@ from ..public_api import (
     _max,
     _sum,
     argmax,
+    binary_cross_entropy,
     cat,
     chunk,
     conv2d,
@@ -118,6 +119,7 @@ standard_object_map.update(
         torch.unsqueeze: unsqueeze,
         torch.var: var,
         # torch.zeros_like: C.zeros_like,  # currently only works with pt backend
+        torch.nn.functional.binary_cross_entropy: binary_cross_entropy,
         torch.nn.functional.conv2d: conv2d,
         torch.nn.functional.conv_transpose2d: conv_transpose2d,
         torch.nn.functional.cross_entropy: cross_entropy,

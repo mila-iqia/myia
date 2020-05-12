@@ -22,11 +22,11 @@ import numpy as np
 
 from . import operations
 from .abstract import myia_static
-from .frontends.abstract_types import AS, AA_bool
+from .frontends.abstract_types import AA, AS, AA_bool
 from .hypermap import hyper_map
 from .operations import primitives as P
 from .utils import MyiaValueError, core
-from .xtype import TupleT, i64, u64
+from .xtype import TupleT, f32, i64, u64
 
 # ############# THESE FUNCTIONS SHOULD BE IN ALPHABETICAL ORDER #############
 
@@ -262,6 +262,19 @@ def argmax(self, dim=None, keepdim=False):
         ret.shape, _dim_explicit(x.shape, dim_orig), keepdim
     )
     return P.reshape(ret, final_shape)
+
+
+@core
+def binary_cross_entropy(input, target, reduction="mean"):
+    """Map of method torch.nn.functional.binary_cross_entropy."""
+    out = -(operations.array_log(input) * target + (1. - target) * operations.array_log(1. - input))
+    if reduction == "none":
+        out = out
+    elif reduction == "mean":
+        out = mean(out)
+    elif reduction == "sum":
+        out = _sum(out)
+    return out
 
 
 @core
@@ -755,6 +768,19 @@ def transpose(a, dim0, dim1):
     """Map of 'transpose' pytorch method."""
     dims = _transpose_dims(len(a.shape), dim0, dim1)
     return P.transpose(a, dims)
+
+
+@core
+def uniform(rstate, size, _min, _max, dtype=f32):
+    """Returns samples from uniform distribution bounded by _min and _max"""
+    r0, v0 = P.random_uint32(rstate, size)
+    _min = P.scalar_to_array(_min, AA)
+    _max = P.scalar_to_array(_max, AA)
+    _min = P.array_cast(_min, dtype)
+    _max = P.array_cast(_max, dtype)
+    rand_range = _max - _min
+    v0 = P.array_cast(v0, dtype)
+    return (v0 * (rand_range / 4294967296)) + _min, r0
 
 
 @core
