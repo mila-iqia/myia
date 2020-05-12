@@ -8,7 +8,7 @@ from ..abstract.data import (
     AbstractArray,
     AbstractScalar,
 )
-from ..xtype import Bool
+from ..xtype import Bool, NDArray
 
 AA_bool = AbstractArray(
     AbstractScalar({TYPE: Bool, VALUE: ANYTHING}),
@@ -19,4 +19,7 @@ AA_bool = AbstractArray(
 AS = AbstractScalar({TYPE: ANYTHING, VALUE: ANYTHING})
 
 
-__all__ = ["AA_bool", "AS"]
+AA = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: NDArray})
+
+
+__all__ = ["AA_bool", "AS", "AA"]
