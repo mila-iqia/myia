@@ -3,7 +3,7 @@
 from collections import Counter, defaultdict
 
 from ..graph_utils import EXCLUDE, FOLLOW, dfs
-from ..utils import Events, OrderedSet, Partializable, WorkSet
+from ..utils import Events, OrderedSet, Partializable, WorkSet, untested_legacy
 from .anf import ANFNode
 from .utils import succ_deeper
 
@@ -603,13 +603,31 @@ class GraphManager(Partializable):
             allow_changes = self.manage
         self.allow_changes = allow_changes
         self.check_opaque = None
+        self.events = None
         self.reset()
+
+    def gc(self):
+        """Garbage-collect disconnected graphs.
+
+        Normally this is done incrementally through reference counting, but
+        because of circular references, some graphs might remain.
+        """
+        reach = OrderedSet(self.roots)
+        for root in self.roots:
+            reach.update(self.graphs_reachable[root])
+        # TODO: Ideally the two lines below should be replaced by the commented
+        # out line, but it causes an error in
+        # tests/test_grad.py::test_recursive_closure
+        # # self._drop_all(self.graphs - reach, drop_nodes=True)
+        if reach != self.graphs:
+            self.reset()
 
     def reset(self):
         """Reset the manager's state.
 
         Recompute everything from the roots.
         """
+        old_events = self.events
         self.events = Events(
             add_node=None,
             drop_node=None,
@@ -619,7 +637,12 @@ class GraphManager(Partializable):
             drop_edge=None,
             invalidate_nesting=None,
             invalidate_uses=None,
+            reset=None,
+            post_reset=None,
         )
+        if old_events:
+            old_events.reset()
+
         roots = OrderedSet(self.roots) if self.roots else OrderedSet()
         self.roots = OrderedSet()
         self.graphs = OrderedSet()
@@ -649,6 +672,9 @@ class GraphManager(Partializable):
 
         for root in roots:
             self.add_graph(root, root=True)
+
+        if old_events:
+            old_events.post_reset()
 
     def set_opaque_condition(self, fn):
         """Set a condition on nodes that should not be included."""
@@ -714,6 +740,14 @@ class GraphManager(Partializable):
             other_graphs = self._maybe_drop_nodes(OrderedSet([graph.return_]))
             if recursive:
                 todo |= other_graphs
+
+        self._drop_all(dropped, drop_nodes=False)
+
+    def _drop_all(self, dropped, drop_nodes=True):
+        if drop_nodes:
+            with untested_legacy():
+                for g in dropped:
+                    self._maybe_drop_nodes(OrderedSet([g.return_]))
 
         for g in dropped:
             self.events.drop_graph(g)

@@ -1101,6 +1101,7 @@ def expand_J(resources, node, equiv):
     """
     from ..grad import Jimpl
 
+    resources.opt_manager.gc()
     arg = equiv[C].value
 
     if not hasattr(resources, "grad_cache"):
