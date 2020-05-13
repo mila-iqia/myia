@@ -2,21 +2,22 @@ from pytest import mark
 
 from myia.compile import closure_convert
 from myia.ir import manage
-from myia.opt import lambda_lift
+from myia.opt import LambdaLiftRewriter
 from myia.pipeline import scalar_debug_pipeline, steps
 
 
-def step_cconv(graph, use_llift):
+def step_cconv(resources, graph, use_llift):
     if use_llift:
         graph.manager.keep_roots(graph)
-        lambda_lift(graph)
+        llift = LambdaLiftRewriter(resources.opt_manager)
+        llift.run()
     closure_convert(graph)
     return {"graph": graph}
 
 
 cconv_pipeline = scalar_debug_pipeline.select(
     "resources", "parse", {"resolve": steps.step_resolve}, "export"
-).insert_after("parse", cconv=step_cconv)
+).insert_after("resolve", cconv=step_cconv)
 
 
 def check_no_free_variables(root):
