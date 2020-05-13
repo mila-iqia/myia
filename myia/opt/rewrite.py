@@ -281,9 +281,27 @@ class RemoveUnusedParameters(GraphInterfaceRewriter):
 
 
 class LambdaLiftRewriter(GraphInterfaceRewriter):
+    """Lambda lifting optimization.
+
+    Graphs with free variables for which we can identify all calls will be
+    modified to take these free variables as extra arguments.
+
+    This is a destructive operation.
+    """
+
     relation = "llift"
 
     def filter(self, entry, all_entries):
+        """Only graphs that have free variables will be transformed.
+
+        In order for the lambda lifting to work properly when a function F
+        refers to a function G that cannot be lambda lifted but has free
+        variables (in other words, the G is a free variable of F), G will have
+        to be moved inside F's scope.
+
+        We only do this if all uses of G are inside the scope of F. Otherwise
+        we will not lambda lift F.
+        """
         g = entry.graph
         fvg = {
             g2
@@ -306,12 +324,26 @@ class LambdaLiftRewriter(GraphInterfaceRewriter):
 
     @lru_cache(maxsize=None)
     def order_key(self, g):
+        """Order graphs so that children are processed before parents.
+
+        Reverse the order so that children are processed before parents. This
+        is important when substituting the new parameters for the free
+        variables, because children that are lambda lifted must replace their
+        uses first (otherwise the original fvs would be replaced by their
+        parent's parameters, which is not what we want)
+        """
         if g.parent:
             return self.order_key(g.parent) - 1
         else:
             return 0
 
     def rewrite_call(self, node, entry):
+        """For each closure, we add arguments to each call of the closure.
+
+        The arguments that are added are the original free variables, or
+        DEAD if none of the graphs that can be called at that site have that
+        free variable.
+        """
         fvs = [
             fv
             if any(fv in gg.free_variables_extended for gg in entry.calls[node])
@@ -324,6 +356,13 @@ class LambdaLiftRewriter(GraphInterfaceRewriter):
         return True
 
     def rewrite_graph(self, entry):
+        """Rewrite the graphs.
+
+        New parameters are added for each free variable.
+
+        Then, we redirect all free variables within scope to the new
+        parameters, which means that they are not closures anymore.
+        """
         mng = self.manager
         new_params = list(entry.graph.parameters)
         with mng.transact() as tr:
