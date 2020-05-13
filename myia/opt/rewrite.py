@@ -337,70 +337,17 @@ class LambdaLiftRewriter(GraphInterfaceRewriter):
         return True
 
 
-# def rewrite_graphs(root, manager):
-#     """Remove unused parameters in graphs whenever possible.
-
-#     * The root graph's parameters are not touched
-#     * Only graphs that only have direct calls (not used in HOFs) are processed
-#     """
-#     changes = False
-#     for g in list(manager.graphs):
-#         if g not in manager.graphs:
-#             # The graph might have been dropped if the only reference was an
-#             # input that has been dropped.
-#             continue
-#         if not g.all_direct_calls:
-#             continue
-
-#         # Drop unused inputs
-#         keep = [bool(manager.uses[param]) for param in g.parameters]
-#         if g is not root and not all(keep):
-#             with manager.transact() as tr:
-#                 tr.set_parameters(
-#                     g, [p for p, keep in zip(g.parameters, keep) if keep]
-#                 )
-#                 for call in g.call_sites:
-#                     new_call = call.graph.apply(
-#                         call.inputs[0],
-#                         *[
-#                             arg
-#                             for arg, keep in zip(call.inputs[1:], keep)
-#                             if keep
-#                         ]
-#                     )
-#                     new_call.abstract = call.abstract
-#                     tr.replace(call, new_call)
-#             changes = True
-#     return changes
-
-
-# class RewriteGraphs(Partializable):
-#     """Remove unused arguments etc."""
-
-#     def __init__(self, resources):
-#         """Initialize RewriteGraphs."""
-#         self.resources = resources
-#         self.name = "rewrite_graphs"
-
-#     def __call__(self, root):
-#         """Apply rewrite_graphs on root."""
-#         args = dict(
-#             opt=self,
-#             node=None,
-#             manager=self.resources.opt_manager,
-#             profile=False,
-#         )
-#         with tracer("opt", **args) as tr:
-#             tr.set_results(success=False, **args)
-#             chg = rewrite_graphs(root, self.resources.opt_manager)
-#             if chg:
-#                 tracer().emit_success(**args, new_node=None)
-#             return chg
-
-
 class GraphInterfaceRewriterOpt(Partializable):
+    """Implements optimizer interface for GraphInferfaceRewriter."""
+
     def __init__(self, resources, rewriter):
-        """Initialize GraphInterfaceRewriterOpt."""
+        """Initialize GraphInterfaceRewriterOpt.
+
+        Arguments:
+            resources: The resources object associated to the pipeline.
+            rewriter: A subclass of GraphInterfaceRewriter. It will be
+                instantiated in the __call__ method.
+        """
         self.resources = resources
         self.rewriter = rewriter
         self.name = rewriter.__name__
@@ -419,9 +366,64 @@ class GraphInterfaceRewriterOpt(Partializable):
             return chg
 
 
+##########################
+# LAMBDA LIFTING EXAMPLE #
+##########################
+
+##################
+# ORIGINAL GRAPH #
+##################
+
+# def f(x, y):
+#     def g(z):
+#         return x + z
+
+#     def h():
+#         return g(y)
+
+#     return h()
+
+##########
+# Step 1 #
+##########
+
+# def f(x, y):
+#     def g(z, _x):          # <- Add parameter
+#         return x + z
+
+#     def h(_y, _x):         # <- Add parameters
+#         return g(y)
+
+#     return h()
+
+##########
+# Step 2 #
+##########
+
+# def f(x, y):
+#     def g(z, _x):
+#         return x + z
+
+#     def h(_y, _x):
+#         return g(y, x)     # <- Add argument to call
+
+#     return h(y, x)         # <- Add arguments to call
+
+##########
+# Step 3 #
+##########
+
+# def f(x, y):
+#     def g(z, _x):
+#         return _x + z      # <- Swap fv for parameter
+
+#     def h(_y, _x):
+#         return g(_y, _x)   # <- Swap fvs for parameters
+
+#     return h(y, x)
+
+
 __all__ = [
-    # "RewriteGraphs",
-    # "rewrite_graphs",
     "GraphInterfaceRewriter",
     "GraphInterfaceRewriterOpt",
     "RemoveUnusedParameters",

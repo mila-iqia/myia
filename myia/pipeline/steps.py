@@ -12,10 +12,10 @@ from ..opt import (
     CSE,
     DeadDataElimination,
     GraphInterfaceRewriterOpt,
+    LambdaLiftRewriter,
     LocalPassOptimizer,
     NodeMap,
     RemoveUnusedParameters,
-    lambda_lift,
     lib as optlib,
 )
 from ..parser import parse
@@ -392,7 +392,10 @@ def step_llift(resources, graph, outspec=None):
     Outputs:
         None.
     """
-    lambda_lift(graph)
+    mng = resources.opt_manager
+    mng.gc()
+    llift = LambdaLiftRewriter(mng)
+    llift.run()
     return {"graph": graph}
 
 
