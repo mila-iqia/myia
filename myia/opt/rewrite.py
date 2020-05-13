@@ -427,5 +427,6 @@ class GraphInterfaceRewriterOpt(Partializable):
 __all__ = [
     "GraphInterfaceRewriter",
     "GraphInterfaceRewriterOpt",
+    "LambdaLiftRewriter",
     "RemoveUnusedParameters",
 ]
