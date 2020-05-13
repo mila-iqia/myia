@@ -393,6 +393,7 @@ def step_llift(resources, graph, outspec=None):
         None.
     """
     mng = resources.opt_manager
+    mng.gc()
     llift = LambdaLiftRewriter(mng)
     llift.run()
     return {"graph": graph}

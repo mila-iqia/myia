@@ -399,6 +399,7 @@ class GraphInterfaceRewriterOpt(Partializable):
         args = dict(opt=self, node=None, manager=mng, profile=False,)
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
+            mng.gc()
             rewriter = self.rewriter(mng)
             chg = rewriter.run()
             if chg:
