@@ -1078,6 +1078,7 @@ class Block:
             return _fresh(node)
         nophi = varnum not in self.parser.possible_phis
         if self.matured or nophi:
+
             def _resolve():
                 if not resolve_globals:
                     return None
