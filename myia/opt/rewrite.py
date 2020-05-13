@@ -249,6 +249,8 @@ class GraphInterfaceRewriter:
 
 
 class RemoveUnusedParameters(GraphInterfaceRewriter):
+    """Optimization to remove unused parameters in graphs."""
+
     def filter(self, entry, all_entries):
         """Keep the entry if graphs in eqv all miss common parameters."""
         params_grouped = zip(*[g.parameters for g in entry.eqv])
