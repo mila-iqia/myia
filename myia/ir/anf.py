@@ -389,11 +389,6 @@ class Graph:
         return self.manager.higher_order_sites[self]
 
     @property
-    def all_direct_calls(self):
-        """Return whether this graph is always in call position."""
-        return not self.higher_order_sites
-
-    @property
     def constants(self):
         """Return all constants used by this graph."""
         return self.manager.constants[self]

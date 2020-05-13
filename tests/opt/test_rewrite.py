@@ -154,6 +154,26 @@ def test_rmunused_switch_drop_one():
     assert isomorphic(f1, f2)
 
 
+def test_rmunused_switch_edge_case():
+    def f(x, y):
+        def g(a, b, c):
+            return a
+
+        def h(a, b, c):
+            return a
+
+        def hof(fn):
+            return switch(y < 0, g, fn)(x + 1, x + 2, x + 3)
+
+        return hof(h)
+
+    # rmunused should do nothing
+    f1 = rmunused(f)
+    f2 = scalar_parse(f)
+
+    assert isomorphic(f1, f2)
+
+
 #######################
 # Test lambda lifting #
 #######################
