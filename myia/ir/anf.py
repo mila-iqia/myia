@@ -616,13 +616,6 @@ class Constant(ANFNode):
         """Construct a literal."""
         super().__init__([], value, None)
 
-    def _serialize(self):
-        return {
-            "value": self.value,
-            "debug": self.debug,
-            "abstract": self.abstract,
-        }
-
     def is_constant(self, cls: Any = object) -> bool:
         """Return whether self is a Constant, with value of given cls."""
         return isinstance(self.value, cls)
