@@ -36,8 +36,6 @@ import codecs
 import os
 import traceback
 
-import numpy as np
-
 
 class MyiaDumper(SafeDumper):
     """Customize the dumper."""
@@ -108,19 +106,6 @@ def __serialize__(self, dumper):
     return dumper.represent_mapping(getattr(self, "@SERIAL_TAG"), data)
 
 
-def __serialize_seq__(self, dumper):
-    seq = self._serialize()
-    assert isinstance(seq, (tuple, list))
-    return dumper.represent_sequence(getattr(self, "@SERIAL_TAG"), seq)
-
-
-def __serialize_scal__(self, dumper):
-    scal = self._serialize()
-    assert scal is not None
-    assert isinstance(scal, str)
-    return dumper.represent_scalar(getattr(self, "@SERIAL_TAG"), scal)
-
-
 def _serialize(dumper, self):
     return self.__serialize__(dumper)
 
@@ -135,23 +120,6 @@ def _make_construct(cls, sequence, scalar):
         except StopIteration as e:
             if e.value is not None:
                 loader.add_finalizer(e.value)
-
-    if sequence:
-
-        def _construct(loader, node):  # noqa: F811
-            it = cls._construct()
-            yield next(it)
-            data = loader.construct_sequence(node)
-            try:
-                it.send(data)
-            except StopIteration as e:
-                return e.value
-
-    if scalar:
-
-        def _construct(loader, node):  # noqa: F811
-            data = loader.construct_scalar(node)
-            return cls._construct(data)
 
     return _construct
 
@@ -171,10 +139,6 @@ def serializable(tag, *, sequence=False, scalar=False, construct=True):
         setattr(cls, "@SERIAL_TAG", tag)
         if not hasattr(cls, "__serialize__"):
             method = __serialize__
-            if sequence:
-                method = __serialize_seq__
-            if scalar:
-                method = __serialize_scal__
             setattr(cls, "__serialize__", method)
         MyiaDumper.add_representer(cls, _serialize)
         if construct:
@@ -195,53 +159,6 @@ def _construct_tuple(loader, node):
 
 MyiaDumper.add_representer(tuple, _serialize_tuple)
 MyiaLoader.add_constructor("tuple", _construct_tuple)
-
-
-def _serialize_ndarray(dumper, data):
-    return dumper.represent_mapping(
-        "arraydata",
-        {"dtype": data.dtype.str, "shape": data.shape, "data": data.tobytes()},
-    )
-
-
-def _construct_ndarray(loader, node):
-    data = loader.construct_mapping(node)
-    res = np.frombuffer(data["data"], dtype=data["dtype"])
-    return res.reshape(data["shape"])
-
-
-MyiaDumper.add_representer(np.ndarray, _serialize_ndarray)
-MyiaLoader.add_constructor("arraydata", _construct_ndarray)
-
-
-def register_npscalar(tag, cls):
-    """Regsiter serialization functions for numpy scalars."""
-
-    def _serialize(dumper, data):
-        return dumper.represent_scalar(tag, repr(data))
-
-    def _construct(loader, node):
-        return cls(loader.construct_scalar(node))
-
-    MyiaDumper.add_representer(cls, _serialize)
-    MyiaLoader.add_constructor(tag, _construct)
-
-
-register_npscalar("float16", np.float16)
-register_npscalar("float32", np.float32)
-register_npscalar("float64", np.float64)
-register_npscalar("float128", np.float128)
-
-register_npscalar("int8", np.int8)
-register_npscalar("int16", np.int16)
-register_npscalar("int32", np.int32)
-register_npscalar("int64", np.int64)
-
-register_npscalar("uint8", np.uint8)
-register_npscalar("uint16", np.uint16)
-register_npscalar("uint32", np.uint32)
-register_npscalar("uint64", np.uint64)
-register_npscalar("bool_", np.bool_)
 
 
 _OBJ_MAP = {}
@@ -320,7 +237,6 @@ __all__ = [
     "MyiaLoader",
     "dump",
     "load",
-    "register_npscalar",
     "register_serialize",
     "serializable",
 ]

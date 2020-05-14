@@ -13,15 +13,6 @@ class UniverseInstance:
         """Initialize a UniverseInstance."""
         self._contents = dict(_contents)
 
-    def _serialize(self):
-        return self._contents
-
-    @classmethod
-    def _construct(cls):
-        res = cls()
-        data = yield res
-        res._contents = data
-
     def get(self, handle):
         """Get the value associated to the handle."""
         if handle in self._contents:
@@ -49,15 +40,6 @@ class HandleInstance:
         """Initialize a HandleInstance."""
         self.state = state
         self.abstract = abstract
-
-    def _serialize(self):
-        return {"state": self.state}
-
-    @classmethod
-    def _construct(cls):
-        res = cls(None)
-        data = yield res
-        res.state = data["state"]
 
 
 new_universe = UniverseInstance()

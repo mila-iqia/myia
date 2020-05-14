@@ -79,15 +79,6 @@ class TaggedPossibilities(list):
         opts = [[tag, typ] for tag, typ in sorted(set(map(tuple, options)))]
         super().__init__(opts)
 
-    def _serialize(self):
-        return self
-
-    @classmethod
-    def _construct(cls):
-        res = cls([])
-        data = yield res
-        res[:] = data
-
     def get(self, tag):
         """Get the type associated to the tag."""
         for i, t in self:
@@ -433,24 +424,6 @@ class AbstractFunctionUnique(AbstractFunctionBase):
         self.args = list(args)
         self.output = output
 
-    def _serialize(self):
-        data = super()._serialize()
-        data["args"] = self.args
-        data["output"] = self.output
-        return data
-
-    @classmethod
-    def _construct(cls):
-        it = super()._construct()
-        res = next(it)
-        data = yield res
-        res.args = data.pop("args")
-        res.output = data.pop("output")
-        try:
-            it.send(data)
-        except StopIteration:
-            pass
-
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
         return AttrEK(self, (v, "args", "output"))
@@ -497,22 +470,6 @@ class AbstractType(AbstractWrapper):
         """Initialize an AbstractType."""
         super().__init__(typ, values)
 
-    def _serialize(self):
-        data = super()._serialize()
-        data["element"] = self.element
-        return data
-
-    @classmethod
-    def _construct(cls):
-        it = super()._construct()
-        res = next(it)
-        data = yield res
-        res.element = data.pop("element")
-        try:
-            it.send(data)
-        except StopIteration:
-            pass
-
     def __pretty__(self, ctx):
         t = pretty_type(self.element)
         return pretty_join(["Ty(", t, ")"])
@@ -528,22 +485,6 @@ class AbstractTuple(AbstractStructure):
         if elements is not ANYTHING:
             elements = list(elements)
         self.elements = elements
-
-    def _serialize(self):
-        data = super()._serialize()
-        data["elements"] = self.elements
-        return data
-
-    @classmethod
-    def _construct(cls):
-        it = super()._construct()
-        res = next(it)
-        data = yield res
-        res.elements = data.pop("elements")
-        try:
-            it.send(data)
-        except StopIteration:
-            pass
 
     def children(self):
         """Return all elements in the tuple."""
@@ -570,22 +511,6 @@ class AbstractArray(AbstractWrapper):
         element: AbstractValue representing each element of the array.
 
     """
-
-    def _serialize(self):
-        data = super()._serialize()
-        data["element"] = self.element
-        return data
-
-    @classmethod
-    def _construct(cls):
-        it = super()._construct()
-        res = next(it)
-        data = yield res
-        res.element = data.pop("element")
-        try:
-            it.send(data)
-        except StopIteration:
-            pass
 
     def xshape(self):
         """Return the shape of this array."""
@@ -710,15 +635,6 @@ class AbstractHandle(AbstractWrapper):
         """Initialize an AbstractHandle."""
         super().__init__(element, values)
 
-    def _serialize(self):
-        return {"element": self.element}
-
-    @classmethod
-    def _construct(cls):
-        res = cls(None)
-        data = yield res
-        res.element = data["element"]
-
     def __pretty__(self, ctx):
         return pretty_call(ctx, "H", self.element)
 
@@ -768,22 +684,6 @@ class AbstractTaggedUnion(AbstractStructure):
             self.options = options
         else:
             self.options = TaggedPossibilities(options)
-
-    def _serialize(self):
-        data = super()._serialize()
-        data["options"] = self.options
-        return data
-
-    @classmethod
-    def _construct(self):
-        it = super()._construct()
-        res = next(it)
-        data = yield res
-        res.options = data.pop("options")
-        try:
-            it.send(data)
-        except StopIteration:
-            pass
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)

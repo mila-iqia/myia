@@ -73,15 +73,6 @@ class EnvInstance:
         """Initialize a EnvType."""
         self._contents = dict(_contents)
 
-    def _serialize(self):
-        return self._contents
-
-    @classmethod
-    def _construct(cls):
-        res = cls([])
-        data = yield res
-        res._contents.update(data)
-
     def get(self, key, default):
         """Get the sensitivity list for the given key."""
         return self._contents.get(key, default)
