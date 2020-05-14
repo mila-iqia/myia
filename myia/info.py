@@ -120,17 +120,6 @@ class NamedDebugInfo(DebugInfo):
             # this line in the code.
             self.trace = traceback.extract_stack()[:-1]
 
-    def _serialize(self):
-        return {"id": self.id, "name": self.debug_name}
-
-    @classmethod
-    def _construct(cls):
-        o = cls()
-        data = yield o
-        assert data is not None
-        o._id = data["id"]
-        o.name = data["name"]
-
     @property
     def obj(self):
         """Return the object that this DebugInfo is about."""

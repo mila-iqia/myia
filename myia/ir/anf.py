@@ -75,22 +75,6 @@ class Graph:
             and self.kwonly == 0
         )
 
-    def _serialize(self):
-        assert self.plain()
-        return {
-            "parameters": self.parameters,
-            "return": self.return_,
-            "debug": self.debug,
-        }
-
-    @classmethod
-    def _construct(cls):
-        g = cls()
-        data = yield g
-        g.parameters = data["parameters"]
-        g.return_ = data["return"]
-        g.debug = data["debug"]
-
     @property
     def abstract(self):
         """Return the graph's type based on parameter/output types."""
@@ -569,30 +553,6 @@ class Apply(ANFNode):
         """Construct an application."""
         super().__init__(inputs, APPLY, graph)
 
-    def _serialize(self):
-        return {
-            "inputs": self.inputs,
-            "graph": self.graph,
-            "debug": self.debug,
-            "abstract": self.abstract,
-        }
-
-    @classmethod
-    def _construct(cls):
-        a = cls([], None)
-        data = yield a
-        a.inputs = data["inputs"]
-        a.graph = data["graph"]
-        a.debug = data["debug"]
-        a.abstract = data["abstract"]
-
-        if a.abstract is not None:
-
-            def _cb():
-                a.abstract = a.abstract.intern()
-
-            return _cb
-
     def is_apply(self, value: Any = None) -> bool:
         """Return whether self is an Apply."""
         if value is not None:
@@ -630,28 +590,6 @@ class Parameter(ANFNode):
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
 
-    def _serialize(self):
-        return {
-            "graph": self.graph,
-            "debug": self.debug,
-            "abstract": self.abstract,
-        }
-
-    @classmethod
-    def _construct(cls):
-        p = cls(None)
-        data = yield p
-        p.graph = data["graph"]
-        p.debug = data["debug"]
-        p.abstract = data["abstract"]
-
-        if p.abstract is not None:
-
-            def _cb():
-                p.abstract = p.abstract.intern()
-
-            return _cb
-
     def is_parameter(self):
         """Return whether self is a Parameter."""
         return True
@@ -684,21 +622,6 @@ class Constant(ANFNode):
             "debug": self.debug,
             "abstract": self.abstract,
         }
-
-    @classmethod
-    def _construct(cls):
-        c = cls(None)
-        data = yield c
-        c.value = data["value"]
-        c.debug = data["debug"]
-        c.abstract = data["abstract"]
-
-        if c.abstract is not None:
-
-            def _cb():
-                c.abstract = c.abstract.intern()
-
-            return _cb
 
     def is_constant(self, cls: Any = object) -> bool:
         """Return whether self is a Constant, with value of given cls."""

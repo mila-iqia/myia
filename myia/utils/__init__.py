@@ -9,7 +9,6 @@ from .misc import *
 from .orderedset import *
 from .overload import *
 from .partial import *
-from .serialize import *
 from .trace import *
 from .unify import *
 from .universe import *

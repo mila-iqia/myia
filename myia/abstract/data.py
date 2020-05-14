@@ -220,16 +220,6 @@ class AbstractValue(Interned, PossiblyRecursive):
         super().__init__()
         self.values = TrackDict(values)
 
-    def _serialize(self):
-        return dict(self.values)
-
-    @classmethod
-    def _construct(cls):
-        obj = cls.empty()
-        data = yield obj
-        obj.values = TrackDict(data)
-        obj._incomplete = False
-
     def xtype(self):
         """Return the type of this AbstractValue."""
         t = self.values.get(TYPE, None)
