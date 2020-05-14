@@ -19,7 +19,6 @@ from ..utils import (
     Named,
     OrderedSet,
     PossiblyRecursive,
-    register_serialize,
 )
 from .loop import Pending
 from .ref import Context
@@ -29,14 +28,12 @@ ABSENT = Named("ABSENT")
 
 # Represents an unknown value
 ANYTHING = Named("ANYTHING")
-register_serialize(ANYTHING, "Anything")
 
 # Represents inference problems
 VOID = Named("VOID")
 
 # Represents specialization problems
 DEAD = Named("DEAD")
-register_serialize(DEAD, "DEAD")
 POLY = Named("POLY")
 
 
@@ -763,15 +760,10 @@ class _AliasIdTrack(Track):
 
 
 VALUE = _ValueTrack("VALUE")
-register_serialize(VALUE, "VALUE")
 TYPE = _TypeTrack("TYPE")
-register_serialize(TYPE, "TYPE")
 SHAPE = _ShapeTrack("SHAPE")
-register_serialize(SHAPE, "SHAPE")
 DATA = _ValueTrack("DATA")
-register_serialize(DATA, "DATA")
 ALIASID = _AliasIdTrack("ALIASID")
-register_serialize(ALIASID, "ALIASID")
 
 
 ##########################

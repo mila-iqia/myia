@@ -1,7 +1,7 @@
 """Utilities for operations and primitives."""
 
 
-from ..utils import HasDefaults, register_serialize
+from ..utils import HasDefaults
 
 
 class Primitive(HasDefaults):
@@ -36,7 +36,6 @@ class BackendPrimitive(Primitive):
     def __init__(self, name, defaults={}):
         """Initialize a BackendPrimitive and register it for serialization."""
         super().__init__(name, defaults)
-        register_serialize(self, f"prim-{name}")
 
 
 class Operation(HasDefaults):
