@@ -110,20 +110,6 @@ def _serialize(dumper, self):
     return self.__serialize__(dumper)
 
 
-def _make_construct(cls):
-    def _construct(loader, node):
-        it = cls._construct()
-        yield next(it)
-        data = loader.construct_mapping(node)
-        try:
-            it.send(data)
-        except StopIteration as e:
-            if e.value is not None:
-                loader.add_finalizer(e.value)
-
-    return _construct
-
-
 def _serialize_tuple(dumper, data):
     return dumper.represent_sequence("tuple", data)
 
