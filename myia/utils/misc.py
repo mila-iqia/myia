@@ -7,8 +7,6 @@ from typing import Any, Dict, List, TypeVar
 
 import numpy as np
 
-from .serialize import serializable
-
 builtins_d = vars(builtins)
 
 
@@ -16,7 +14,6 @@ T1 = TypeVar("T1")
 T2 = TypeVar("T2")
 
 
-@serializable("RandomStateWrapper")
 class RandomStateWrapper:
     """Represents a wrapper around a backend random state object."""
 
@@ -27,7 +24,6 @@ class RandomStateWrapper:
         self.state = backend_state
 
 
-@serializable("TaggedValue")
 class TaggedValue:
     """Represents a tagged value for a TaggedUnion."""
 

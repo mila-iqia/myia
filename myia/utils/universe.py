@@ -1,8 +1,6 @@
 """Classes to support universes."""
-from . import serializable
 
 
-@serializable("Universe")
 class UniverseInstance:
     """Universe mapping references to values.
 
@@ -32,7 +30,6 @@ class UniverseInstance:
             handle.state = value
 
 
-@serializable("Handle")
 class HandleInstance:
     """Key to use in an Universe."""
 

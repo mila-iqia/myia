@@ -124,28 +124,6 @@ def _make_construct(cls):
     return _construct
 
 
-def serializable(tag, *, construct=True):
-    """Class decorator to make the wrapped class serializable.
-
-    Arguments:
-        tag (string): serialization tag, must be unique
-        construct: register the deserialization function or not
-
-    """
-
-    def wrapper(cls):
-        setattr(cls, "@SERIAL_TAG", tag)
-        if not hasattr(cls, "__serialize__"):
-            setattr(cls, "__serialize__", __serialize__)
-        MyiaDumper.add_representer(cls, _serialize)
-        if construct:
-            _construct = _make_construct(cls)
-            MyiaLoader.add_constructor(tag, _construct)
-        return cls
-
-    return wrapper
-
-
 def _serialize_tuple(dumper, data):
     return dumper.represent_sequence("tuple", data)
 
@@ -235,5 +213,4 @@ __all__ = [
     "dump",
     "load",
     "register_serialize",
-    "serializable",
 ]

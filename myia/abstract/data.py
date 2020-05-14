@@ -20,7 +20,6 @@ from ..utils import (
     OrderedSet,
     PossiblyRecursive,
     register_serialize,
-    serializable,
 )
 from .loop import Pending
 from .ref import Context
@@ -66,7 +65,6 @@ class Possibilities(list):
         return hash(tuple(self))
 
 
-@serializable("TaggedPossibilities")
 class TaggedPossibilities(list):
     """Represents a set of possible tag/type combos.
 
@@ -184,7 +182,6 @@ class TransformedFunction(Function):
     transform: object
 
 
-@serializable("TypedPrimitive")
 @dataclass(frozen=True)
 class TypedPrimitive(Function):
     """Represents a Primitive with an explicitly given type signature.
@@ -255,7 +252,6 @@ class AbstractAtom(AbstractValue):
     """Base class for abstract values that are not structures."""
 
 
-@serializable("AbstractScalar")
 class AbstractScalar(AbstractAtom):
     """Represents a scalar (integer, float, bool, etc.)."""
 
@@ -267,7 +263,6 @@ class AbstractScalar(AbstractAtom):
         return rval
 
 
-@serializable("AbstractError")
 class AbstractError(AbstractAtom):
     """This represents some kind of problem in the computation.
 
@@ -287,7 +282,6 @@ class AbstractError(AbstractAtom):
         return f"E({self.values[VALUE]})"
 
 
-@serializable("AbstractBottom")
 class AbstractBottom(AbstractAtom):
     """Represents the type of an expression that does not return."""
 
@@ -325,7 +319,6 @@ class AbstractFunctionBase(AbstractAtom):
         return None
 
 
-@serializable("AbstractFunction")
 class AbstractFunction(AbstractFunctionBase):
     """Represents a function or set of functions.
 
@@ -406,7 +399,6 @@ class AbstractFunction(AbstractFunctionBase):
         return pretty_join(fns, sep=" | ")
 
 
-@serializable("AbstractFunctionUnique")
 class AbstractFunctionUnique(AbstractFunctionBase):
     """Represents some function with an explicitly given type signature.
 
@@ -432,7 +424,6 @@ class AbstractFunctionUnique(AbstractFunctionBase):
         return pretty_call(ctx, "Fn", (self.args, self.output))
 
 
-@serializable("AbstractRandomState")
 class AbstractRandomState(AbstractAtom):
     """Abstract class to represent a backend random state object."""
 
@@ -462,7 +453,6 @@ class AbstractWrapper(AbstractStructure):
         return AttrEK(self, (v, "element"))
 
 
-@serializable("AbstractType")
 class AbstractType(AbstractWrapper):
     """Represents a type as a first class value."""
 
@@ -475,7 +465,6 @@ class AbstractType(AbstractWrapper):
         return pretty_join(["Ty(", t, ")"])
 
 
-@serializable("AbstractTuple")
 class AbstractTuple(AbstractStructure):
     """Represents a tuple of elements."""
 
@@ -498,7 +487,6 @@ class AbstractTuple(AbstractStructure):
         return pretty_call(ctx, "", self.elements)
 
 
-@serializable("AbstractArray")
 class AbstractArray(AbstractWrapper):
     """Represents an array.
 
@@ -627,7 +615,6 @@ class AbstractJTagged(AbstractWrapper):
         return pretty_call(ctx, "J", self.element)
 
 
-@serializable("AbstractHandle")
 class AbstractHandle(AbstractWrapper):
     """Represents a value (non-function) transformed through J."""
 
@@ -668,7 +655,6 @@ class AbstractUnion(AbstractStructure):
         return pretty_call(ctx, "U", self.options)
 
 
-@serializable("AbstractTaggedUnion")
 class AbstractTaggedUnion(AbstractStructure):
     """Represents a tagged union.
 

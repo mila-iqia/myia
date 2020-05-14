@@ -15,7 +15,7 @@ from typing import Any, Dict, Iterable, List, Union
 
 from ..info import About, NamedDebugInfo
 from ..operations import Primitive, primitives as primops
-from ..utils import Named, list_str, repr_, serializable
+from ..utils import Named, list_str, repr_
 from ..utils.unify import Unification, expandlist, noseq
 from .abstract import Node
 
@@ -24,7 +24,6 @@ SPECIAL = Named("SPECIAL")
 APPLY = Named("APPLY")
 
 
-@serializable("Graph")
 class Graph:
     r"""A function graph.
 
@@ -559,7 +558,6 @@ class ANFNode(Node):
         return Unification().unify(self, node)
 
 
-@serializable("Apply")
 class Apply(ANFNode):
     """A function application.
 
@@ -619,7 +617,6 @@ class Apply(ANFNode):
         )
 
 
-@serializable("Parameter")
 class Parameter(ANFNode):
     """A parameter to a function.
 
@@ -663,7 +660,6 @@ class Parameter(ANFNode):
         return repr_(self, name=self.debug.debug_name, graph=self.graph)
 
 
-@serializable("Constant")
 class Constant(ANFNode):
     """A constant node.
 

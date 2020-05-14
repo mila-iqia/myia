@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import numpy as np
 
 from .overload import overload
-from .serialize import serializable
 
 
 def require_same(fns, objs):
@@ -61,7 +60,6 @@ def _add(self, x: object, y):
     return x + y
 
 
-@serializable("Env")
 class EnvInstance:
     """Environment mapping keys to values.
 

@@ -6,8 +6,6 @@ import weakref
 from contextvars import ContextVar
 from typing import Any, Set
 
-from .utils import serializable
-
 
 class StackVar:
     """ContextVar that represents a stack."""
@@ -89,7 +87,6 @@ class DebugInherit(DebugInfo):
         _about.pop()
 
 
-@serializable("DebugInfo")
 class NamedDebugInfo(DebugInfo):
     """Debug information for an object.
 
