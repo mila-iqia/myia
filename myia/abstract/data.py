@@ -66,7 +66,7 @@ class Possibilities(list):
         return hash(tuple(self))
 
 
-@serializable("TaggedPossibilities", sequence=True)
+@serializable("TaggedPossibilities")
 class TaggedPossibilities(list):
     """Represents a set of possible tag/type combos.
 
