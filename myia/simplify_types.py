@@ -306,8 +306,7 @@ def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
 
 @overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractRandomState, coerce):
-    if not isinstance(arg, RandomStateWrapper):
-        raise MyiaInputTypeError("Expected %s" % RandomStateWrapper.__name__)
+    # arg must be a RandomStateWrapper
     return arg
 
 
