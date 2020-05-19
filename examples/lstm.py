@@ -12,6 +12,7 @@ from numpy.random import RandomState
 
 from myia import ArithmeticData, myia, value_and_grad
 from myia.debug import traceback  # noqa
+from myia.modules import Linear, Sequential, Tanh
 from myia.xtype import Array
 
 ###########
@@ -105,27 +106,6 @@ def sigmoid(x):
 
 
 @dataclass(frozen=True)
-class Linear(ArithmeticData):
-    """Linear layer."""
-
-    W: "Weights array"
-    b: "Biases vector"
-
-    def apply(self, input):
-        """Apply the layer."""
-        return input @ self.W + self.b
-
-
-@dataclass(frozen=True)
-class Tanh(ArithmeticData):
-    """Tanh layer."""
-
-    def apply(self, input):
-        """Apply the layer."""
-        return numpy.tanh(input)
-
-
-@dataclass(frozen=True)
 class LSTMLayer(ArithmeticData):
     """LSTM layer."""
 
@@ -168,19 +148,6 @@ class LSTMLayer(ArithmeticData):
             s, c = self.step(e, s, c)
         # Maybe collect and return the full list of s outputs?
         return s
-
-
-@dataclass(frozen=True)
-class Sequential(ArithmeticData):
-    """Sequential layer, applies all sub-layers in order."""
-
-    layers: "Tuple of layers"
-
-    def apply(self, x):
-        """Apply the layer."""
-        for layer in self.layers:
-            x = layer.apply(x)
-        return x
 
 
 def cost(model, x, target):
