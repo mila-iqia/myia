@@ -35,6 +35,7 @@ from .compile import BackendValue
 from .ir import Constant
 from .operations import primitives as P
 from .utils import HandleInstance, MyiaInputTypeError, TaggedValue, overload
+from .utils.misc import RandomStateWrapper
 from .xtype import Int, NDArray, String
 
 ####################
@@ -304,6 +305,13 @@ def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
 
 
 @overload  # noqa: F811
+def to_canonical(self, arg, orig_t: AbstractRandomState, coerce):
+    if not isinstance(arg, RandomStateWrapper):
+        raise MyiaInputTypeError("Expected %s" % RandomStateWrapper.__name__)
+    return arg
+
+
+@overload  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractDict, coerce):
     if not isinstance(arg, dict):
         raise MyiaInputTypeError("Expected dict")
@@ -448,7 +456,7 @@ def from_canonical(self, res, orig_t: AbstractTuple):
 
 @overload  # noqa: F811
 def from_canonical(self, res, orig_t: AbstractRandomState):
-    return res.state
+    return res
 
 
 @overload  # noqa: F811
