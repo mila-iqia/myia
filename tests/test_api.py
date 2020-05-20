@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from myia.abstract.data import AbstractRandomState
 from myia.api import myia, to_device
 from myia.compile import closure_convert
 from myia.ir import clone
@@ -11,6 +12,7 @@ from myia.pipeline import (
 )
 from myia.simplify_types import from_canonical, to_canonical
 from myia.utils import DoTrace, HandleInstance, InferenceError, TaggedValue
+from myia.utils.misc import RandomStateWrapper
 from myia.xtype import Bool
 
 from .common import (
@@ -88,6 +90,14 @@ def test_myia_dict_field():
 
     v = f({"x": 2})
     assert v == 2
+
+
+def test_random_state_to_canonical():
+    rsw = RandomStateWrapper(None)
+    ars = AbstractRandomState()
+    assert to_canonical(rsw, ars) is rsw
+    with pytest.raises(TypeError):
+        to_canonical(None, ars)
 
 
 def test_to_canonical():
