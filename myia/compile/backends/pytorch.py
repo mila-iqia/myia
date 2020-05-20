@@ -612,6 +612,8 @@ class PyTorchBackend(Backend):
         elif isinstance(t, abstract.AbstractTaggedUnion):
             real_t = t.options.get(v.tag)
             return TaggedValue(v.tag, self.to_backend_value(v.value, real_t))
+        elif isinstance(t, abstract.AbstractRandomState):
+            return self.from_numpy(v.state.copy())
         else:
             raise NotImplementedError(f"to_backend_value for {t}")
 

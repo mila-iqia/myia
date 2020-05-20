@@ -21,6 +21,7 @@ from ..utils import (
     is_dataclass_type,
     overload,
 )
+from ..utils.misc import RandomStateWrapper
 from .amerge import amerge
 from .data import (
     ALIASID,
@@ -35,6 +36,7 @@ from .data import (
     AbstractExternal,
     AbstractFunction,
     AbstractHandle,
+    AbstractRandomState,
     AbstractScalar,
     AbstractTuple,
     AbstractType,
@@ -173,6 +175,11 @@ def to_abstract(
 @overload  # noqa: F811
 def to_abstract(self, v: tuple, **kwargs):
     return AbstractTuple([self(elem, **kwargs) for elem in v])
+
+
+@overload  # noqa: F811
+def to_abstract(self, v: RandomStateWrapper, **kwargs):
+    return AbstractRandomState()
 
 
 @overload  # noqa: F811

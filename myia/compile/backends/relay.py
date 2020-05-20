@@ -15,7 +15,7 @@ from ...operations import Primitive, primitives as P
 from ...operations.primitives import BackendPrimitive
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
 from ...utils.variables import X, Y
-from ...xtype import type_to_np_dtype
+from ...xtype import type_to_np_dtype, u32
 from ..channel import handle
 from ..transform import get_prim_graph, return_handles, wrap_result
 from . import Backend, Converter, HandleBackend, relay_philox
@@ -917,6 +917,9 @@ class RelayInputConverter(Converter):
 
     def convert_tuple(self, v, t):
         return tuple(self(e, et) for e, et in zip(v, t.elements))
+
+    def convert_random_state(self, v, t):
+        return tuple(self.convert_scalar(e, u32) for e in v.state)
 
     def convert_universe(self, v, t):
         return ()
