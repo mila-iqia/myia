@@ -20,7 +20,7 @@ class LoadingError(Exception):
     """
 
 
-def channel_loader(pkg, name):
+def backend_loader(pkg, name):
     """Helper function for simple backends.
 
     This will return a callable that will load a module, retrieve a
@@ -52,11 +52,11 @@ def pytorch_default(device="cpu:0"):
 
 _backends = {
     "relay": (
-        channel_loader("myia.compile.backends.relay", "RelayBackend"),
+        backend_loader("myia.compile.backends.relay", "RelayBackend"),
         relay_defaults,
     ),
     "pytorch": (
-        channel_loader("myia.compile.backends.pytorch", "PyTorchBackend"),
+        backend_loader("myia.compile.backends.pytorch", "PyTorchBackend"),
         pytorch_default,
     ),
 }
