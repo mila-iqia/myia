@@ -4,17 +4,18 @@ Myia is still a work in progress, and this example may change in the future.
 """
 from __future__ import print_function
 
+from dataclasses import dataclass
+
 import gym
 import numpy as np
 import torch
 from numpy.random import RandomState
 
-from myia import myia, value_and_grad
+from myia import ArithmeticData, myia, value_and_grad
 from myia.api import to_device
 from myia.debug import traceback  # noqa
 from myia.frontends import activate_frontend
-from myia.modules import Linear, Sequential, Softmax, Tanh
-from myia.public_api import _sum, mean, std
+from myia.public_api import _sum, mean, softmax, std
 
 activate_frontend("pytorch")
 
@@ -61,6 +62,52 @@ def mlp_parameters(*layer_sizes, seed=90909):
         b = param(R, 1, o)
         parameters.append((W, b))
     return parameters
+
+
+@dataclass(frozen=True)
+class Linear(ArithmeticData):
+    """Linear layer."""
+
+    W: "Weights array"
+    b: "Biases vector"
+
+    def apply(self, input):
+        """Apply the layer."""
+        return input @ self.W + self.b
+
+
+@dataclass(frozen=True)
+class Tanh(ArithmeticData):
+    """Tanh layer."""
+
+    def apply(self, input):
+        """Apply the layer."""
+        return np.tanh(input)
+
+
+@dataclass(frozen=True)
+class Softmax(ArithmeticData):
+    """LogSoftmax layer."""
+
+    # dims: Static(int)
+    dims: "Dimensions tuple"
+
+    def apply(self, input):
+        """Apply the layer."""
+        return softmax(input, dim=self.dims)
+
+
+@dataclass(frozen=True)
+class Sequential(ArithmeticData):
+    """Sequential layer, applies all sub-layers in order."""
+
+    layers: "Tuple of layers"
+
+    def apply(self, x):
+        """Apply the layer."""
+        for layer in self.layers:
+            x = layer.apply(x)
+        return x
 
 
 layer_sizes = (4, 24, 2)

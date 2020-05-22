@@ -12,7 +12,6 @@ from numpy.random import RandomState
 
 from myia import ArithmeticData, myia, value_and_grad
 from myia.debug import traceback  # noqa
-from myia.modules import Linear, Sequential, Tanh
 
 ###########
 # Options #
@@ -84,6 +83,27 @@ def rnn_parameters(*layer_sizes, batch_size, seed=123123):
 
 
 @dataclass(frozen=True)
+class Linear(ArithmeticData):
+    """Linear layer."""
+
+    W: "Weights array"
+    b: "Biases vector"
+
+    def apply(self, input):
+        """Apply the layer."""
+        return input @ self.W + self.b
+
+
+@dataclass(frozen=True)
+class Tanh(ArithmeticData):
+    """Tanh layer."""
+
+    def apply(self, input):
+        """Apply the layer."""
+        return numpy.tanh(input)
+
+
+@dataclass(frozen=True)
 class RNNLayer(ArithmeticData):
     """RNN layer."""
 
@@ -103,6 +123,19 @@ class RNNLayer(ArithmeticData):
             h = self.step(e, h)
         # Maybe collect and return the full list of outputs?
         return h
+
+
+@dataclass(frozen=True)
+class Sequential(ArithmeticData):
+    """Sequential layer, applies all sub-layers in order."""
+
+    layers: "Tuple of layers"
+
+    def apply(self, x):
+        """Apply the layer."""
+        for layer in self.layers:
+            x = layer.apply(x)
+        return x
 
 
 def cost(model, x, target):
