@@ -15,7 +15,7 @@ from ...operations import Primitive, primitives as P
 from ...operations.primitives import BackendPrimitive
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
 from ...utils.variables import X, Y
-from ...xtype import type_to_np_dtype
+from ...xtype import type_to_np_dtype, u32
 from ..transform import convert_grad, get_prim_graph, return_handles
 from . import Backend, Converter, relay_philox
 from .relay_helpers import (
