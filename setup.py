@@ -27,7 +27,6 @@ setup(
         "colorama",
         "prettyprinter",
         "numpy",
-        "ruamel.yaml",
     ],
     extras_require={
         "test": [

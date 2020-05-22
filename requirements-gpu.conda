@@ -7,7 +7,6 @@ cudnn
 notoraptor::tvm==0.7dev1+1.*
 pytest
 pytest-cov
-yaml
 flake8==3.7.7
 pytorch::pytorch==1.5.0
 isort==4.3.21
