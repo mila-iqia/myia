@@ -166,7 +166,6 @@ class GraphInterfaceRewriter:
             entries = new_entries
 
         # 3. Sort the entries, if operations must be done in a specific order
-        # if self.order_key is NotImplemented:
         if getattr(self.order_key, "noop", False):
             tasks = entries.values()
         else:
@@ -378,35 +377,6 @@ class LambdaLiftRewriter(GraphInterfaceRewriter):
         return True
 
 
-class GraphInterfaceRewriterOpt(Partializable):
-    """Implements optimizer interface for GraphInferfaceRewriter."""
-
-    def __init__(self, resources, rewriter):
-        """Initialize GraphInterfaceRewriterOpt.
-
-        Arguments:
-            resources: The resources object associated to the pipeline.
-            rewriter: A subclass of GraphInterfaceRewriter. It will be
-                instantiated in the __call__ method.
-        """
-        self.resources = resources
-        self.rewriter = rewriter
-        self.name = rewriter.__name__
-
-    def __call__(self, root):
-        """Apply the rewriter on root."""
-        mng = self.resources.opt_manager
-        args = dict(opt=self, node=None, manager=mng, profile=False,)
-        with tracer("opt", **args) as tr:
-            tr.set_results(success=False, **args)
-            mng.gc()
-            rewriter = self.rewriter(mng)
-            chg = rewriter.run()
-            if chg:
-                tracer().emit_success(**args, new_node=None)
-            return chg
-
-
 ##########################
 # LAMBDA LIFTING EXAMPLE #
 ##########################
@@ -462,6 +432,35 @@ class GraphInterfaceRewriterOpt(Partializable):
 #         return g(_y, _x)   # <- Swap fvs for parameters
 
 #     return h(y, x)
+
+
+class GraphInterfaceRewriterOpt(Partializable):
+    """Implements optimizer interface for GraphInferfaceRewriter."""
+
+    def __init__(self, resources, rewriter):
+        """Initialize GraphInterfaceRewriterOpt.
+
+        Arguments:
+            resources: The resources object associated to the pipeline.
+            rewriter: A subclass of GraphInterfaceRewriter. It will be
+                instantiated in the __call__ method.
+        """
+        self.resources = resources
+        self.rewriter = rewriter
+        self.name = rewriter.__name__
+
+    def __call__(self, root):
+        """Apply the rewriter on root."""
+        mng = self.resources.opt_manager
+        args = dict(opt=self, node=None, manager=mng, profile=False,)
+        with tracer("opt", **args) as tr:
+            tr.set_results(success=False, **args)
+            mng.gc()
+            rewriter = self.rewriter(mng)
+            chg = rewriter.run()
+            if chg:
+                tracer().emit_success(**args, new_node=None)
+            return chg
 
 
 __all__ = [
