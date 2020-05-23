@@ -322,8 +322,8 @@ class SensRemapper(GradRemapper):
     def gen_fv_extended(self, g, ng, node):
         """Generate sensitivities for free variables.
 
-        Note that the default gen_fv does nothing, so this is different
-        behavior.
+        Note that the default gen_fv_extended does nothing, so this is
+        different behavior.
         """
         with About(node.debug, self.relation):
             self.remap_node((g, node), g, node, ng, ng.apply())
