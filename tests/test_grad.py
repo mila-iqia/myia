@@ -382,7 +382,7 @@ def test_list_for(xs):
     return y
 
 
-@gradient(4.5)
+@mt(gradient(4.5), gradient(-7.9))
 def test_nested_closure(x):
     a = x * x
 
@@ -398,6 +398,17 @@ def test_nested_closure(x):
         return g if x < 0 else h
 
     return f()()
+
+
+@gradient(4.3, pipeline=standard_pipeline)
+def test_recursive_closure(x):
+    def f(y):
+        if y <= 0:
+            return x
+        else:
+            return f(y - 1)
+
+    return f(7)
 
 
 @gradient(4.5, 6.7)

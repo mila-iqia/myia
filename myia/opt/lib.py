@@ -721,8 +721,7 @@ def force_constants(resources, node, equiv):
     except Exception:
         return None
     if val is DEAD:
-        with untested_legacy():
-            return None
+        return None
     ct = Constant(val)
     ct.abstract = node.abstract
     return ct
