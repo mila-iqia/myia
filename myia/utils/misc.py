@@ -531,6 +531,10 @@ class WorkSet:
         """Add an element to the queue."""
         self.elements.append(element)
 
+    def queue_all(self, elements):
+        """Add elements to the queue."""
+        self.elements.extend(elements)
+
     def requeue(self, element):
         """Add an element to the queue."""
         self.done.discard(element)

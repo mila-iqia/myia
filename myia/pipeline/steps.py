@@ -11,10 +11,11 @@ from ..ir import Graph, clone
 from ..opt import (
     CSE,
     DeadDataElimination,
+    GraphInterfaceRewriterOpt,
+    LambdaLiftRewriter,
     LocalPassOptimizer,
     NodeMap,
-    RewriteGraphs,
-    lambda_lift,
+    RemoveUnusedParameters,
     lib as optlib,
 )
 from ..parser import parse
@@ -348,7 +349,9 @@ step_opt = Optimizer.partial(
 
 step_opt2 = Optimizer.partial(
     phases=dict(
-        rewrite=RewriteGraphs.partial(),
+        rmunused=GraphInterfaceRewriterOpt.partial(
+            rewriter=RemoveUnusedParameters
+        ),
         dde=DeadDataElimination.partial(),
         main=[
             optlib.force_constants,
@@ -389,7 +392,10 @@ def step_llift(resources, graph, outspec=None):
     Outputs:
         None.
     """
-    lambda_lift(graph)
+    mng = resources.opt_manager
+    mng.gc()
+    llift = LambdaLiftRewriter(mng)
+    llift.run()
     return {"graph": graph}
 
 
