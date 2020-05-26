@@ -255,6 +255,20 @@ def relay_array_getitem(c, a, start, stop, strides):
     )
 
 
+def relay_array_setitem(c, array, start, stop, strides, value):
+    assert start.is_constant(tuple)
+    assert stop.is_constant(tuple)
+    assert strides.is_constant(tuple)
+
+    v_start = relay.const(list(start.value))
+    v_stop = relay.const(list(stop.value))
+    v_strides = relay.const(list(strides.value))
+
+    return relay.op.transform.strided_set(
+        c.ref(array), c.ref(value), v_start, v_stop, v_strides
+    )
+
+
 def relay_argmax(c, v, dims):
     """Implementation of argmax for Relay."""
     v = c.ref(v)
@@ -602,6 +616,7 @@ COMPLEX_MAP = {
     P.env_getitem: relay_env_getitem,
     P.unsafe_static_cast: relay_unsafe_static_cast,
     P.array_getitem: relay_array_getitem,
+    P.array_setitem: relay_array_setitem,
     P.argmax: relay_argmax,
     P.max_pool2d: relay_max_pool2d,
     P.max_pool2d_grad: relay_max_pool2d_grad,

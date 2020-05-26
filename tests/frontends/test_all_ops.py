@@ -715,12 +715,12 @@ def test_torch_norm(inp, p, dim):
     return torch.norm(inp, p, dim)
 
 
-@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_get(x):
     return x[:, -3:-1:2, -2]
 
 
-@fwd_and_bwd_no_relay(nn.Parameter(torch.randn(2, 4, 3)))
+@fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3)))
 def test_torch_tensor_get2(x):
     return x[1, 2]
 
