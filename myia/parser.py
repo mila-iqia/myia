@@ -167,6 +167,16 @@ def parse(func, use_universe=False):
 
 
 class FindPossiblePhi(ast.NodeVisitor):
+    """Find all variable names that are not single static assigment.
+
+    These are variables in if/while/for statements. Multiple assignments to the
+    same variable in a linear sequence of statements do not count as "phi"
+    since each such occurrence can straightforwardly be renamed.
+
+    Attributes:
+        phis: set of variable names that are in if/while/for statements.
+    """
+
     def __init__(self, tree):
         self.phis = set()
         self.root = True
@@ -194,7 +204,6 @@ class FindPossiblePhi(ast.NodeVisitor):
 
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Store) and self.inloop:
-            # breakpoint()
             self.phis.add(node.id)
 
 
