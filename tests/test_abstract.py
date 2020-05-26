@@ -32,6 +32,7 @@ from myia.abstract import (
     TaggedPossibilities,
     TrackDict,
     TransformedFunction,
+    abstract_check,
     abstract_clone,
     amerge,
     broaden,
@@ -305,6 +306,13 @@ def test_abstract_clone_pending():
     assert abstract_clone(sp) is sp
     p.set_result(ty.Int[32])
     assert abstract_clone(sp) is s1
+
+
+def test_abstract_clone_edge_cases():
+    tup = T(ANYTHING)
+    assert abstract_check(tup)
+    tup2 = abstract_clone(tup)
+    assert tup is tup2
 
 
 def test_broaden_recursive():
