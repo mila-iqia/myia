@@ -15,11 +15,11 @@ repository = "https://github.com/mila-iqia/myia"
 python = "^3.7"
 asttokens = "^2.0.3"
 colorama = "^0.4.3"
-numpy = "^1.18.2"
-opt_einsum = "^3.2.0"
+numpy = "^1.16"
+opt_einsum = "^3.1.0"
 prettyprinter = "^0.18.0"
 antlr4-python3-runtime = { version = "4.7.2", optional = true }
-#tvm = { version = "0.7dev1+1.*", optional = true }
+tvm = { version = "0.7dev1+1.*", optional = true }
 pytorch = { version = "1.5.0", optional = true }
 torchvision = { version = "0.6.0", optional = true }
 cpuonly = { version = "*", optional = true }
@@ -29,6 +29,8 @@ cudnn = { version = "~7.6.5", optional = true }
 [tool.poetry.extras]
 relay = ["antlr4-python3-runtime", "tvm"]
 pytorch = ["pytorch", "torchvision"]
+gpu = ["cudatoolkit", "cudnn"]
+cpu = ["cpuonly"]
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
@@ -49,7 +51,7 @@ name = "myia"
 pytorch = { channel = "pytorch" }
 torchvision = { channel = "pytorch" }
 cpuonly = { channel = "pytorch" }
-tvm = { channel = "abergeron" }
+tvm = { channel = "mila-iqia" }
 asttokens = { channel = "pip" }
 prettyprinter = { channel = "pip" }
 antlr4-python3-runtime = { channel = "pip" }
