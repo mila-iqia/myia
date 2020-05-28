@@ -2,17 +2,22 @@ from pytest import mark
 
 from myia.compile import closure_convert
 from myia.ir import manage
+from myia.opt import LambdaLiftRewriter
 from myia.pipeline import scalar_debug_pipeline, steps
 
 
-def step_cconv(graph):
+def step_cconv(resources, graph, use_llift):
+    if use_llift:
+        graph.manager.keep_roots(graph)
+        llift = LambdaLiftRewriter(resources.opt_manager)
+        llift.run()
     closure_convert(graph)
     return {"graph": graph}
 
 
 cconv_pipeline = scalar_debug_pipeline.select(
     "resources", "parse", {"resolve": steps.step_resolve}, "export"
-).insert_after("parse", cconv=step_cconv)
+).insert_after("resolve", cconv=step_cconv)
 
 
 def check_no_free_variables(root):
@@ -29,11 +34,11 @@ def check_no_free_variables(root):
                     raise Exception(f"Free variable detected: {node}")
 
 
-def cconv(*arglists):
+def cconv(*arglists, use_llift=False):
     def decorate(fn):
         def run_test(args):
             result_py = fn(*args)
-            res = cconv_pipeline.make()(input=fn)
+            res = cconv_pipeline.make()(input=fn, use_llift=use_llift)
             check_no_free_variables(res["graph"])
             result_final = res["output"](*args)
             assert result_py == result_final
@@ -91,7 +96,7 @@ def test_return_in_double_while(x):
     return -1
 
 
-@cconv((3,))
+@cconv((3,), use_llift=True)
 def test_pow10(x):
     v = x
     j = 0

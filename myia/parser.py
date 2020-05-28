@@ -166,6 +166,47 @@ def parse(func, use_universe=False):
     return graph
 
 
+class FindPossiblePhi(ast.NodeVisitor):
+    """Find all variable names that are not single static assigment.
+
+    These are variables in if/while/for statements. Multiple assignments to the
+    same variable in a linear sequence of statements do not count as "phi"
+    since each such occurrence can straightforwardly be renamed.
+
+    Attributes:
+        phis: set of variable names that are in if/while/for statements.
+    """
+
+    def __init__(self, tree):
+        self.phis = set()
+        self.root = True
+        self.inloop = False
+        assert isinstance(tree, ast.FunctionDef)
+        self.generic_visit(tree)
+
+    def visit_loop(self, node):
+        prev = self.inloop
+        self.inloop = True
+        self.generic_visit(node)
+        self.inloop = prev
+
+    def visit_FunctionDef(self, node):
+        return
+
+    def visit_If(self, node):
+        self.visit_loop(node)
+
+    def visit_For(self, node):
+        self.visit_loop(node)
+
+    def visit_While(self, node):
+        self.visit_loop(node)
+
+    def visit_Name(self, node):
+        if isinstance(node.ctx, ast.Store) and self.inloop:
+            self.phis.add(node.id)
+
+
 class Parser:
     """Parser for a function.
 
@@ -211,6 +252,8 @@ class Parser:
         self.read_cache = OrderedSet()
         # Finalizers for functions
         self.finalizers = {}
+        # Variable names that could be phi nodes
+        self.possible_phis = set()
 
     def new_block(self, **kwargs) -> "Block":
         """Create a new block."""
@@ -341,6 +384,9 @@ class Parser:
     def _finalize_function(self, node, function_block):
         """Process a function definition."""
         # Process arguments and their defaults
+        possible_phis_bk = self.possible_phis
+        self.possible_phis = FindPossiblePhi(node).phis
+
         args = node.args.args
         nondefaults = [None] * (len(args) - len(node.args.defaults))
         defaults = nondefaults + node.args.defaults
@@ -400,6 +446,7 @@ class Parser:
         function_block.graph.return_.inputs[2:] = defaults_list
 
         # TODO: check that if after_block returns?
+        self.possible_phis = possible_phis_bk
         return function_block
 
     def process_node(self, block, node, used=True):  # noqa
@@ -1038,7 +1085,8 @@ class Block:
             if lock:
                 self.lock[varnum] = lock
             return _fresh(node)
-        if self.matured:
+        nophi = varnum not in self.parser.possible_phis
+        if self.matured or nophi:
 
             def _resolve():
                 if not resolve_globals:
@@ -1050,7 +1098,9 @@ class Block:
                     ns = self.parser.global_namespace
                     return self.make_resolve(ns, varnum)
 
-            if len(self.preds) == 1:
+            if not self.preds:
+                return _resolve()
+            if len(self.preds) == 1 or nophi:
                 result = self.preds[0].read(
                     varnum,
                     resolve_globals=False,
@@ -1058,8 +1108,7 @@ class Block:
                     or (self.type == "function" and self.graph.debug.name),
                 )
                 return result or _resolve()
-            if not self.preds:
-                return _resolve()
+
         # TODO: point to the original definition
         with About(NamedDebugInfo(name=varnum), "phi"):
             phi = Parameter(self.graph)
