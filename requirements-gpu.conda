@@ -4,7 +4,7 @@ numpy
 opt_einsum
 cudatoolkit=10.2.*
 cudnn
-mila-iqia::tvm==0.7dev1+2.*
+mila-iqia::tvm==0.7dev1+3.*
 pytest
 pytest-cov
 flake8==3.7.7
