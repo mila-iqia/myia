@@ -23,9 +23,8 @@ export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
 conda update -q conda
-conda create -y -n test python=3.7
 conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
-conda activate test
-pip install poetry
-./scripts/install-deps-$DEV.sh
+pip install poetry2conda>=0.3.0
+poetry2conda pyproject.toml --dev -E pytorch -E $DEV -E relay env.yml
+conda env create -n test -f env.yml $DEV-extras.conda relay-extras.conda

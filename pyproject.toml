@@ -19,18 +19,17 @@ numpy = "^1.16"
 opt_einsum = "^3.1.0"
 prettyprinter = "^0.18.0"
 antlr4-python3-runtime = { version = "4.7.2", optional = true }
-#tvm = { git = "https://github.com/apache/incubator-tvm.git", rev = "07449f5a579bdde6e98527aa652e6f693ec4c81e", optional = true }
 torch = { version = "1.5.0", optional = true }
 torchvision = { version = "0.6.0", optional = true }
-#cpuonly = { version = "*", optional = true }
-#cudatoolkit = { version = "~10.2.0", optional = true }
-#cudnn = { version = "~7.6.5", optional = true }
 
 [tool.poetry.extras]
-relay = ["antlr4-python3-runtime", "tvm"]
+relay = ["antlr4-python3-runtime"]
+# tvm version is managed by relay-extras.conda
 pytorch = ["torch", "torchvision"]
-gpu = ["cudatoolkit", "cudnn"]
-cpu = ["cpuonly"]
+
+# versions for these are managed by {gpu,cpu}-extras.conda
+#gpu = ["cudatoolkit", "cudnn"]
+#cpu = ["cpuonly"]
 
 [tool.poetry.dev-dependencies]
 black = "^19.10b0"
@@ -50,8 +49,6 @@ name = "myia"
 [tool.poetry2conda.dependencies]
 torch = { channel = "pytorch" }
 torchvision = { channel = "pytorch" }
-cpuonly = { channel = "pytorch" }
-tvm = { name="tvm", channel = "mila-iqia", version = "0.7dev1+1.*"}
 asttokens = { channel = "pip" }
 prettyprinter = { channel = "pip" }
 antlr4-python3-runtime = { channel = "pip" }
