@@ -49,7 +49,7 @@ pillow = "<7"
 name = "myia"
 
 [tool.poetry2conda.dependencies]
-torch = { channel = "pytorch" }
+torch = { channel = "pytorch", name = "pytorch" }
 torchvision = { channel = "pytorch" }
 asttokens = { channel = "pip" }
 prettyprinter = { channel = "pip" }
