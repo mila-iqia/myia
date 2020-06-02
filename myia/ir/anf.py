@@ -15,7 +15,7 @@ from typing import Any, Dict, Iterable, List, Union
 
 from ..info import About, NamedDebugInfo
 from ..operations import Primitive, primitives as primops
-from ..utils import Named, list_str, repr_, serializable
+from ..utils import Named, list_str, repr_
 from ..utils.unify import Unification, expandlist, noseq
 from .abstract import Node
 
@@ -24,7 +24,6 @@ SPECIAL = Named("SPECIAL")
 APPLY = Named("APPLY")
 
 
-@serializable("Graph")
 class Graph:
     r"""A function graph.
 
@@ -75,22 +74,6 @@ class Graph:
             and self.defaults == []
             and self.kwonly == 0
         )
-
-    def _serialize(self):
-        assert self.plain()
-        return {
-            "parameters": self.parameters,
-            "return": self.return_,
-            "debug": self.debug,
-        }
-
-    @classmethod
-    def _construct(cls):
-        g = cls()
-        data = yield g
-        g.parameters = data["parameters"]
-        g.return_ = data["return"]
-        g.debug = data["debug"]
 
     @property
     def abstract(self):
@@ -559,7 +542,6 @@ class ANFNode(Node):
         return Unification().unify(self, node)
 
 
-@serializable("Apply")
 class Apply(ANFNode):
     """A function application.
 
@@ -570,30 +552,6 @@ class Apply(ANFNode):
     def __init__(self, inputs: List[ANFNode], graph: "Graph") -> None:
         """Construct an application."""
         super().__init__(inputs, APPLY, graph)
-
-    def _serialize(self):
-        return {
-            "inputs": self.inputs,
-            "graph": self.graph,
-            "debug": self.debug,
-            "abstract": self.abstract,
-        }
-
-    @classmethod
-    def _construct(cls):
-        a = cls([], None)
-        data = yield a
-        a.inputs = data["inputs"]
-        a.graph = data["graph"]
-        a.debug = data["debug"]
-        a.abstract = data["abstract"]
-
-        if a.abstract is not None:
-
-            def _cb():
-                a.abstract = a.abstract.intern()
-
-            return _cb
 
     def is_apply(self, value: Any = None) -> bool:
         """Return whether self is an Apply."""
@@ -619,7 +577,6 @@ class Apply(ANFNode):
         )
 
 
-@serializable("Parameter")
 class Parameter(ANFNode):
     """A parameter to a function.
 
@@ -633,28 +590,6 @@ class Parameter(ANFNode):
         """Construct the parameter."""
         super().__init__([], PARAMETER, graph)
 
-    def _serialize(self):
-        return {
-            "graph": self.graph,
-            "debug": self.debug,
-            "abstract": self.abstract,
-        }
-
-    @classmethod
-    def _construct(cls):
-        p = cls(None)
-        data = yield p
-        p.graph = data["graph"]
-        p.debug = data["debug"]
-        p.abstract = data["abstract"]
-
-        if p.abstract is not None:
-
-            def _cb():
-                p.abstract = p.abstract.intern()
-
-            return _cb
-
     def is_parameter(self):
         """Return whether self is a Parameter."""
         return True
@@ -663,7 +598,6 @@ class Parameter(ANFNode):
         return repr_(self, name=self.debug.debug_name, graph=self.graph)
 
 
-@serializable("Constant")
 class Constant(ANFNode):
     """A constant node.
 
@@ -681,28 +615,6 @@ class Constant(ANFNode):
     def __init__(self, value: Any) -> None:
         """Construct a literal."""
         super().__init__([], value, None)
-
-    def _serialize(self):
-        return {
-            "value": self.value,
-            "debug": self.debug,
-            "abstract": self.abstract,
-        }
-
-    @classmethod
-    def _construct(cls):
-        c = cls(None)
-        data = yield c
-        c.value = data["value"]
-        c.debug = data["debug"]
-        c.abstract = data["abstract"]
-
-        if c.abstract is not None:
-
-            def _cb():
-                c.abstract = c.abstract.intern()
-
-            return _cb
 
     def is_constant(self, cls: Any = object) -> bool:
         """Return whether self is a Constant, with value of given cls."""

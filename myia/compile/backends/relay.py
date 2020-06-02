@@ -16,9 +16,8 @@ from ...operations.primitives import BackendPrimitive
 from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
 from ...utils.variables import X, Y
 from ...xtype import type_to_np_dtype, u32
-from ..channel import handle
-from ..transform import get_prim_graph, return_handles, wrap_result
-from . import Backend, Converter, HandleBackend, relay_philox
+from ..transform import convert_grad, get_prim_graph, return_handles
+from . import Backend, Converter, relay_philox
 from .relay_helpers import (
     TypeHelper,
     add_functions,
@@ -32,15 +31,6 @@ from .relay_helpers import (
 
 # Temporary primitive to replace make_handle in graphs
 make_cell = BackendPrimitive(name="make_cell", defaults={})
-
-
-@wrap_result.register
-def wrap_result(data: tvm.runtime.container.ADT):
-    """Wrap tuples from relay."""
-    if data.tag == 0:
-        return tuple(handle(d) for d in data)
-    else:
-        return handle(data)
 
 
 def ashape(node):
@@ -824,10 +814,7 @@ class CompileGraph:
 
         res = handle_wrapper(res, handles_params)
 
-        def f(*args):
-            return wrap_result(res(*args))
-
-        return f
+        return res
 
     def on_parameter(self, node):
         """Convert a parameter node."""
@@ -1059,14 +1046,10 @@ class RelayBackend(Backend):
     def compile(self, graph, argspec, outspec):
         """Compiler a graph."""
         make_handle_to_make_cell(graph)
+        graph = convert_grad(graph)
         return self.compiler.run(
             graph, self.context, self.target, self.exec_kind
         )
 
 
-def RelayBackendR(target, device_id, exec_kind):
-    """Relay proxy."""
-    return HandleBackend(RelayBackend(target, device_id, exec_kind))
-
-
-__all__ = ["RelayBackend", "RelayBackendR"]
+__all__ = ["RelayBackend"]

@@ -10,7 +10,7 @@ from ...utils import RandomStateWrapper, TaggedValue, untested_legacy
 from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from ..cconv import closure_convert
 from ..transform import CompileGraphs, nonlinear_ops
-from . import Backend, HandleBackend
+from . import Backend
 from .pytorch_conv_grad import conv2d_weight
 
 _type_map = {
@@ -618,9 +618,4 @@ class PyTorchBackend(Backend):
             raise NotImplementedError(f"to_backend_value for {t}")
 
 
-def PyTorchBackendR(device):
-    """Pytorch proxy."""
-    return HandleBackend(PyTorchBackend(device))
-
-
-__all__ = ["PyTorchBackend", "PyTorchBackendR"]
+__all__ = ["PyTorchBackend"]

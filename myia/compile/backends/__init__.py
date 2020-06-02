@@ -1,12 +1,11 @@
 """Compilation backends."""
 
+import importlib
 import os
 import urllib
 import weakref
 
 from ... import abstract, xtype
-from ..channel import RPCProcess, handle
-from ..transform import convert_grad
 
 
 class UnknownBackend(Exception):
@@ -21,7 +20,7 @@ class LoadingError(Exception):
     """
 
 
-def channel_loader(pkg, name):
+def backend_loader(pkg, name):
     """Helper function for simple backends.
 
     This will return a callable that will load a module, retrieve a
@@ -30,8 +29,9 @@ def channel_loader(pkg, name):
     """
 
     def loader(init_args):
-        proc = RPCProcess(pkg, name, init_args)
-        return ChannelBackend(proc)
+        module = importlib.import_module(pkg)
+        cls = getattr(module, name)
+        return cls(**init_args)
 
     return loader
 
@@ -52,11 +52,11 @@ def pytorch_default(device="cpu:0"):
 
 _backends = {
     "relay": (
-        channel_loader("myia.compile.backends.relay", "RelayBackendR"),
+        backend_loader("myia.compile.backends.relay", "RelayBackend"),
         relay_defaults,
     ),
     "pytorch": (
-        channel_loader("myia.compile.backends.pytorch", "PyTorchBackendR"),
+        backend_loader("myia.compile.backends.pytorch", "PyTorchBackend"),
         pytorch_default,
     ),
 }
@@ -266,50 +266,3 @@ class Converter:
             return self.convert_handle(v, t)
         else:
             raise NotImplementedError(f"convert for {t}")
-
-
-def _close_and_wait(stream):
-    stream.close()
-    os.waitpid(-1, 0)
-
-
-class ChannelBackend(Backend):
-    """Backend based on a channel to another process."""
-
-    def __init__(self, proc):
-        """Remote."""
-        self.proc = proc
-        weakref.finalize(proc, _close_and_wait, proc.proc.stdin)
-
-    def compile(self, graph, argspec, outspec):
-        """Remote."""
-        graph = convert_grad(graph)
-        return self.proc.call_method("compile", graph, argspec, outspec)
-
-    def from_backend_value(self, v, t):
-        """Remote."""
-        return self.proc.call_method("from_backend_value", v, t)
-
-    def to_backend_value(self, v, t):
-        """Remote."""
-        return self.proc.call_method("to_backend_value", v, t)
-
-
-class HandleBackend(Backend):
-    """Proxy for remote process backend."""
-
-    def __init__(self, real):
-        """Set the proxied backend."""
-        self.real = real
-
-    def compile(self, graph, argspec, outspec):
-        """Proxy."""
-        return handle(self.real.compile(graph, argspec, outspec))
-
-    def from_backend_value(self, v, t):
-        """Remote."""
-        return self.real.from_backend_value(v, t)
-
-    def to_backend_value(self, v, t):
-        """Remote."""
-        return handle(self.real.to_backend_value(v, t))

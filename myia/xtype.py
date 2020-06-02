@@ -11,7 +11,6 @@ from .utils import (
     MyiaInputTypeError,
     SymbolicKeyInstance,
     UniverseInstance,
-    register_serialize,
 )
 
 _type_cache = {}
@@ -227,40 +226,6 @@ f16 = Float[16]
 f32 = Float[32]
 f64 = Float[64]
 
-
-register_serialize(Bool, "bool")
-register_serialize(Nil, "nil")
-register_serialize(SymbolicKeyType, "symbolic_key_type")
-register_serialize(EnvType, "env_type")
-register_serialize(Tuple, "tuple_type")
-register_serialize(NDArray, "ndarray_type")
-register_serialize(i8, "i8")
-register_serialize(i16, "i16")
-register_serialize(i32, "i32")
-register_serialize(i64, "i64")
-register_serialize(u8, "u8")
-register_serialize(u16, "u16")
-register_serialize(u32, "u32")
-register_serialize(u64, "u64")
-register_serialize(f16, "f16")
-register_serialize(f32, "f32")
-register_serialize(f64, "f64")
-register_serialize(UniverseType, "universe_type")
-
-register_serialize(numpy.bool, "numpy_bool")
-register_serialize(numpy.int, "numpy_int")
-register_serialize(numpy.float, "numpy_float")
-register_serialize(numpy.int8, "numpy_int8")
-register_serialize(numpy.int16, "numpy_int16")
-register_serialize(numpy.int32, "numpy_int32")
-register_serialize(numpy.int64, "numpy_int64")
-register_serialize(numpy.uint8, "numpy_uint8")
-register_serialize(numpy.uint16, "numpy_uint16")
-register_serialize(numpy.uint32, "numpy_uint32")
-register_serialize(numpy.uint64, "numpy_uint64")
-register_serialize(numpy.float16, "numpy_float16")
-register_serialize(numpy.float32, "numpy_float32")
-register_serialize(numpy.float64, "numpy_float64")
 
 DTYPE_TO_MTYPE = dict(
     int8=Int[8],
