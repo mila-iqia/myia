@@ -14,7 +14,7 @@ class Linear(ArithmeticData):
     W: "Weights array"
     b: "Biases vector"
 
-    def apply(self, input):
+    def apply(self, input):  # pragma: no cover
         """Apply the layer."""
         return input @ self.W + self.b
 
@@ -25,7 +25,7 @@ class Sequential(ArithmeticData):
 
     layers: "Tuple of layers"
 
-    def apply(self, x):
+    def apply(self, x):  # pragma: no cover
         """Apply the layer."""
         for layer in self.layers:
             x = layer.apply(x)
@@ -39,7 +39,7 @@ class Softmax(ArithmeticData):
     # dims: Static(int)
     dims: "Dimensions tuple"
 
-    def apply(self, input):
+    def apply(self, input):  # pragma: no cover
         """Apply the layer."""
         return pub.softmax(input, dim=self.dims)
 
@@ -48,7 +48,7 @@ class Softmax(ArithmeticData):
 class Tanh(ArithmeticData):
     """Tanh layer."""
 
-    def apply(self, input):
+    def apply(self, input):  # pragma: no cover
         """Apply the layer."""
         return ops.array_tanh(input)
 
