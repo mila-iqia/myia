@@ -48,7 +48,7 @@ pillow = "<7"
 name = "myia"
 
 [tool.poetry2conda.dependencies]
-pytorch = { channel = "pytorch" }
+torch = { channel = "pytorch" }
 torchvision = { channel = "pytorch" }
 cpuonly = { channel = "pytorch" }
 tvm = { name="tvm", channel = "mila-iqia", version = "0.7dev1+1.*"}
