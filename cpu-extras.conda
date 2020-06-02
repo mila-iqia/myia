@@ -1,1 +1,1 @@
-pytorch::cpuonly
+  - pytorch::cpuonly

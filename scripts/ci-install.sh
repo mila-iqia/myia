@@ -27,4 +27,5 @@ conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
 pip install poetry2conda>=0.3.0
 poetry2conda pyproject.toml --dev -E pytorch -E $DEV -E relay env.yml
-conda env create -n test -f env.yml $DEV-extras.conda relay-extras.conda
+cat $DEV-extras.conda relay-extrans.conda >> env.yml
+conda env create -n test -f env.yml
