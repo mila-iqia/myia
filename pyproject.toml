@@ -28,7 +28,9 @@ relay = ["antlr4-python3-runtime"]
 pytorch = ["torch", "torchvision"]
 
 # versions for these are managed by {gpu,cpu}-extras.conda
+gpu = []
 #gpu = ["cudatoolkit", "cudnn"]
+cpu = []
 #cpu = ["cpuonly"]
 
 [tool.poetry.dev-dependencies]
