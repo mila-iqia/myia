@@ -509,6 +509,16 @@ def relay_split(c, x, sections, dim):
     return relay.split(c.ref(x), sections, dim.value).astuple()
 
 
+def relay_gather(c, data, axis, indices):
+    assert axis.is_constant(int)
+    return relay.gather(c.ref(data), axis.value, c.ref(indices))
+
+
+def relay_scatter(c, inp, dim, index, src):
+    assert dim.is_constant(int)
+    return relay.scatter(c.ref(inp), c.ref(index), c.ref(src), dim.value)
+
+
 def relay_make_cell(c, v, u):
     return relay.Tuple((c.ref(u), relay.expr.RefCreate(c.ref(v))))
 
@@ -622,6 +632,8 @@ COMPLEX_MAP = {
     P.random_initialize: relay_random_initialize,
     P.random_uint32: relay_random_uint32,
     make_cell: relay_make_cell,
+    P.gather: relay_gather,
+    P.scatter: relay_scatter,
 }
 
 

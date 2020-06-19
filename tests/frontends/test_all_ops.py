@@ -634,17 +634,17 @@ def test_torch_conv_transpose2d(i, w, b, s, p, o_p, g, d):
 
 
 @mt(
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.Tensor(torch.randn(3, 5))),
         nn.Parameter(torch.randint(5, (3,)), requires_grad=False),
         "mean",
     ),
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.Tensor(torch.randn(3, 5))),
         nn.Parameter(torch.randint(5, (3,)), requires_grad=False),
         "none",
     ),
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.Tensor(torch.randn(3, 5))),
         nn.Parameter(torch.randint(5, (3,)), requires_grad=False),
         "sum",
@@ -683,7 +683,7 @@ def test_torch_detach(x):
     return r
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.Tensor(MA(3, 4))),
     torch.tensor([[0, 1, 2, 0], [0, 0, 0, 1]]),
 )
@@ -814,9 +814,7 @@ def test_torch_mse_loss(x, y):
     return torch.nn.functional.mse_loss(x, y)
 
 
-@fwd_and_bwd_no_relay(
-    nn.Parameter(torch.Tensor(MA(2, 3))), torch.tensor([1, 2])
-)
+@fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), torch.tensor([1, 2]))
 def test_torch_nll_loss(x, y):
     return torch.nn.functional.nll_loss(x, y)
 
@@ -832,13 +830,12 @@ def test_torch_nll_loss(x, y):
         nn.Parameter(torch.Tensor(MA(2, 3))), torch.tensor([1, 2]), "mean"
     ),
     broad_specs=(True, True, False),
-    backend=backend_no_relay,
 )
 def test_torch_nll_loss_reduce_options(x, y, z):
     return torch.nn.functional.nll_loss(x, y, reduction=z)
 
 
-@fwd_and_bwd_no_relay(
+@fwd_and_bwd(
     nn.Parameter(torch.randn(2, 3, dtype=torch.float64)), torch.tensor([1, 2])
 )
 def test_torch_nll_loss_reduce_cast(x, y):
