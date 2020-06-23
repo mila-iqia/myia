@@ -42,6 +42,11 @@ from .common import AA, MA, MB, Point3D, U, f64, to_abstract_test, u64
 from .multitest import backend_all, mt, myia_function_test
 
 
+@pytest.fixture(params=[pytest.param("pytorch"), pytest.param("relay")])
+def _backend_fixture(request):
+    return request.param
+
+
 @dataclass
 class Point:
     x: f64
@@ -703,13 +708,14 @@ def test_aliasing():
     _chk(res3, (3 * o, 2 * o, (2 * o, 3 * o)))
 
 
-def test_aliasing_list():
+def test_aliasing_list(_backend_fixture):
+    backend = _backend_fixture
     from myia.compile.backends import LoadingError, load_backend
 
     try:
-        load_backend("pytorch")
+        load_backend(backend)
     except LoadingError:
-        pytest.skip("PyTorch not available")
+        pytest.skip("%s not available" % backend)
 
     def g(xs, y):
         res = 0
@@ -717,7 +723,7 @@ def test_aliasing_list():
             res = res + x
         return sum(res)
 
-    @myia(backend="pytorch", alias_tracker=ndarray_aliasable)
+    @myia(backend=backend, alias_tracker=ndarray_aliasable)
     def f(xs, y):
         return grad(g)(xs, y)
 
