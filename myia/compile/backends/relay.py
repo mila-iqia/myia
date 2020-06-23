@@ -424,7 +424,7 @@ def relay_conv_transpose2d(
 
     data_shape = input.abstract.xshape()
     kern_shape = weight.abstract.xshape()
-    h_in, w_in = data_shape[2:]
+    n, _, h_in, w_in = data_shape
     filter_h, filter_w = kern_shape[2:]
     strides = stride.value
     padding = padding.value
@@ -485,7 +485,7 @@ def relay_conv_transpose2d(
         img = relay.op.transform.strided_slice(
             data=img,
             begin=[0, 0, padding[0], padding[1]],
-            end=[None, None, h_out + padding[0], w_out + padding[1]],
+            end=[n + 1, c_out + 1, h_out + padding[0], w_out + padding[1]],
         )
 
     return img
