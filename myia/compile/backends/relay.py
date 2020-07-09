@@ -263,7 +263,7 @@ def relay_argmax(c, v, dims):
     """Implementation of argmax for Relay."""
     v = c.ref(v)
     assert dims.is_constant(tuple)
-    return relay.cast(relay.argmax(v, axis=dims.value), "int64")
+    return relay.cast(relay.argmax(v, axis=dims.value, keepdims=True), "int64")
 
 
 def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
