@@ -519,6 +519,11 @@ def relay_scatter(c, inp, dim, index, src):
     return relay.scatter(c.ref(inp), c.ref(index), c.ref(src), dim.value)
 
 
+def relay_scatter_add(c, inp, dim, index, src):
+    assert dim.is_constant(int)
+    return relay.scatter_add(c.ref(inp), c.ref(index), c.ref(src), dim.value)
+
+
 def relay_make_cell(c, v, u):
     return relay.Tuple((c.ref(u), relay.expr.RefCreate(c.ref(v))))
 
@@ -634,6 +639,7 @@ COMPLEX_MAP = {
     make_cell: relay_make_cell,
     P.gather: relay_gather,
     P.scatter: relay_scatter,
+    P.scatter_add: relay_scatter_add,
 }
 
 
