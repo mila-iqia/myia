@@ -23,6 +23,7 @@ export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
 conda update -q conda
+conda install pip
 conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
 pip install poetry2conda>=0.3.0
