@@ -23,10 +23,13 @@ export PATH="$HOME/miniconda/bin:$PATH"
 hash -r
 conda config --set always_yes yes --set changeps1 no
 conda update -q conda
-conda create -y -n test python=3.7
+conda install pip
 conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
-conda activate test
-conda install --file=requirements-$DEV.conda
-pip install -r requirements.txt
-pip install -e . --no-deps
+pip install poetry2conda>=0.3.0
+poetry2conda pyproject.toml --dev -E pytorch -E $DEV -E relay env.yml
+cat $DEV-extras.conda relay-extras.conda >> env.yml
+# conda doesn't like overwriting envs anymore, but doesn't complain
+# if you remove a non-existent env.
+conda env remove -n test
+conda env create -n test -f env.yml

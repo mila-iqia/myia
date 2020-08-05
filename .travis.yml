@@ -1,14 +1,16 @@
-language: python
+# Set language to generic because we install using conda and there is no need
+# for travis to create a virtualenv.
+language: generic
 
 install:
-  - ./ci-install.sh
+  - ./scripts/ci-install.sh
   - export PATH="$HOME/miniconda/bin:$PATH"
 env:
   - TEST_SUITE=static
   - TEST_SUITE=unit
 script:
-  - if [[ $TEST_SUITE == "static" ]]; then source activate test && flake8 && pydocstyle myia && isort -c -df && black --check .; fi
-  - if [[ $TEST_SUITE == "static" ]]; then source activate test && cd docs && sphinx-apidoc -fo source/ ../myia/ && sphinx-build -W -b html . _build; fi
+  - if [[ $TEST_SUITE == "static" ]]; then source activate test && ./scripts/check.sh; fi
+  - if [[ $TEST_SUITE == "static" ]]; then source activate test && ./scripts/build-doc.sh; fi
   - if [[ $TEST_SUITE == "unit" ]]; then source activate test && pytest tests --cov=./ --cov-report term-missing; fi
 after_success:
   - if [[ $TEST_SUITE == "unit" ]]; then codecov; fi
