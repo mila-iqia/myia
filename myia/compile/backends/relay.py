@@ -263,7 +263,7 @@ def relay_argmax(c, v, dims):
     """Implementation of argmax for Relay."""
     v = c.ref(v)
     assert dims.is_constant(tuple)
-    return relay.cast(relay.argmax(v, axis=dims.value), "int64")
+    return relay.cast(relay.argmax(v, axis=dims.value, keepdims=True), "int64")
 
 
 def relay_max_pool2d(c, img, psize, stride, pad, dil, ceil_mode):
@@ -424,7 +424,7 @@ def relay_conv_transpose2d(
 
     data_shape = input.abstract.xshape()
     kern_shape = weight.abstract.xshape()
-    h_in, w_in = data_shape[2:]
+    n, _, h_in, w_in = data_shape
     filter_h, filter_w = kern_shape[2:]
     strides = stride.value
     padding = padding.value
@@ -485,7 +485,7 @@ def relay_conv_transpose2d(
         img = relay.op.transform.strided_slice(
             data=img,
             begin=[0, 0, padding[0], padding[1]],
-            end=[None, None, h_out + padding[0], w_out + padding[1]],
+            end=[n + 1, c_out + 1, h_out + padding[0], w_out + padding[1]],
         )
 
     return img
@@ -507,6 +507,21 @@ def relay_split(c, x, sections, dim):
 
     sections = tuple(accumulate(sections.value))[:-1]
     return relay.split(c.ref(x), sections, dim.value).astuple()
+
+
+def relay_gather(c, data, axis, indices):
+    assert axis.is_constant(int)
+    return relay.gather(c.ref(data), axis.value, c.ref(indices))
+
+
+def relay_scatter(c, inp, dim, index, src):
+    assert dim.is_constant(int)
+    return relay.scatter(c.ref(inp), c.ref(index), c.ref(src), dim.value)
+
+
+def relay_scatter_add(c, inp, dim, index, src):
+    assert dim.is_constant(int)
+    return relay.scatter_add(c.ref(inp), c.ref(index), c.ref(src), dim.value)
 
 
 def relay_make_cell(c, v, u):
@@ -622,6 +637,9 @@ COMPLEX_MAP = {
     P.random_initialize: relay_random_initialize,
     P.random_uint32: relay_random_uint32,
     make_cell: relay_make_cell,
+    P.gather: relay_gather,
+    P.scatter: relay_scatter,
+    P.scatter_add: relay_scatter_add,
 }
 
 
