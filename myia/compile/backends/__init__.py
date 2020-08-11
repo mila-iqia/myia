@@ -4,6 +4,7 @@ import importlib
 import os
 import urllib
 import weakref
+
 import pkg_resources
 
 from ... import abstract, xtype
@@ -76,7 +77,7 @@ class BackendLoader:
 
 
 def collect_backend_plugins():
-    """ Collect backend plugins.
+    """Collect backend plugins.
 
     Look for entry points in namespace "myia.backend".
     Each entry point must be a backend module.
@@ -96,8 +97,7 @@ def collect_backend_plugins():
         entry_point.name: BackendLoader.loader_callable_from_pkg(
             entry_point.module_name
         )
-        for entry_point
-        in pkg_resources.iter_entry_points('myia.backend')
+        for entry_point in pkg_resources.iter_entry_points("myia.backend")
     }
 
 
