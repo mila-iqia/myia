@@ -33,3 +33,11 @@ cat $DEV-extras.conda relay-extras.conda >> env.yml
 # if you remove a non-existent env.
 conda env remove -n test
 conda env create -n test -f env.yml
+
+# Install backend plugins.
+curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+cd myia_backend_pytorch
+poetry install
+cd ../myia_backend_relay
+poetry install
+cd ..
