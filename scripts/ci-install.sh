@@ -35,7 +35,9 @@ conda env remove -n test
 conda env create -n test -f env.yml
 
 # Install backend plugins.
+conda activate test
 curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
+source $HOME/.poetry/env
 cd myia_backend_pytorch
 poetry install
 cd ../myia_backend_relay
