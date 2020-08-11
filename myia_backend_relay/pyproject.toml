@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "myia_backend_relay"
 version = "0.1.0"
-description = ""
-authors = ["notoraptor <stevenbocco@gmail.com>"]
+description = "Relay backend for myia"
+authors = ["Mila development team"]
 
 [tool.poetry.dependencies]
 python = "^3.7"

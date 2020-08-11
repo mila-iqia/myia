@@ -1,8 +1,8 @@
 [tool.poetry]
 name = "myia_backend_pytorch"
 version = "0.1.0"
-description = ""
-authors = ["notoraptor <stevenbocco@gmail.com>"]
+description = "Pytorch backend for myia"
+authors = ["Mila development team"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
