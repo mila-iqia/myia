@@ -46,11 +46,12 @@ class BackendLoader:
         """Return a function that creates a new backend loader.
 
         :param pkg: module name (example myia.compile.backends.relay).
-        Module must provide 2 functions (see __init__ for more details):
-        - load_options: defaults_fn function
-        _ load_backend: load_fn function
+            Module must provide 2 functions:
+            - `load_options` for `__init__`'s `default_fn` parameter
+            - `load_backend` for `__init__`'s `load_fn` parameter
+
         :return: a callable (with no arguments) that will generate
-        and return a BackendLoader object.
+            and return a BackendLoader object.
         """
 
         def loader():
@@ -82,10 +83,10 @@ def collect_backend_plugins():
     Look for entry points in namespace "myia.backend".
     Each entry point must be a backend module.
     From a backend module we must be able to import two functions:
-    - load_options(**backend_options): must check
-      backend options and return a dictionary with valid options.
-      Used to cache loaded backends.
-    - load_backend(backend_options): must take
+
+    - `load_options(**backend_options)`: must check backend options and return
+      a dictionary with valid options. Used to cache loaded backends.
+    - `load_backend(backend_options)`: must take
       a dictionary of valid backend options and return a new instance
       of backend. Used to effectively load the backend
       if not already in cache.
