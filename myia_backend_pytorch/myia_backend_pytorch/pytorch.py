@@ -8,8 +8,7 @@ from myia.compile.backends import Backend
 from myia.compile.cconv import closure_convert
 from myia.compile.transform import CompileGraphs, nonlinear_ops
 from myia.ir import manage
-from myia.operations import Primitive
-from myia.operations import primitives as P
+from myia.operations import Primitive, primitives as P
 from myia.utils import RandomStateWrapper, TaggedValue, untested_legacy
 from myia.xtype import Bool, Float, Int, UInt, type_to_np_dtype
 
