@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "myia_backend_pytorch"
+version = "0.1.0"
+description = ""
+authors = ["notoraptor <stevenbocco@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
+[tool.poetry.plugins] # Optional super table
+
+[tool.poetry.plugins."myia.backend"]
+"pytorch" = "myia_backend_pytorch"

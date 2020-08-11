@@ -17,8 +17,9 @@ from myia.utils import HandleInstance, RandomStateWrapper, TaggedValue
 from myia.utils.variables import X, Y
 from myia.xtype import type_to_np_dtype, u32
 from myia.compile.transform import convert_grad, get_prim_graph, return_handles
-from myia.compile.backends import Backend, Converter, relay_philox
-from myia.compile.backends.relay_helpers import (
+from myia.compile.backends import Backend, Converter
+from . import relay_philox
+from .relay_helpers import (
     TypeHelper,
     add_functions,
     dead_value,

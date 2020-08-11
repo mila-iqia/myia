@@ -11,7 +11,7 @@ from myia.xtype import Bool, Float, Int, UInt, type_to_np_dtype
 from myia.compile.cconv import closure_convert
 from myia.compile.transform import CompileGraphs, nonlinear_ops
 from myia.compile.backends import Backend
-from myia.compile.backends.pytorch_conv_grad import conv2d_weight
+from .pytorch_conv_grad import conv2d_weight
 
 _type_map = {
     Int[8]: torch.int8,

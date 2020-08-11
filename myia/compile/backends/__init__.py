@@ -4,6 +4,7 @@ import importlib
 import os
 import urllib
 import weakref
+import pkg_resources
 
 from ... import abstract, xtype
 
@@ -28,13 +29,13 @@ class BackendLoader:
     def __init__(self, load_fn, defaults_fn):
         """Create a backend loader from given functions.
 
-        :param load_fn: function(**backend_options): must check
-          backend options and return a dictionary with valid options.
-          Used to cache loaded backends.
-        :param defaults_fn: function(backend_options): must take
+        :param load_fn: function(backend_options): must take
           a dictionary of valid backend options and return a new instance
           of backend. Used to effectively load the backend
           if not already in cache.
+        :param defaults_fn: function(**backend_options): must check
+          backend options and return a dictionary with valid options.
+          Used to cache loaded backends.
         """
         self.load_options = defaults_fn
         self.load_backend = load_fn
@@ -74,14 +75,33 @@ class BackendLoader:
         return loader
 
 
-_backends = {
-    "relay": BackendLoader.loader_callable_from_pkg(
-        "myia.compile.backends.relay"
-    ),
-    "pytorch": BackendLoader.loader_callable_from_pkg(
-        "myia.compile.backends.pytorch"
-    ),
-}
+def collect_backend_plugins():
+    """ Collect backend plugins.
+
+    Look for entry points in namespace "myia.backend".
+    Each entry point must be a backend module.
+    From a backend module we must be able to import two functions:
+    - load_options(**backend_options): must check
+      backend options and return a dictionary with valid options.
+      Used to cache loaded backends.
+    - load_backend(backend_options): must take
+      a dictionary of valid backend options and return a new instance
+      of backend. Used to effectively load the backend
+      if not already in cache.
+
+    :return: a dictionary mapping a backend name to a loader function
+        to generate BackendLoader instances.
+    """
+    return {
+        entry_point.name: BackendLoader.loader_callable_from_pkg(
+            entry_point.module_name
+        )
+        for entry_point
+        in pkg_resources.iter_entry_points('myia.backend')
+    }
+
+
+_backends = collect_backend_plugins()
 
 _active_backends = weakref.WeakValueDictionary()
 
