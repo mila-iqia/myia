@@ -618,4 +618,24 @@ class PyTorchBackend(Backend):
             raise NotImplementedError(f"to_backend_value for {t}")
 
 
-__all__ = ["PyTorchBackend"]
+def load_options(device="cpu:0"):
+    """Format options for pytorch."""
+    if device == "cuda":
+        device = "cuda:0"
+    if device == "cpu":
+        device = "cpu:0"
+    return {"device": device}
+
+
+def load_backend(options):
+    """Load backend.
+
+    :param options: dictionary of options for PyTorchBackend class.
+    :type options: dict
+    :return: a new instance of PyTorchBackend
+    :rtype: PyTorchBackend
+    """
+    return PyTorchBackend(**options)
+
+
+__all__ = ["PyTorchBackend", "load_options", "load_backend"]

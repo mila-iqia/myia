@@ -1070,4 +1070,20 @@ class RelayBackend(Backend):
         )
 
 
-__all__ = ["RelayBackend"]
+def load_options(target="cpu", device_id=0, exec_kind="vm"):
+    """Format options for relay."""
+    return {"target": target, "device_id": device_id, "exec_kind": exec_kind}
+
+
+def load_backend(options):
+    """Load backend.
+
+    :param options: dictionary of options for RelayBackend class.
+    :type options: dict
+    :return: a new instance of RelayBackend
+    :rtype: RelayBackend
+    """
+    return RelayBackend(**options)
+
+
+__all__ = ["RelayBackend", "load_options", "load_backend"]
