@@ -8,17 +8,17 @@ from tvm import relay
 from tvm.relay import adt
 from tvm.relay.backend import interpreter
 
-from ...abstract import AbstractTaggedUnion
-from ...graph_utils import toposort
-from ...ir import Graph, manage, sexp_to_node
-from ...operations import Primitive, primitives as P
-from ...operations.primitives import BackendPrimitive
-from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
-from ...utils.variables import X, Y
-from ...xtype import type_to_np_dtype, u32
-from ..transform import convert_grad, get_prim_graph, return_handles
-from . import Backend, Converter, relay_philox
-from .relay_helpers import (
+from myia.abstract import AbstractTaggedUnion
+from myia.graph_utils import toposort
+from myia.ir import Graph, manage, sexp_to_node
+from myia.operations import Primitive, primitives as P
+from myia.operations.primitives import BackendPrimitive
+from myia.utils import HandleInstance, RandomStateWrapper, TaggedValue
+from myia.utils.variables import X, Y
+from myia.xtype import type_to_np_dtype, u32
+from myia.compile.transform import convert_grad, get_prim_graph, return_handles
+from myia.compile.backends import Backend, Converter, relay_philox
+from myia.compile.backends.relay_helpers import (
     TypeHelper,
     add_functions,
     dead_value,
