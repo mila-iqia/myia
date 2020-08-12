@@ -26,20 +26,26 @@ conda update -q conda
 conda install pip
 conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
-pip install poetry2conda>=0.3.0
-poetry2conda pyproject.toml --dev -E pytorch -E $DEV -E relay env.yml
-cat $DEV-extras.conda relay-extras.conda >> env.yml
-# conda doesn't like overwriting envs anymore, but doesn't complain
-# if you remove a non-existent env.
 conda env remove -n test
 conda env create -n test -f env.yml
 
-# Install backend plugins.
+# Activate conda environment and install poetry.
 conda activate test
 curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
 source $HOME/.poetry/env
+
+# Install myia and backend plugins using poetry.
+poetry install
 cd myia_backend_pytorch
 poetry install
 cd ../myia_backend_relay
 poetry install
+cd ..
+
+# Complete installation with specific conda packages using environment files.
+conda env update --file environment-${DEV}.yml
+cd myia_backend_pytorch
+conda env update --file environment-${DEV}.yml
+cd ../myia_backend_relay
+conda env update --file environment.yml
 cd ..

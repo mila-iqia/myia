@@ -1,3 +1,7 @@
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
 [tool.poetry]
 name = "myia_backend_pytorch"
 version = "0.1.0"
@@ -6,10 +10,16 @@ authors = ["Mila development team"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
+numpy = "^1.16"
+torch = "1.5.0"
+torchvision = "0.6.0"
 
-[build-system]
-requires = ["poetry>=0.12"]
-build-backend = "poetry.masonry.api"
+[tool.poetry2conda]
+name = "myia_backend_pytorch"
+
+[tool.poetry2conda.dependencies]
+torch = { channel = "pytorch", name = "pytorch" }
+torchvision = { channel = "pytorch" }
 
 [tool.isort]
 known_first_party = "myia_backend_pytorch"
