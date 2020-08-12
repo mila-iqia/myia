@@ -27,7 +27,7 @@ conda install pip
 conda init
 . $HOME/miniconda/etc/profile.d/conda.sh
 conda env remove -n test
-conda env create -n test -f env.yml
+conda create -n test python=3.7
 
 # Activate conda environment and install poetry.
 conda activate test
