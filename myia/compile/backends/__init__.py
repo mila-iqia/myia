@@ -5,6 +5,8 @@ import os
 import urllib
 import weakref
 
+import pkg_resources
+
 from ... import abstract, xtype
 
 
@@ -20,46 +22,85 @@ class LoadingError(Exception):
     """
 
 
-def backend_loader(pkg, name):
-    """Helper function for simple backends.
+class BackendLoader:
+    """Utility class to load a backend."""
 
-    This will return a callable that will load a module, retrieve a
-    object from its namespace and return that.
+    def __init__(self, load_fn, defaults_fn):
+        """Create a backend loader from given functions.
 
+        :param load_fn: function(backend_options): must take
+          a dictionary of valid backend options and return a new instance
+          of backend. Used to effectively load the backend
+          if not already in cache.
+        :param defaults_fn: function(**backend_options): must check
+          backend options and return a dictionary with valid options.
+          Used to cache loaded backends.
+        """
+        self.load_options = defaults_fn
+        self.load_backend = load_fn
+
+    @classmethod
+    def loader_callable_from_pkg(cls, pkg):
+        """Return a function that creates a new backend loader.
+
+        :param pkg: module name (example myia.compile.backends.relay).
+            Module must provide 2 functions:
+            - `load_options` for `__init__`'s `default_fn` parameter
+            - `load_backend` for `__init__`'s `load_fn` parameter
+
+        :return: a callable (with no arguments) that will generate
+            and return a BackendLoader object.
+        """
+
+        def loader():
+            module = importlib.import_module(pkg)
+            load_options = getattr(module, "load_options")
+            load_backend = getattr(module, "load_backend")
+            return cls(load_fn=load_backend, defaults_fn=load_options)
+
+        return loader
+
+    @classmethod
+    def loader_callable_from_functions(cls, load_fn, defaults_fn):
+        """Return a function that creates a new backend loader.
+
+        for more details about load_fn and defaults_fn.
+        :return: a callable (with no arguments) that will generate
+        and return a BackendLoader object.
+        """
+
+        def loader():
+            return cls(load_fn=load_fn, defaults_fn=defaults_fn)
+
+        return loader
+
+
+def collect_backend_plugins():
+    """Collect backend plugins.
+
+    Look for entry points in namespace "myia.backend".
+    Each entry point must be a backend module.
+    From a backend module we must be able to import two functions:
+
+    - `load_options(**backend_options)`: must check backend options and return
+      a dictionary with valid options. Used to cache loaded backends.
+    - `load_backend(backend_options)`: must take
+      a dictionary of valid backend options and return a new instance
+      of backend. Used to effectively load the backend
+      if not already in cache.
+
+    :return: a dictionary mapping a backend name to a loader function
+        to generate BackendLoader instances.
     """
-
-    def loader(init_args):
-        module = importlib.import_module(pkg)
-        cls = getattr(module, name)
-        return cls(**init_args)
-
-    return loader
-
-
-def relay_defaults(target="cpu", device_id=0, exec_kind="vm"):
-    """Format options for relay."""
-    return dict(target=target, device_id=device_id, exec_kind=exec_kind)
+    return {
+        entry_point.name: BackendLoader.loader_callable_from_pkg(
+            entry_point.module_name
+        )
+        for entry_point in pkg_resources.iter_entry_points("myia.backend")
+    }
 
 
-def pytorch_default(device="cpu:0"):
-    """Format options for pytorch."""
-    if device == "cuda":
-        device = "cuda:0"
-    if device == "cpu":
-        device = "cpu:0"
-    return dict(device=device)
-
-
-_backends = {
-    "relay": (
-        backend_loader("myia.compile.backends.relay", "RelayBackend"),
-        relay_defaults,
-    ),
-    "pytorch": (
-        backend_loader("myia.compile.backends.pytorch", "PyTorchBackend"),
-        pytorch_default,
-    ),
-}
+_backends = collect_backend_plugins()
 
 _active_backends = weakref.WeakValueDictionary()
 
@@ -130,12 +171,13 @@ def load_backend(name, options=None):
         options = {}
     if name not in _backends:
         raise UnknownBackend(name)
-    options = _backends[name][1](**options)
+    backend_loader = _backends[name]()
+    options = backend_loader.load_options(**options)
     key = (name, tuple(sorted(list(options.items()))))
     res = _active_backends.get(key, None)
     if res is None:
         try:
-            res = _backends[name][0](options)
+            res = backend_loader.load_backend(options)
             _active_backends[key] = res
         except Exception as e:
             raise LoadingError(name) from e
@@ -160,7 +202,9 @@ def register_backend(name, load_fn, defaults_fn):
 
     """
     assert name not in _backends
-    _backends[name] = (load_fn, defaults_fn)
+    _backends[name] = BackendLoader.loader_callable_from_functions(
+        load_fn, defaults_fn
+    )
 
 
 class Backend:

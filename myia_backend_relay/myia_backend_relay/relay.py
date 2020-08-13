@@ -8,16 +8,18 @@ from tvm import relay
 from tvm.relay import adt
 from tvm.relay.backend import interpreter
 
-from ...abstract import AbstractTaggedUnion
-from ...graph_utils import toposort
-from ...ir import Graph, manage, sexp_to_node
-from ...operations import Primitive, primitives as P
-from ...operations.primitives import BackendPrimitive
-from ...utils import HandleInstance, RandomStateWrapper, TaggedValue
-from ...utils.variables import X, Y
-from ...xtype import type_to_np_dtype, u32
-from ..transform import convert_grad, get_prim_graph, return_handles
-from . import Backend, Converter, relay_philox
+from myia.abstract import AbstractTaggedUnion
+from myia.compile.backends import Backend, Converter
+from myia.compile.transform import convert_grad, get_prim_graph, return_handles
+from myia.graph_utils import toposort
+from myia.ir import Graph, manage, sexp_to_node
+from myia.operations import Primitive, primitives as P
+from myia.operations.primitives import BackendPrimitive
+from myia.utils import HandleInstance, RandomStateWrapper, TaggedValue
+from myia.utils.variables import X, Y
+from myia.xtype import type_to_np_dtype, u32
+
+from . import relay_philox
 from .relay_helpers import (
     TypeHelper,
     add_functions,
@@ -1070,4 +1072,20 @@ class RelayBackend(Backend):
         )
 
 
-__all__ = ["RelayBackend"]
+def load_options(target="cpu", device_id=0, exec_kind="vm"):
+    """Format options for relay."""
+    return {"target": target, "device_id": device_id, "exec_kind": exec_kind}
+
+
+def load_backend(options):
+    """Load backend.
+
+    :param options: dictionary of options for RelayBackend class.
+    :type options: dict
+    :return: a new instance of RelayBackend
+    :rtype: RelayBackend
+    """
+    return RelayBackend(**options)
+
+
+__all__ = ["RelayBackend", "load_options", "load_backend"]

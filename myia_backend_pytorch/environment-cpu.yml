@@ -1,0 +1,6 @@
+dependencies:
+- python>=3.7,<4.0
+- numpy>=1.16,<2.0
+- pytorch::pytorch==1.5.0
+- pytorch::torchvision==0.6.0
+- pytorch::cpuonly

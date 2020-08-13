@@ -1,0 +1,10 @@
+dependencies:
+- python>=3.7,<4.0
+- numpy>=1.16,<2.0
+- scipy>=1.5,<2.0
+- decorator>=4,<5
+- attrs>=19,<20
+- pip
+- mila-iqia::tvm=0.7dev1+5.*
+- pip:
+  - antlr4-python3-runtime==4.7.2

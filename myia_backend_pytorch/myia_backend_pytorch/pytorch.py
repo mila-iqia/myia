@@ -3,14 +3,15 @@
 import numpy as np
 import torch
 
-from ... import abstract, xtype
-from ...ir import manage
-from ...operations import Primitive, primitives as P
-from ...utils import RandomStateWrapper, TaggedValue, untested_legacy
-from ...xtype import Bool, Float, Int, UInt, type_to_np_dtype
-from ..cconv import closure_convert
-from ..transform import CompileGraphs, nonlinear_ops
-from . import Backend
+from myia import abstract, xtype
+from myia.compile.backends import Backend
+from myia.compile.cconv import closure_convert
+from myia.compile.transform import CompileGraphs, nonlinear_ops
+from myia.ir import manage
+from myia.operations import Primitive, primitives as P
+from myia.utils import RandomStateWrapper, TaggedValue, untested_legacy
+from myia.xtype import Bool, Float, Int, UInt, type_to_np_dtype
+
 from .pytorch_conv_grad import conv2d_weight
 
 _type_map = {
@@ -618,4 +619,24 @@ class PyTorchBackend(Backend):
             raise NotImplementedError(f"to_backend_value for {t}")
 
 
-__all__ = ["PyTorchBackend"]
+def load_options(device="cpu:0"):
+    """Format options for pytorch."""
+    if device == "cuda":
+        device = "cuda:0"
+    if device == "cpu":
+        device = "cpu:0"
+    return {"device": device}
+
+
+def load_backend(options):
+    """Load backend.
+
+    :param options: dictionary of options for PyTorchBackend class.
+    :type options: dict
+    :return: a new instance of PyTorchBackend
+    :rtype: PyTorchBackend
+    """
+    return PyTorchBackend(**options)
+
+
+__all__ = ["PyTorchBackend", "load_options", "load_backend"]

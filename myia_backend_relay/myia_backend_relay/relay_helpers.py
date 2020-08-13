@@ -8,7 +8,7 @@ from tvm import relay
 from tvm.relay import adt
 from tvm.runtime.object import Object
 
-from ...abstract import (
+from myia.abstract import (
     AbstractArray,
     AbstractError,
     AbstractFunctionUnique,
@@ -20,9 +20,9 @@ from ...abstract import (
     AbstractType,
     TypedPrimitive,
 )
-from ...operations import primitives as P
-from ...utils import overload
-from ...xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
+from myia.operations import primitives as P
+from myia.utils import overload
+from myia.xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
 union_type = relay.GlobalTypeVar("$_union_adt")
 empty_union = adt.Constructor("empty", [], union_type)

@@ -1,2 +1,0 @@
-  - cudatoolkit=10.2.*
-  - cudnn=7.6.*
