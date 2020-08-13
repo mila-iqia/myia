@@ -34,6 +34,11 @@ conda activate test
 curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python
 source $HOME/.poetry/env
 
+# Install myia_utils. It's used later to re-generate conda environment files.
+cd myia_utils
+poetry install
+cd ..
+
 # Install myia and backend plugins using poetry.
 poetry install
 cd myia_backend_pytorch
@@ -43,9 +48,16 @@ poetry install
 cd ..
 
 # Complete installation with specific conda packages using environment files.
+# Re-generate environment files before using them.
+./scripts/gen_conda_env_file.sh
 conda env update --file environment-${DEV}.yml
+
 cd myia_backend_pytorch
+./scripts/gen_conda_env_file.sh
 conda env update --file environment-${DEV}.yml
+
 cd ../myia_backend_relay
+./scripts/gen_conda_env_file.sh
 conda env update --file environment.yml
+
 cd ..

@@ -25,8 +25,6 @@ class LoadingError(Exception):
 class BackendLoader:
     """Utility class to load a backend."""
 
-    __slots__ = ("load_options", "load_backend")
-
     def __init__(self, load_fn, defaults_fn):
         """Create a backend loader from given functions.
 

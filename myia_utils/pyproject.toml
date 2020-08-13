@@ -1,0 +1,19 @@
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
+
+[tool.poetry]
+name = "myia_utils"
+version = "0.1.0"
+description = "Utility scripts for myia and myia-related packages"
+authors = ["Mila development team"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+pyyaml = "^5.3"
+
+[tool.isort]
+known_first_party = "myia_utils"
+multi_line_output = 3
+include_trailing_comma = true
+combine_as_imports = true

@@ -1,3 +1,9 @@
+"""
+Utility script to update a conda environment file.
+- allow to extend environment file with a requirements.txt-like file.
+- simplify file to make it work correctly with command:
+  `conda env update --file <env-file>`
+"""
 import argparse
 
 from yaml import dump, load
@@ -14,7 +20,7 @@ def main():
     parser.add_argument(
         "-p",
         "--packages",
-        help="File containing packages requirements " "to add to YAML file.",
+        help="File containing packages requirements to add to YAML file.",
     )
     parser.add_argument(
         "-o", "--output", help="Output YAML file. By default, print output."
