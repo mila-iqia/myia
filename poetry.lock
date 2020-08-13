@@ -727,12 +727,10 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [extras]
-cpu = []
-gpu = []
 pytorch = ["torch", "torchvision"]
 
 [metadata]
-content-hash = "540f51c92474d5da8a2b090b043199c8616ed21500aea188aa82c220c04fba33"
+content-hash = "ab122ad1c039751d4bffbc0a43ba96f3d07a48d1a17ab19d38fa08424d80d486"
 lock-version = "1.0"
 python-versions = "~3.7"
 

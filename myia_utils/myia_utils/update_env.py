@@ -49,7 +49,7 @@ def main():
             dependencies.extend(packages)
         data["dependencies"] = dependencies
     data.pop("name", None)
-    output = dump(data, Dumper=Dumper)
+    output = dump(data, Dumper=Dumper, sort_keys=False)
     if args.output:
         with open(args.output, "w") as file:
             file.write(output)

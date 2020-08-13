@@ -50,7 +50,7 @@ cd ..
 # Complete installation with specific conda packages using environment files.
 # Re-generate environment files before using them.
 ./scripts/gen_conda_env_file.sh
-conda env update --file environment-${DEV}.yml
+conda env update --file environment.yml
 
 cd myia_backend_pytorch
 ./scripts/gen_conda_env_file.sh
