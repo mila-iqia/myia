@@ -183,7 +183,10 @@ def test_parametric():
 
 
 def test_annotation_parsing():
-    def f(a: int, b: float) -> bool:
+    from typing import List
+
+    # Type annotation for b is wrong, but we use is here just for testing.
+    def f(a: int, b: List[int]) -> bool:
         c: tuple = (2, 3)
         d: int = int(b + 1.5)
         return bool(a * b) * c[0] + d
@@ -193,21 +196,22 @@ def test_annotation_parsing():
 
     # Check parameters annotation.
     parameters = {p.debug.debug_name: p for p in graph.parameters}
-    assert parameters["a"].annotation == "int"
-    assert parameters["b"].annotation == "float"
+    assert parameters["a"].annotation is int
+    assert parameters["b"].annotation is not List
+    assert parameters["b"].annotation is List[int]
 
     # Check return annotation.
-    assert graph.return_.annotation == "bool"
+    assert graph.return_.annotation is bool
 
     # Check variable annotations.
     variables_checked = 0
     for node in manager.all_nodes:
         name = node.debug.debug_name
         if name == "c":
-            assert node.annotation == "tuple"
+            assert node.annotation is tuple
             variables_checked += 1
         elif name == "d":
-            assert node.annotation == "int"
+            assert node.annotation is int
             variables_checked += 1
     assert variables_checked == 2
 

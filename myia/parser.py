@@ -130,6 +130,15 @@ def _fresh(node):
         return node
 
 
+def _eval_ast_node(node):
+    """Evaluate an AST node as a Python expression and return result."""
+    # eval() does not accept an AST node, so we first convert AST node
+    # to string code.
+    code = astunparse.unparse(node).strip()
+    # Then we parse it with eval().
+    return eval(code)
+
+
 def parse(func, use_universe=False):
     """Parse a function into a Myia graph.
 
@@ -406,9 +415,7 @@ class Parser:
 
             if arg.annotation:
                 # Get tyoe annotation for function arg.
-                param_node.annotation = astunparse.unparse(
-                    arg.annotation
-                ).strip()
+                param_node.annotation = _eval_ast_node(arg.annotation)
 
             function_block.add_parameter(param_node)
             function_block.write(arg.arg, param_node, track=False)
@@ -455,9 +462,9 @@ class Parser:
 
         if node.returns:
             # Get type annotation for function return.
-            function_block.graph.return_.annotation = astunparse.unparse(
+            function_block.graph.return_.annotation = _eval_ast_node(
                 node.returns
-            ).strip()
+            )
 
         # TODO: check that if after_block returns?
         self.possible_phis = possible_phis_bk
@@ -787,7 +794,7 @@ class Parser:
         """Process an annotated assignment."""
         anf_node = self.process_node(block, node.value)
         # Get type annotation for variable.
-        anf_node.annotation = astunparse.unparse(node.annotation).strip()
+        anf_node.annotation = _eval_ast_node(node.annotation)
         self._assign(block, node.target, anf_node)
         return block
 
