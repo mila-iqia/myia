@@ -130,15 +130,6 @@ def _fresh(node):
         return node
 
 
-def _eval_ast_node(node, globals=None, locals=None):
-    """Evaluate an AST node as a Python expression and return result."""
-    # eval() does not accept an AST node, so we first convert AST node
-    # to string code.
-    code = astunparse.unparse(node).strip()
-    # Then we parse it with eval().
-    return eval(code, globals or {}, locals or {})
-
-
 def parse(func, use_universe=False):
     """Parse a function into a Myia graph.
 
@@ -264,6 +255,14 @@ class Parser:
         self.finalizers = {}
         # Variable names that could be phi nodes
         self.possible_phis = set()
+
+    def _eval_ast_node(self, node):
+        """Evaluate an AST node as a Python expression in function context."""
+        # eval() does not accept an AST node, so we first convert AST node
+        # to string code.
+        code = astunparse.unparse(node).strip()
+        # Then we parse it with eval().
+        return eval(code, self.function.__globals__, self.closure_namespace)
 
     def new_block(self, **kwargs) -> "Block":
         """Create a new block."""
@@ -415,11 +414,7 @@ class Parser:
 
             if arg.annotation:
                 # Get tyoe annotation for function arg.
-                param_node.annotation = _eval_ast_node(
-                    arg.annotation,
-                    self.function.__globals__,
-                    self.closure_namespace,
-                )
+                param_node.annotation = self._eval_ast_node(arg.annotation)
 
             function_block.add_parameter(param_node)
             function_block.write(arg.arg, param_node, track=False)
@@ -466,8 +461,8 @@ class Parser:
 
         if node.returns:
             # Get type annotation for function return.
-            function_block.graph.return_.annotation = _eval_ast_node(
-                node.returns, self.function.__globals__, self.closure_namespace
+            function_block.graph.return_.annotation = self._eval_ast_node(
+                node.returns
             )
 
         # TODO: check that if after_block returns?
@@ -798,9 +793,7 @@ class Parser:
         """Process an annotated assignment."""
         anf_node = self.process_node(block, node.value)
         # Get type annotation for variable.
-        anf_node.annotation = _eval_ast_node(
-            node.annotation, self.function.__globals__, self.closure_namespace
-        )
+        anf_node.annotation = self._eval_ast_node(node.annotation)
         self._assign(block, node.target, anf_node)
         return block
 
