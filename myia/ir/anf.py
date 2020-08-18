@@ -481,6 +481,8 @@ class ANFNode(Node):
             container is updated automatically; do not manipulate it manually.
         debug: An object with debug information about this node e.g. a
             human-readable name and the Python source code.
+        annotation: string code of Python type annotation for this node,
+            if type annotation is available. Examples: "int", "List[str]".
 
     """
 
@@ -493,6 +495,7 @@ class ANFNode(Node):
         self.graph = graph
         self.debug = NamedDebugInfo(self)
         self.abstract = None
+        self.annotation = None
 
     @property
     def shape(self):

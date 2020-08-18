@@ -38,6 +38,7 @@ from types import FunctionType
 from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import asttokens
+import astunparse
 
 from . import operations
 from .graph_utils import dfs
@@ -167,7 +168,7 @@ def parse(func, use_universe=False):
 
 
 class FindPossiblePhi(ast.NodeVisitor):
-    """Find all variable names that are not single static assigment.
+    """Find all variable names that are not single static assignment.
 
     These are variables in if/while/for statements. Multiple assignments to the
     same variable in a linear sequence of statements do not count as "phi"
@@ -402,6 +403,13 @@ class Parser:
             with DebugInherit(ast=arg, location=self.make_location(arg)):
                 param_node = Parameter(function_block.graph)
             param_node.debug.name = arg.arg
+
+            if arg.annotation:
+                # Get tyoe annotation for function arg.
+                param_node.annotation = astunparse.unparse(
+                    arg.annotation
+                ).strip()
+
             function_block.add_parameter(param_node)
             function_block.write(arg.arg, param_node, track=False)
             if dflt:
@@ -444,6 +452,12 @@ class Parser:
         function_block.graph.defaults = defaults_names
         function_block.graph.kwonly = len(node.args.kwonlyargs)
         function_block.graph.return_.inputs[2:] = defaults_list
+
+        if node.returns:
+            # Get type annotation for function return.
+            function_block.graph.return_.annotation = astunparse.unparse(
+                node.returns
+            ).strip()
 
         # TODO: check that if after_block returns?
         self.possible_phis = possible_phis_bk
@@ -767,6 +781,14 @@ class Parser:
         for targ in node.targets:
             self._assign(block, targ, anf_node)
 
+        return block
+
+    def process_AnnAssign(self, block: "Block", node: ast.AnnAssign) -> "Block":
+        """Process an annotated assignment."""
+        anf_node = self.process_node(block, node.value)
+        # Get type annotation for variable.
+        anf_node.annotation = astunparse.unparse(node.annotation).strip()
+        self._assign(block, node.target, anf_node)
         return block
 
     def process_Expr(self, block: "Block", node: ast.Expr) -> "Block":

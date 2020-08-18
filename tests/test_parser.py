@@ -5,6 +5,7 @@ import warnings
 import pytest
 
 from myia.debug.traceback import myia_warning
+from myia.ir import manage
 from myia.parser import (
     MyiaDisconnectedCodeWarning,
     MyiaSyntaxError,
@@ -179,6 +180,36 @@ def test_parametric():
     assert raw_parse(h).vararg == "args"
     assert raw_parse(i).kwonly == 1
     assert raw_parse(j).kwarg == "kwargs"
+
+
+def test_annotation_parsing():
+    def f(a: int, b: float) -> bool:
+        c: tuple = (2, 3)
+        d: int = int(b + 1.5)
+        return bool(a * b) * c[0] + d
+
+    graph = raw_parse(f)
+    manager = manage(graph)
+
+    # Check parameters annotation.
+    parameters = {p.debug.debug_name: p for p in graph.parameters}
+    assert parameters["a"].annotation == "int"
+    assert parameters["b"].annotation == "float"
+
+    # Check return annotation.
+    assert graph.return_.annotation == "bool"
+
+    # Check variable annotations.
+    variables_checked = 0
+    for node in manager.all_nodes:
+        name = node.debug.debug_name
+        if name == "c":
+            assert node.annotation == "tuple"
+            variables_checked += 1
+        elif name == "d":
+            assert node.annotation == "int"
+            variables_checked += 1
+    assert variables_checked == 2
 
 
 def test_fn_param_same_name():
