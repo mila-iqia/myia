@@ -242,6 +242,35 @@ def test_annotation_parsing_numpy():
     assert variables_checked == 1
 
 
+def test_annotation_parsing_local_import():
+    # Just import something not imported globally,
+    # to test parsing with local imports.
+    from array import ArrayType
+
+    def f(a: ArrayType) -> ArrayType:
+        b: ArrayType = np.arange(10)
+        return a.sum() + b.sum()
+
+    graph = raw_parse(f)
+    manager = manage(graph)
+
+    # Check parameters annotation.
+    parameters = {p.debug.debug_name: p for p in graph.parameters}
+    assert parameters["a"].annotation is ArrayType
+
+    # Check return annotation.
+    assert graph.return_.annotation is ArrayType
+
+    # Check variable annotations.
+    variables_checked = 0
+    for node in manager.all_nodes:
+        name = node.debug.debug_name
+        if name == "b":
+            assert node.annotation is ArrayType
+            variables_checked += 1
+    assert variables_checked == 1
+
+
 def test_fn_param_same_name():
     def a(a):
         return a + 1
