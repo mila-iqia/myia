@@ -1,7 +1,9 @@
 import re
 import sys
 import warnings
+from typing import List
 
+import numpy as np
 import pytest
 
 from myia.debug.traceback import myia_warning
@@ -182,8 +184,7 @@ def test_parametric():
     assert raw_parse(j).kwarg == "kwargs"
 
 
-def test_annotation_parsing():
-    from typing import List
+def test_annotation_parsing_typing():
 
     # Type annotation for b is wrong, but we use is here just for testing.
     def f(a: int, b: List[int]) -> bool:
@@ -214,6 +215,31 @@ def test_annotation_parsing():
             assert node.annotation is int
             variables_checked += 1
     assert variables_checked == 2
+
+
+def test_annotation_parsing_numpy():
+    def f(a: np.ndarray) -> np.ndarray:
+        b: np.ndarray = np.arange(10)
+        return a.sum() + b.sum()
+
+    graph = raw_parse(f)
+    manager = manage(graph)
+
+    # Check parameters annotation.
+    parameters = {p.debug.debug_name: p for p in graph.parameters}
+    assert parameters["a"].annotation is np.ndarray
+
+    # Check return annotation.
+    assert graph.return_.annotation is np.ndarray
+
+    # Check variable annotations.
+    variables_checked = 0
+    for node in manager.all_nodes:
+        name = node.debug.debug_name
+        if name == "b":
+            assert node.annotation is np.ndarray
+            variables_checked += 1
+    assert variables_checked == 1
 
 
 def test_fn_param_same_name():

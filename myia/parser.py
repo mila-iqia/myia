@@ -130,13 +130,13 @@ def _fresh(node):
         return node
 
 
-def _eval_ast_node(node):
+def _eval_ast_node(node, globals=None):
     """Evaluate an AST node as a Python expression and return result."""
     # eval() does not accept an AST node, so we first convert AST node
     # to string code.
     code = astunparse.unparse(node).strip()
     # Then we parse it with eval().
-    return eval(code)
+    return eval(code, globals or {})
 
 
 def parse(func, use_universe=False):
@@ -415,7 +415,9 @@ class Parser:
 
             if arg.annotation:
                 # Get tyoe annotation for function arg.
-                param_node.annotation = _eval_ast_node(arg.annotation)
+                param_node.annotation = _eval_ast_node(
+                    arg.annotation, self.function.__globals__
+                )
 
             function_block.add_parameter(param_node)
             function_block.write(arg.arg, param_node, track=False)
@@ -463,7 +465,7 @@ class Parser:
         if node.returns:
             # Get type annotation for function return.
             function_block.graph.return_.annotation = _eval_ast_node(
-                node.returns
+                node.returns, self.function.__globals__
             )
 
         # TODO: check that if after_block returns?
@@ -794,7 +796,9 @@ class Parser:
         """Process an annotated assignment."""
         anf_node = self.process_node(block, node.value)
         # Get type annotation for variable.
-        anf_node.annotation = _eval_ast_node(node.annotation)
+        anf_node.annotation = _eval_ast_node(
+            node.annotation, self.function.__globals__
+        )
         self._assign(block, node.target, anf_node)
         return block
 
