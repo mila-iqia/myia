@@ -261,7 +261,7 @@ class Parser:
         # eval() does not accept an AST node, so we first convert AST node
         # to string code.
         code = astunparse.unparse(node).strip()
-        # Then we parse it with eval().
+        # Then we evaluate it with eval().
         return eval(code, self.function.__globals__, self.closure_namespace)
 
     def new_block(self, **kwargs) -> "Block":
@@ -413,7 +413,7 @@ class Parser:
             param_node.debug.name = arg.arg
 
             if arg.annotation:
-                # Get tyoe annotation for function arg.
+                # Get type annotation for function arg.
                 param_node.annotation = self._eval_ast_node(arg.annotation)
 
             function_block.add_parameter(param_node)
