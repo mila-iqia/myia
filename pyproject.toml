@@ -14,6 +14,7 @@ repository = "https://github.com/mila-iqia/myia"
 [tool.poetry.dependencies]
 python = "~3.7"
 asttokens = "^2.0.3"
+astunparse = "^1.6"
 colorama = "^0.4.3"
 numpy = "^1.16"
 opt_einsum = "^3.1.0"
