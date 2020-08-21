@@ -118,21 +118,21 @@ class CheckState:
 
 
 @overload.wrapper(initial_state=lambda: CheckState({}, None))
-def abstract_check(__call__, self, x, *args):
+def abstract_check(__call__, self, x, **kwargs):
     """Check that a predicate applies to a given object."""
 
     def proceed():
         if prop:
             if hasattr(x, prop):
                 return getattr(x, prop) is x
-            elif __call__(self, x, *args):
+            elif __call__(self, x, **kwargs):
                 if isinstance(x, AbstractValue):
                     setattr(x, prop, x)
                 return True
             else:
                 return False
         else:
-            return __call__(self, x, *args)
+            return __call__(self, x, **kwargs)
 
     prop = self.state.prop
     cache = self.state.cache
@@ -151,80 +151,80 @@ def abstract_check(__call__, self, x, *args):
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: TrackDict, *args):
-    return all(self(v, *args) for v in x.values())
+def abstract_check(self, x: TrackDict, **kwargs):
+    return all(self(v, **kwargs) for v in x.values())
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: AbstractScalar, *args):
-    return self(x.values, *args)
+def abstract_check(self, x: AbstractScalar, **kwargs):
+    return self(x.values, **kwargs)
 
 
 @overload  # noqa: F811
-def abstract_check(self, xs: AbstractStructure, *args):
+def abstract_check(self, xs: AbstractStructure, **kwargs):
     ch = xs.children()
     if ch is ANYTHING:
         return self(ch)
     else:
-        return all(self(x, *args) for x in ch)
+        return all(self(x, **kwargs) for x in ch)
 
 
 @overload  # noqa: F811
-def abstract_check(self, xs: AbstractAtom, *args):
+def abstract_check(self, xs: AbstractAtom, **kwargs):
     return True
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: AbstractFunction, *args):
-    return self(x.values, *args)
+def abstract_check(self, x: AbstractFunction, **kwargs):
+    return self(x.values, **kwargs)
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: AbstractFunctionUnique, *args):
+def abstract_check(self, x: AbstractFunctionUnique, **kwargs):
     return (
-        self(x.values, *args)
-        and all(self(v, *args) for v in x.args)
-        and self(x.output, *args)
+        self(x.values, **kwargs)
+        and all(self(v, **kwargs) for v in x.args)
+        and self(x.output, **kwargs)
     )
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: AbstractUnion, *args):
-    return self(x.options, *args)
+def abstract_check(self, x: AbstractUnion, **kwargs):
+    return self(x.options, **kwargs)
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: Possibilities, *args):
-    return all(self(v, *args) for v in x)
+def abstract_check(self, x: Possibilities, **kwargs):
+    return all(self(v, **kwargs) for v in x)
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: AbstractTaggedUnion, *args):
-    return self(x.options, *args)
+def abstract_check(self, x: AbstractTaggedUnion, **kwargs):
+    return self(x.options, **kwargs)
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: TaggedPossibilities, *args):
-    return all(self(v, *args) for _, v in x)
+def abstract_check(self, x: TaggedPossibilities, **kwargs):
+    return all(self(v, **kwargs) for _, v in x)
 
 
 @overload  # noqa: F811
-def abstract_check(self, t: PartialApplication, *args):
-    return self(t.fn, *args) and all(self(v, *args) for v in t.args)
+def abstract_check(self, t: PartialApplication, **kwargs):
+    return self(t.fn, **kwargs) and all(self(v, **kwargs) for v in t.args)
 
 
 @overload  # noqa: F811
-def abstract_check(self, t: TransformedFunction, *args):
-    return self(t.fn, *args)
+def abstract_check(self, t: TransformedFunction, **kwargs):
+    return self(t.fn, **kwargs)
 
 
 @overload  # noqa: F811
-def abstract_check(self, x: Pending, *args):
+def abstract_check(self, x: Pending, **kwargs):
     return False
 
 
 @overload  # noqa: F811
-def abstract_check(self, xs: object, *args):
+def abstract_check(self, xs: object, **kwargs):
     return True
 
 
@@ -253,13 +253,13 @@ def _make_constructor(inst):
 @overload.wrapper(
     initial_state=lambda: CloneState({}, None, None), postprocess=intern
 )
-def abstract_clone(__call__, self, x, *args):
+def abstract_clone(__call__, self, x, **kwargs):
     """Clone an abstract value."""
 
     def proceed():
         if isinstance(x, AbstractValue) and x in cache:
             return cache[x]
-        result = __call__(self, x, *args)
+        result = __call__(self, x, **kwargs)
         if not isinstance(result, GeneratorType):
             return result
         cls = result.send(None)
@@ -286,7 +286,7 @@ def abstract_clone(__call__, self, x, *args):
         if hasattr(x, prop):
             return getattr(x, prop)
         elif isinstance(x, AbstractValue):
-            if self.state.check(x, *args):
+            if self.state.check(x, **kwargs):
                 res = x
             else:
                 res = proceed()
@@ -294,112 +294,112 @@ def abstract_clone(__call__, self, x, *args):
             return res
         else:
             return proceed()
-    elif self.state.check and self.state.check(x, *args):
+    elif self.state.check and self.state.check(x, **kwargs):
         return x
     else:
         return proceed()
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractScalar, *args):
-    return AbstractScalar(self(x.values, *args))
+def abstract_clone(self, x: AbstractScalar, **kwargs):
+    return AbstractScalar(self(x.values, **kwargs))
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractFunction, *args):
-    return (yield AbstractFunction)(value=self(x.get_sync(), *args))
+def abstract_clone(self, x: AbstractFunction, **kwargs):
+    return (yield AbstractFunction)(value=self(x.get_sync(), **kwargs))
 
 
 @overload  # noqa: F811
-def abstract_clone(self, d: TrackDict, *args):
+def abstract_clone(self, d: TrackDict, **kwargs):
     return {k: k.clone(v, self) for k, v in d.items()}
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractTuple, *args):
+def abstract_clone(self, x: AbstractTuple, **kwargs):
     if x.elements is ANYTHING:
         return (yield AbstractTuple)(ANYTHING)
     return (yield AbstractTuple)(
-        [self(y, *args) for y in x.elements], self(x.values, *args)
+        [self(y, **kwargs) for y in x.elements], self(x.values, **kwargs)
     )
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractDict, *args):
+def abstract_clone(self, x: AbstractDict, **kwargs):
     return (yield AbstractDict)(
-        dict((k, self(v, *args)) for k, v in x.entries.items())
+        dict((k, self(v, **kwargs)) for k, v in x.entries.items())
     )
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractWrapper, *args):
-    return (yield type(x))(self(x.element, *args), self(x.values, *args))
+def abstract_clone(self, x: AbstractWrapper, **kwargs):
+    return (yield type(x))(self(x.element, **kwargs), self(x.values, **kwargs))
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractClassBase, *args):
+def abstract_clone(self, x: AbstractClassBase, **kwargs):
     return (yield type(x))(
         x.tag,
-        {k: self(v, *args) for k, v in x.attributes.items()},
-        values=self(x.values, *args),
+        {k: self(v, **kwargs) for k, v in x.attributes.items()},
+        values=self(x.values, **kwargs),
         constructor=x.constructor,
     )
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractUnion, *args):
-    return (yield AbstractUnion)(self(x.options, *args))
+def abstract_clone(self, x: AbstractUnion, **kwargs):
+    return (yield AbstractUnion)(self(x.options, **kwargs))
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractTaggedUnion, *args):
-    return (yield AbstractTaggedUnion)(self(x.options, *args))
+def abstract_clone(self, x: AbstractTaggedUnion, **kwargs):
+    return (yield AbstractTaggedUnion)(self(x.options, **kwargs))
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractKeywordArgument, *args):
-    return (yield AbstractKeywordArgument)(x.key, self(x.argument, *args))
+def abstract_clone(self, x: AbstractKeywordArgument, **kwargs):
+    return (yield AbstractKeywordArgument)(x.key, self(x.argument, **kwargs))
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: Possibilities, *args):
-    return Possibilities([self(v, *args) for v in x])
+def abstract_clone(self, x: Possibilities, **kwargs):
+    return Possibilities([self(v, **kwargs) for v in x])
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: TaggedPossibilities, *args):
-    return TaggedPossibilities([[i, self(v, *args)] for i, v in x])
+def abstract_clone(self, x: TaggedPossibilities, **kwargs):
+    return TaggedPossibilities([[i, self(v, **kwargs)] for i, v in x])
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: PartialApplication, *args):
+def abstract_clone(self, x: PartialApplication, **kwargs):
     return PartialApplication(
-        self(x.fn, *args), [self(arg, *args) for arg in x.args]
+        self(x.fn, **kwargs), [self(arg, **kwargs) for arg in x.args]
     )
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: TransformedFunction, *args):
-    return TransformedFunction(self(x.fn, *args), x.transform)
+def abstract_clone(self, x: TransformedFunction, **kwargs):
+    return TransformedFunction(self(x.fn, **kwargs), x.transform)
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: AbstractFunctionUnique, *args):
+def abstract_clone(self, x: AbstractFunctionUnique, **kwargs):
     return (yield AbstractFunctionUnique)(
-        [self(arg, *args) for arg in x.args], self(x.output, *args)
+        [self(arg, **kwargs) for arg in x.args], self(x.output, **kwargs)
     )
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: Pending, *args):
+def abstract_clone(self, x: Pending, **kwargs):
     if x.done():
-        return self(x.result(), *args)
+        return self(x.result(), **kwargs)
     else:
         return x
 
 
 @overload  # noqa: F811
-def abstract_clone(self, x: object, *args):
+def abstract_clone(self, x: object, **kwargs):
     return x
 
 
@@ -458,14 +458,14 @@ def concretize_cache(src, dest=None):
 @abstract_check.variant(
     initial_state=lambda: CheckState(cache={}, prop="_broad")
 )
-def is_broad(self, x: object, *args):
+def is_broad(self, x: object, **kwargs):
     """Check whether the object is broad or not."""
     return x is ANYTHING
 
 
 @overload  # noqa: F811
-def is_broad(self, x: (AbstractScalar, AbstractFunction), *args):
-    return self(x.xvalue(), *args)
+def is_broad(self, x: (AbstractScalar, AbstractFunction), **kwargs):
+    return self(x.xvalue(), **kwargs)
 
 
 ###########
@@ -476,7 +476,7 @@ def is_broad(self, x: (AbstractScalar, AbstractFunction), *args):
 @abstract_clone.variant(
     initial_state=lambda: CloneState({}, "_broad", is_broad)
 )
-def broaden(self, d: TrackDict, *args):  # noqa: D417
+def broaden(self, d: TrackDict, **kwargs):  # noqa: D417
     """Broaden an abstract value.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
@@ -485,7 +485,7 @@ def broaden(self, d: TrackDict, *args):  # noqa: D417
         d: The abstract data to clone.
 
     """
-    return {k: k.broaden(v, self, *args) for k, v in d.items()}
+    return {k: k.broaden(v, self, **kwargs) for k, v in d.items()}
 
 
 ###############

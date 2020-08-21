@@ -32,13 +32,13 @@ class ValidationError(Exception):
 
 
 @abstract_check.variant
-def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
+def validate_abstract(self, a: (AbstractClass, AbstractJTagged), *, uses):
     """Validate a type."""
     raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractError, uses):
+def validate_abstract(self, a: AbstractError, *, uses):
     kind = a.xvalue()
     if kind is DEAD:
         return True
@@ -51,7 +51,7 @@ def validate_abstract(self, a: AbstractError, uses):
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractArray, uses):
+def validate_abstract(self, a: AbstractArray, *, uses):
     at = a.xtype()
     if at is not ANYTHING and not issubclass(at, xtype.NDArray):
         raise ValidationError(
@@ -61,7 +61,7 @@ def validate_abstract(self, a: AbstractArray, uses):
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractScalar, uses):
+def validate_abstract(self, a: AbstractScalar, *, uses):
     if not issubclass(
         a.xtype(),
         (
@@ -80,17 +80,17 @@ def validate_abstract(self, a: AbstractScalar, uses):
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: (type(None), AbstractExternal), uses):
+def validate_abstract(self, a: (type(None), AbstractExternal), *, uses):
     raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractType, uses):
+def validate_abstract(self, a: AbstractType, *, uses):
     return True
 
 
 @overload  # noqa: F811
-def validate_abstract(self, a: AbstractFunction, uses):
+def validate_abstract(self, a: AbstractFunction, *, uses):
     raise ValidationError("Only VirtualFunction is allowed in the final graph")
 
 
@@ -130,7 +130,7 @@ class AbstractValidator(NodeValidator):
 
     def test_node(self, node):
         """Test that the node's abstract type is valid."""
-        return validate_abstract(node.abstract, self.manager.uses[node])
+        return validate_abstract(node.abstract, uses=self.manager.uses[node])
 
 
 class OperatorValidator(NodeValidator):

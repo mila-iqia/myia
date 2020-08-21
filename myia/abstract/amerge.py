@@ -50,7 +50,7 @@ amerge_engine = ContextVar("amerge_engine", default=None)
 
 
 @is_broad.variant(initial_state=lambda: CheckState(cache={}, prop=None))
-def _is_tentative(self, x: (Possibilities, TaggedPossibilities), loop):
+def _is_tentative(self, x: (Possibilities, TaggedPossibilities), *, loop):
     return False
 
 
@@ -60,7 +60,7 @@ def _is_tentative(self, x: (Possibilities, TaggedPossibilities), loop):
 
 
 @broaden.variant(initial_state=lambda: CloneState({}, None, _is_tentative))
-def tentative(self, p: Possibilities, loop):  # noqa: D417
+def tentative(self, p: Possibilities, *, loop):  # noqa: D417
     """Broaden an abstract value and make it tentative.
 
     * Concrete values such as 1 or True will be broadened to ANYTHING.
@@ -76,7 +76,7 @@ def tentative(self, p: Possibilities, loop):  # noqa: D417
 
 
 @overload  # noqa: F811
-def tentative(self, p: TaggedPossibilities, loop):
+def tentative(self, p: TaggedPossibilities, *, loop):
     return loop.create_pending_tentative(tentative=p)
 
 
@@ -501,7 +501,7 @@ def bind(loop, committed, resolved, pending):
         committed = amergeall()
         # We broaden the result so that the as-of-yet unresolved stuff
         # can be merged more easily.
-        committed = tentative(committed, loop)
+        committed = tentative(committed, loop=loop)
         resolved.clear()
         return committed
 
