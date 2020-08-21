@@ -4,34 +4,35 @@
 from collections import defaultdict
 
 import numpy as np
+from ovld import ovld
 
 from ..classes import ADT
 from ..operations import primitives as P
-from ..utils import MyiaInputTypeError, get_fields, overload
+from ..utils import MyiaInputTypeError, get_fields
 from . import data as ab
 
 
-@overload.wrapper(bootstrap=True)
-def _explore(__call__, self, v, vseq, path):
+@ovld.dispatch
+def _explore(self, v, vseq, path):
     yield v, vseq, path
-    yield from __call__(self, v, vseq, path)
+    yield from self.resolve(v, vseq, path)(v, vseq, path)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _explore(self, v: (list, tuple), vseq, path):
     vseq = (*vseq, v)
     for i, x in enumerate(v):
         yield from self(x, vseq, (*path, i))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _explore(self, v: dict, vseq, path):
     vseq = (*vseq, v)
     for k, x in v.items():
         yield from self(x, vseq, (*path, k))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _explore(self, v: object, vseq, path):
     vseq = (*vseq, v)
 
@@ -105,7 +106,7 @@ def find_aliases(obj, aliasable=ndarray_aliasable):
     return id_to_aid, aid_to_paths
 
 
-@overload(bootstrap=True)
+@ovld
 def generate_getters(self, tup: ab.AbstractTuple, get):
     """Recursively generate sexps for getting elements of a data structure."""
     yield tup, get
@@ -114,7 +115,7 @@ def generate_getters(self, tup: ab.AbstractTuple, get):
         yield from self(elem, geti)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def generate_getters(self, dat: ab.AbstractClassBase, get):
     yield dat, get
     for k, elem in dat.attributes.items():
@@ -122,7 +123,7 @@ def generate_getters(self, dat: ab.AbstractClassBase, get):
         yield from self(elem, getk)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def generate_getters(self, dat: ab.AbstractDict, get):
     yield dat, get
     for k, elem in dat.entries.items():
@@ -130,7 +131,7 @@ def generate_getters(self, dat: ab.AbstractDict, get):
         yield from self(elem, getk)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def generate_getters(self, obj: object, get):
     yield obj, get
 

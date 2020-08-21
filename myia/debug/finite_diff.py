@@ -4,10 +4,11 @@
 import itertools
 from dataclasses import is_dataclass
 from typing import Any, Callable, Dict, List
+from ovld import ovld
 
 import numpy
 
-from ..utils import dataclass_fields, overload, smap
+from ..utils import dataclass_fields, smap
 
 
 @smap.variant
@@ -43,7 +44,7 @@ def clean_args(args):
     return tuple(a.value if isinstance(a, NoTestGrad) else a for a in args)
 
 
-@overload(bootstrap=True)
+@ovld
 def gen_paths(self, obj: NoTestGrad, path):
     """Generate all paths to a scalar through an object.
 
@@ -53,19 +54,19 @@ def gen_paths(self, obj: NoTestGrad, path):
     yield from []
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def gen_paths(self, obj: (list, tuple), path):
     for i, x in enumerate(obj):
         yield from gen_paths(x, path + (i,))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def gen_paths(self, obj: numpy.ndarray, path):
     for coord in itertools.product(*[range(d) for d in obj.shape]):
         yield path + (coord,)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def gen_paths(self, obj: object, path):
     if is_dataclass(obj):
         for name, value in dataclass_fields(obj).items():
@@ -84,7 +85,7 @@ def resolve_path(obj, path):
     return obj
 
 
-@overload(bootstrap=True)
+@ovld
 def gen_variants(self, obj: NoTestGrad, gen, path):
     """
     Generate perturbated variants of the given object.
@@ -106,7 +107,7 @@ def gen_variants(self, obj: NoTestGrad, gen, path):
     yield from []
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def gen_variants(self, obj: object, gen, path):
     if is_dataclass(obj):
         fields = list(obj.__dataclass_fields__.keys())
@@ -125,7 +126,7 @@ def gen_variants(self, obj: object, gen, path):
         yield (gen(obj), path)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def gen_variants(self, obj: (list, tuple), gen, path):
     for i, x in enumerate(obj):
         for variants, p in self(x, gen, path + (i,)):
@@ -140,7 +141,7 @@ def gen_variants(self, obj: (list, tuple), gen, path):
             )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def gen_variants(self, obj: numpy.ndarray, gen, path):
     for coord in itertools.product(*[range(d) for d in obj.shape]):
         for variants, p in self(obj[coord], gen, path + (coord,)):

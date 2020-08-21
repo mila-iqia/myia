@@ -1,6 +1,7 @@
 """Pipeline resources."""
 
 from types import FunctionType
+from ovld import ovld
 
 import numpy as np
 
@@ -24,7 +25,7 @@ from ..vm import VM
 #####################
 
 
-@overload
+@ovld
 def default_convert(env, fn: FunctionType):
     """Default converter for Python types."""
     g = parser.parse(fn)
@@ -34,7 +35,7 @@ def default_convert(env, fn: FunctionType):
     return g
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_convert(env, g: Graph):
     mng = env.resources.infer_manager
     if g._manager is not mng:
@@ -45,12 +46,12 @@ def default_convert(env, g: Graph):
         return g
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_convert(env, seq: (tuple, list)):
     return type(seq)(env(x) for x in seq)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_convert(env, x: Operation):
     dflt = x.defaults()
     if "mapping" in dflt:
@@ -59,7 +60,7 @@ def default_convert(env, x: Operation):
         raise MyiaConversionError(f"Cannot convert '{x}'")
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_convert(env, x: object):
     if hasattr(x, "__to_myia__"):
         return x.__to_myia__()
@@ -67,7 +68,7 @@ def default_convert(env, x: object):
         return x
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_convert(env, x: type):
     try:
         return type_to_abstract(x)
@@ -75,7 +76,7 @@ def default_convert(env, x: type):
         return x
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_convert(env, x: np.dtype):
     return default_convert(env, xtype.np_dtype_to_type(x.name))
 

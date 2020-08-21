@@ -1,6 +1,7 @@
 import inspect
 import typing
 from dataclasses import dataclass, is_dataclass
+from ovld import ovld
 
 import numpy as np
 
@@ -30,7 +31,7 @@ from myia.abstract import (
 )
 from myia.classes import ADT
 from myia.ir import MultitypeGraph
-from myia.utils import EnvInstance, HandleInstance, dataclass_fields, overload
+from myia.utils import EnvInstance, HandleInstance, dataclass_fields
 from myia.xtype import Bool, f16, f32, f64, i16, i32, i64, u64
 
 B = Bool
@@ -128,7 +129,7 @@ def TU(**opts):
     return AbstractTaggedUnion(opts)
 
 
-@overload(bootstrap=True)
+@ovld
 def to_abstract_test(
     self,
     x: (
@@ -153,12 +154,12 @@ def to_abstract_test(
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, v: HandleInstance, **kwargs):
     return AbstractHandle(self(v.state, **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(
     self,
     x: (
@@ -172,7 +173,7 @@ def to_abstract_test(
     return AbstractScalar({VALUE: ANYTHING, TYPE: x})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, x: np.ndarray):
     return AbstractArray(
         AbstractScalar(
@@ -182,22 +183,22 @@ def to_abstract_test(self, x: np.ndarray):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, x: AbstractValue):
     return x
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, tup: tuple):
     return AbstractTuple([self(x) for x in tup])
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, d: dict):
     return AbstractDict({k: self(v) for k, v in d.items()})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, lst: list):
     if lst == []:
         return empty
@@ -205,17 +206,17 @@ def to_abstract_test(self, lst: list):
     return listof(self(lst[0]))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, x: Exception):
     return x
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, t: type):
-    return self[t](t)
+    return self[(t,)](t)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract_test(self, x: object):
     if is_dataclass(x):
         new_args = {}
