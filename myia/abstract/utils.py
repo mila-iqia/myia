@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, replace as dc_replace
 from types import AsyncGeneratorType, GeneratorType
+from ovld import ovld
 
 from .. import xtype
 from ..utils import intern, overload
@@ -87,17 +88,17 @@ def build_value(a, default=ABSENT):
         return v
 
 
-@overload
+@ovld
 def _build_value(x: AbstractValue):
     raise ValueError(x)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _build_value(x: AbstractTuple):
     return tuple(build_value(y) for y in x.elements)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _build_value(ac: AbstractClass):
     args = {k: build_value(v) for k, v in ac.attributes.items()}
     return ac.constructor(**args)
@@ -516,16 +517,17 @@ async def _force_through_post(x):
     return intern(await x)
 
 
-@overload.wrapper(initial_state=lambda: {}, postprocess=_force_through_post)
-async def force_through(__call__, self, x, through):
+@ovld.dispatch(initial_state=lambda: {}, postprocess=_force_through_post)
+async def force_through(self, x, through):
     """Clone an abstract value (asynchronous)."""
+    __call__ = self[type(x), object]
     if not isinstance(x, through) and not isinstance(x, Pending):
         return x
     cache = self.state
     if isinstance(x, AbstractValue) and x in cache:
         return cache[x]
 
-    call = __call__(self, x, through)
+    call = __call__(x, through)
     if isinstance(call, AsyncGeneratorType):
         cls = await call.asend(None)
         inst = cls.empty()
@@ -541,22 +543,22 @@ async def force_through(__call__, self, x, through):
 # Uncomment and test the other implementations if/when needed:
 
 
-# @overload  # noqa: F811
+# @ovld  # noqa: F811
 # async def force_through(self, x: AbstractScalar, through):
 #     return AbstractScalar(await self(x.values, through))
 
 
-# @overload  # noqa: F811
+# @ovld  # noqa: F811
 # async def force_through(self, x: AbstractFunction, through):
 #     yield (yield AbstractFunction)(*(await self(x.get_sync(), through)))
 
 
-# @overload  # noqa: F811
+# @ovld  # noqa: F811
 # async def force_through(self, d: TrackDict, through):
 #     return {k: await self(v, through) for k, v in d.items()}
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: AbstractTuple, through):
     yield (yield AbstractTuple)(
         [(await self(y, through)) for y in x.elements],
@@ -564,14 +566,14 @@ async def force_through(self, x: AbstractTuple, through):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: AbstractArray, through):
     yield (yield type(x))(
         await self(x.element, through), await self(x.values, through)
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: AbstractClassBase, through):
     yield (yield type(x))(
         x.tag,
@@ -580,7 +582,7 @@ async def force_through(self, x: AbstractClassBase, through):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: AbstractDict, through):
     yield (yield AbstractDict)(
         {k: (await self(v, through)) for k, v in x.entries.items()},
@@ -588,28 +590,28 @@ async def force_through(self, x: AbstractDict, through):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: AbstractUnion, through):
     yield (yield AbstractUnion)(await self(x.options, through))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: AbstractTaggedUnion, through):
     opts = await self(x.options, through)
     yield (yield AbstractTaggedUnion)(opts)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: Possibilities, through):
     return Possibilities([await self(v, through) for v in x])
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: TaggedPossibilities, through):
     return TaggedPossibilities([[i, await self(v, through)] for i, v in x])
 
 
-# @overload  # noqa: F811
+# @ovld  # noqa: F811
 # async def force_through(self, x: PartialApplication, through):
 #     return PartialApplication(
 #         await self(x.fn, through),
@@ -617,12 +619,12 @@ async def force_through(self, x: TaggedPossibilities, through):
 #     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: Pending, through):
     return await self(await x, through)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 async def force_through(self, x: object, through):
     raise NotImplementedError(type(x))
 
@@ -632,7 +634,7 @@ async def force_through(self, x: object, through):
 ################################
 
 
-@overload(bootstrap=True)
+@ovld
 def refmap(self, fn, x: Context):
     """Map a function on a Reference/Context/etc."""
     return Context(
@@ -640,22 +642,22 @@ def refmap(self, fn, x: Context):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def refmap(self, fn, x: Reference):
     return Reference(x.engine, x.node, self(fn, x.context))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def refmap(self, fn, x: tuple):
     return tuple(self(fn, y) for y in x)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def refmap(self, fn, x: AbstractValue):
     return fn(x)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def refmap(self, fn, x: object):
     return x
 

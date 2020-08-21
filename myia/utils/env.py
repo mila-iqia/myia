@@ -4,8 +4,7 @@
 from dataclasses import dataclass
 
 import numpy as np
-
-from .overload import overload
+from ovld import ovld
 
 
 def require_same(fns, objs):
@@ -29,20 +28,14 @@ def require_same(fns, objs):
                 )
 
 
-@overload(bootstrap=True)
-def smap(self, arg: object, *rest):
-    """Map a function recursively over all scalars in a structure."""
-    raise NotImplementedError()
-
-
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def smap(self, arg: (list, tuple), *rest):
     seqs = [arg, *rest]
     require_same([type, len], seqs)
     return type(arg)(self(*[s[i] for s in seqs]) for i in range(len(arg)))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def smap(self, arg: np.ndarray, *rest):
     return np.vectorize(self)(arg, *rest)
 

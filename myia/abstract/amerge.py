@@ -3,6 +3,7 @@
 from contextvars import ContextVar
 from functools import reduce
 from itertools import chain
+from ovld import ovld
 
 from .. import xtype
 from ..utils import MyiaTypeError, TypeMismatchError, overload, untested_legacy
@@ -100,9 +101,9 @@ def nobottom(self, x: Pending, *args):
 #########
 
 
-@overload.wrapper(bootstrap=True, initial_state=dict)
+@ovld.dispatch(initial_state=dict)
 def amerge(
-    __call__, self, x1, x2, forced=False, bind_pending=True, accept_pending=True
+    self, x1, x2, forced=False, bind_pending=True, accept_pending=True
 ):
     """Merge two values.
 
@@ -126,6 +127,8 @@ def amerge(
             top level call.
 
     """
+    __call__ = self[type(x1), type(x2), object, object]
+
     if x1 is x2:
         return x1
 
@@ -208,7 +211,9 @@ def amerge(
                 f"Type mismatch: {type(x1)} != {type(x2)}; {x1} != {x2}"
             )
         else:
-            return self.map[type(x1)](self, x1, x2, forced, bind_pending)
+            return self[type(x1), type(x2), object, object](
+                x1, x2, forced, bind_pending
+            )
 
     self.state[keypair] = x1 if forced else ABSENT
     rval = helper()
@@ -218,7 +223,7 @@ def amerge(
     return rval
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: Possibilities, x2, forced, bp):
     if set(x1).issuperset(set(x2)):
         return x1
@@ -228,7 +233,7 @@ def amerge(self, x1: Possibilities, x2, forced, bp):
         return Possibilities(x1 + x2)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: TaggedPossibilities, x2, forced, bp):
     d1 = dict(x1)
     d2 = dict(x2)
@@ -251,7 +256,7 @@ def amerge(self, x1: TaggedPossibilities, x2, forced, bp):
         return res
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: xtype.TypeMeta, x2, forced, bp):
     if issubclass(x2, x1):
         return x1
@@ -261,7 +266,7 @@ def amerge(self, x1: xtype.TypeMeta, x2, forced, bp):
         raise TypeMismatchError(x1, x2)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: TrackDict, x2, forced, bp):
     keys = {*x1.keys(), *x2.keys()}
     rval = type(x1)()
@@ -283,7 +288,7 @@ def amerge(self, x1: TrackDict, x2, forced, bp):
     return x1 if forced or not changes else rval
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: dict, x2, forced, bp):
     if set(x1.keys()) != set(x2.keys()):
         raise MyiaTypeError(f"Keys mismatch")
@@ -297,7 +302,7 @@ def amerge(self, x1: dict, x2, forced, bp):
     return x1 if forced or not changes else rval
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: (tuple, list), x2, forced, bp):
     if len(x1) != len(x2):  # pragma: no cover
         raise MyiaTypeError(f"Tuple length mismatch")
@@ -311,7 +316,7 @@ def amerge(self, x1: (tuple, list), x2, forced, bp):
     return x1 if forced or not changes else type(x1)(rval)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: AbstractScalar, x2, forced, bp):
     values = self(x1.values, x2.values, forced, bp)
     if forced or values is x1.values:
@@ -319,7 +324,7 @@ def amerge(self, x1: AbstractScalar, x2, forced, bp):
     return AbstractScalar(values)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: AbstractError, x2, forced, bp):
     e1 = x1.xvalue()
     e2 = x2.xvalue()
@@ -329,7 +334,7 @@ def amerge(self, x1: AbstractError, x2, forced, bp):
     return AbstractError(e)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: AbstractFunctionBase, x2, forced, bp):
     if not isinstance(x2, AbstractFunctionBase):
         raise MyiaTypeError(f"Expected function, but got {x2}")
@@ -375,7 +380,7 @@ def amerge(self, x1: AbstractFunctionBase, x2, forced, bp):
         return vfn
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: AbstractTuple, x2, forced, bp):
     args1 = (x1.elements, x1.values)
     args2 = (x2.elements, x2.values)
@@ -385,7 +390,7 @@ def amerge(self, x1: AbstractTuple, x2, forced, bp):
     return AbstractTuple(*merged)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: AbstractWrapper, x2, forced, bp):
     args1 = (x1.element, x1.values)
     args2 = (x2.element, x2.values)
@@ -395,7 +400,7 @@ def amerge(self, x1: AbstractWrapper, x2, forced, bp):
     return type(x1)(*merged)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: AbstractClassBase, x2, forced, bp):
     args1 = (x1.tag, x1.attributes, x1.values)
     args2 = (x2.tag, x2.attributes, x2.values)
@@ -406,7 +411,7 @@ def amerge(self, x1: AbstractClassBase, x2, forced, bp):
     return type(x1)(tag, attrs, values=values)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: AbstractDict, x2, forced, bp):
     args1 = (x1.entries, x1.values)
     args2 = (x2.entries, x2.values)
@@ -416,7 +421,7 @@ def amerge(self, x1: AbstractDict, x2, forced, bp):
     return type(x1)(*merged)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: (AbstractUnion, AbstractTaggedUnion), x2, forced, bp):
     args1 = x1.options
     args2 = x2.options
@@ -426,14 +431,14 @@ def amerge(self, x1: (AbstractUnion, AbstractTaggedUnion), x2, forced, bp):
     return type(x1)(merged)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: (int, float, bool), x2, forced, bp):
     if forced and x1 != x2:
         raise TypeMismatchError(x1, x2)
     return x1 if x1 == x2 else ANYTHING
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def amerge(self, x1: object, x2, forced, bp):
     if x1 != x2:
         raise TypeMismatchError(x1, x2)
