@@ -105,7 +105,7 @@ def _fix_type(self, a: GraphFunction, *, finder, monomorphizer):
         return AbstractError(DEAD)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _fix_type(self, a: PartialApplication, *, finder, monomorphizer):
     vfn = self(a.fn, finder=finder, monomorphizer=monomorphizer)
     if isinstance(vfn, AbstractError) and vfn.xvalue() is DEAD:
@@ -115,7 +115,7 @@ def _fix_type(self, a: PartialApplication, *, finder, monomorphizer):
     return vfn
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _fix_type(self, a: AbstractFunctionUnique, *, finder, monomorphizer):
     return (yield AbstractFunctionUnique)(
         tuple(self(arg, finder=finder, monomorphizer=monomorphizer) for arg in a.args),
@@ -123,7 +123,7 @@ def _fix_type(self, a: AbstractFunctionUnique, *, finder, monomorphizer):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _fix_type(self, a: TransformedFunction, *, finder, monomorphizer):
     def _jtag(x):
         assert not isinstance(x, AbstractFunction)
@@ -142,7 +142,7 @@ def _fix_type(self, a: TransformedFunction, *, finder, monomorphizer):
     return AbstractFunctionUnique(jargs, out)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _fix_type(self, a: AbstractFunction, *, finder, monomorphizer):
     vfns = self(a.get_sync(), finder=finder, monomorphizer=monomorphizer)
     if len(vfns) == 1:
@@ -157,7 +157,7 @@ def _fix_type(self, a: AbstractFunction, *, finder, monomorphizer):
     return vfn
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _fix_type(self, a: PrimitiveFunction, *, finder, monomorphizer):
     try:
         return self(
@@ -167,14 +167,14 @@ def _fix_type(self, a: PrimitiveFunction, *, finder, monomorphizer):
         return AbstractError(err.problem)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _fix_type(self, a: MetaGraphFunction, *, finder, monomorphizer):
     inf = finder.engine.get_inferrer_for(a)
     argvals, outval = finder._find_unique_argvals(None, inf, None)
     return AbstractFunctionUnique(tuple(argvals), outval)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _fix_type(self, a: TypedPrimitive, *, finder, monomorphizer):
     return AbstractFunctionUnique(
         tuple(self(ar, finder=finder, monomorphizer=monomorphizer) for ar in a.args),

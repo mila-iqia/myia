@@ -251,16 +251,17 @@ def _make_constructor(inst):
     return f
 
 
-@overload.wrapper(
+@ovld.dispatch(
     initial_state=lambda: CloneState({}, None, None), postprocess=intern
 )
-def abstract_clone(__call__, self, x, **kwargs):
+def abstract_clone(self, x, **kwargs):
     """Clone an abstract value."""
+    __call__ = self.resolve(x)
 
     def proceed():
         if isinstance(x, AbstractValue) and x in cache:
             return cache[x]
-        result = __call__(self, x, **kwargs)
+        result = __call__(x, **kwargs)
         if not isinstance(result, GeneratorType):
             return result
         cls = result.send(None)
@@ -301,22 +302,22 @@ def abstract_clone(__call__, self, x, **kwargs):
         return proceed()
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractScalar, **kwargs):
     return AbstractScalar(self(x.values, **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractFunction, **kwargs):
     return (yield AbstractFunction)(value=self(x.get_sync(), **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, d: TrackDict, **kwargs):
     return {k: k.clone(v, self) for k, v in d.items()}
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractTuple, **kwargs):
     if x.elements is ANYTHING:
         return (yield AbstractTuple)(ANYTHING)
@@ -325,19 +326,19 @@ def abstract_clone(self, x: AbstractTuple, **kwargs):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractDict, **kwargs):
     return (yield AbstractDict)(
         dict((k, self(v, **kwargs)) for k, v in x.entries.items())
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractWrapper, **kwargs):
     return (yield type(x))(self(x.element, **kwargs), self(x.values, **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractClassBase, **kwargs):
     return (yield type(x))(
         x.tag,
@@ -347,51 +348,51 @@ def abstract_clone(self, x: AbstractClassBase, **kwargs):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractUnion, **kwargs):
     return (yield AbstractUnion)(self(x.options, **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractTaggedUnion, **kwargs):
     return (yield AbstractTaggedUnion)(self(x.options, **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractKeywordArgument, **kwargs):
     return (yield AbstractKeywordArgument)(x.key, self(x.argument, **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: Possibilities, **kwargs):
     return Possibilities([self(v, **kwargs) for v in x])
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: TaggedPossibilities, **kwargs):
     return TaggedPossibilities([[i, self(v, **kwargs)] for i, v in x])
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: PartialApplication, **kwargs):
     return PartialApplication(
         self(x.fn, **kwargs), [self(arg, **kwargs) for arg in x.args]
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: TransformedFunction, **kwargs):
     return TransformedFunction(self(x.fn, **kwargs), x.transform)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: AbstractFunctionUnique, **kwargs):
     return (yield AbstractFunctionUnique)(
         [self(arg, **kwargs) for arg in x.args], self(x.output, **kwargs)
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: Pending, **kwargs):
     if x.done():
         return self(x.result(), **kwargs)
@@ -399,7 +400,7 @@ def abstract_clone(self, x: Pending, **kwargs):
         return x
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_clone(self, x: object, **kwargs):
     return x
 
@@ -504,7 +505,7 @@ def sensitivity_transform(self, x: (AbstractFunction, AbstractFunctionUnique)):
     return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.EnvType})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def sensitivity_transform(self, x: AbstractJTagged):
     return self(x.element)
 

@@ -75,7 +75,7 @@ def tentative(self, p: Possibilities, *, loop):  # noqa: D417
     return loop.create_pending_tentative(tentative=p)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def tentative(self, p: TaggedPossibilities, *, loop):
     return loop.create_pending_tentative(tentative=p)
 

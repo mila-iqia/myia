@@ -77,7 +77,7 @@ def _reabs(self, a: AbstractClassBase):
     return (yield AbstractTuple)(self(x) for x in a.attributes.values())
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _reabs(self, a: AbstractScalar):
     new_values = self(a.values)
     if a.xtype() == String:
@@ -89,26 +89,26 @@ def _reabs(self, a: AbstractScalar):
         return AbstractScalar(new_values)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _reabs(self, a: AbstractDict):
     return (yield AbstractTuple)(self(x) for x in a.entries.values())
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _reabs(self, a: AbstractArray):
     return (yield AbstractArray)(
         self(a.element), {**self(a.values), TYPE: NDArray}
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _reabs(self, a: AbstractUnion):
     return (yield AbstractTaggedUnion)(
         [type_to_tag(opt), self(opt)] for opt in a.options
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _reabs(self, a: AbstractKeywordArgument):
     return self(a.argument)
 
