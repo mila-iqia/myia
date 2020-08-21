@@ -1,6 +1,7 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
 from types import SimpleNamespace
+from ovld import ovld
 
 from . import xtype
 from .abstract import (
@@ -37,7 +38,7 @@ def validate_abstract(self, a: (AbstractClass, AbstractJTagged), *, uses):
     raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def validate_abstract(self, a: AbstractError, *, uses):
     kind = a.xvalue()
     if kind is DEAD:
@@ -50,7 +51,7 @@ def validate_abstract(self, a: AbstractError, *, uses):
         raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def validate_abstract(self, a: AbstractArray, *, uses):
     at = a.xtype()
     if at is not ANYTHING and not issubclass(at, xtype.NDArray):
@@ -60,7 +61,7 @@ def validate_abstract(self, a: AbstractArray, *, uses):
     return True
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def validate_abstract(self, a: AbstractScalar, *, uses):
     if not issubclass(
         a.xtype(),
@@ -79,17 +80,17 @@ def validate_abstract(self, a: AbstractScalar, *, uses):
     return True
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def validate_abstract(self, a: (type(None), AbstractExternal), *, uses):
     raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def validate_abstract(self, a: AbstractType, *, uses):
     return True
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def validate_abstract(self, a: AbstractFunction, *, uses):
     raise ValidationError("Only VirtualFunction is allowed in the final graph")
 

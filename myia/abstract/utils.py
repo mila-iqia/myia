@@ -117,22 +117,23 @@ class CheckState:
     prop: str
 
 
-@overload.wrapper(initial_state=lambda: CheckState({}, None))
-def abstract_check(__call__, self, x, **kwargs):
+@ovld.dispatch(initial_state=lambda: CheckState({}, None))
+def abstract_check(self, x, **kwargs):
     """Check that a predicate applies to a given object."""
+    __call__ = self.resolve(x)
 
     def proceed():
         if prop:
             if hasattr(x, prop):
                 return getattr(x, prop) is x
-            elif __call__(self, x, **kwargs):
+            elif __call__(x, **kwargs):
                 if isinstance(x, AbstractValue):
                     setattr(x, prop, x)
                 return True
             else:
                 return False
         else:
-            return __call__(self, x, **kwargs)
+            return __call__(x, **kwargs)
 
     prop = self.state.prop
     cache = self.state.cache
@@ -150,17 +151,17 @@ def abstract_check(__call__, self, x, **kwargs):
         return rval
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: TrackDict, **kwargs):
     return all(self(v, **kwargs) for v in x.values())
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: AbstractScalar, **kwargs):
     return self(x.values, **kwargs)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, xs: AbstractStructure, **kwargs):
     ch = xs.children()
     if ch is ANYTHING:
@@ -169,17 +170,17 @@ def abstract_check(self, xs: AbstractStructure, **kwargs):
         return all(self(x, **kwargs) for x in ch)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, xs: AbstractAtom, **kwargs):
     return True
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: AbstractFunction, **kwargs):
     return self(x.values, **kwargs)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: AbstractFunctionUnique, **kwargs):
     return (
         self(x.values, **kwargs)
@@ -188,42 +189,42 @@ def abstract_check(self, x: AbstractFunctionUnique, **kwargs):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: AbstractUnion, **kwargs):
     return self(x.options, **kwargs)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: Possibilities, **kwargs):
     return all(self(v, **kwargs) for v in x)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: AbstractTaggedUnion, **kwargs):
     return self(x.options, **kwargs)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: TaggedPossibilities, **kwargs):
     return all(self(v, **kwargs) for _, v in x)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, t: PartialApplication, **kwargs):
     return self(t.fn, **kwargs) and all(self(v, **kwargs) for v in t.args)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, t: TransformedFunction, **kwargs):
     return self(t.fn, **kwargs)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, x: Pending, **kwargs):
     return False
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def abstract_check(self, xs: object, **kwargs):
     return True
 
@@ -463,7 +464,7 @@ def is_broad(self, x: object, **kwargs):
     return x is ANYTHING
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def is_broad(self, x: (AbstractScalar, AbstractFunction), **kwargs):
     return self(x.xvalue(), **kwargs)
 

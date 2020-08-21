@@ -91,8 +91,8 @@ def nobottom(self, x: AbstractBottom):
     return False
 
 
-@overload  # noqa: F811
-def nobottom(self, x: Pending, *args):
+@ovld  # noqa: F811
+def nobottom(self, x: Pending):
     return True
 
 
