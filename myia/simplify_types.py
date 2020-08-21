@@ -2,6 +2,7 @@
 
 import weakref
 from itertools import count
+from ovld import ovld
 
 from . import xtype
 from .abstract import (
@@ -272,8 +273,8 @@ def simplify_types(root, manager):
 ########################
 
 
-@overload.wrapper(bootstrap=True)
-def to_canonical(fn, self, arg, orig_t, coerce=False):
+@ovld.dispatch
+def to_canonical(self, arg, orig_t, coerce=False):
     """Check and convert an argument to the canonical representation.
 
     Arguments:
@@ -285,16 +286,17 @@ def to_canonical(fn, self, arg, orig_t, coerce=False):
         and unions are properly tagged.
 
     """
+    fn = self[object, type(orig_t), object]
     if isinstance(arg, BackendValue):
         if not typecheck(orig_t, arg.orig_t):
             raise MyiaInputTypeError("Bad type for backend value.")
         return arg
     if fn is None:
         raise AssertionError(f"to_canonical not defined for {orig_t}")
-    return fn(self, arg, orig_t, coerce)
+    return fn(arg, orig_t, coerce)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
     if not isinstance(arg, tuple):
         raise MyiaInputTypeError("Expected tuple")
@@ -304,7 +306,7 @@ def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
     return tuple(self(x, o, coerce) for x, o in zip(arg, oe))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractRandomState, coerce):
     # arg must be a RandomStateWrapper
     if not isinstance(arg, RandomStateWrapper):
@@ -312,7 +314,7 @@ def to_canonical(self, arg, orig_t: AbstractRandomState, coerce):
     return arg
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractDict, coerce):
     if not isinstance(arg, dict):
         raise MyiaInputTypeError("Expected dict")
@@ -326,7 +328,7 @@ def to_canonical(self, arg, orig_t: AbstractDict, coerce):
     return tuple(self(arg[k], o, coerce) for k, o in orig_t.entries.items())
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractClassBase, coerce):
     if orig_t.tag is Empty:
         if arg != []:
@@ -352,7 +354,7 @@ def to_canonical(self, arg, orig_t: AbstractClassBase, coerce):
         return res
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractArray, coerce):
     et = orig_t.element
     assert isinstance(et, AbstractScalar)
@@ -372,7 +374,7 @@ def to_canonical(self, arg, orig_t: AbstractArray, coerce):
     return arg
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractUnion, coerce):
     for opt in orig_t.options:
         try:
@@ -386,7 +388,7 @@ def to_canonical(self, arg, orig_t: AbstractUnion, coerce):
         raise MyiaInputTypeError(f"Expected one of {opts}, not {arg}")
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractHandle, coerce):
     if not isinstance(arg, HandleInstance):
         raise MyiaInputTypeError(f"Expected handle")
@@ -394,7 +396,7 @@ def to_canonical(self, arg, orig_t: AbstractHandle, coerce):
     return arg
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractScalar, coerce):
     if not typecheck(orig_t, from_value(arg)):
         xt = orig_t.xtype()
@@ -411,17 +413,17 @@ def to_canonical(self, arg, orig_t: AbstractScalar, coerce):
     return arg
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractType, coerce):
     return _reabs(arg)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractError, coerce):
     return _reabs(arg)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_canonical(self, arg, orig_t: AbstractKeywordArgument, coerce):
     return arg
 
@@ -431,7 +433,7 @@ def to_canonical(self, arg, orig_t: AbstractKeywordArgument, coerce):
 #####################
 
 
-@overload(bootstrap=True)
+@ovld
 def from_canonical(self, res, orig_t: AbstractClassBase):
     if orig_t.tag in (Empty, Cons):
         rval = []
@@ -444,41 +446,41 @@ def from_canonical(self, res, orig_t: AbstractClassBase):
     return orig_t.constructor(*tup)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def from_canonical(self, res, orig_t: AbstractDict):
     tup = tuple(self(x, o) for x, o in zip(res, orig_t.entries.values()))
     return dict(zip(orig_t.entries.keys(), tup))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def from_canonical(self, res, orig_t: AbstractTuple):
     return tuple(self(x, o) for x, o in zip(res, orig_t.elements))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def from_canonical(self, res, orig_t: AbstractRandomState):
     return res
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractScalar):
     if orig_t.xtype() == xtype.String:
         arg = _strmap_tag[arg]
     return arg
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractArray):
     return orig_t.xtype().from_numpy(arg)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractHandle):
     # The state is updated by the pipeline through universe.commit()
     return arg
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractUnion):
     for typ in orig_t.options:
         tag = type_to_tag(typ)
