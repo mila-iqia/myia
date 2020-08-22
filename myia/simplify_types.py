@@ -35,7 +35,7 @@ from .classes import Cons, Empty
 from .compile import BackendValue
 from .ir import Constant
 from .operations import primitives as P
-from .utils import HandleInstance, MyiaInputTypeError, TaggedValue, overload
+from .utils import HandleInstance, MyiaInputTypeError, TaggedValue
 from .utils.misc import RandomStateWrapper
 from .xtype import Int, NDArray, String
 

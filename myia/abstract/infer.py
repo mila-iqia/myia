@@ -3,6 +3,7 @@
 import asyncio
 from dataclasses import replace as dc_replace
 from functools import reduce
+from ovld import OvldMC, ovld
 
 from .. import operations, xtype
 from ..info import About
@@ -13,7 +14,6 @@ from ..utils import (
     InternalInferenceError,
     MyiaTypeError,
     OrderedSet,
-    Overload,
     Partializable,
     infer_trace,
     tracer,
@@ -59,7 +59,7 @@ from .utils import (
 )
 
 
-class InferenceEngine:
+class InferenceEngine(metaclass=OvldMC):
     """Infer various properties about nodes in graphs.
 
     Attributes:
@@ -227,39 +227,34 @@ class InferenceEngine:
             for task in asyncio.all_tasks(self.loop):
                 task._log_destroy_pending = False
 
-    get_inferrer_for = Overload()
-
-    @get_inferrer_for.wrapper
-    def get_inferrer_for(__call__, self, fn):
+    @ovld.dispatch
+    def get_inferrer_for(self, fn):
         """Return the Inferrer for the given function."""
+        __call__ = self.resolve(fn)
         tracking = getattr(fn, "tracking_id", None)
         if tracking is None:
-            return __call__(self, fn)
-        if fn not in self.constructors:
+            return __call__(fn)
+        if fn not in self.bind_to.constructors:
             fn_generic = dc_replace(fn, tracking_id=None)
-            inf = __call__(self, fn_generic)
-            self.constructors[fn] = TrackedInferrer(inf)
-        return self.constructors[fn]
+            inf = __call__(fn_generic)
+            self.bind_to.constructors[fn] = TrackedInferrer(inf)
+        return self.bind_to.constructors[fn]
 
-    @get_inferrer_for.register
     def get_inferrer_for(self, pf: PrimitiveFunction):
         if pf.prim not in self.constructors:
             cons = self._constructors[pf.prim]
             self.constructors[pf.prim] = cons()
         return self.constructors[pf.prim]
 
-    @get_inferrer_for.register
     def get_inferrer_for(self, g: GraphFunction):
         assert g.graph.abstract is None
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
         return self.constructors[g]
 
-    @get_inferrer_for.register
     def get_inferrer_for(self, part: PartialApplication):
         return PartialInferrer(self.get_inferrer_for(part.fn), part.args)
 
-    @get_inferrer_for.register
     def get_inferrer_for(self, tf: TransformedFunction):
         if tf.transform is P.J:
             return JInferrer(self.get_inferrer_for(tf.fn), tf.fn)
@@ -268,17 +263,14 @@ class InferenceEngine:
                 f"No available transform for {tf.transform}"
             )
 
-    @get_inferrer_for.register
     def get_inferrer_for(self, vf: (TypedPrimitive, AbstractFunctionUnique)):
         return VirtualInferrer(vf.args, vf.output)
 
-    @get_inferrer_for.register
     def get_inferrer_for(self, mg: MetaGraphFunction):
         if mg not in self.constructors:
             self.constructors[mg] = GraphInferrer(mg.metagraph, None)
         return self.constructors[mg]
 
-    @get_inferrer_for.register
     def get_inferrer_for(self, m: MacroFunction):
         if m not in self.constructors:
             self.constructors[m] = MacroInferrer(m.macro)

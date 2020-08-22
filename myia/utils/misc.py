@@ -527,6 +527,47 @@ class WorkSet:
             yield elem
 
 
+class TypeMap(dict):
+    """Map types to handlers or values.
+
+    Mapping a type to a value also (lazily) maps all of its subclasses to the
+    same value, unless they have a mapping of their own.
+
+    TypeMap should ideally not be updated after it is used, because updates may
+    make some cached associations invalid.
+    """
+
+    def register(self, *obj_ts):
+        """Decorator to register a handler to the given types."""
+
+        def deco(handler):
+            for obj_t in obj_ts:
+                self[obj_t] = handler
+            return handler
+
+        return deco
+
+    def __missing__(self, obj_t):
+        """Get the handler for the given type."""
+        handler = None
+        to_set = []
+
+        for cls in type.mro(obj_t):
+            handler = super().get(cls, None)
+            if handler is not None:
+                for cls2 in to_set:
+                    self[cls2] = handler
+                break
+            to_set.append(cls)
+
+        if handler is not None:
+            return handler
+        elif hasattr(self, "_key_error"):
+            raise self._key_error(obj_t)
+        else:  # pragma: no cover
+            raise KeyError(obj_t)
+
+
 __consolidate__ = True
 __all__ = [
     "ClosureNamespace",
@@ -544,6 +585,7 @@ __all__ = [
     "Tag",
     "TagFactory",
     "TaggedValue",
+    "TypeMap",
     "UNKNOWN",
     "WorkSet",
     "assert_scalar",

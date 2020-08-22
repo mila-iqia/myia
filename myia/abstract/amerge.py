@@ -6,7 +6,7 @@ from itertools import chain
 from ovld import ovld
 
 from .. import xtype
-from ..utils import MyiaTypeError, TypeMismatchError, overload, untested_legacy
+from ..utils import MyiaTypeError, TypeMismatchError, untested_legacy
 from .data import (
     ABSENT,
     ANYTHING,

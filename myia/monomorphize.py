@@ -56,7 +56,7 @@ from .ir import (
     succ_incoming,
 )
 from .operations import Primitive, primitives as P
-from .utils import InferenceError, MyiaTypeError, OrderedSet, overload
+from .utils import InferenceError, MyiaTypeError, OrderedSet
 
 
 class Unspecializable(Exception):

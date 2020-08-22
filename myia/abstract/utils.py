@@ -5,7 +5,7 @@ from types import AsyncGeneratorType, GeneratorType
 from ovld import ovld
 
 from .. import xtype
-from ..utils import intern, overload
+from ..utils import intern
 from .data import (
     ABSENT,
     ANYTHING,

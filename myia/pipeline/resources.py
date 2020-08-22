@@ -15,7 +15,6 @@ from ..utils import (
     MyiaConversionError,
     Partial,
     Partializable,
-    overload,
     tracer,
 )
 from ..vm import VM
