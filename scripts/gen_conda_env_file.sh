@@ -7,7 +7,7 @@
 pip install poetry2conda==0.3.0
 
 # Generate environment.yml from pyproject using poetry2conda
-poetry2conda pyproject.toml --dev -E pytorch environment.yml
+poetry2conda pyproject.toml --dev environment.yml
 
 # Remove name field from environment file.
 python -m myia_utils.update_env environment.yml -o environment.yml

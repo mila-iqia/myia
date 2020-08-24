@@ -7,12 +7,19 @@ from myia.abstract import (
     AbstractFunction,
     TypedPrimitive,
 )
-from myia.frontends.pytorch_abstract_types import PyTorchTensor
+from myia.frontends import activate_frontend
 from myia.operations import partial, primitives as P
 from myia.pipeline import scalar_parse, scalar_pipeline
 from myia.validate import ValidationError, validate, validate_abstract
 
 from .common import Point, f64, i64, to_abstract_test
+
+activate_frontend("pytorch")
+pytorch_abstract_types = pytest.importorskip(
+    "myia_frontend_pytorch.pytorch_abstract_types"
+)
+PyTorchTensor = pytorch_abstract_types.PyTorchTensor
+
 
 Point_a = Point(i64, i64)
 
