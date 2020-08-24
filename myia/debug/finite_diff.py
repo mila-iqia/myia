@@ -4,9 +4,9 @@
 import itertools
 from dataclasses import is_dataclass
 from typing import Any, Callable, Dict, List
-from ovld import ovld
 
 import numpy
+from ovld import ovld
 
 from ..utils import dataclass_fields, smap
 

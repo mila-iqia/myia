@@ -1,8 +1,9 @@
 """Utilities to merge dictionaries and other data structures."""
 
 
-from .misc import MISSING, Named, Registry
 from ovld import ovld
+
+from .misc import MISSING, Named, Registry
 
 # Use in a merge to indicate that a key should be deleted
 DELETE = Named("DELETE")

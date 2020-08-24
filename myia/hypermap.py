@@ -2,9 +2,9 @@
 
 from dataclasses import is_dataclass
 from functools import reduce
-from ovld import OvldMC
 
 import numpy as np
+from ovld import OvldMC
 
 from . import abstract, operations
 from .abstract import broaden
@@ -166,14 +166,14 @@ class HyperMap(MetaGraph, metaclass=OvldMC):
         g.set_flags(core=False)
         return g.output
 
-    def _make(self, a: abstract.AbstractUnion, g, fnarg, argmap):
-        options = [[None, x] for x in a.options]
-        return self._make_union_helper(a, options, g, fnarg, argmap)
-
     def _make(self, a: abstract.AbstractTaggedUnion, g, fnarg, argmap):
         return self._make_union_helper(a, a.options, g, fnarg, argmap)
 
-    def _make(self, t: abstract.AbstractArray, g, fnarg, argmap):
+    def _make(self, a: abstract.AbstractUnion, g, fnarg, argmap):  # noqa: F811
+        options = [[None, x] for x in a.options]
+        return self._make_union_helper(a, options, g, fnarg, argmap)
+
+    def _make(self, t: abstract.AbstractArray, g, fnarg, argmap):  # noqa: F811
         self._name(g, "A")
 
         if fnarg is None:
@@ -196,7 +196,7 @@ class HyperMap(MetaGraph, metaclass=OvldMC):
 
         return g.apply(P.array_map, fnarg, *args)
 
-    def _make(self, a: abstract.AbstractTuple, g, fnarg, argmap):
+    def _make(self, a: abstract.AbstractTuple, g, fnarg, argmap):  # noqa: F811
         self._name(g, "T")
         for a2, isleaf in argmap.values():
             if not isleaf and len(a2.elements) != len(a.elements):
@@ -215,7 +215,7 @@ class HyperMap(MetaGraph, metaclass=OvldMC):
             elems.append(val)
         return g.apply(P.make_tuple, *elems)
 
-    def _make(self, a: abstract.AbstractDict, g, fnarg, argmap):
+    def _make(self, a: abstract.AbstractDict, g, fnarg, argmap):  # noqa: F811
         for a2, isleaf in argmap.values():
             if not isleaf and a.entries.keys() != a2.entries.keys():
                 raise MyiaTypeError(f"Dict keys mismatch: {a} != {a2}")
@@ -233,7 +233,9 @@ class HyperMap(MetaGraph, metaclass=OvldMC):
             elems.append(val)
         return g.apply(P.make_dict, a, *elems)
 
-    def _make(self, a: abstract.AbstractClassBase, g, fnarg, argmap):
+    def _make(  # noqa: F811
+        self, a: abstract.AbstractClassBase, g, fnarg, argmap
+    ):
         for a2, isleaf in argmap.values():
             if not isleaf:
                 if (

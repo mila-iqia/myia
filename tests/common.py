@@ -1,9 +1,9 @@
 import inspect
 import typing
 from dataclasses import dataclass, is_dataclass
-from ovld import ovld
 
 import numpy as np
+from ovld import ovld
 
 from myia import ArithmeticData, xtype
 from myia.abstract import (

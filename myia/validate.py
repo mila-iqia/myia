@@ -1,6 +1,7 @@
 """Validate that a graph has been cleaned up and is ready for optimization."""
 
 from types import SimpleNamespace
+
 from ovld import ovld
 
 from . import xtype

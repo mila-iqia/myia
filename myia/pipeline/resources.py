@@ -1,9 +1,9 @@
 """Pipeline resources."""
 
 from types import FunctionType
-from ovld import ovld
 
 import numpy as np
+from ovld import ovld
 
 from .. import parser, xtype
 from ..abstract import InferenceEngine, LiveInferenceEngine, type_to_abstract
@@ -11,12 +11,7 @@ from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import Monomorphizer
 from ..operations.utils import Operation
-from ..utils import (
-    MyiaConversionError,
-    Partial,
-    Partializable,
-    tracer,
-)
+from ..utils import MyiaConversionError, Partial, Partializable, tracer
 from ..vm import VM
 
 #####################

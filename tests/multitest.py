@@ -1,9 +1,9 @@
 from itertools import product
 from types import FunctionType
 
-from ovld import ovld
 import numpy as np
 import pytest
+from ovld import ovld
 
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline

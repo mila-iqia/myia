@@ -3,6 +3,7 @@
 import asyncio
 from dataclasses import replace as dc_replace
 from functools import reduce
+
 from ovld import OvldMC, ovld
 
 from .. import operations, xtype
@@ -240,22 +241,22 @@ class InferenceEngine(metaclass=OvldMC):
             self.bind_to.constructors[fn] = TrackedInferrer(inf)
         return self.bind_to.constructors[fn]
 
-    def get_inferrer_for(self, pf: PrimitiveFunction):
+    def get_inferrer_for(self, pf: PrimitiveFunction):  # noqa: F811
         if pf.prim not in self.constructors:
             cons = self._constructors[pf.prim]
             self.constructors[pf.prim] = cons()
         return self.constructors[pf.prim]
 
-    def get_inferrer_for(self, g: GraphFunction):
+    def get_inferrer_for(self, g: GraphFunction):  # noqa: F811
         assert g.graph.abstract is None
         if g not in self.constructors:
             self.constructors[g] = GraphInferrer(g.graph, g.context)
         return self.constructors[g]
 
-    def get_inferrer_for(self, part: PartialApplication):
+    def get_inferrer_for(self, part: PartialApplication):  # noqa: F811
         return PartialInferrer(self.get_inferrer_for(part.fn), part.args)
 
-    def get_inferrer_for(self, tf: TransformedFunction):
+    def get_inferrer_for(self, tf: TransformedFunction):  # noqa: F811
         if tf.transform is P.J:
             return JInferrer(self.get_inferrer_for(tf.fn), tf.fn)
         else:
@@ -263,15 +264,17 @@ class InferenceEngine(metaclass=OvldMC):
                 f"No available transform for {tf.transform}"
             )
 
-    def get_inferrer_for(self, vf: (TypedPrimitive, AbstractFunctionUnique)):
+    def get_inferrer_for(  # noqa: F811
+        self, vf: (TypedPrimitive, AbstractFunctionUnique)
+    ):
         return VirtualInferrer(vf.args, vf.output)
 
-    def get_inferrer_for(self, mg: MetaGraphFunction):
+    def get_inferrer_for(self, mg: MetaGraphFunction):  # noqa: F811
         if mg not in self.constructors:
             self.constructors[mg] = GraphInferrer(mg.metagraph, None)
         return self.constructors[mg]
 
-    def get_inferrer_for(self, m: MacroFunction):
+    def get_inferrer_for(self, m: MacroFunction):  # noqa: F811
         if m not in self.constructors:
             self.constructors[m] = MacroInferrer(m.macro)
         return self.constructors[m]

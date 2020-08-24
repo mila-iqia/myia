@@ -2,8 +2,9 @@
 
 from dataclasses import is_dataclass
 
-from .misc import dataclass_fields
 from ovld import ovld
+
+from .misc import dataclass_fields
 
 
 @ovld

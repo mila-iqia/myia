@@ -3,6 +3,7 @@
 from contextvars import ContextVar
 from functools import reduce
 from itertools import chain
+
 from ovld import ovld
 
 from .. import xtype
@@ -15,7 +16,6 @@ from .data import (
     AbstractDict,
     AbstractError,
     AbstractFunction,
-    AbstractFunctionBase,
     AbstractFunctionUnique,
     AbstractScalar,
     AbstractTaggedUnion,

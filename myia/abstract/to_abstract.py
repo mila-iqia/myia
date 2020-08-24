@@ -4,8 +4,8 @@ import typing
 from dataclasses import is_dataclass
 from functools import reduce
 
-from ovld import ovld
 import numpy as np
+from ovld import ovld
 
 from .. import xtype
 from ..classes import ADT, Cons, Empty
