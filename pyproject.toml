@@ -43,6 +43,7 @@ black = { channel = "pip" }
 codecov = { channel = "pip" }
 pydocstyle = { channel = "pip" }
 gym = { channel = "pip" }
+ovld = { channel = "pip" }
 
 [tool.black]
 line-length = 80
