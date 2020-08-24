@@ -97,9 +97,12 @@ def _fix_type(self, a: GraphFunction, *, finder, monomorphizer):
         g = monomorphizer.results[ctx]
         return AbstractFunctionUnique(
             tuple(
-                self(p.abstract, finder=finder, monomorphizer=monomorphizer) for p in g.parameters
+                self(p.abstract, finder=finder, monomorphizer=monomorphizer)
+                for p in g.parameters
             ),
-            self(g.return_.abstract, finder=finder, monomorphizer=monomorphizer),
+            self(
+                g.return_.abstract, finder=finder, monomorphizer=monomorphizer
+            ),
         )
     else:
         return AbstractError(DEAD)
@@ -118,7 +121,10 @@ def _fix_type(self, a: PartialApplication, *, finder, monomorphizer):
 @ovld  # noqa: F811
 def _fix_type(self, a: AbstractFunctionUnique, *, finder, monomorphizer):
     return (yield AbstractFunctionUnique)(
-        tuple(self(arg, finder=finder, monomorphizer=monomorphizer) for arg in a.args),
+        tuple(
+            self(arg, finder=finder, monomorphizer=monomorphizer)
+            for arg in a.args
+        ),
         self(a.output, finder=finder, monomorphizer=monomorphizer),
     )
 
@@ -128,9 +134,15 @@ def _fix_type(self, a: TransformedFunction, *, finder, monomorphizer):
     def _jtag(x):
         assert not isinstance(x, AbstractFunction)
         if isinstance(x, AbstractFunctionUnique):
-            return self(TransformedFunction(x, P.J), finder=finder, monomorphizer=monomorphizer)
+            return self(
+                TransformedFunction(x, P.J),
+                finder=finder,
+                monomorphizer=monomorphizer,
+            )
         else:
-            rval = AbstractJTagged(self(x, finder=finder, monomorphizer=monomorphizer))
+            rval = AbstractJTagged(
+                self(x, finder=finder, monomorphizer=monomorphizer)
+            )
         return rval
 
     assert a.transform is P.J
@@ -161,7 +173,9 @@ def _fix_type(self, a: AbstractFunction, *, finder, monomorphizer):
 def _fix_type(self, a: PrimitiveFunction, *, finder, monomorphizer):
     try:
         return self(
-            finder.analyze_function(None, a, None)[0], finder=finder, monomorphizer=monomorphizer
+            finder.analyze_function(None, a, None)[0],
+            finder=finder,
+            monomorphizer=monomorphizer,
         )
     except Unspecializable as err:
         return AbstractError(err.problem)
@@ -177,7 +191,10 @@ def _fix_type(self, a: MetaGraphFunction, *, finder, monomorphizer):
 @ovld  # noqa: F811
 def _fix_type(self, a: TypedPrimitive, *, finder, monomorphizer):
     return AbstractFunctionUnique(
-        tuple(self(ar, finder=finder, monomorphizer=monomorphizer) for ar in a.args),
+        tuple(
+            self(ar, finder=finder, monomorphizer=monomorphizer)
+            for ar in a.args
+        ),
         self(a.output, finder=finder, monomorphizer=monomorphizer),
     )
 

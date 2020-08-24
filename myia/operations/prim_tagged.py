@@ -22,7 +22,9 @@ async def infer_tagged(self, engine, x, *rest):
     elif len(rest) == 1:
         (tag,) = rest
         tag_v = self.require_constant(tag, argnum=2)
-        return lib.AbstractTaggedUnion([[tag_v, lib.broaden(x, loop=engine.loop)]])
+        return lib.AbstractTaggedUnion(
+            [[tag_v, lib.broaden(x, loop=engine.loop)]]
+        )
     else:
         raise lib.type_error_nargs(P.tagged, "1 or 2", len(rest) + 1)
 
