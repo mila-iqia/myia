@@ -273,7 +273,7 @@ def simplify_types(root, manager):
 ########################
 
 
-@ovld.dispatch
+@ovld.dispatch(type_error=MyiaInputTypeError)
 def to_canonical(self, arg, orig_t, coerce=False):
     """Check and convert an argument to the canonical representation.
 
@@ -286,20 +286,16 @@ def to_canonical(self, arg, orig_t, coerce=False):
         and unions are properly tagged.
 
     """
-    fn = self[object, type(orig_t), object]
     if isinstance(arg, BackendValue):
         if not typecheck(orig_t, arg.orig_t):
             raise MyiaInputTypeError("Bad type for backend value.")
         return arg
-    if fn is None:
-        raise AssertionError(f"to_canonical not defined for {orig_t}")
+    fn = self[type(arg), type(orig_t), bool]
     return fn(arg, orig_t, coerce)
 
 
 @ovld  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
-    if not isinstance(arg, tuple):
-        raise MyiaInputTypeError("Expected tuple")
+def to_canonical(self, arg: tuple, orig_t: AbstractTuple, coerce):
     oe = orig_t.elements
     if len(arg) != len(oe):
         raise MyiaInputTypeError(f"Expected {len(oe)} elements")
@@ -307,17 +303,14 @@ def to_canonical(self, arg, orig_t: AbstractTuple, coerce):
 
 
 @ovld  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractRandomState, coerce):
-    # arg must be a RandomStateWrapper
-    if not isinstance(arg, RandomStateWrapper):
-        raise MyiaInputTypeError("Expected %s" % RandomStateWrapper.__name__)
+def to_canonical(
+    self, arg: RandomStateWrapper, orig_t: AbstractRandomState, coerce
+):
     return arg
 
 
 @ovld  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractDict, coerce):
-    if not isinstance(arg, dict):
-        raise MyiaInputTypeError("Expected dict")
+def to_canonical(self, arg: dict, orig_t: AbstractDict, coerce):
     types = orig_t.entries
     if len(arg) != len(types):
         raise MyiaInputTypeError(
@@ -388,10 +381,16 @@ def to_canonical(self, arg, orig_t: AbstractUnion, coerce):
         raise MyiaInputTypeError(f"Expected one of {opts}, not {arg}")
 
 
+# @ovld  # noqa: F811
+# def to_canonical(self, arg, orig_t: AbstractHandle, coerce):
+#     if not isinstance(arg, HandleInstance):
+#         raise MyiaInputTypeError(f"Expected handle")
+#     arg.state = self(arg.state, orig_t.element, coerce)
+#     return arg
+
+
 @ovld  # noqa: F811
-def to_canonical(self, arg, orig_t: AbstractHandle, coerce):
-    if not isinstance(arg, HandleInstance):
-        raise MyiaInputTypeError(f"Expected handle")
+def to_canonical(self, arg: HandleInstance, orig_t: AbstractHandle, coerce):
     arg.state = self(arg.state, orig_t.element, coerce)
     return arg
 

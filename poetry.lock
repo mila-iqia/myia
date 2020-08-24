@@ -334,8 +334,8 @@ category = "main"
 description = "Overloading Python functions"
 name = "ovld"
 optional = false
-python-versions = ">=3.7,<4.0"
-version = "0.1.0"
+python-versions = ">=3.6,<4.0"
+version = "0.1.5"
 
 [[package]]
 category = "dev"
@@ -721,12 +721,8 @@ docs = ["sphinx", "jaraco.packaging (>=3.2)", "rst.linker (>=1.9)"]
 testing = ["jaraco.itertools", "func-timeout"]
 
 [metadata]
-<<<<<<< HEAD
 content-hash = "0cbbe36b0795656f96a8b180d819e640a216793d7f022dba91c69af28fd0951f"
 lock-version = "1.0"
-=======
-content-hash = "46bf743b1d3691a47b9383be60dd50a962a57357b7ab8dac286a3871870accef"
->>>>>>> 3eac96fc... Move @overload to @ovld
 python-versions = "~3.7"
 
 [metadata.files]
@@ -934,8 +930,8 @@ opt-einsum = [
     {file = "opt_einsum-3.3.0.tar.gz", hash = "sha256:59f6475f77bbc37dcf7cd748519c0ec60722e91e63ca114e68821c0c54a46549"},
 ]
 ovld = [
-    {file = "ovld-0.1.0-py3-none-any.whl", hash = "sha256:c36b06ad75209825fdd9ab3d8404fc4581f468bd86efbd011ce8e6f4e0f92366"},
-    {file = "ovld-0.1.0.tar.gz", hash = "sha256:1658308ba212f0a033584a6c8740e125fda9946a04082122aea9c20cecc391c5"},
+    {file = "ovld-0.1.5-py3-none-any.whl", hash = "sha256:24a335d998ac35298eafc410dfad501cde7de5d66ff350c7e29efe325d02c449"},
+    {file = "ovld-0.1.5.tar.gz", hash = "sha256:b543df89bc4cb45019e10b536952d719f8667e4106d5d7d85845f2b02ac3876e"},
 ]
 packaging = [
     {file = "packaging-20.4-py2.py3-none-any.whl", hash = "sha256:998416ba6962ae7fbd6596850b80e17859a5753ba17c32284f67bfff33784181"},
