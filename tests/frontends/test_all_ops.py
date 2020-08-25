@@ -15,10 +15,6 @@ from myia.abstract.data import (
 )
 from myia.debug.finite_diff import NoTestGrad, clean_args
 from myia.frontends import activate_frontend  # noqa: E402
-from myia.frontends.pytorch_abstract_types import (
-    PyTorchTensor,
-    pytorch_dtype_to_type,
-)
 from myia.pipeline import standard_pipeline
 from myia.xtype import NDArray, np_dtype_to_type
 
@@ -31,6 +27,11 @@ nn = torch.nn
 F = torch.nn.functional
 
 activate_frontend("pytorch")
+pytorch_abstract_types = pytest.importorskip(
+    "myia_frontend_pytorch.pytorch_abstract_types"
+)
+PyTorchTensor = pytorch_abstract_types.PyTorchTensor
+pytorch_dtype_to_type = pytorch_abstract_types.pytorch_dtype_to_type
 
 
 # Uncomment this line to print values at specific precision

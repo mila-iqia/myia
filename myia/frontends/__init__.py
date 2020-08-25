@@ -2,6 +2,8 @@
 
 import importlib
 
+import pkg_resources
+
 
 class UnknownFrontend(Exception):
     """Indicates that the frontend name is not recognized."""
@@ -27,7 +29,22 @@ def import_mod(pkg):
     return loader
 
 
-_frontends = {"pytorch": import_mod("myia.frontends.pytorch")}
+def collect_frontend_plugins():
+    """Collect frontend plugins.
+
+    Look for entry points in namespace "myia.frontend".
+    Each entry point must be a frontend module.
+
+    :return: a dictionary mapping a frontend name to a loader function
+        to import frontend module.
+    """
+    return {
+        entry_point.name: import_mod(entry_point.module_name)
+        for entry_point in pkg_resources.iter_entry_points("myia.frontend")
+    }
+
+
+_frontends = collect_frontend_plugins()
 
 
 def activate_frontend(name):

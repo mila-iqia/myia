@@ -12,6 +12,9 @@ authors = ["Mila development team"]
 python = "^3.7"
 pyyaml = "^5.3"
 
+[tool.poetry.dev-dependencies]
+isort = "~4.3.21"
+
 [tool.isort]
 known_first_party = "myia_utils"
 multi_line_output = 3

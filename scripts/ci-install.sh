@@ -39,12 +39,18 @@ cd myia_utils
 poetry install
 cd ..
 
-# Install myia and backend plugins using poetry.
+# Install myia, backend and frontend plugins using poetry.
 poetry install
+
 cd myia_backend_pytorch
 poetry install
+
 cd ../myia_backend_relay
 poetry install
+
+cd ../myia_frontend_pytorch
+poetry install
+
 cd ..
 
 # Complete installation with specific conda packages using environment files.
@@ -59,5 +65,9 @@ conda env update --file environment-${DEV}.yml
 cd ../myia_backend_relay
 ./scripts/gen_conda_env_file.sh
 conda env update --file environment.yml
+
+cd ../myia_frontend_pytorch
+./scripts/gen_conda_env_file.sh
+conda env update --file environment-${DEV}.yml
 
 cd ..

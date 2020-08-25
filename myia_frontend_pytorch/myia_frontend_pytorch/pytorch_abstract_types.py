@@ -1,6 +1,6 @@
 """Abstract Types for PyTorch Frontend."""
 
-from ..abstract.data import (
+from myia.abstract.data import (
     ANYTHING,
     SHAPE,
     TYPE,
@@ -9,8 +9,8 @@ from ..abstract.data import (
     AbstractClassBase,
     AbstractScalar,
 )
-from ..utils import MyiaInputTypeError
-from ..xtype import Bool, Float, Int, Object, UInt
+from myia.utils import MyiaInputTypeError
+from myia.xtype import Bool, Float, Int, Object, UInt
 
 
 class PyTorchTensor(Object):

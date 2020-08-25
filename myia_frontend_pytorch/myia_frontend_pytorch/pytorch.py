@@ -6,8 +6,8 @@ from collections import OrderedDict
 
 import torch
 
-from .. import operations
-from ..abstract.data import (
+from myia import operations
+from myia.abstract.data import (
     ALIASID,
     ANYTHING,
     SHAPE,
@@ -16,13 +16,13 @@ from ..abstract.data import (
     AbstractArray,
     AbstractScalar,
 )
-from ..abstract.infer import to_abstract
-from ..classes import ADT
-from ..hypermap import hyper_map
-from ..operations import primitives as P
-from ..pipeline.resources import default_convert
-from ..pipeline.standard import standard_method_map, standard_object_map
-from ..public_api import (
+from myia.abstract.infer import to_abstract
+from myia.classes import ADT
+from myia.hypermap import hyper_map
+from myia.operations import primitives as P
+from myia.pipeline.resources import default_convert
+from myia.pipeline.standard import standard_method_map, standard_object_map
+from myia.public_api import (
     _max,
     _sum,
     argmax,
@@ -59,8 +59,9 @@ from ..public_api import (
     var,
     view_as,
 )
-from ..utils import OrderedSet, core, get_fields
-from ..xtype import NDArray, f32
+from myia.utils import OrderedSet, core, get_fields
+from myia.xtype import NDArray, f32
+
 from .pytorch_abstract_types import (
     APT,
     AbstractModule,

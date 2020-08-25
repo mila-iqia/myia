@@ -3,35 +3,34 @@ requires = ["poetry>=0.12"]
 build-backend = "poetry.masonry.api"
 
 [tool.poetry]
-name = "myia_backend_relay"
+name = "myia_frontend_pytorch"
 version = "0.1.0"
-description = "Relay backend for myia"
+description = "Pytorch frontend for myia"
 authors = ["Mila development team"]
 
 [tool.poetry.dependencies]
 python = "^3.7"
 numpy = "^1.16"
-scipy = "^1.5"
-antlr4-python3-runtime = "4.7.2"
-decorator = "^4"
-attrs = "^19"
+torch = "1.5.0"
+torchvision = "0.6.0"
 
 [tool.poetry.dev-dependencies]
 isort = "~4.3.21"
 
 [tool.poetry2conda]
-name = "myia_backend_relay"
+name = "myia_frontend_pytorch"
 
 [tool.poetry2conda.dependencies]
-antlr4-python3-runtime = { channel = "pip" }
+torch = { channel = "pytorch", name = "pytorch" }
+torchvision = { channel = "pytorch" }
 
 [tool.isort]
-known_first_party = "myia_backend_relay"
+known_first_party = "myia_frontend_pytorch"
 multi_line_output = 3
 include_trailing_comma = true
 combine_as_imports = true
 
 [tool.poetry.plugins] # Optional super table
 
-[tool.poetry.plugins."myia.backend"]
-"relay" = "myia_backend_relay"
+[tool.poetry.plugins."myia.frontend"]
+"pytorch" = "myia_frontend_pytorch"
