@@ -435,6 +435,7 @@ def to_canonical(self, arg, orig_t: AbstractKeywordArgument, coerce):
 
 @ovld
 def from_canonical(self, res, orig_t: AbstractClassBase):
+    """Convert from the canonical representation to the final output."""
     if orig_t.tag in (Empty, Cons):
         rval = []
         while res:

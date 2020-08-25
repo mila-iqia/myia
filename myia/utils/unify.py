@@ -283,6 +283,7 @@ def noseq(fn: Callable[[T], T], u: T) -> T:
 
 @ovld
 def default_visit(value: (list, tuple), fn):
+    """Default function to visit data structures."""
     xs = expandlist(fn(x) for x in value)
     return type(value)(xs)
 

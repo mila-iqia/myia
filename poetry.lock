@@ -335,7 +335,7 @@ description = "Overloading Python functions"
 name = "ovld"
 optional = false
 python-versions = ">=3.6,<4.0"
-version = "0.1.5"
+version = "0.1.6"
 
 [[package]]
 category = "dev"
@@ -930,8 +930,8 @@ opt-einsum = [
     {file = "opt_einsum-3.3.0.tar.gz", hash = "sha256:59f6475f77bbc37dcf7cd748519c0ec60722e91e63ca114e68821c0c54a46549"},
 ]
 ovld = [
-    {file = "ovld-0.1.5-py3-none-any.whl", hash = "sha256:24a335d998ac35298eafc410dfad501cde7de5d66ff350c7e29efe325d02c449"},
-    {file = "ovld-0.1.5.tar.gz", hash = "sha256:b543df89bc4cb45019e10b536952d719f8667e4106d5d7d85845f2b02ac3876e"},
+    {file = "ovld-0.1.6-py3-none-any.whl", hash = "sha256:7d562fc46dca8be9dca3678c8e879a709f1e851be615e3acb25d24e9f11009fc"},
+    {file = "ovld-0.1.6.tar.gz", hash = "sha256:d53425be780ba992ee1289608f67d32aa7a8133d495200d3f3b1664793f85f6e"},
 ]
 packaging = [
     {file = "packaging-20.4-py2.py3-none-any.whl", hash = "sha256:998416ba6962ae7fbd6596850b80e17859a5753ba17c32284f67bfff33784181"},

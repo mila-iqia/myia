@@ -30,6 +30,7 @@ def require_same(fns, objs):
 
 @ovld  # noqa: F811
 def smap(self, arg: (list, tuple), *rest):
+    """Structural map."""
     seqs = [arg, *rest]
     require_same([type, len], seqs)
     return type(arg)(self(*[s[i] for s in seqs]) for i in range(len(arg)))

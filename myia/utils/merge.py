@@ -60,6 +60,7 @@ class Reset(MergeMode):
 
 @ovld
 def cleanup(value: object):
+    """Clean up work structures and values."""
     return value
 
 
