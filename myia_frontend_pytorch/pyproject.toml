@@ -14,6 +14,9 @@ numpy = "^1.16"
 torch = "1.5.0"
 torchvision = "0.6.0"
 
+[tool.poetry.dev-dependencies]
+isort = "~4.3.21"
+
 [tool.poetry2conda]
 name = "myia_frontend_pytorch"
 

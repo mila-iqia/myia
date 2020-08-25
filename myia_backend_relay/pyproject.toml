@@ -16,6 +16,9 @@ antlr4-python3-runtime = "4.7.2"
 decorator = "^4"
 attrs = "^19"
 
+[tool.poetry.dev-dependencies]
+isort = "~4.3.21"
+
 [tool.poetry2conda]
 name = "myia_backend_relay"
 
