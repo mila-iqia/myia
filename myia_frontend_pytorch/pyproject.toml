@@ -25,7 +25,7 @@ torch = { channel = "pytorch", name = "pytorch" }
 torchvision = { channel = "pytorch" }
 
 [tool.isort]
-known_first_party = "myia_backend_pytorch"
+known_first_party = "myia_frontend_pytorch"
 multi_line_output = 3
 include_trailing_comma = true
 combine_as_imports = true
