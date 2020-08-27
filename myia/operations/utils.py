@@ -33,10 +33,6 @@ class PlaceholderPrimitive(Primitive):
 class BackendPrimitive(Primitive):
     """Represents a primitive that must be implemented by the backend."""
 
-    def __init__(self, name, defaults={}):
-        """Initialize a BackendPrimitive and register it for serialization."""
-        super().__init__(name, defaults)
-
 
 class Operation(HasDefaults):
     """Represents an operation."""
