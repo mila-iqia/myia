@@ -76,5 +76,5 @@ exclude_lines = [
     "pragma: no cover",
     "AssertionError",
     "NotImplementedError",
-    "untested_legacy",
+    "untested",
 ]

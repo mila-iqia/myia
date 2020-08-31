@@ -8,7 +8,7 @@ import numpy as np
 from ovld import ovld
 
 from .. import xtype
-from ..utils import MyiaTypeError, TypeMismatchError, untested_legacy
+from ..utils import MyiaTypeError, TypeMismatchError, untested
 from .data import (
     ABSENT,
     ANYTHING,
@@ -344,7 +344,7 @@ def amerge(
 
 @ovld  # noqa: F811
 def amerge(self, x1: AbstractFunctionUnique, x2: AbstractFunction, forced, bp):
-    with untested_legacy():
+    with untested():
         vfn = x1
         poss = x2.get_sync()
 

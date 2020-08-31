@@ -6,14 +6,7 @@ from .. import abstract, xtype
 from ..abstract import ANYTHING, DEAD, PartialApplication
 from ..ir import Constant, Graph
 from ..operations import Primitive, primitives as P
-from ..utils import (
-    Named,
-    Partializable,
-    Registry,
-    newenv,
-    tracer,
-    untested_legacy,
-)
+from ..utils import Named, Partializable, Registry, newenv, tracer, untested
 
 WILDCARD = Named("WILDCARD")
 MAX_NEED_DEPTH = 5
@@ -463,7 +456,7 @@ def make_dead(node):
         if a.xtype() == xtype.EnvType:
             val = newenv
         elif a.xtype() == xtype.UniverseType:
-            with untested_legacy():
+            with untested():
                 return None
     repl = Constant(val)
     repl.abstract = node.abstract

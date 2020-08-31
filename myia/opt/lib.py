@@ -25,7 +25,7 @@ from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
 from ..utils import Partializable, tracer
-from ..utils.errors import untested_legacy
+from ..utils.errors import untested
 from ..utils.unify import Var, var
 from ..utils.variables import (
     C1,
@@ -971,7 +971,7 @@ def env_getitem_transform(orig_graph, key, default):
             graph.output = value
             break
     else:
-        with untested_legacy():
+        with untested():
             graph.output = graph.apply(P.env_getitem, out, key, default)
     graph.return_.abstract = key.abstract
     return graph

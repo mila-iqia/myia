@@ -96,7 +96,7 @@ class MyiaInputTypeError(TypeError):
 
 
 @contextmanager
-def untested_legacy():
+def untested():
     """Wrap legacy code that isn't covered anymore but we are not sure why."""
     warnings.warn(
         UserWarning(
@@ -125,5 +125,5 @@ __all__ = [
     "check_nargs",
     "infer_trace",
     "type_error_nargs",
-    "untested_legacy",
+    "untested",
 ]
