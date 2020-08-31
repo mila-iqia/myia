@@ -252,8 +252,12 @@ def _make_constructor(inst):
     return f
 
 
+def _intern(_, x):
+    return intern(x)
+
+
 @ovld.dispatch(
-    initial_state=lambda: CloneState({}, None, None), postprocess=intern
+    initial_state=lambda: CloneState({}, None, None), postprocess=_intern
 )
 def abstract_clone(self, x, **kwargs):
     """Clone an abstract value."""
@@ -516,7 +520,7 @@ def sensitivity_transform(self, x: AbstractJTagged):
 #################
 
 
-async def _force_through_post(x):
+async def _force_through_post(_, x):
     return intern(await x)
 
 
