@@ -222,7 +222,7 @@ class Graph:
         ):
             return self
 
-        new_graph = clone(self, total=True)
+        new_graph = clone(self, total=False)
         repl = {}
 
         max_n_pos = (
