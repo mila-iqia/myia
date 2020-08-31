@@ -17,7 +17,6 @@ from ..info import About, NamedDebugInfo
 from ..operations import Primitive, primitives as primops
 from ..utils import Named, list_str, repr_
 from ..utils.unify import Unification, expandlist, noseq
-from .abstract import Node
 
 PARAMETER = Named("PARAMETER")
 SPECIAL = Named("SPECIAL")
@@ -460,7 +459,7 @@ class Graph:
         )
 
 
-class ANFNode(Node):
+class ANFNode:
     """A node in the graph-based ANF IR.
 
     There are three types of nodes: Function applications; parameters; and
