@@ -392,7 +392,9 @@ class __Module:
 
     @property
     def backend_gpu(self):
-        return Multiple(*list(_get_backend_testing_parameters()))
+        return Multiple(
+            *[param for _, _, param in _get_backend_testing_parameters()]
+        )
 
     @property
     def backend_all(self):
