@@ -3,6 +3,7 @@ import pytest
 
 from myia import grad, myia, value_and_grad
 from myia.api import to_device
+from myia.compile.backends import get_backend_names
 from myia.frontends import activate_frontend
 from myia.utils import MyiaInputTypeError, MyiaTypeError, MyiaValueError
 
@@ -46,7 +47,9 @@ def get_backend_options(args, backend):
     return backend_options
 
 
-@pytest.fixture(params=[pytest.param("pytorch"), pytest.param("relay")])
+@pytest.fixture(
+    params=[pytest.param(backend) for backend in get_backend_names()]
+)
 def _backend_fixture(request):
     return request.param
 
@@ -55,8 +58,6 @@ class Args:
     def __init__(self):
         # device used
         self.dev = "cpu"
-        # backend used (set 'relay' by default)
-        self.backend = "relay"
         # numerical precision
         self.dtype = "float32"
 

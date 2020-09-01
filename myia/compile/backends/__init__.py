@@ -105,6 +105,11 @@ _backends = collect_backend_plugins()
 _active_backends = weakref.WeakValueDictionary()
 
 
+def get_backend_names():
+    """Return a set of all loaded backend names."""
+    return set(_backends.keys())
+
+
 def get_default():
     """Returns the default backend.
 
@@ -157,7 +162,7 @@ def load_backend(name, options=None):
     Returns the backend class registered for the name.
 
     If you pass None as the name, this will load the default backend.
-    See the documenation for get_default() for more information.
+    See the documentation for get_default() for more information.
 
     Raises:
         UnknownBackend: The name is not recognized.

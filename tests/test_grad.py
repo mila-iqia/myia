@@ -7,6 +7,7 @@ from pytest import mark
 
 from myia.abstract import from_value, ndarray_aliasable
 from myia.api import myia
+from myia.compile.backends import get_backend_names
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.operations import (
     array_map,
@@ -42,7 +43,9 @@ from .common import AA, MA, MB, Point3D, U, f64, to_abstract_test, u64
 from .multitest import backend_all, mt, myia_function_test
 
 
-@pytest.fixture(params=[pytest.param("pytorch"), pytest.param("relay")])
+@pytest.fixture(
+    params=[pytest.param(backend) for backend in get_backend_names()]
+)
 def _backend_fixture(request):
     return request.param
 
