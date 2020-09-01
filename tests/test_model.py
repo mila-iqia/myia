@@ -7,11 +7,11 @@ from numpy import ones as _ones, zeros as _zeros
 from myia.abstract import from_value
 from myia.operations import array_reduce, grad, scalar_add
 from myia.pipeline import standard_pipeline
+from myia.testing.common import MA, MB, MC, MD, af32_of, af64_of
+from myia.testing.multitest import mt, run
 from myia.utils import InferenceError
 from myia.xtype import Array
 
-from .common import MA, MB, MC, MD, af32_of, af64_of
-from .multitest import mt, run
 from .test_grad import gradient
 from .test_infer import infer_standard
 

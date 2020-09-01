@@ -11,11 +11,7 @@ from myia.pipeline import (
     scalar_parse as parse,
 )
 from myia.simplify_types import from_canonical, to_canonical
-from myia.utils import DoTrace, HandleInstance, InferenceError, TaggedValue
-from myia.utils.misc import RandomStateWrapper
-from myia.xtype import Bool
-
-from .common import (
+from myia.testing.common import (
     D,
     Point,
     Point3D,
@@ -27,6 +23,9 @@ from .common import (
     i64,
     to_abstract_test,
 )
+from myia.utils import DoTrace, HandleInstance, InferenceError, TaggedValue
+from myia.utils.misc import RandomStateWrapper
+from myia.xtype import Bool
 
 
 def test_myia():

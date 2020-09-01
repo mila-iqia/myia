@@ -22,9 +22,9 @@ from myia.operations import (
     tuple_setitem,
 )
 from myia.opt import lib
+from myia.testing.common import af64_of, f64, i64, to_abstract_test
 from myia.utils import newenv
 
-from ..common import af64_of, f64, i64, to_abstract_test
 from .test_opt import _check_opt
 
 #######################

@@ -59,25 +59,7 @@ from myia.operations import (
 )
 from myia.operations.utils import InferencePrimitive
 from myia.pipeline import scalar_pipeline, standard_pipeline
-from myia.utils import InferenceError, MyiaTypeError, newenv
-from myia.xtype import (
-    Array,
-    EnvType as Env,
-    External,
-    Int,
-    Nil,
-    Number,
-    String,
-    f16,
-    f32,
-    f64,
-    i16,
-    i32,
-    i64,
-    u64,
-)
-
-from .common import (
+from myia.testing.common import (
     AN,
     JT,
     TU,
@@ -104,7 +86,24 @@ from .common import (
     mysum,
     to_abstract_test,
 )
-from .multitest import infer as mt_infer, mt, run_debug
+from myia.testing.multitest import infer as mt_infer, mt, run_debug
+from myia.utils import InferenceError, MyiaTypeError, newenv
+from myia.xtype import (
+    Array,
+    EnvType as Env,
+    External,
+    Int,
+    Nil,
+    Number,
+    String,
+    f16,
+    f32,
+    f64,
+    i16,
+    i32,
+    i64,
+    u64,
+)
 
 ai64 = Array[i64]
 af64 = Array[f64]

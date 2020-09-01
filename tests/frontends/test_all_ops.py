@@ -16,10 +16,8 @@ from myia.abstract.data import (
 from myia.debug.finite_diff import NoTestGrad, clean_args
 from myia.frontends import activate_frontend  # noqa: E402
 from myia.pipeline import standard_pipeline
-from myia.xtype import NDArray, np_dtype_to_type
-
-from ..common import MA, MB, to_abstract_test
-from ..multitest import (
+from myia.testing.common import MA, MB, to_abstract_test
+from myia.testing.multitest import (
     backend_all,
     eqtest,
     mt,
@@ -27,6 +25,8 @@ from ..multitest import (
     run as basic_run,
     to_numpy,
 )
+from myia.xtype import NDArray, np_dtype_to_type
+
 from ..test_grad import grad_wrap
 
 torch = pytest.importorskip("torch")

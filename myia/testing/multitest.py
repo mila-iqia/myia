@@ -1,3 +1,4 @@
+"""Common testing utilities."""
 from itertools import product
 from types import FunctionType
 
@@ -5,7 +6,7 @@ import numpy as np
 import pytest
 from ovld import ovld
 
-from myia.compile.backends import get_backend_names
+from myia.compile.backends import get_backend_names, load_backend
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline
 from myia.utils import keyword_decorator, merge
@@ -53,7 +54,10 @@ infer_pipeline = standard_pipeline.select("resources", "parse", "infer")
 
 
 class Multiple:
+    """Wrapper class for pytest options."""
+
     def __init__(self, *params, **options):
+        """Initialize multiple options."""
         self.options = []
         for i, param in enumerate(params):
             assert isinstance(param, ParameterSet)
@@ -219,9 +223,11 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     """Inference test.
 
     Arguments:
+        self: auto-passed MyiaFunctionTest object.
         fn: The Myia function to test.
         args: The argspec for the function.
         result: The expected result, or an exception subclass.
+        pipeline: pipeline to use for inference
     """
     args = [to_abstract_test(arg) for arg in args]
 
@@ -252,6 +258,7 @@ def _run(
     """Test a Myia function.
 
     Arguments:
+        self: auto-passed MyiaFunctionTest object.
         fn: The Myia function to test.
         args: The args for the function.
         result: The expected result, or an exception subclass. If result is
@@ -263,6 +270,8 @@ def _run(
             default, broaden all arguments.
         validate: Whether to run the validation step.
         pipeline: The pipeline to use.
+        backend: backends to use. Tuple (backend name, backend options)
+        numpy_compat: if True, check if args can be converted to numpy arrays.
     """
 
     if backend:
@@ -318,10 +327,6 @@ def _run(
         out(args)
 
 
-_loaded_backends = get_backend_names()
-_pytest_parameters = {}
-
-
 def _generate_pytest_parameter(backend, target, options, identifier=None):
     if identifier is None:
         identifier = "%s-%s" % (backend, target)
@@ -332,7 +337,7 @@ def _generate_pytest_parameter(backend, target, options, identifier=None):
 
 
 def register_backend_testing(backend, target, options, identifier=None):
-    """register some backend options to test a backend.
+    """Register some backend options to test a backend.
 
     :param backend: name of backend to register parameters
     :param target: device to register parameters.
@@ -354,6 +359,11 @@ def register_backend_testing(backend, target, options, identifier=None):
     )
 
 
+def get_backend_testing_options(backend, target):
+    """Return registered options for given backend and target."""
+    return [param.values[0][1] for param in _pytest_parameters[backend][target]]
+
+
 def _get_backend_testing_parameters():
     for backend, targets in _pytest_parameters.items():
         for target, params in targets.items():
@@ -361,12 +371,14 @@ def _get_backend_testing_parameters():
                 yield backend, target, param
 
 
-register_backend_testing("relay", "cpu", {"target": "cpu", "device_id": 0})
-register_backend_testing(
-    "relay", "gpu", {"target": "cuda", "device_id": 0}, "relay-cuda"
-)
-register_backend_testing("pytorch", "cpu", {"device": "cpu"})
-register_backend_testing("pytorch", "gpu", {"device": "cuda"}, "pytorch-cuda")
+def _load_backends():
+    """Load all backends without options.
+
+    This should allow backends to make all necessary initializations,
+    e.g. register backend testings.
+    """
+    for backend in _loaded_backends:
+        load_backend(backend)
 
 
 class __Module:
@@ -407,6 +419,9 @@ class __Module:
         )
 
 
+_loaded_backends = get_backend_names()
+_pytest_parameters = {}
+_load_backends()
 __module = __Module()
 
 

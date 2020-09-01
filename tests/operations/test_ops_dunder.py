@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
 from myia.lib import ANYTHING, InferenceError
+from myia.testing.common import af32_of, ai64_of, f64, i64
+from myia.testing.multitest import mt
 
-from ..common import af32_of, ai64_of, f64, i64
-from ..multitest import mt
 from ..test_infer import infer_standard
 
 

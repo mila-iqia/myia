@@ -5,10 +5,9 @@ from myia import grad, myia, value_and_grad
 from myia.api import to_device
 from myia.compile.backends import get_backend_names
 from myia.frontends import activate_frontend
+from myia.testing.common import MA
+from myia.testing.multitest import eqtest, get_backend_testing_options, run
 from myia.utils import MyiaInputTypeError, MyiaTypeError, MyiaValueError
-
-from ..common import MA
-from ..multitest import eqtest, run
 
 torch = pytest.importorskip("torch")
 nn = torch.nn
@@ -36,13 +35,9 @@ def test_pytorch_dtype_to_type():
 
 def get_backend_options(args, backend):
     device_type = args.dev
-
-    backend_options_dict = {
-        "pytorch": {"device": device_type},
-        "relay": {"target": device_type, "device_id": 0},
-    }
-
-    backend_options = backend_options_dict[backend]
+    backend_options = get_backend_testing_options(backend, device_type)
+    assert len(backend_options) == 1
+    backend_options = backend_options[0]
 
     return backend_options
 

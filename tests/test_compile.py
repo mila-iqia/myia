@@ -1,5 +1,3 @@
-import pytest
-
 from myia.abstract import from_value
 from myia.operations import (
     array_getitem,
@@ -11,23 +9,11 @@ from myia.operations import (
     tagged,
 )
 from myia.pipeline import standard_pipeline
-
-from .common import MA, MB, Point
-from .multitest import Multiple, mt, run
+from myia.testing.common import MA, MB, Point
+from myia.testing.multitest import mt, run
 
 run_no_opt = run.configure(
     pipeline=standard_pipeline.configure({"opt.phases.main": []})
-)
-
-
-run_relay_debug = run.configure(
-    backend=Multiple(
-        pytest.param(
-            ("relay", {"exec_kind": "debug"}),
-            id="relay-cpu-debug",
-            marks=pytest.mark.relay,
-        )
-    )
 )
 
 
@@ -160,8 +146,6 @@ def test_is_not(x):
     run(1, 1.7, Point(3, 4), (8, 9)),
     run(0, 1.7, Point(3, 4), (8, 9)),
     run(-1, 1.7, Point(3, 4), (8, 9)),
-    # TODO Is run_relay_debug still necessary?
-    run_relay_debug(0, 1.7, Point(3, 4), (8, 9)),
 )
 def test_tagged(c, x, y, z):
     if c > 0:

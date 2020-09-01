@@ -60,10 +60,10 @@ from myia.operations import (
     unsafe_static_cast,
 )
 from myia.pipeline import scalar_debug_pipeline
+from myia.testing.common import AA, f16, i64, to_abstract_test
+from myia.testing.multitest import mt, run_debug
 from myia.utils import assert_scalar, newenv
 
-from ..common import AA, f16, i64, to_abstract_test
-from ..multitest import mt, run_debug
 from ..test_lang import run_lang
 
 

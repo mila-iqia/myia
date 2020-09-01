@@ -37,10 +37,18 @@ from myia.pipeline import (
     standard_resources,
     steps,
 )
+from myia.testing.common import (
+    AA,
+    MA,
+    MB,
+    Point3D,
+    U,
+    f64,
+    to_abstract_test,
+    u64,
+)
+from myia.testing.multitest import backend_all, mt, myia_function_test
 from myia.utils import InferenceError, MyiaInputTypeError
-
-from .common import AA, MA, MB, Point3D, U, f64, to_abstract_test, u64
-from .multitest import backend_all, mt, myia_function_test
 
 
 @pytest.fixture(

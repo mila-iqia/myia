@@ -1,8 +1,7 @@
 from myia.lib import InferenceError
 from myia.operations import dtype, scalar_cast
-
-from ..common import MA, Ty, af32_of, f32, i64, to_abstract_test
-from ..multitest import infer, mt, run
+from myia.testing.common import MA, Ty, af32_of, f32, i64, to_abstract_test
+from myia.testing.multitest import infer, mt, run
 
 
 @mt(

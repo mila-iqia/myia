@@ -4,11 +4,10 @@ from myia.operations import (
     universe_getitem,
     universe_setitem,
 )
+from myia.testing.common import H, f64, i64
+from myia.testing.multitest import infer, mt, run_debug
 from myia.utils import HandleInstance, InferenceError, new_universe
 from myia.xtype import EnvType, UniverseType
-
-from ..common import H, f64, i64
-from ..multitest import infer, mt, run_debug
 
 
 @mt(
