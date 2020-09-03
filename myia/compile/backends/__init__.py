@@ -107,7 +107,7 @@ _active_backends = weakref.WeakValueDictionary()
 
 def get_backend_names():
     """Return a set of all loaded backend names."""
-    return set(_backends.keys())
+    return sorted(_backends.keys())
 
 
 def get_default():
