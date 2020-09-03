@@ -1,5 +1,9 @@
 ignore:
   - "tests"
+  - "myia/testing"
+  - "myia_backend_pytorch/tests"
+  - "myia_backend_relay/tests"
+  - "myia_frontend_pytorch/tests"
   - "docs"
   - "setup.py"
   - "myia/debug"
