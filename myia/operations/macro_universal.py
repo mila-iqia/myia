@@ -1,7 +1,9 @@
 """Implementation of the 'universal' macro."""
 
+from ovld import ovld
+
 from .. import lib, operations
-from ..lib import Constant, MetaGraph, core, macro, overload
+from ..lib import Constant, MetaGraph, core, macro
 
 
 @core(universal=True)
@@ -16,23 +18,23 @@ def universal_wrapper(fn):
     return wrapped
 
 
-@overload(bootstrap=True)
+@ovld
 def is_universal(self, g: lib.GraphFunction):
     """Check whether a function is universal or not."""
     return g.graph.has_flags("universal")
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def is_universal(self, g: lib.PartialApplication):
     return self(g.fn)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def is_universal(self, p: (lib.PrimitiveFunction, lib.TypedPrimitive)):
     return p.prim.universal
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def is_universal(self, x: object):
     return False
 

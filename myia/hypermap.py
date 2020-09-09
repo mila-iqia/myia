@@ -4,12 +4,13 @@ from dataclasses import is_dataclass
 from functools import reduce
 
 import numpy as np
+from ovld import OvldMC
 
 from . import abstract, operations
 from .abstract import broaden
 from .ir import Graph, MetaGraph
 from .operations import array_map, primitives as P
-from .utils import MyiaTypeError, Overload
+from .utils import MyiaTypeError
 
 nonleaf_defaults = (
     abstract.AbstractArray,
@@ -21,7 +22,7 @@ nonleaf_defaults = (
 )
 
 
-class HyperMap(MetaGraph):
+class HyperMap(MetaGraph, metaclass=OvldMC):
     """Map over tuples, classes, lists and arrays.
 
     Arguments:
@@ -90,8 +91,6 @@ class HyperMap(MetaGraph):
 
     def _is_leaf(self, arg):
         return not self._is_nonleaf(arg)
-
-    _make = Overload(name="hypermap._make")
 
     def _make_union_helper(self, a, options, g, fnarg, argmap):
         # Options must be a list of (tag, type) pairs. If the tag is None,
@@ -167,17 +166,14 @@ class HyperMap(MetaGraph):
         g.set_flags(core=False)
         return g.output
 
-    @_make.register
-    def _make(self, a: abstract.AbstractUnion, g, fnarg, argmap):
-        options = [[None, x] for x in a.options]
-        return self._make_union_helper(a, options, g, fnarg, argmap)
-
-    @_make.register
     def _make(self, a: abstract.AbstractTaggedUnion, g, fnarg, argmap):
         return self._make_union_helper(a, a.options, g, fnarg, argmap)
 
-    @_make.register
-    def _make(self, t: abstract.AbstractArray, g, fnarg, argmap):
+    def _make(self, a: abstract.AbstractUnion, g, fnarg, argmap):  # noqa: F811
+        options = [[None, x] for x in a.options]
+        return self._make_union_helper(a, options, g, fnarg, argmap)
+
+    def _make(self, t: abstract.AbstractArray, g, fnarg, argmap):  # noqa: F811
         self._name(g, "A")
 
         if fnarg is None:
@@ -200,8 +196,7 @@ class HyperMap(MetaGraph):
 
         return g.apply(P.array_map, fnarg, *args)
 
-    @_make.register
-    def _make(self, a: abstract.AbstractTuple, g, fnarg, argmap):
+    def _make(self, a: abstract.AbstractTuple, g, fnarg, argmap):  # noqa: F811
         self._name(g, "T")
         for a2, isleaf in argmap.values():
             if not isleaf and len(a2.elements) != len(a.elements):
@@ -220,8 +215,7 @@ class HyperMap(MetaGraph):
             elems.append(val)
         return g.apply(P.make_tuple, *elems)
 
-    @_make.register
-    def _make(self, a: abstract.AbstractDict, g, fnarg, argmap):
+    def _make(self, a: abstract.AbstractDict, g, fnarg, argmap):  # noqa: F811
         for a2, isleaf in argmap.values():
             if not isleaf and a.entries.keys() != a2.entries.keys():
                 raise MyiaTypeError(f"Dict keys mismatch: {a} != {a2}")
@@ -239,8 +233,9 @@ class HyperMap(MetaGraph):
             elems.append(val)
         return g.apply(P.make_dict, a, *elems)
 
-    @_make.register
-    def _make(self, a: abstract.AbstractClassBase, g, fnarg, argmap):
+    def _make(  # noqa: F811
+        self, a: abstract.AbstractClassBase, g, fnarg, argmap
+    ):
         for a2, isleaf in argmap.values():
             if not isleaf:
                 if (

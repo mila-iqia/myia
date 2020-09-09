@@ -18,11 +18,13 @@ def pyimpl_tagged(x, tag=None):
 async def infer_tagged(self, engine, x, *rest):
     """Infer the return type of primitive `tagged`."""
     if len(rest) == 0:
-        return lib.AbstractUnion([lib.broaden(x, engine.loop)])
+        return lib.AbstractUnion([lib.broaden(x, loop=engine.loop)])
     elif len(rest) == 1:
         (tag,) = rest
         tag_v = self.require_constant(tag, argnum=2)
-        return lib.AbstractTaggedUnion([[tag_v, lib.broaden(x, engine.loop)]])
+        return lib.AbstractTaggedUnion(
+            [[tag_v, lib.broaden(x, loop=engine.loop)]]
+        )
     else:
         raise lib.type_error_nargs(P.tagged, "1 or 2", len(rest) + 1)
 

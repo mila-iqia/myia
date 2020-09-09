@@ -50,6 +50,8 @@ expressions. See `SensRemapper.link_apply` for more information.
 
 from functools import reduce
 
+from ovld import ovld
+
 from . import operations
 from .debug.label import short_labeler, short_relation_symbols as syms
 from .info import About, NamedDebugInfo
@@ -64,7 +66,7 @@ from .ir import (
 )
 from .operations import Primitive, gadd, primitives as P, zeros_like
 from .parser import operations_ns
-from .utils import InternalInferenceError, OrderedSet, newenv, overload
+from .utils import InternalInferenceError, OrderedSet, newenv
 from .utils.variables import Xs
 
 
@@ -474,7 +476,7 @@ def _grad(root):
     return remappers["grad_fprop"].get_graph(root)
 
 
-@overload
+@ovld
 def Jimpl(prim: Primitive, resources, node):
     """Implement J on a Primitive."""
     try:
@@ -491,13 +493,13 @@ def Jimpl(prim: Primitive, resources, node):
     return resources.convert(g, manage=False)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def Jimpl(graph: Graph, resources, node):
     """Implement J on a Graph."""
     return _grad(graph)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def Jimpl(other: object, resources, node):
     """We do not implement J on non-functions here."""
     name = type(other).__qualname__

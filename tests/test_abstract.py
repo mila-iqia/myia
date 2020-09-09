@@ -280,22 +280,22 @@ def test_repr_recursive():
 
 
 @abstract_clone.variant
-def upcast(self, x: AbstractScalar, nbits):
+def upcast(self, x: AbstractScalar, *, nbits):
     return AbstractScalar({VALUE: x.xvalue(), TYPE: ty.Int[nbits]})
 
 
 def test_abstract_clone():
     s1 = S(t=ty.Int[32])
     s2 = S(t=ty.Int[64])
-    assert upcast(s1, 64) is s2
+    assert upcast(s1, nbits=64) is s2
 
     a1 = T([s1, AbstractClass(object, {"field": s1})])
     a2 = T([s2, AbstractClass(object, {"field": s2})])
-    assert upcast(a1, 64) is a2
+    assert upcast(a1, nbits=64) is a2
 
     jt = TransformedFunction(AbstractFunctionUnique((s1,), s1), P.J)
-    assert upcast(jt, 64).fn.args == [s2]
-    assert upcast(jt, 64).fn.output is s2
+    assert upcast(jt, nbits=64).fn.args == [s2]
+    assert upcast(jt, nbits=64).fn.output is s2
 
 
 def test_abstract_clone_pending():

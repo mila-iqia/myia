@@ -5,6 +5,7 @@ from dataclasses import is_dataclass
 from functools import reduce
 
 import numpy as np
+from ovld import ovld
 
 from .. import xtype
 from ..classes import ADT, Cons, Empty
@@ -19,7 +20,6 @@ from ..utils import (
     UniverseInstance,
     dataclass_fields,
     is_dataclass_type,
-    overload,
 )
 from ..utils.misc import RandomStateWrapper
 from .amerge import amerge
@@ -94,7 +94,7 @@ def from_value(v, broaden=False, **kwargs):
 ###############
 
 
-@overload(bootstrap=True)
+@ovld
 def to_abstract(self, v: AbstractValue, **kwargs):
     """Translate the value to an abstract value.
 
@@ -112,7 +112,7 @@ def to_abstract(self, v: AbstractValue, **kwargs):
     return AbstractType(v)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: Graph, context=None, node=None, **kwargs):
     ctx = context or Context.empty()
     if v.abstract is None:
@@ -121,29 +121,29 @@ def to_abstract(self, v: Graph, context=None, node=None, **kwargs):
         return v.abstract
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: MetaGraph, node=None, **kwargs):
     return AbstractFunction(
         MetaGraphFunction(v, Context.empty(), tracking_id=node)
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: Macro, **kwargs):
     return AbstractFunction(MacroFunction(v))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: Primitive, node=None, **kwargs):
     return AbstractFunction(PrimitiveFunction(v, tracking_id=node))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: HandleInstance, **kwargs):
     return AbstractHandle(v.abstract or self(v.state, **kwargs))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(
     self,
     v: (
@@ -161,7 +161,7 @@ def to_abstract(
     return AbstractScalar({VALUE: v, TYPE: typ})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(
     self, v: (int, float, np.integer, np.floating), loop=None, **kwargs
 ):
@@ -172,17 +172,17 @@ def to_abstract(
     return AbstractScalar({VALUE: v, TYPE: typ})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: tuple, **kwargs):
     return AbstractTuple([self(elem, **kwargs) for elem in v])
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: RandomStateWrapper, **kwargs):
     return AbstractRandomState()
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: list, **kwargs):
     if v == []:
         return empty
@@ -192,13 +192,13 @@ def to_abstract(self, v: list, **kwargs):
         return listof(_broaden(elem_type))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: dict, **kwargs):
     entries = dict((k, self(val, **kwargs)) for k, val in v.items())
     return AbstractDict(entries)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
     tracks = {SHAPE: v.shape, TYPE: xtype.NDArray}
     if id(v) in alias_map:
@@ -211,12 +211,12 @@ def to_abstract(self, v: np.ndarray, alias_map={}, **kwargs):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: typing._GenericAlias, **kwargs):
     return AbstractType(type_to_abstract(v))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: ADT, **kwargs):
     new_args = {}
     for name, value in dataclass_fields(v).items():
@@ -225,7 +225,7 @@ def to_abstract(self, v: ADT, **kwargs):
     return normalize_adt(draft)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: object, **kwargs):
     if is_dataclass(v):
         assert not isinstance(v, Function)
@@ -237,7 +237,7 @@ def to_abstract(self, v: object, **kwargs):
         return AbstractExternal({VALUE: v, TYPE: type(v)})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_abstract(self, v: type, **kwargs):
     try:
         return AbstractType(type_to_abstract(v))
@@ -253,21 +253,21 @@ def to_abstract(self, v: type, **kwargs):
 _default_type_params = {tuple: (), list: (object,)}
 
 
-@overload(bootstrap=True)
+@ovld
 def type_to_abstract(self, t: xtype.TypeMeta):
     """Convert a type to an AbstractValue.
 
     If the value is already an AbstractValue, returns it directly.
     """
-    return self[t](t)
+    return self[(t,)](t)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def type_to_abstract(self, t: AbstractValue):
     return t
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def type_to_abstract(
     self,
     t: (
@@ -282,12 +282,12 @@ def type_to_abstract(
     return AbstractScalar({VALUE: ANYTHING, TYPE: t})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def type_to_abstract(self, t: np.dtype):
     return self(xtype.np_dtype_to_type(t.name))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def type_to_abstract(self, t: type):
     if is_dataclass_type(t):
         fields = t.__dataclass_fields__
@@ -306,23 +306,25 @@ def type_to_abstract(self, t: type):
         return ANYTHING
 
     else:
-        return pytype_to_abstract[t](t, _default_type_params.get(t, None))
+        return pytype_to_abstract[t, object](
+            t, _default_type_params.get(t, None)
+        )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def type_to_abstract(self, t: typing._GenericAlias):
     args = tuple(
         object if isinstance(arg, typing.TypeVar) else arg for arg in t.__args__
     )
-    return pytype_to_abstract[t.__origin__](t, args)
+    return pytype_to_abstract[t.__origin__, object](t, args)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def type_to_abstract(self, t: Tag):
     return ANYTHING
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def type_to_abstract(self, t: object):
     raise MyiaTypeError(f"{t} is not a recognized type")
 
@@ -342,7 +344,7 @@ _numpy_types = (
 )
 
 
-@overload
+@ovld
 def pytype_to_abstract(main: tuple, args):
     """Convert a Python type to an AbstractValue."""
     if args == () or args is None:
@@ -354,7 +356,7 @@ def pytype_to_abstract(main: tuple, args):
     return AbstractTuple(targs)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def pytype_to_abstract(main: list, args):
     (arg,) = args
     argt = type_to_abstract(arg)
@@ -363,7 +365,7 @@ def pytype_to_abstract(main: list, args):
     return rval
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def pytype_to_abstract(main: np.ndarray, args):
     (arg,) = args
     arg = type_to_abstract(arg)
@@ -371,27 +373,27 @@ def pytype_to_abstract(main: np.ndarray, args):
     return AbstractArray(arg, {SHAPE: shp, TYPE: xtype.NDArray})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def pytype_to_abstract(main: _numpy_types, args):
     return type_to_abstract(xtype.np_dtype_to_type(main.__name__))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def pytype_to_abstract(main: int, args):
     return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Int[64]})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def pytype_to_abstract(main: float, args):
     return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Float[64]})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def pytype_to_abstract(main: bool, args):
     return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.Bool})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def pytype_to_abstract(main: AbstractArray, args):
     return AbstractArray(ANYTHING, values={SHAPE: ANYTHING, TYPE: ANYTHING})
 

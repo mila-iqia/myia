@@ -1,8 +1,9 @@
 """Utilities to merge dictionaries and other data structures."""
 
 
+from ovld import ovld
+
 from .misc import MISSING, Named, Registry
-from .overload import overload
 
 # Use in a merge to indicate that a key should be deleted
 DELETE = Named("DELETE")
@@ -57,22 +58,23 @@ class Reset(MergeMode):
 ###########
 
 
-@overload
+@ovld
 def cleanup(value: object):
+    """Clean up work structures and values."""
     return value
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def cleanup(mm: MergeMode):
     return mm.value
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def cleanup(d: dict):
     return type(d)({k: cleanup(v) for k, v in d.items() if v is not DELETE})
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def cleanup(xs: (tuple, list, set)):
     return type(xs)(cleanup(x) for x in xs)
 
@@ -82,8 +84,8 @@ def cleanup(xs: (tuple, list, set)):
 #########
 
 
-@overload.wrapper
-def merge(__call__, a, b, mode=MergeMode.mode):
+@ovld.dispatch
+def merge(self, a, b, mode=MergeMode.mode):
     """Merge two data structures.
 
     Arguments:
@@ -102,10 +104,10 @@ def merge(__call__, a, b, mode=MergeMode.mode):
         mode = b.mode
         b = b.value
     assert not isinstance(a, MergeMode)
-    return __call__(a, b, mode)
+    return self.resolve(a, b, mode)(a, b, mode)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def merge(d1: dict, d2, mode):
     if mode == "reset":
         assert not isinstance(d1, Registry)
@@ -130,7 +132,7 @@ def merge(d1: dict, d2, mode):
     return rval
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def merge(xs: tuple, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
@@ -140,7 +142,7 @@ def merge(xs: tuple, ys, mode):
         return ys
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def merge(xs: list, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
@@ -150,7 +152,7 @@ def merge(xs: list, ys, mode):
         return ys
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def merge(xs: set, ys, mode):
     xs = cleanup(xs)
     ys = cleanup(ys)
@@ -160,7 +162,7 @@ def merge(xs: set, ys, mode):
         return ys
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def merge(a: object, b, mode):
     if hasattr(a, "__merge__"):
         return a.__merge__(b, mode)

@@ -7,7 +7,6 @@ from .intern import *
 from .merge import *
 from .misc import *
 from .orderedset import *
-from .overload import *
 from .partial import *
 from .trace import *
 from .unify import *

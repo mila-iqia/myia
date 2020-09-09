@@ -3,24 +3,25 @@ from types import FunctionType
 
 import numpy as np
 import pytest
+from ovld import ovld
 
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline
-from myia.utils import keyword_decorator, merge, overload
+from myia.utils import keyword_decorator, merge
 
 from .common import to_abstract_test
 
 ParameterSet = type(pytest.param(1234))
 
 
-@overload
+@ovld
 def eqtest(t1: tuple, t2, **kwargs):
     return isinstance(t2, tuple) and all(
         eqtest(x1, x2, **kwargs) for x1, x2 in zip(t1, t2)
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def eqtest(a1: (np.ndarray, int, float), a2, rtol=1e-5, atol=1e-8, **kwargs):
     try:
         return np.allclose(a1, a2, rtol=rtol, atol=atol)
@@ -28,7 +29,7 @@ def eqtest(a1: (np.ndarray, int, float), a2, rtol=1e-5, atol=1e-8, **kwargs):
         return False
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def eqtest(x: type(None), y, **kwargs):
     if y is None:
         return True
@@ -36,7 +37,7 @@ def eqtest(x: type(None), y, **kwargs):
         return (y == 0).all()
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def eqtest(x: object, y, **kwargs):
     return x == y
 

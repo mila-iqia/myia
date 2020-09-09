@@ -1,4 +1,4 @@
 [pydocstyle]
-ignore-decorators = overload
+ignore-decorators = ovld
 add-ignore = D105,D202
 convention = google

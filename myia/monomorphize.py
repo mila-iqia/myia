@@ -11,6 +11,8 @@ from itertools import count
 from typing import Optional
 from warnings import warn
 
+from ovld import ovld
+
 from .abstract import (
     DEAD,
     POLY,
@@ -55,7 +57,7 @@ from .ir import (
     succ_incoming,
 )
 from .operations import Primitive, primitives as P
-from .utils import InferenceError, MyiaTypeError, OrderedSet, overload
+from .utils import InferenceError, MyiaTypeError, OrderedSet
 
 
 class Unspecializable(Exception):
@@ -79,6 +81,7 @@ def _chk(
         MetaGraphFunction,
         TypedPrimitive,
     ),
+    *,
     finder,
     monomorphizer,
 ):
@@ -88,24 +91,27 @@ def _chk(
 @abstract_clone.variant(
     initial_state=lambda: CloneState(cache={}, prop="_fixed", check=_chk)
 )
-def _fix_type(self, a: GraphFunction, finder, monomorphizer):
+def _fix_type(self, a: GraphFunction, *, finder, monomorphizer):
     assert a.graph.abstract is None
     if a.tracking_id in monomorphizer.ctcache:
         ctx = monomorphizer.ctcache[a.tracking_id]
         g = monomorphizer.results[ctx]
         return AbstractFunctionUnique(
             tuple(
-                self(p.abstract, finder, monomorphizer) for p in g.parameters
+                self(p.abstract, finder=finder, monomorphizer=monomorphizer)
+                for p in g.parameters
             ),
-            self(g.return_.abstract, finder, monomorphizer),
+            self(
+                g.return_.abstract, finder=finder, monomorphizer=monomorphizer
+            ),
         )
     else:
         return AbstractError(DEAD)
 
 
-@overload  # noqa: F811
-def _fix_type(self, a: PartialApplication, finder, monomorphizer):
-    vfn = self(a.fn, finder, monomorphizer)
+@ovld  # noqa: F811
+def _fix_type(self, a: PartialApplication, *, finder, monomorphizer):
+    vfn = self(a.fn, finder=finder, monomorphizer=monomorphizer)
     if isinstance(vfn, AbstractError) and vfn.xvalue() is DEAD:
         return vfn
     assert isinstance(vfn, AbstractFunctionUnique)
@@ -113,26 +119,35 @@ def _fix_type(self, a: PartialApplication, finder, monomorphizer):
     return vfn
 
 
-@overload  # noqa: F811
-def _fix_type(self, a: AbstractFunctionUnique, finder, monomorphizer):
+@ovld  # noqa: F811
+def _fix_type(self, a: AbstractFunctionUnique, *, finder, monomorphizer):
     return (yield AbstractFunctionUnique)(
-        tuple(self(arg, finder, monomorphizer) for arg in a.args),
-        self(a.output, finder, monomorphizer),
+        tuple(
+            self(arg, finder=finder, monomorphizer=monomorphizer)
+            for arg in a.args
+        ),
+        self(a.output, finder=finder, monomorphizer=monomorphizer),
     )
 
 
-@overload  # noqa: F811
-def _fix_type(self, a: TransformedFunction, finder, monomorphizer):
+@ovld  # noqa: F811
+def _fix_type(self, a: TransformedFunction, *, finder, monomorphizer):
     def _jtag(x):
         assert not isinstance(x, AbstractFunction)
         if isinstance(x, AbstractFunctionUnique):
-            return self(TransformedFunction(x, P.J), finder, monomorphizer)
+            return self(
+                TransformedFunction(x, P.J),
+                finder=finder,
+                monomorphizer=monomorphizer,
+            )
         else:
-            rval = AbstractJTagged(self(x, finder, monomorphizer))
+            rval = AbstractJTagged(
+                self(x, finder=finder, monomorphizer=monomorphizer)
+            )
         return rval
 
     assert a.transform is P.J
-    vfn = self(a.fn, finder, monomorphizer)
+    vfn = self(a.fn, finder=finder, monomorphizer=monomorphizer)
     jargs = tuple(_jtag(arg) for arg in vfn.args)
     jres = _jtag(vfn.output)
     bprop = compute_bprop_type(vfn, vfn.args, vfn.output)
@@ -140,9 +155,9 @@ def _fix_type(self, a: TransformedFunction, finder, monomorphizer):
     return AbstractFunctionUnique(jargs, out)
 
 
-@overload  # noqa: F811
-def _fix_type(self, a: AbstractFunction, finder, monomorphizer):
-    vfns = self(a.get_sync(), finder, monomorphizer)
+@ovld  # noqa: F811
+def _fix_type(self, a: AbstractFunction, *, finder, monomorphizer):
+    vfns = self(a.get_sync(), finder=finder, monomorphizer=monomorphizer)
     if len(vfns) == 1:
         (vfn,) = vfns
     else:
@@ -155,34 +170,39 @@ def _fix_type(self, a: AbstractFunction, finder, monomorphizer):
     return vfn
 
 
-@overload  # noqa: F811
-def _fix_type(self, a: PrimitiveFunction, finder, monomorphizer):
+@ovld  # noqa: F811
+def _fix_type(self, a: PrimitiveFunction, *, finder, monomorphizer):
     try:
         return self(
-            finder.analyze_function(None, a, None)[0], finder, monomorphizer
+            finder.analyze_function(None, a, None)[0],
+            finder=finder,
+            monomorphizer=monomorphizer,
         )
     except Unspecializable as err:
         return AbstractError(err.problem)
 
 
-@overload  # noqa: F811
-def _fix_type(self, a: MetaGraphFunction, finder, monomorphizer):
+@ovld  # noqa: F811
+def _fix_type(self, a: MetaGraphFunction, *, finder, monomorphizer):
     inf = finder.engine.get_inferrer_for(a)
     argvals, outval = finder._find_unique_argvals(None, inf, None)
     return AbstractFunctionUnique(tuple(argvals), outval)
 
 
-@overload  # noqa: F811
-def _fix_type(self, a: TypedPrimitive, finder, monomorphizer):
+@ovld  # noqa: F811
+def _fix_type(self, a: TypedPrimitive, *, finder, monomorphizer):
     return AbstractFunctionUnique(
-        tuple(self(ar, finder, monomorphizer) for ar in a.args),
-        self(a.output, finder, monomorphizer),
+        tuple(
+            self(ar, finder=finder, monomorphizer=monomorphizer)
+            for ar in a.args
+        ),
+        self(a.output, finder=finder, monomorphizer=monomorphizer),
     )
 
 
 def type_fixer(finder, monomorphizer=None):
     """Return a function to canonicalize the type of the input."""
-    return lambda x: _fix_type(x, finder, monomorphizer)
+    return lambda x: _fix_type(x, finder=finder, monomorphizer=monomorphizer)
 
 
 _count = count(1)

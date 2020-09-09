@@ -764,7 +764,7 @@ class GraphManager(Partializable):
             node: node that will change inputs
             key (int): input position
             inp: input node to add/remove
-            direction {1, -1}: Added/removed::
+            direction: {1, -1}: Added/removed::
                 * 1 if the edge is added.
                 * -1 if the edge is removed.
 
@@ -791,7 +791,7 @@ class GraphManager(Partializable):
 
         Arguments:
             node: node to process
-            direction {1, -1}: Added/removed::
+            direction: {1, -1}: Added/removed::
                 * 1 if the node was connected.
                 * -1 if the node was disconnected.
 

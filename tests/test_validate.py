@@ -148,7 +148,7 @@ def test_validate_abstract():
         TypedPrimitive(P.scalar_add, (scalar_i64, scalar_i64), scalar_i64),
     )
     with pytest.raises(ValidationError):
-        validate_abstract(fn, {})
+        validate_abstract(fn, uses={})
 
 
 def test_validate_abstract_2():
@@ -156,4 +156,4 @@ def test_validate_abstract_2():
         to_abstract_test(f64), {SHAPE: (1, 2), TYPE: PyTorchTensor}
     )
     with pytest.raises(ValidationError):
-        validate_abstract(bad_array, {})
+        validate_abstract(bad_array, uses={})

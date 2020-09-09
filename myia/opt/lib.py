@@ -1,5 +1,7 @@
 """Library of optimizations."""
 
+from ovld import ovld
+
 from .. import operations
 from ..abstract import (
     DEAD,
@@ -24,7 +26,7 @@ from ..operations import Primitive, primitives as P
 from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
-from ..utils import Partializable, overload, tracer
+from ..utils import Partializable, tracer
 from ..utils.errors import untested_legacy
 from ..utils.unify import Var, var
 from ..utils.variables import (
@@ -224,18 +226,18 @@ _ArrayType = Var("ArrayType")
 _Shape = Var("Shape")
 
 
-@overload
+@ovld
 def _transform(pattern: tuple):
     f, *args = pattern
     return (P.array_map, f, *tuple(_transform(arg) for arg in args))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _transform(pattern: Var):
     return pattern
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def _transform(pattern: (int, float)):
     return (P.distribute, (P.scalar_to_array, pattern, _ArrayType), _Shape)
 

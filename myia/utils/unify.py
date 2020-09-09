@@ -4,7 +4,7 @@ import operator
 from functools import reduce
 from typing import Any, Callable, Dict, Iterable, List, Set, TypeVar, Union
 
-from . import overload
+from ovld import ovld
 
 T = TypeVar("T")
 
@@ -281,18 +281,19 @@ def noseq(fn: Callable[[T], T], u: T) -> T:
     return um
 
 
-@overload
+@ovld
 def default_visit(value: (list, tuple), fn):
+    """Default function to visit data structures."""
     xs = expandlist(fn(x) for x in value)
     return type(value)(xs)
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_visit(value: dict, fn):
     return {fn(k): fn(v) for k, v in sorted(value.items())}
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def default_visit(value: object, fn):
     visit = getattr(value, "__visit__", None)
     if visit is None:

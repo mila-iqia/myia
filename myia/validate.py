@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+from ovld import ovld
+
 from . import xtype
 from .abstract import (
     ANYTHING,
@@ -19,7 +21,7 @@ from .abstract import (
 )
 from .operations import Primitive
 from .operations.primitives import BackendPrimitive
-from .utils import ErrorPool, Partializable, overload
+from .utils import ErrorPool, Partializable
 
 
 class ValidationError(Exception):
@@ -32,13 +34,13 @@ class ValidationError(Exception):
 
 
 @abstract_check.variant
-def validate_abstract(self, a: (AbstractClass, AbstractJTagged), uses):
+def validate_abstract(self, a: (AbstractClass, AbstractJTagged), *, uses):
     """Validate a type."""
     raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
-@overload  # noqa: F811
-def validate_abstract(self, a: AbstractError, uses):
+@ovld  # noqa: F811
+def validate_abstract(self, a: AbstractError, *, uses):
     kind = a.xvalue()
     if kind is DEAD:
         return True
@@ -50,8 +52,8 @@ def validate_abstract(self, a: AbstractError, uses):
         raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
-@overload  # noqa: F811
-def validate_abstract(self, a: AbstractArray, uses):
+@ovld  # noqa: F811
+def validate_abstract(self, a: AbstractArray, *, uses):
     at = a.xtype()
     if at is not ANYTHING and not issubclass(at, xtype.NDArray):
         raise ValidationError(
@@ -60,8 +62,8 @@ def validate_abstract(self, a: AbstractArray, uses):
     return True
 
 
-@overload  # noqa: F811
-def validate_abstract(self, a: AbstractScalar, uses):
+@ovld  # noqa: F811
+def validate_abstract(self, a: AbstractScalar, *, uses):
     if not issubclass(
         a.xtype(),
         (
@@ -79,18 +81,18 @@ def validate_abstract(self, a: AbstractScalar, uses):
     return True
 
 
-@overload  # noqa: F811
-def validate_abstract(self, a: (type(None), AbstractExternal), uses):
+@ovld  # noqa: F811
+def validate_abstract(self, a: (type(None), AbstractExternal), *, uses):
     raise ValidationError(f"Illegal type in the graph: {a}", type=a)
 
 
-@overload  # noqa: F811
-def validate_abstract(self, a: AbstractType, uses):
+@ovld  # noqa: F811
+def validate_abstract(self, a: AbstractType, *, uses):
     return True
 
 
-@overload  # noqa: F811
-def validate_abstract(self, a: AbstractFunction, uses):
+@ovld  # noqa: F811
+def validate_abstract(self, a: AbstractFunction, *, uses):
     raise ValidationError("Only VirtualFunction is allowed in the final graph")
 
 
@@ -130,7 +132,7 @@ class AbstractValidator(NodeValidator):
 
     def test_node(self, node):
         """Test that the node's abstract type is valid."""
-        return validate_abstract(node.abstract, self.manager.uses[node])
+        return validate_abstract(node.abstract, uses=self.manager.uses[node])
 
 
 class OperatorValidator(NodeValidator):

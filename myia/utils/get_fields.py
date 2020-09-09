@@ -2,11 +2,12 @@
 
 from dataclasses import is_dataclass
 
+from ovld import ovld
+
 from .misc import dataclass_fields
-from .overload import overload
 
 
-@overload
+@ovld
 def get_fields(instance: object):
     """Returns fields of an instance."""
     if is_dataclass(instance):

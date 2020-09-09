@@ -19,6 +19,7 @@ colorama = "^0.4.3"
 numpy = "^1.16"
 opt_einsum = "^3.1.0"
 prettyprinter = "^0.18.0"
+ovld = "^0.1.8"
 
 [tool.poetry.dev-dependencies]
 black = "~19.10b0"
@@ -42,13 +43,14 @@ black = { channel = "pip" }
 codecov = { channel = "pip" }
 pydocstyle = { channel = "pip" }
 gym = { channel = "pip" }
+ovld = { channel = "pip" }
 
 [tool.black]
 line-length = 80
 
 [tool.isort]
 known_first_party = "myia,debug"
-known_third_party = "torch,torchvision,tvm,hrepr,buche,breakword,docopt,gym"
+known_third_party = "torch,torchvision,tvm,hrepr,buche,breakword,docopt,gym,ovld"
 multi_line_output = 3
 include_trailing_comma = true
 combine_as_imports = true

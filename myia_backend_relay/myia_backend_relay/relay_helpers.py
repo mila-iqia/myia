@@ -4,6 +4,7 @@ Most of those should go away as Relay main development progresses.
 """
 
 import numpy as np
+from ovld import ovld
 from tvm import relay
 from tvm.relay import adt
 from tvm.runtime.object import Object
@@ -21,7 +22,6 @@ from myia.abstract import (
     TypedPrimitive,
 )
 from myia.operations import primitives as P
-from myia.utils import overload
 from myia.xtype import Bool, EnvType, Nil, UniverseType, type_to_np_dtype
 
 union_type = relay.GlobalTypeVar("$_union_adt")
@@ -141,7 +141,7 @@ class TypeHelper:
         return adt.Match(val, [some_c, nil_c])
 
 
-@overload(bootstrap=True)
+@ovld
 def to_relay_type(self, a: AbstractScalar):
     """Convert a myia abstract to a Relay type."""
     tp = a.xtype()
@@ -157,7 +157,7 @@ def to_relay_type(self, a: AbstractScalar):
         return relay.ty.scalar_type(type_to_np_dtype(tp))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_relay_type(self, a: AbstractRandomState):
     return relay.ty.TupleType(
         [
@@ -169,7 +169,7 @@ def to_relay_type(self, a: AbstractRandomState):
     )
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_relay_type(self, a: AbstractType):
     # Abstract types are not currently used in the graph,
     # they are replaced with other calls,
@@ -178,28 +178,28 @@ def to_relay_type(self, a: AbstractType):
     return relay.ty.scalar_type("int32")
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_relay_type(self, a: AbstractTuple):
     return relay.ty.TupleType([self(e) for e in a.elements])
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_relay_type(self, a: AbstractArray):
     tp = a.element.xtype()
     return relay.ty.TensorType(a.xshape(), type_to_np_dtype(tp))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_relay_type(self, a: (AbstractFunctionUnique, TypedPrimitive)):
     return relay.ty.FuncType([self(aa) for aa in a.args], self(a.output))
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_relay_type(self, a: AbstractTaggedUnion):
     return union_type()
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_relay_type(self, a: AbstractHandle):
     return relay.ty.RefType(self(a.element))
 
