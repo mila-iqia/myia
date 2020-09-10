@@ -2,6 +2,7 @@
 
 import inspect
 import typing
+from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -14,9 +15,7 @@ from ..abstract import (
     AbstractRandomState,
     AbstractScalar,
     AbstractTuple,
-    AbstractUnion,
 )
-from ..classes import Empty
 from ..ir.anf import ANFNode
 from ..utils.misc import RandomStateWrapper
 from ..xtype import pytype_to_myiatype
@@ -79,10 +78,10 @@ class _Introspection:
 
         def decorator(function):
             for typedef in type_definitions:
-                if self.__is_type(typedef) or self.__is_typing(typedef):
-                    self.mapping[typedef] = function
-                else:
-                    raise ValueError(f"Invalid typing: {typedef}")
+                assert self.__is_type(typedef) or self.__is_typing(typedef)
+                self.mapping[typedef] = function
+                # else:
+                #     raise ValueError(f"Invalid typing: {typedef}")
 
         return decorator
 
@@ -103,18 +102,19 @@ class _Introspection:
                 if parent_class in self.mapping:
                     function = self.mapping[parent_class]
                     break
-        elif self.__is_typing(typedef):
+        else:
+            assert self.__is_typing(typedef)
             cls = typedef.__origin__
             sub_cls = typedef.__args__
+            if all(
+                isinstance(sub_class, typing.TypeVar) for sub_class in sub_cls
+            ):
+                # Sub-classes are undefined, e.g. for List. We just ignore them.
+                sub_cls = ()
             if typedef in self.mapping:
                 function = self.mapping[typedef]
             elif cls in self.mapping:
                 function = self.mapping[cls]
-        else:
-            raise ValueError(f"Invalid typing: {typedef}")
-
-        if not function:
-            raise ValueError(f"Unregistered typing: {typedef}")
 
         return function(cls, sub_cls, *args, **kwargs)
 
@@ -135,7 +135,7 @@ def _check_scalar(cls, _, abstract, node_name):
         )
 
 
-@annotation_checker.register(tuple)
+@annotation_checker.register(tuple, Tuple)
 def _check_tuple(cls, sub_cls, abstract, node_name):
     if not isinstance(abstract, AbstractTuple):
         _raise_error(node_name, cls, abstract, "expected an AbstractTuple")
@@ -153,83 +153,23 @@ def _check_tuple(cls, sub_cls, abstract, node_name):
             annotation_checker(element_type, element, f"{node_name}[{i}]")
 
 
-@annotation_checker.register(list)
+@annotation_checker.register(list, List)
 def _check_list(cls, sub_cls, abstract, node_name):
     if not isinstance(abstract, AbstractADT):
         _raise_error(node_name, cls, abstract, "expected an AbstractADT")
     if sub_cls:
-        if len(sub_cls) != 1:
-            _raise_error(
-                node_name,
-                (cls, sub_cls),
-                abstract,
-                "expected only 1 element type for a list",
-            )
         (element_type,) = sub_cls
         if abstract.attributes:
-            if "head" not in abstract.attributes:
-                _raise_error(
-                    node_name,
-                    cls,
-                    abstract,
-                    "missing head attribute in AbstractADT",
-                )
-            if "tail" not in abstract.attributes:
-                _raise_error(
-                    node_name,
-                    cls,
-                    abstract,
-                    "missing tail attribute in AbstractADT",
-                )
             annotation_checker(
                 element_type, abstract.attributes["head"], f"{node_name}[0]"
             )
-            if not isinstance(abstract.attributes["tail"], AbstractUnion):
-                _raise_error(
-                    node_name,
-                    cls,
-                    abstract,
-                    "expected tail to be an AbstractUnion",
-                )
-            tail_options = abstract.attributes["tail"].options
-            if len(tail_options) != 2:
-                _raise_error(
-                    node_name,
-                    cls,
-                    abstract,
-                    f"expected tail to have 2 options, got {len(tail_options)}",
-                )
-            if (
-                not isinstance(tail_options[0], AbstractADT)
-                or tail_options[0].tag is not Empty
-            ):
-                _raise_error(
-                    node_name,
-                    cls,
-                    abstract,
-                    f"expected tail first option to be AbstractADT[Empty], got {tail_options[0]}",
-                )
-            if tail_options[1] != abstract:
-                _raise_error(
-                    node_name,
-                    cls,
-                    abstract,
-                    f"expected tail 2nd option to be same as abstract, got {tail_options[1]}",
-                )
 
 
-@annotation_checker.register(dict)
+@annotation_checker.register(dict, Dict)
 def _check_dict(cls, sub_cls, abstract, node_name):
     if not isinstance(abstract, AbstractDict):
         _raise_error(node_name, cls, abstract, "expected an AbstractDict")
     if sub_cls:
-        if len(sub_cls) != 2:
-            _raise_error(
-                node_name,
-                (cls, sub_cls),
-                abstract,
-                f"expected 2 sub-types for a dict, got {len(sub_cls)}",
-            )
         key_type, value_type = sub_cls
         if not isinstance(key_type, type):
             _raise_error(

@@ -23,16 +23,20 @@ def test_scalar():
     assert g(np.float32(2), np.float32(3)) == np.float32(6)
 
     with pytest.raises(AnnotationValidationError):
+        # wrong type for first argument
         f(2.0, 4.5)
 
     with pytest.raises(AnnotationValidationError):
+        # wrong type for 2nd argument
         f(2, 4)
 
     with pytest.raises(AnnotationValidationError):
-        g(2, 3)
+        # wrong output type
+        g(np.arange(1), np.arange(1))
 
     with pytest.raises(AnnotationValidationError):
-        g(2.0, 3.0)
+        # wrong output scalar type
+        g(2, 3)
 
 
 def test_tuple():
@@ -48,10 +52,16 @@ def test_tuple():
     assert g((2.0, 3)) == 5.0
 
     with pytest.raises(AnnotationValidationError):
+        # wrong argument type
         f([2, 3])
 
     with pytest.raises(AnnotationValidationError):
+        # wrong tuple elements type
         g((2.0, 3.0))
+
+    with pytest.raises(AnnotationValidationError):
+        # wrong tuple length
+        g((1.0, 2, 3))
 
 
 def test_list():
@@ -68,10 +78,12 @@ def test_list():
     assert g([np.int16(10), np.int16(3)]) == 12
 
     with pytest.raises(AnnotationValidationError):
+        # wrong argument type
         f((5, 3))
 
     with pytest.raises(AnnotationValidationError):
-        g((5, 3))
+        # wrong list element type
+        g([5, 3])
 
 
 def test_dict():
@@ -79,13 +91,38 @@ def test_dict():
     def f(x: Dict[str, np.float32]):
         return np.float32(x["value"]) * np.float32(2.5)
 
+    @myia
+    def g(x: Dict[str, int]):
+        return x
+
+    @myia
+    def h(x: Dict[Tuple[int, int], int]):
+        return x
+
+    @myia
+    def j(x: Dict[int, int]):
+        return x
+
     d1 = {"test": 5, "value": 11}
     d2 = {"test": np.float32(5), "value": np.float32(11)}
 
     assert f(d2) == 27.5
 
     with pytest.raises(AnnotationValidationError):
+        # wrong dict value type
         f(d1)
+
+    with pytest.raises(AnnotationValidationError):
+        # wrong argument type
+        g((1, 2))
+
+    with pytest.raises(AnnotationValidationError):
+        # unsupported dict key type
+        h(d1)
+
+    with pytest.raises(AnnotationValidationError):
+        # wrong dict key type
+        j(d1)
 
 
 def test_ndarray():
@@ -98,6 +135,7 @@ def test_ndarray():
     assert np.all(f(2, arr) == 2 * arr)
 
     with pytest.raises(AnnotationValidationError):
+        # wrong type for 2nd argument
         f(2, 2)
 
 
@@ -112,8 +150,8 @@ def test_random_state_wrapper():
     def g(rstate: RandomStateWrapper):
         return rstate
 
-    r = f(10)
-    g(r)
+    g(f(10))
 
     with pytest.raises(AnnotationValidationError):
+        # wrong argument type
         g(0)
