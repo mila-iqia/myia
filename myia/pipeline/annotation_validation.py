@@ -109,7 +109,8 @@ class _Introspection:
             if all(
                 isinstance(sub_class, typing.TypeVar) for sub_class in sub_cls
             ):
-                # Sub-classes are undefined, e.g. for List. We just ignore them.
+                # Sub-classes are undefined, e.g. for List.
+                # We just ignore them.
                 sub_cls = ()
             if typedef in self.mapping:
                 function = self.mapping[typedef]

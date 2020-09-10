@@ -45,15 +45,24 @@ def test_tuple():
         return x[0] + x[1]
 
     @myia
+    def f_(x: Tuple):
+        # to check if `Tuple` is parsed correctly as `tuple`.
+        return x
+
+    @myia
     def g(x: Tuple[float, int]):
         return x[0] + float(x[1])
 
     assert f((2, 3)) == 5
+    assert f_((2,)) == (2,)
     assert g((2.0, 3)) == 5.0
 
     with pytest.raises(AnnotationValidationError):
         # wrong argument type
         f([2, 3])
+
+    with pytest.raises(AnnotationValidationError):
+        f_([2, 3])
 
     with pytest.raises(AnnotationValidationError):
         # wrong tuple elements type
