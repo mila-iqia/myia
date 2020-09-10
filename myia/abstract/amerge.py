@@ -4,6 +4,7 @@ from contextvars import ContextVar
 from functools import reduce
 from itertools import chain
 
+import numpy as np
 from ovld import ovld
 
 from .. import xtype
@@ -438,7 +439,13 @@ def amerge(
 
 
 @ovld  # noqa: F811
-def amerge(self, x1: (int, float, bool), x2: (int, float, bool), forced, bp):
+def amerge(
+    self,
+    x1: (int, float, bool, np.integer, np.floating),
+    x2: (int, float, bool, np.integer, np.floating),
+    forced,
+    bp,
+):
     if forced and x1 != x2:
         raise TypeMismatchError(x1, x2)
     return x1 if x1 == x2 else ANYTHING
