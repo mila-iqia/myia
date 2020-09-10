@@ -95,9 +95,9 @@ def dfs(root: ANFNode, follow_graph: bool = False) -> Iterable[ANFNode]:
     return _dfs(root, succ_deep if follow_graph else succ_incoming)
 
 
-def toposort(root: ANFNode) -> Iterable[ANFNode]:
+def toposort(root: ANFNode, *, allow_cycles=False) -> Iterable[ANFNode]:
     """Order the nodes topologically."""
-    return _toposort(root, succ_incoming)
+    return _toposort(root, succ_incoming, allow_cycles=allow_cycles)
 
 
 ###############
@@ -272,7 +272,7 @@ def print_graph(g):
         else:
             return f"%{node.debug.debug_name}"
 
-    for node in toposort(g.output):
+    for node in toposort(g.output, allow_cycles=True):
         if node.is_apply():
             print(f"  %{node.debug.debug_name} = ", end="", file=buf)
             print(f"{repr_node(node.inputs[0])}(", end="", file=buf)

@@ -63,6 +63,7 @@ def toposort(
     root: T,
     succ: Callable[[T], Iterable[T]],
     include: Callable[[T], str] = always_include,
+    allow_cycles=False,
 ) -> Iterable[T]:
     """Yield the nodes in the tree starting at root in topological order.
 
@@ -80,6 +81,7 @@ def toposort(
     done: Set[T] = set()
     todo: List[T] = [root]
     rank: Dict[T, int] = {}
+    cycles = set()
 
     while todo:
         node = todo[-1]
@@ -87,14 +89,18 @@ def toposort(
             todo.pop()
             continue
         if node in rank and rank[node] != len(todo):
-            raise ValueError("cycle")
-        rank[node] = len(todo)
+            if allow_cycles:
+                cycles.add(node)
+            else:
+                raise ValueError('cycle')
+        else:
+            rank[node] = len(todo)
         cont = False
 
         incl = include(node)
         if incl == FOLLOW:
             for i in succ(node):
-                if i not in done:
+                if i not in done and i not in cycles:
                     todo.append(i)
                     cont = True
         elif incl == NOFOLLOW:
