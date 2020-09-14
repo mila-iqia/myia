@@ -12,6 +12,7 @@ from ..utils import MyiaTypeError, TypeMismatchError, untested_legacy
 from .data import (
     ABSENT,
     ANYTHING,
+    AbstractADT,
     AbstractBottom,
     AbstractClassBase,
     AbstractDict,
@@ -419,6 +420,16 @@ def amerge(self, x1: AbstractDict, x2: AbstractDict, forced, bp):
     if forced or merged is args1:
         return x1
     return type(x1)(*merged)
+
+
+@ovld  # noqa: F811
+def amerge(self, x1: AbstractADT, x2: AbstractADT, forced, bp):
+    if x1.tag is not x2.tag:
+        raise TypeMismatchError(x1.tag, x2.tag)
+    merged = self(x1.attributes, x2.attributes)
+    if forced or merged is x1.attributes:
+        return x1
+    return type(x1)(tag=x1.tag, attributes=merged)
 
 
 @ovld  # noqa: F811

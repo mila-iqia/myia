@@ -43,7 +43,6 @@ from myia.abstract import (
     to_abstract,
     type_to_abstract,
 )
-from myia.classes import Cons, Empty
 from myia.ir import Constant
 from myia.operations import primitives as P
 from myia.pipeline import standard_resources
@@ -54,7 +53,7 @@ from myia.utils import (
     SymbolicKeyInstance,
 )
 
-from .common import Point, S, Ty, U, af32_of, f32, i16, to_abstract_test
+from .common import Point, S, Ty, af32_of, f32, i16, to_abstract_test
 
 
 def test_to_abstract_skey():
@@ -376,9 +375,7 @@ def test_type_to_abstract():
     assert type_to_abstract(int) is S(t=ty.Int[64])
     assert type_to_abstract(float) is S(t=ty.Float[64])
     assert type_to_abstract(bool) is S(t=ty.Bool)
-    assert type_to_abstract(typing.List) is U(
-        type_to_abstract(Empty), type_to_abstract(Cons)
-    )
+    assert type_to_abstract(typing.List) is listof(ANYTHING)
     assert type_to_abstract(typing.Tuple) is T(ANYTHING)
 
 
