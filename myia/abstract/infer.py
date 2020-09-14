@@ -1,6 +1,7 @@
 """Algorithms for inference."""
 
 import asyncio
+import typing
 from dataclasses import replace as dc_replace
 from functools import reduce
 
@@ -11,22 +12,24 @@ from ..info import About
 from ..ir import Constant, Graph
 from ..operations import primitives as P
 from ..utils import (
+    AnnotationMismatchError,
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,
     OrderedSet,
     Partializable,
+    TypeMismatchError,
     infer_trace,
     tracer,
     type_error_nargs,
     untested_legacy,
 )
 from .amerge import amerge, bind
-from .annotation_validation import validate_annotation
 from .data import (
     ANYTHING,
     TYPE,
     VALUE,
+    AbstractDict,
     AbstractFunction,
     AbstractFunctionUnique,
     AbstractJTagged,
@@ -52,13 +55,60 @@ from .ref import (
     Reference,
     VirtualReference,
 )
-from .to_abstract import to_abstract
+from .to_abstract import to_abstract, type_to_abstract
 from .utils import (
     broaden as _broaden,
     concretize_abstract,
     concretize_cache,
     sensitivity_transform,
 )
+
+
+def _annotation_as_dict(type_hint):
+    """Return dict type args if type hint is a dict, else None."""
+    if type_hint is dict:
+        return ()
+    if (
+        isinstance(type_hint, typing._GenericAlias)
+        and type_hint.__origin__ is dict
+    ):
+        return type_hint.__args__
+    return None
+
+
+def _check_dict_annotation(abstract, type_args):
+    """Check if abstract is an abstract dict.
+
+    type_args is either () or the couple (key_type, value_type) of
+    expected python types for dict keys and values.
+    """
+    if not isinstance(abstract, AbstractDict):
+        raise TypeMismatchError(AbstractDict, abstract)
+    if type_args:
+        key_type, value_type = type_args
+        if key_type is not str:
+            raise TypeMismatchError(str, key_type)
+        abstract_value_type = type_to_abstract(value_type)
+        for child in abstract.children():
+            amerge(child, abstract_value_type)
+    return abstract
+
+
+def validate_annotation(annotation, abstract):
+    """Check if abstract is allowed by given annotation."""
+    try:
+        dict_annotation = _annotation_as_dict(annotation)
+        if dict_annotation is not None:
+            # type_to_abstract could not generate a suitable
+            # AbstractDict from a type hint because it won't
+            # provide dict keys and values, so we need
+            # a specific check for dict types.
+            _check_dict_annotation(abstract, dict_annotation)
+        else:
+            amerge(abstract, type_to_abstract(annotation))
+    except MyiaTypeError as exc:
+        raise AnnotationMismatchError(f"{type(exc).__name__}: {exc.message}")
+    return abstract
 
 
 class InferenceEngine(metaclass=OvldMC):

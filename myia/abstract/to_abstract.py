@@ -8,7 +8,7 @@ import numpy as np
 from ovld import ovld
 
 from .. import xtype
-from ..classes import ADT, Cons, Empty
+from ..classes import ADT
 from ..ir import Graph, MetaGraph
 from ..operations import Primitive
 from ..utils import (
@@ -40,7 +40,6 @@ from .data import (
     AbstractScalar,
     AbstractTuple,
     AbstractType,
-    AbstractUnion,
     AbstractValue,
     Function,
     GraphFunction,
@@ -250,7 +249,7 @@ def to_abstract(self, v: type, **kwargs):
 ####################
 
 
-_default_type_params = {tuple: (), list: (object,)}
+_default_type_params = {tuple: (), list: (object,), np.ndarray: (object,)}
 
 
 @ovld
@@ -360,9 +359,7 @@ def pytype_to_abstract(main: tuple, args):
 def pytype_to_abstract(main: list, args):
     (arg,) = args
     argt = type_to_abstract(arg)
-    assert argt is ANYTHING
-    rval = AbstractUnion([type_to_abstract(Empty), type_to_abstract(Cons)])
-    return rval
+    return listof(argt)
 
 
 @ovld  # noqa: F811
@@ -396,6 +393,11 @@ def pytype_to_abstract(main: bool, args):
 @ovld  # noqa: F811
 def pytype_to_abstract(main: AbstractArray, args):
     return AbstractArray(ANYTHING, values={SHAPE: ANYTHING, TYPE: ANYTHING})
+
+
+@ovld  # noqa: F811
+def pytype_to_abstract(main: RandomStateWrapper, args):
+    return AbstractRandomState()
 
 
 __all__ = [
