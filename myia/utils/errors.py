@@ -87,6 +87,10 @@ class TypeMismatchError(MyiaTypeError):
         self.got = got
 
 
+class AnnotationMismatchError(MyiaTypeError):
+    """Error when an annotation does not match an abstract."""
+
+
 class MyiaInputTypeError(TypeError):
     """Represents a type error on an input to a Myia function."""
 
@@ -117,6 +121,7 @@ __all__ = [
     "MyiaTypeError",
     "MyiaValueError",
     "TypeMismatchError",
+    "AnnotationMismatchError",
     "check_nargs",
     "infer_trace",
     "type_error_nargs",

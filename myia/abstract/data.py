@@ -418,6 +418,9 @@ class AbstractRandomState(AbstractAtom):
         """Initialize an AbstractRandomState."""
         super().__init__({})
 
+    def __pretty__(self, ctx):
+        return ""
+
 
 class AbstractStructure(AbstractValue):
     """Base class for abstract values that are structures."""

@@ -22,6 +22,7 @@ from ..utils import (
     untested_legacy,
 )
 from .amerge import amerge, bind
+from .annotation_validation import validate_annotation
 from .data import (
     ANYTHING,
     TYPE,
@@ -183,6 +184,9 @@ class InferenceEngine(metaclass=OvldMC):
                 f" This indicates either a bug in a macro or a bug in Myia.",
                 refs=[ref],
             )
+
+        if ref.node.annotation:
+            result = validate_annotation(ref.node.annotation, result)
 
         tracer().emit("compute_ref", engine=self, reference=ref, result=result)
         return result
@@ -617,6 +621,8 @@ class GraphInferrer(Inferrer):
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
         for p, arg in zip(g.parameters, context.argkey):
+            if p.annotation:
+                validate_annotation(p.annotation, arg)
             ref = engine.ref(p, context)
             engine.cache.set_value(ref, arg)
 

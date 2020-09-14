@@ -302,7 +302,6 @@ standard_pipeline = PipelineDefinition(
     parse=steps.step_parse,
     infer=steps.step_infer,
     specialize=steps.step_specialize,
-    check_annotations=steps.step_validate_annotations,
     simplify_types=steps.step_simplify_types,
     opt=steps.step_opt,
     opt2=steps.step_opt2,

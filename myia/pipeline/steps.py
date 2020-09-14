@@ -29,7 +29,6 @@ from ..utils import (
 )
 from ..validate import ValidationError
 from ..xtype import UniverseType
-from . import annotation_validation
 
 #############
 # Optimizer #
@@ -198,20 +197,6 @@ def step_specialize(resources, graph, inference_context):
     new_graph = resources.monomorphizer(inference_context)
     resources.opt_manager.keep_roots(new_graph)
     return {"graph": new_graph}
-
-
-#####################
-# Check annotations #
-#####################
-
-
-def step_validate_annotations(graph):
-    for parameter in graph.parameters:
-        annotation_validation.validate_node(parameter)
-    annotation_validation.validate_node(graph.return_)
-    for node in graph.manager.all_nodes:
-        annotation_validation.validate_node(node)
-    return {"graph": graph}
 
 
 ####################
