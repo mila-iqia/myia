@@ -1061,7 +1061,7 @@ def test_isinstance(x):
                 return f(x[0]) + f(x[1:])
         elif isinstance(x, list):
             if x:
-                return f(x.head) + f(x.tail)
+                return f(x[0]) + f(x[0])
             else:
                 return 0
         elif isinstance(x, Point):
