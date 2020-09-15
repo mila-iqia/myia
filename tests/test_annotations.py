@@ -131,7 +131,7 @@ def test_dict():
         return np.float32(x["value"]) * np.float32(2.5)
 
     @myia
-    def g(x: Dict[str, int]):
+    def g(x: dict):
         return x
 
     @myia
