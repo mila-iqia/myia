@@ -35,14 +35,7 @@ from .loop import (
     find_coherent_result_sync,
     is_simple,
 )
-from .utils import (
-    CheckState,
-    CloneState,
-    abstract_check,
-    broaden,
-    is_broad,
-    union_simplify,
-)
+from .utils import abstract_check, broaden, is_broad, union_simplify
 
 amerge_engine = ContextVar("amerge_engine", default=None)
 
@@ -52,9 +45,7 @@ amerge_engine = ContextVar("amerge_engine", default=None)
 ###################
 
 
-@is_broad.variant(
-    initial_state=lambda: {"state": CheckState(cache={}, prop=None)}
-)
+@is_broad.variant(initial_state=lambda: {"cache": {}, "prop": None})
 def _is_tentative(self, x: (Possibilities, TaggedPossibilities), *, loop):
     return False
 
@@ -65,7 +56,7 @@ def _is_tentative(self, x: (Possibilities, TaggedPossibilities), *, loop):
 
 
 @broaden.variant(
-    initial_state=lambda: {"state": CloneState({}, None, _is_tentative)}
+    initial_state=lambda: {"cache": {}, "prop": None, "check": _is_tentative},
 )
 def tentative(self, p: Possibilities, *, loop):  # noqa: D417
     """Broaden an abstract value and make it tentative.

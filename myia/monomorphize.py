@@ -21,8 +21,6 @@ from .abstract import (
     AbstractFunctionUnique,
     AbstractJTagged,
     AbstractTuple,
-    CheckState,
-    CloneState,
     Context,
     GraphFunction,
     GraphInferrer,
@@ -70,9 +68,7 @@ class Unspecializable(Exception):
         self.data = data
 
 
-@abstract_check.variant(
-    initial_state=lambda: {"state": CheckState({}, "_fixed")}
-)
+@abstract_check.variant(initial_state=lambda: {"cache": {}, "prop": "_fixed"})
 def _chk(
     self,
     a: (
@@ -91,9 +87,7 @@ def _chk(
 
 
 @abstract_clone.variant(
-    initial_state=lambda: {
-        "state": CloneState(cache={}, prop="_fixed", check=_chk)
-    }
+    initial_state=lambda: {"cache": {}, "prop": "_fixed", "check": _chk},
 )
 def _fix_type(self, a: GraphFunction, *, finder, monomorphizer):
     assert a.graph.abstract is None

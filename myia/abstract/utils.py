@@ -110,15 +110,7 @@ def _build_value(ac: AbstractClass):
 ############
 
 
-@dataclass
-class CheckState:
-    """State of abstract_check."""
-
-    cache: dict
-    prop: str
-
-
-@ovld.dispatch(initial_state=lambda: {"state": CheckState({}, None)})
+@ovld.dispatch(initial_state=lambda: {"cache": {}, "prop": None})
 def abstract_check(self, x, **kwargs):
     """Check that a predicate applies to a given object."""
     __call__ = self.resolve(x)
@@ -136,8 +128,8 @@ def abstract_check(self, x, **kwargs):
         else:
             return __call__(x, **kwargs)
 
-    prop = self.state.prop
-    cache = self.state.cache
+    prop = self.prop
+    cache = self.cache
 
     try:
         rval = cache.get(x, None)
@@ -235,15 +227,6 @@ def abstract_check(self, xs: object, **kwargs):
 ###########
 
 
-@dataclass
-class CloneState:
-    """State of abstract_clone."""
-
-    cache: dict
-    prop: str
-    check: callable
-
-
 def _make_constructor(inst):
     def f(*args, **kwargs):
         inst.__init__(*args, **kwargs)
@@ -257,7 +240,7 @@ def _intern(_, x):
 
 
 @ovld.dispatch(
-    initial_state=lambda: {"state": CloneState({}, None, None)},
+    initial_state=lambda: {"cache": {}, "prop": None, "check": None},
     postprocess=_intern,
 )
 def abstract_clone(self, x, **kwargs):
@@ -288,13 +271,13 @@ def abstract_clone(self, x, **kwargs):
                 "Generators in abstract_clone must yield once, then return."
             )
 
-    cache = self.state.cache
-    prop = self.state.prop
+    cache = self.cache
+    prop = self.prop
     if prop:
         if hasattr(x, prop):
             return getattr(x, prop)
         elif isinstance(x, AbstractValue):
-            if self.state.check(x, **kwargs):
+            if self.check(x, **kwargs):
                 res = x
             else:
                 res = proceed()
@@ -302,7 +285,7 @@ def abstract_clone(self, x, **kwargs):
             return res
         else:
             return proceed()
-    elif self.state.check and self.state.check(x, **kwargs):
+    elif self.check and self.check(x, **kwargs):
         return x
     else:
         return proceed()
@@ -417,7 +400,11 @@ def abstract_clone(self, x: object, **kwargs):
 
 
 @abstract_clone.variant(
-    initial_state=lambda: {"state": CloneState({}, "_concrete", abstract_check)}
+    initial_state=lambda: {
+        "cache": {},
+        "prop": "_concrete",
+        "check": abstract_check,
+    },
 )
 def concretize_abstract(self, x: Pending):
     """Clone an abstract value while resolving all Pending (synchronous)."""
@@ -428,7 +415,7 @@ def concretize_abstract(self, x: Pending):
 
 
 @abstract_check.variant(
-    initial_state=lambda: {"state": CheckState({}, "_no_track")}
+    initial_state=lambda: {"cache": {}, "prop": "_no_track"}
 )
 def _check_no_tracking_id(self, x: GraphFunction):
     return x.tracking_id is None
@@ -436,10 +423,10 @@ def _check_no_tracking_id(self, x: GraphFunction):
 
 @concretize_abstract.variant(
     initial_state=lambda: {
-        "state": CloneState(
-            cache={}, prop="_no_track", check=_check_no_tracking_id
-        )
-    }
+        "cache": {},
+        "prop": "_no_track",
+        "check": _check_no_tracking_id,
+    },
 )
 def no_tracking_id(self, x: GraphFunction):
     """Resolve all Pending and erase tracking_id information."""
@@ -467,9 +454,7 @@ def concretize_cache(src, dest=None):
 ###############
 
 
-@abstract_check.variant(
-    initial_state=lambda: {"state": CheckState(cache={}, prop="_broad")}
-)
+@abstract_check.variant(initial_state=lambda: {"cache": {}, "prop": "_broad"})
 def is_broad(self, x: object, **kwargs):
     """Check whether the object is broad or not."""
     return x is ANYTHING
@@ -486,7 +471,7 @@ def is_broad(self, x: (AbstractScalar, AbstractFunction), **kwargs):
 
 
 @abstract_clone.variant(
-    initial_state=lambda: {"state": CloneState({}, "_broad", is_broad)}
+    initial_state=lambda: {"cache": {}, "prop": "_broad", "check": is_broad},
 )
 def broaden(self, d: TrackDict, **kwargs):  # noqa: D417
     """Broaden an abstract value.
@@ -768,8 +753,6 @@ def _finalize_adt(self, x: AbstractUnion):
 
 __consolidate__ = True
 __all__ = [
-    "CheckState",
-    "CloneState",
     "abstract_check",
     "abstract_clone",
     "broaden",
