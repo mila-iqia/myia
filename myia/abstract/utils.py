@@ -118,7 +118,7 @@ class CheckState:
     prop: str
 
 
-@ovld.dispatch(initial_state=lambda: CheckState({}, None))
+@ovld.dispatch(initial_state=lambda: {"state": CheckState({}, None)})
 def abstract_check(self, x, **kwargs):
     """Check that a predicate applies to a given object."""
     __call__ = self.resolve(x)
@@ -257,7 +257,8 @@ def _intern(_, x):
 
 
 @ovld.dispatch(
-    initial_state=lambda: CloneState({}, None, None), postprocess=_intern
+    initial_state=lambda: {"state": CloneState({}, None, None)},
+    postprocess=_intern,
 )
 def abstract_clone(self, x, **kwargs):
     """Clone an abstract value."""
@@ -416,7 +417,7 @@ def abstract_clone(self, x: object, **kwargs):
 
 
 @abstract_clone.variant(
-    initial_state=lambda: CloneState({}, "_concrete", abstract_check)
+    initial_state=lambda: {"state": CloneState({}, "_concrete", abstract_check)}
 )
 def concretize_abstract(self, x: Pending):
     """Clone an abstract value while resolving all Pending (synchronous)."""
@@ -426,15 +427,19 @@ def concretize_abstract(self, x: Pending):
         raise AssertionError("Unresolved Pending", x)
 
 
-@abstract_check.variant(initial_state=lambda: CheckState({}, "_no_track"))
+@abstract_check.variant(
+    initial_state=lambda: {"state": CheckState({}, "_no_track")}
+)
 def _check_no_tracking_id(self, x: GraphFunction):
     return x.tracking_id is None
 
 
 @concretize_abstract.variant(
-    initial_state=lambda: CloneState(
-        cache={}, prop="_no_track", check=_check_no_tracking_id
-    )
+    initial_state=lambda: {
+        "state": CloneState(
+            cache={}, prop="_no_track", check=_check_no_tracking_id
+        )
+    }
 )
 def no_tracking_id(self, x: GraphFunction):
     """Resolve all Pending and erase tracking_id information."""
@@ -463,7 +468,7 @@ def concretize_cache(src, dest=None):
 
 
 @abstract_check.variant(
-    initial_state=lambda: CheckState(cache={}, prop="_broad")
+    initial_state=lambda: {"state": CheckState(cache={}, prop="_broad")}
 )
 def is_broad(self, x: object, **kwargs):
     """Check whether the object is broad or not."""
@@ -481,7 +486,7 @@ def is_broad(self, x: (AbstractScalar, AbstractFunction), **kwargs):
 
 
 @abstract_clone.variant(
-    initial_state=lambda: CloneState({}, "_broad", is_broad)
+    initial_state=lambda: {"state": CloneState({}, "_broad", is_broad)}
 )
 def broaden(self, d: TrackDict, **kwargs):  # noqa: D417
     """Broaden an abstract value.
@@ -524,7 +529,9 @@ async def _force_through_post(_, x):
     return intern(await x)
 
 
-@ovld.dispatch(initial_state=lambda: {}, postprocess=_force_through_post)
+@ovld.dispatch(
+    initial_state=lambda: {"state": {}}, postprocess=_force_through_post
+)
 async def force_through(self, x, through):
     """Clone an abstract value (asynchronous)."""
     __call__ = self[type(x), object]

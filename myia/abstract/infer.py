@@ -247,17 +247,17 @@ class InferenceEngine(metaclass=OvldMC):
                 task._log_destroy_pending = False
 
     @ovld.dispatch
-    def get_inferrer_for(self, fn):
+    def get_inferrer_for(ovldcall, fn):
         """Return the Inferrer for the given function."""
-        __call__ = self.resolve(fn)
+        __call__ = ovldcall.resolve(fn)
         tracking = getattr(fn, "tracking_id", None)
         if tracking is None:
             return __call__(fn)
-        if fn not in self.bind_to.constructors:
+        if fn not in ovldcall.obj.constructors:
             fn_generic = dc_replace(fn, tracking_id=None)
             inf = __call__(fn_generic)
-            self.bind_to.constructors[fn] = TrackedInferrer(inf)
-        return self.bind_to.constructors[fn]
+            ovldcall.obj.constructors[fn] = TrackedInferrer(inf)
+        return ovldcall.obj.constructors[fn]
 
     def get_inferrer_for(self, pf: PrimitiveFunction):  # noqa: F811, D102
         if pf.prim not in self.constructors:

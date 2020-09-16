@@ -52,7 +52,9 @@ amerge_engine = ContextVar("amerge_engine", default=None)
 ###################
 
 
-@is_broad.variant(initial_state=lambda: CheckState(cache={}, prop=None))
+@is_broad.variant(
+    initial_state=lambda: {"state": CheckState(cache={}, prop=None)}
+)
 def _is_tentative(self, x: (Possibilities, TaggedPossibilities), *, loop):
     return False
 
@@ -62,7 +64,9 @@ def _is_tentative(self, x: (Possibilities, TaggedPossibilities), *, loop):
 #############
 
 
-@broaden.variant(initial_state=lambda: CloneState({}, None, _is_tentative))
+@broaden.variant(
+    initial_state=lambda: {"state": CloneState({}, None, _is_tentative)}
+)
 def tentative(self, p: Possibilities, *, loop):  # noqa: D417
     """Broaden an abstract value and make it tentative.
 
@@ -104,7 +108,7 @@ def nobottom(self, x: Pending):
 #########
 
 
-@ovld.dispatch(initial_state=dict, type_error=MyiaTypeError)
+@ovld.dispatch(initial_state=lambda: {"state": {}}, type_error=MyiaTypeError)
 def amerge(self, x1, x2, forced=False, bind_pending=True, accept_pending=True):
     """Merge two values.
 

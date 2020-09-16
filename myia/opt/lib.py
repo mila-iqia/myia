@@ -1134,13 +1134,15 @@ def expand_J(resources, node, equiv):
     return Constant(newg)
 
 
-@abstract_check.variant(initial_state=lambda: CheckState({}, "_noj"))
+@abstract_check.variant(initial_state=lambda: {"state": CheckState({}, "_noj")})
 def _jelim_jfree(self, j: AbstractJTagged):
     return False
 
 
 @abstract_clone.variant(
-    initial_state=lambda: CloneState(cache={}, prop="_noj", check=_jelim_jfree)
+    initial_state=lambda: {
+        "state": CloneState(cache={}, prop="_noj", check=_jelim_jfree)
+    }
 )
 def _jelim_retype(self, j: AbstractJTagged):
     if not _jelim_nofunc(j.element):
@@ -1148,7 +1150,9 @@ def _jelim_retype(self, j: AbstractJTagged):
     return _jelim_retype(j.element)
 
 
-@abstract_check.variant(initial_state=lambda: CheckState({}, "_nofunc"))
+@abstract_check.variant(
+    initial_state=lambda: {"state": CheckState({}, "_nofunc")}
+)
 def _jelim_nofunc(self, f: (AbstractFunction, AbstractFunctionUnique)):
     return False
 
