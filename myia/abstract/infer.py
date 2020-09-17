@@ -24,7 +24,7 @@ from ..utils import (
     type_error_nargs,
     untested_legacy,
 )
-from .amerge import amerge, bind
+from .amerge import amerge, annotation_merge, bind
 from .data import (
     ANYTHING,
     TYPE,
@@ -90,7 +90,9 @@ def _check_dict_annotation(abstract, type_args):
             raise TypeMismatchError(str, key_type)
         abstract_value_type = type_to_abstract(value_type)
         for child in abstract.children():
-            amerge(abstract_value_type, child, forced=True, bind_pending=True)
+            annotation_merge(
+                abstract_value_type, child, forced=True, bind_pending=True
+            )
     return abstract
 
 
@@ -105,7 +107,7 @@ def validate_annotation(annotation, abstract):
             # a specific check for dict types.
             _check_dict_annotation(abstract, dict_annotation)
         else:
-            amerge(
+            annotation_merge(
                 type_to_abstract(annotation),
                 abstract,
                 forced=True,

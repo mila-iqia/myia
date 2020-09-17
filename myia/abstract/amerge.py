@@ -12,7 +12,6 @@ from ..utils import MyiaTypeError, TypeMismatchError, untested_legacy
 from .data import (
     ABSENT,
     ANYTHING,
-    AbstractADT,
     AbstractBottom,
     AbstractClassBase,
     AbstractDict,
@@ -23,6 +22,7 @@ from .data import (
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
+    AbstractValue,
     AbstractWrapper,
     Possibilities,
     TaggedPossibilities,
@@ -440,32 +440,6 @@ def amerge(
 
 
 @ovld  # noqa: F811
-def amerge(self, x1: AbstractUnion, x2: AbstractADT, forced, bp):
-    """ Special case to merge an abstract union with an abstract ADT.
-
-    When checking an annotation `list` (without arguments) against a list
-    (AbstractADT), `type_to_abstract(annotation)` will return an union
-    (union of empty and list of anything), and then
-    amerge(annotation: AbstractUnion, abstract: AbstractADT) will fail.
-    This overload is intended to check this specific case.
-    """
-    # We check if at least one option in x1 matches x2.
-    merged = None
-    for option in set(x1.options):
-        try:
-            merged = amerge(option, x2, forced, bp)
-        except TypeMismatchError:
-            pass
-    if merged is None:
-        raise TypeMismatchError(x1, x2)
-    # If forced, we return the union.
-    if forced:
-        return x1
-    # Otherwise, we return the merged type.
-    return merged
-
-
-@ovld  # noqa: F811
 def amerge(
     self,
     x1: (int, float, bool, np.integer, np.floating),
@@ -483,6 +457,33 @@ def amerge(self, x1: object, x2: object, forced, bp):
     if x1 != x2:
         raise TypeMismatchError(x1, x2)
     return x1
+
+
+@amerge.variant  # noqa: F811
+def annotation_merge(self, x1: AbstractUnion, x2: AbstractValue, forced, bp):
+    """Special variant to merge an abstract union with an abstract value.
+
+    Example case: when checking an annotation `list` (without arguments)
+    against a list (AbstractADT), `type_to_abstract(annotation)` will return
+    an union (union of empty and list of anything), and then
+    amerge(annotation: AbstractUnion, abstract: AbstractADT) will fail.
+
+    This variant is intended to check such cases.
+    """
+    # We check if at least one option in x1 matches x2.
+    merged = None
+    for option in set(x1.options):
+        try:
+            merged = amerge(option, x2, forced, bp)
+        except TypeMismatchError:
+            pass
+    if merged is None:
+        raise TypeMismatchError(x1, x2)
+    # If forced, we return the union.
+    if forced:
+        return x1
+    # Otherwise, we return the merged type.
+    return merged
 
 
 def bind(loop, committed, resolved, pending):
@@ -681,6 +682,7 @@ def typecheck(model, abstract):
 
 __all__ = [
     "amerge",
+    "annotation_merge",
     "bind",
     "hastype_helper",
     "nobottom",
