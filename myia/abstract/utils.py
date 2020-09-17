@@ -1,6 +1,6 @@
 """Utilities for abstract values and inference."""
 
-from dataclasses import dataclass, replace as dc_replace
+from dataclasses import replace as dc_replace
 from types import AsyncGeneratorType, GeneratorType
 
 from ovld import ovld
