@@ -474,7 +474,8 @@ def annotation_merge(self, x1: AbstractUnion, x2: AbstractValue, forced, bp):
     merged = None
     for option in set(x1.options):
         try:
-            merged = amerge(option, x2, forced, bp)
+            merged = self(option, x2, forced, bp)
+            break
         except TypeMismatchError:
             pass
     if merged is None:
