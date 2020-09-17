@@ -8,7 +8,7 @@ import numpy as np
 from ovld import ovld
 
 from .. import xtype
-from ..classes import ADT
+from ..classes import ADT, Cons, Empty
 from ..ir import Graph, MetaGraph
 from ..operations import Primitive
 from ..utils import (
@@ -40,6 +40,7 @@ from .data import (
     AbstractScalar,
     AbstractTuple,
     AbstractType,
+    AbstractUnion,
     AbstractValue,
     Function,
     GraphFunction,
@@ -359,7 +360,11 @@ def pytype_to_abstract(main: tuple, args):
 def pytype_to_abstract(main: list, args):
     (arg,) = args
     argt = type_to_abstract(arg)
-    return listof(argt)
+    if argt is ANYTHING:
+        rval = AbstractUnion([type_to_abstract(Empty), type_to_abstract(Cons)])
+    else:
+        rval = listof(argt)
+    return rval
 
 
 @ovld  # noqa: F811

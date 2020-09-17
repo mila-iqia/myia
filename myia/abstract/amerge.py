@@ -423,16 +423,6 @@ def amerge(self, x1: AbstractDict, x2: AbstractDict, forced, bp):
 
 
 @ovld  # noqa: F811
-def amerge(self, x1: AbstractADT, x2: AbstractADT, forced, bp):
-    if x1.tag is not x2.tag:
-        raise TypeMismatchError(x1.tag, x2.tag)
-    merged = self(x1.attributes, x2.attributes)
-    if forced or merged is x1.attributes:
-        return x1
-    return type(x1)(tag=x1.tag, attributes=merged)
-
-
-@ovld  # noqa: F811
 def amerge(
     self,
     x1: (AbstractUnion, AbstractTaggedUnion),
@@ -447,6 +437,32 @@ def amerge(
     if forced or merged is args1:
         return x1
     return type(x1)(merged)
+
+
+@ovld  # noqa: F811
+def amerge(self, x1: AbstractUnion, x2: AbstractADT, forced, bp):
+    """ Special case to merge an abstract union with an abstract ADT.
+
+    When checking an annotation `list` (without arguments) against a list
+    (AbstractADT), `type_to_abstract(annotation)` will return an union
+    (union of empty and list of anything), and then
+    amerge(annotation: AbstractUnion, abstract: AbstractADT) will fail.
+    This overload is intended to check this specific case.
+    """
+    # We check if at least one option in x1 matches x2.
+    merged = None
+    for option in set(x1.options):
+        try:
+            merged = amerge(option, x2, forced, bp)
+        except TypeMismatchError:
+            pass
+    if merged is None:
+        raise TypeMismatchError(x1, x2)
+    # If forced, we return the union.
+    if forced:
+        return x1
+    # Otherwise, we return the merged type.
+    return merged
 
 
 @ovld  # noqa: F811

@@ -90,7 +90,7 @@ def _check_dict_annotation(abstract, type_args):
             raise TypeMismatchError(str, key_type)
         abstract_value_type = type_to_abstract(value_type)
         for child in abstract.children():
-            amerge(child, abstract_value_type)
+            amerge(abstract_value_type, child, forced=True, bind_pending=True)
     return abstract
 
 
@@ -105,7 +105,12 @@ def validate_annotation(annotation, abstract):
             # a specific check for dict types.
             _check_dict_annotation(abstract, dict_annotation)
         else:
-            amerge(abstract, type_to_abstract(annotation))
+            amerge(
+                type_to_abstract(annotation),
+                abstract,
+                forced=True,
+                bind_pending=True,
+            )
     except MyiaTypeError as exc:
         raise AnnotationMismatchError(f"{type(exc).__name__}: {exc.message}")
     return abstract
