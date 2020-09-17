@@ -42,6 +42,7 @@ from .data import (
     AbstractType,
     AbstractUnion,
     AbstractValue,
+    DictDesc,
     Function,
     GraphFunction,
     MacroFunction,
@@ -403,6 +404,21 @@ def pytype_to_abstract(main: AbstractArray, args):
 @ovld  # noqa: F811
 def pytype_to_abstract(main: RandomStateWrapper, args):
     return AbstractRandomState()
+
+
+@ovld  # noqa: F811
+def pytype_to_abstract(main: dict, args):
+    if args is None:
+        # Just provide an empty dict as entries.
+        entries = {}
+    else:
+        key_type, value_type = args
+        if key_type is not str:
+            raise MyiaTypeError(f"Expected dict type str, got {key_type}")
+        # We cannot get keys from a type description, so we will instead use
+        # a placeholder object keeping abstract value.
+        entries = DictDesc(type_to_abstract(value_type))
+    return AbstractDict(entries)
 
 
 __all__ = [

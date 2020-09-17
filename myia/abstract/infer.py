@@ -1,7 +1,6 @@
 """Algorithms for inference."""
 
 import asyncio
-import typing
 from dataclasses import replace as dc_replace
 from functools import reduce
 
@@ -18,7 +17,6 @@ from ..utils import (
     MyiaTypeError,
     OrderedSet,
     Partializable,
-    TypeMismatchError,
     infer_trace,
     tracer,
     type_error_nargs,
@@ -29,7 +27,6 @@ from .data import (
     ANYTHING,
     TYPE,
     VALUE,
-    AbstractDict,
     AbstractFunction,
     AbstractFunctionUnique,
     AbstractJTagged,
@@ -64,55 +61,15 @@ from .utils import (
 )
 
 
-def _annotation_as_dict(type_hint):
-    """Return dict type args if type hint is a dict, else None."""
-    if type_hint is dict:
-        return ()
-    if (
-        isinstance(type_hint, typing._GenericAlias)
-        and type_hint.__origin__ is dict
-    ):
-        return type_hint.__args__
-    return None
-
-
-def _check_dict_annotation(abstract, type_args):
-    """Check if abstract is an abstract dict.
-
-    type_args is either () or the couple (key_type, value_type) of
-    expected python types for dict keys and values.
-    """
-    if not isinstance(abstract, AbstractDict):
-        raise TypeMismatchError(AbstractDict, abstract)
-    if type_args:
-        key_type, value_type = type_args
-        if key_type is not str:
-            raise TypeMismatchError(str, key_type)
-        abstract_value_type = type_to_abstract(value_type)
-        for child in abstract.children():
-            annotation_merge(
-                abstract_value_type, child, forced=True, bind_pending=True
-            )
-    return abstract
-
-
 def validate_annotation(annotation, abstract):
     """Check if abstract is allowed by given annotation."""
     try:
-        dict_annotation = _annotation_as_dict(annotation)
-        if dict_annotation is not None:
-            # type_to_abstract could not generate a suitable
-            # AbstractDict from a type hint because it won't
-            # provide dict keys and values, so we need
-            # a specific check for dict types.
-            _check_dict_annotation(abstract, dict_annotation)
-        else:
-            annotation_merge(
-                type_to_abstract(annotation),
-                abstract,
-                forced=True,
-                bind_pending=True,
-            )
+        annotation_merge(
+            type_to_abstract(annotation),
+            abstract,
+            forced=True,
+            bind_pending=True,
+        )
     except MyiaTypeError as exc:
         raise AnnotationMismatchError(f"{type(exc).__name__}: {exc.message}")
     return abstract

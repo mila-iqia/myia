@@ -37,6 +37,40 @@ DEAD = Named("DEAD")
 POLY = Named("POLY")
 
 
+# Represent a dict description with known value type but unknown keys.
+class DictDesc:
+    """Dictionary descriptor.
+
+    Helper class to describe dict entries when keys are unknown.
+    This will be used for AbstractDict entries when inferring
+    it from a type description (e.g. `Dict[str, int]`).
+    """
+
+    __slots__ = ("value_type",)
+
+    def __init__(self, value_type):
+        """Init dict descriptor with an abstract value.
+
+        value_type must be an AbstractValue or derived.
+        """
+        self.value_type = value_type
+
+    def to_dict(self, keys):
+        """Convert to a real dict with given keys.
+
+        Each key will be associated to the abstract value in output dict.
+        """
+        return {key: self.value_type for key in keys}
+
+    def keys(self):
+        """Return an empty iterable.
+
+        Placeholder to make AbstractDict work correctly, as it is called
+        in AbstractDict.__eqkey__.
+        """
+        return ()
+
+
 #####################
 # Function wrappers #
 #####################
