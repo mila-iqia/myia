@@ -4,7 +4,7 @@ from dataclasses import is_dataclass
 from functools import reduce
 
 import numpy as np
-from ovld import OvldMC
+from ovld import OvldMC, ovld
 
 from . import abstract, operations
 from .abstract import broaden
@@ -166,6 +166,7 @@ class HyperMap(MetaGraph, metaclass=OvldMC):
         g.set_flags(core=False)
         return g.output
 
+    @ovld
     def _make(self, a: abstract.AbstractTaggedUnion, g, fnarg, argmap):
         return self._make_union_helper(a, a.options, g, fnarg, argmap)
 
