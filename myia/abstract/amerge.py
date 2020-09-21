@@ -501,9 +501,7 @@ def annotation_merge(self, x1: AbstractDict, x2: AbstractDict, forced, bp):
     args1 = (entries_1, x1.values)
     args2 = (entries_2, x2.values)
     merged = self(args1, args2, forced, bp)
-    if forced or merged is args1:
-        return x1
-    return type(x1)(*merged)
+    return x1 if (forced or merged is args1) else type(x1)(*merged)
 
 
 def bind(loop, committed, resolved, pending):
