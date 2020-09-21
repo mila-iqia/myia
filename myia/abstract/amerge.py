@@ -491,6 +491,7 @@ def annotation_merge(self, x1: AbstractUnion, x2: AbstractValue, forced, bp):
 @ovld  # noqa: F811
 def annotation_merge(self, x1: AbstractDict, x2: AbstractDict, forced, bp):
     """Specific case when annotation (x1) is a dict type hint."""
+
     entries_1 = x1.entries
     entries_2 = x2.entries
     if isinstance(entries_1, DictDesc):
