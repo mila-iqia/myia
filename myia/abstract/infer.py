@@ -11,6 +11,7 @@ from ..info import About
 from ..ir import Constant, Graph
 from ..operations import primitives as P
 from ..utils import (
+    AnnotationMismatchError,
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,
@@ -21,7 +22,7 @@ from ..utils import (
     type_error_nargs,
     untested_legacy,
 )
-from .amerge import amerge, bind
+from .amerge import amerge, annotation_merge, bind
 from .data import (
     ANYTHING,
     TYPE,
@@ -51,13 +52,27 @@ from .ref import (
     Reference,
     VirtualReference,
 )
-from .to_abstract import to_abstract
+from .to_abstract import to_abstract, type_to_abstract
 from .utils import (
     broaden as _broaden,
     concretize_abstract,
     concretize_cache,
     sensitivity_transform,
 )
+
+
+def validate_annotation(annotation, abstract):
+    """Check if abstract is allowed by given annotation."""
+    try:
+        annotation_merge(
+            type_to_abstract(annotation),
+            abstract,
+            forced=True,
+            bind_pending=True,
+        )
+    except MyiaTypeError as exc:
+        raise AnnotationMismatchError(f"{type(exc).__name__}: {exc.message}")
+    return abstract
 
 
 class InferenceEngine(metaclass=OvldMC):
@@ -183,6 +198,9 @@ class InferenceEngine(metaclass=OvldMC):
                 f" This indicates either a bug in a macro or a bug in Myia.",
                 refs=[ref],
             )
+
+        if ref.node.annotation:
+            result = validate_annotation(ref.node.annotation, result)
 
         tracer().emit("compute_ref", engine=self, reference=ref, result=result)
         return result
@@ -617,6 +635,8 @@ class GraphInferrer(Inferrer):
         # We associate each parameter of the Graph with its value for each
         # property, in the context we built.
         for p, arg in zip(g.parameters, context.argkey):
+            if p.annotation:
+                validate_annotation(p.annotation, arg)
             ref = engine.ref(p, context)
             engine.cache.set_value(ref, arg)
 

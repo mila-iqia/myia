@@ -253,6 +253,7 @@ class CloneRemapper(BasicRemapper):
         graph_relation,
         clone_constants,
         set_abstract=True,
+        set_annotation=True,
     ):
         """Initialize the GraphCloner."""
         super().__init__(
@@ -265,12 +266,15 @@ class CloneRemapper(BasicRemapper):
         self.inlines = inlines
         self.clone_constants = clone_constants
         self.set_abstract = set_abstract
+        self.set_annotation = set_annotation
 
     def remap_node(self, key, graph, node, new_graph, new_node, link=None):
-        """Remap the given node as normal and also copy the abstract."""
+        """Remap the given node as normal and copy abstract and annotation."""
         nn = super().remap_node(key, graph, node, new_graph, new_node, link)
         if self.set_abstract and nn.abstract is None:
             nn.abstract = node.abstract
+        if self.set_annotation and nn.annotation is None:
+            nn.annotation = node.annotation
         return nn
 
     def get_graph(self, graph):

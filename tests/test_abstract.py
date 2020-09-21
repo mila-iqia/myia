@@ -11,6 +11,7 @@ from myia.abstract import (
     DEAD,
     TYPE,
     VALUE,
+    AbstractADT,
     AbstractBottom,
     AbstractClass,
     AbstractError,
@@ -35,6 +36,7 @@ from myia.abstract import (
     abstract_check,
     abstract_clone,
     amerge,
+    annotation_merge,
     broaden,
     build_value,
     empty,
@@ -54,7 +56,7 @@ from myia.utils import (
     SymbolicKeyInstance,
 )
 
-from .common import Point, S, Ty, U, af32_of, f32, i16, to_abstract_test
+from .common import Point, S, Ty, U, af32_of, f32, i16, i32, to_abstract_test
 
 
 def test_to_abstract_skey():
@@ -388,3 +390,29 @@ def test_get_resolved():
     ref = eng.ref(Constant(123), Context.empty())
     with pytest.raises(InternalInferenceError):
         ref.get_resolved()
+
+
+def test_annotation_merge():
+    with pytest.raises(MyiaTypeError):
+        annotation_merge(
+            AbstractUnion(
+                [AbstractScalar({TYPE: i16}), AbstractScalar({TYPE: f32})]
+            ),
+            AbstractScalar({TYPE: i32}),
+        )
+
+    scalar = AbstractScalar({TYPE: f32})
+    union = AbstractUnion([AbstractScalar({TYPE: i16}), scalar])
+    assert annotation_merge(union, scalar) is scalar
+    assert annotation_merge(union, scalar, forced=True) is union
+
+    generic_list_type = type_to_abstract(list)
+    specific_list_type = to_abstract([1, 2])
+    assert isinstance(generic_list_type, AbstractUnion)
+    assert (
+        annotation_merge(generic_list_type, specific_list_type, forced=True)
+        is generic_list_type
+    )
+    assert isinstance(
+        annotation_merge(generic_list_type, specific_list_type), AbstractADT
+    )

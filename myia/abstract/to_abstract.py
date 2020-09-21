@@ -42,6 +42,7 @@ from .data import (
     AbstractType,
     AbstractUnion,
     AbstractValue,
+    DictDesc,
     Function,
     GraphFunction,
     MacroFunction,
@@ -250,7 +251,7 @@ def to_abstract(self, v: type, **kwargs):
 ####################
 
 
-_default_type_params = {tuple: (), list: (object,)}
+_default_type_params = {tuple: (), list: (object,), np.ndarray: (object,)}
 
 
 @ovld
@@ -360,8 +361,10 @@ def pytype_to_abstract(main: tuple, args):
 def pytype_to_abstract(main: list, args):
     (arg,) = args
     argt = type_to_abstract(arg)
-    assert argt is ANYTHING
-    rval = AbstractUnion([type_to_abstract(Empty), type_to_abstract(Cons)])
+    if argt is ANYTHING:
+        rval = AbstractUnion([type_to_abstract(Empty), type_to_abstract(Cons)])
+    else:
+        rval = listof(argt)
     return rval
 
 
@@ -396,6 +399,26 @@ def pytype_to_abstract(main: bool, args):
 @ovld  # noqa: F811
 def pytype_to_abstract(main: AbstractArray, args):
     return AbstractArray(ANYTHING, values={SHAPE: ANYTHING, TYPE: ANYTHING})
+
+
+@ovld  # noqa: F811
+def pytype_to_abstract(main: RandomStateWrapper, args):
+    return AbstractRandomState()
+
+
+@ovld  # noqa: F811
+def pytype_to_abstract(main: dict, args):
+    if args is None:
+        # Just provide an empty dict as entries.
+        entries = {}
+    else:
+        key_type, value_type = args
+        if key_type is not str:
+            raise MyiaTypeError(f"Expected dict type str, got {key_type}")
+        # We cannot get keys from a type description, so we will instead use
+        # a placeholder object keeping abstract value.
+        entries = DictDesc(type_to_abstract(value_type))
+    return AbstractDict(entries)
 
 
 __all__ = [

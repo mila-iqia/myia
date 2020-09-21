@@ -4,6 +4,7 @@ from contextvars import ContextVar
 from functools import reduce
 from itertools import chain
 
+import numpy as np
 from ovld import ovld
 
 from .. import xtype
@@ -21,7 +22,9 @@ from .data import (
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
+    AbstractValue,
     AbstractWrapper,
+    DictDesc,
     Possibilities,
     TaggedPossibilities,
     TrackDict,
@@ -438,7 +441,13 @@ def amerge(
 
 
 @ovld  # noqa: F811
-def amerge(self, x1: (int, float, bool), x2: (int, float, bool), forced, bp):
+def amerge(
+    self,
+    x1: (int, float, bool, np.integer, np.floating),
+    x2: (int, float, bool, np.integer, np.floating),
+    forced,
+    bp,
+):
     if forced and x1 != x2:
         raise TypeMismatchError(x1, x2)
     return x1 if x1 == x2 else ANYTHING
@@ -449,6 +458,51 @@ def amerge(self, x1: object, x2: object, forced, bp):
     if x1 != x2:
         raise TypeMismatchError(x1, x2)
     return x1
+
+
+@amerge.variant  # noqa: F811
+def annotation_merge(self, x1: AbstractUnion, x2: AbstractValue, forced, bp):
+    """Special variant to merge an abstract union with an abstract value.
+
+    Example case: when checking an annotation `list` (without arguments)
+    against a list (AbstractADT), `type_to_abstract(annotation)` will return
+    an union (union of empty and list of anything), and then
+    amerge(annotation: AbstractUnion, abstract: AbstractADT) will fail.
+
+    This variant is intended to check such cases.
+    """
+    # We check if at least one option in x1 matches x2.
+    merged = None
+    for option in set(x1.options):
+        try:
+            merged = self(option, x2, forced, bp)
+            break
+        except TypeMismatchError:
+            pass
+    if merged is None:
+        raise TypeMismatchError(x1, x2)
+    # If forced, we return the union.
+    if forced:
+        return x1
+    # Otherwise, we return the merged type.
+    return merged
+
+
+@ovld  # noqa: F811
+def annotation_merge(self, x1: AbstractDict, x2: AbstractDict, forced, bp):
+    """Specific case when annotation (x1) is a dict type hint."""
+
+    entries_1 = x1.entries
+    entries_2 = x2.entries
+    if isinstance(entries_1, DictDesc):
+        # Create a dict in entries_1 using keys from entries_2.
+        entries_1 = entries_1.to_dict(entries_2.keys())
+    # Otherwise, entries_1 and entries_2 should be real dicts.
+
+    args1 = (entries_1, x1.values)
+    args2 = (entries_2, x2.values)
+    merged = self(args1, args2, forced, bp)
+    return x1 if (forced or merged is args1) else type(x1)(*merged)
 
 
 def bind(loop, committed, resolved, pending):
@@ -647,6 +701,7 @@ def typecheck(model, abstract):
 
 __all__ = [
     "amerge",
+    "annotation_merge",
     "bind",
     "hastype_helper",
     "nobottom",
