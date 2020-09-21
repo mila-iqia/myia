@@ -415,22 +415,8 @@ def amerge(self, x1: AbstractClassBase, x2: AbstractClassBase, forced, bp):
 
 @ovld  # noqa: F811
 def amerge(self, x1: AbstractDict, x2: AbstractDict, forced, bp):
-    entries_1 = x1.entries
-    entries_2 = x2.entries
-    if isinstance(entries_1, DictDesc) and isinstance(entries_2, DictDesc):
-        # No available keys, use empty dicts.
-        entries_1 = {}
-        entries_2 = {}
-    elif isinstance(entries_1, DictDesc) and isinstance(entries_2, dict):
-        # Create a dict in entries_1 using keys from entries_2.
-        entries_1 = entries_1.to_dict(entries_2.keys())
-    elif isinstance(entries_1, dict) and isinstance(entries_2, DictDesc):
-        # Create a dict in entries_2 using keys from entries_1.
-        entries_2 = entries_2.to_dict(entries_1.keys())
-    # Otherwise, entries_1 and entries_2 should be real dicts.
-
-    args1 = (entries_1, x1.values)
-    args2 = (entries_2, x2.values)
+    args1 = (x1.entries, x1.values)
+    args2 = (x2.entries, x2.values)
     merged = self(args1, args2, forced, bp)
     if forced or merged is args1:
         return x1
@@ -500,6 +486,24 @@ def annotation_merge(self, x1: AbstractUnion, x2: AbstractValue, forced, bp):
         return x1
     # Otherwise, we return the merged type.
     return merged
+
+
+@ovld  # noqa: F811
+def annotation_merge(self, x1: AbstractDict, x2: AbstractDict, forced, bp):
+    """Specific case when annotation (x1) is a dict type hint."""
+    entries_1 = x1.entries
+    entries_2 = x2.entries
+    if isinstance(entries_1, DictDesc):
+        # Create a dict in entries_1 using keys from entries_2.
+        entries_1 = entries_1.to_dict(entries_2.keys())
+    # Otherwise, entries_1 and entries_2 should be real dicts.
+
+    args1 = (entries_1, x1.values)
+    args2 = (entries_2, x2.values)
+    merged = self(args1, args2, forced, bp)
+    if forced or merged is args1:
+        return x1
+    return type(x1)(*merged)
 
 
 def bind(loop, committed, resolved, pending):
