@@ -44,7 +44,7 @@ def eqtest(x: object, y, **kwargs):
     return x == y
 
 
-@overload  # noqa: F811
+@ovld  # noqa: F811
 def to_numpy(value: object):
     """Convert a value to a numpy array. Used in _run below."""
     return value

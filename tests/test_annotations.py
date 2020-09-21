@@ -4,21 +4,31 @@ import numpy as np
 import pytest
 
 from myia import myia
+from myia.compile.backends import get_backend_names
 from myia.operations import random_initialize, random_uint32
 from myia.utils import AnnotationMismatchError
 from myia.utils.misc import RandomStateWrapper
 
 
-def test_scalar():
-    @myia
+@pytest.fixture(
+    params=[pytest.param(backend) for backend in get_backend_names()]
+)
+def _backend_fixture(request):
+    return request.param
+
+
+def test_scalar(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(x: int, y: float) -> np.float32:
         return np.float32(np.float64(x) * np.float64(y))
 
-    @myia
+    @myia(backend=backend)
     def g(a, b) -> np.float32:
         return a * b
 
-    @myia
+    @myia(backend=backend)
     def h(a, b):
         c: float = a * b
         return 2 * c
@@ -48,21 +58,23 @@ def test_scalar():
         h(1, 2)
 
 
-def test_tuple():
-    @myia
+def test_tuple(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(x: tuple):
         return x[0] + x[1]
 
-    @myia
+    @myia(backend=backend)
     def g(x: Tuple) -> tuple:
         # to check if `Tuple` is parsed correctly as `tuple`.
         return x
 
-    @myia
+    @myia(backend=backend)
     def h(x: Tuple[float, int]):
         return x[0] + float(x[1])
 
-    @myia
+    @myia(backend=backend)
     def j(x):
         y: tuple = x
         return y[0]
@@ -93,16 +105,18 @@ def test_tuple():
         j(7)
 
 
-def test_list():
-    @myia
+def test_list(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(x: list):
         return x[0] + 2
 
-    @myia
+    @myia(backend=backend)
     def g(x: List[np.int16]):
         return x[0] + 2
 
-    @myia
+    @myia(backend=backend)
     def h(x):
         y: list = x
         return y[0] + 2
@@ -125,24 +139,26 @@ def test_list():
         h((5, 3))
 
 
-def test_dict():
-    @myia
+def test_dict(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(x: Dict[str, np.float32]):
         return np.float32(x["value"]) * np.float32(2.5)
 
-    @myia
+    @myia(backend=backend)
     def g(x: dict):
         return x
 
-    @myia
+    @myia(backend=backend)
     def h(x: Dict[Tuple[int, int], int]):
         return x
 
-    @myia
+    @myia(backend=backend)
     def j(x: Dict[int, int]):
         return x
 
-    @myia
+    @myia(backend=backend)
     def k(x):
         y: Dict[str, np.float32] = x
         return y["test"]
@@ -174,12 +190,14 @@ def test_dict():
         k(d1)
 
 
-def test_ndarray():
-    @myia
+def test_ndarray(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(a, b: np.ndarray) -> np.ndarray:
         return a * b
 
-    @myia
+    @myia(backend=backend)
     def g(a):
         x: np.ndarray = 2 * a + 1
         return x[0, 0].item()
@@ -198,18 +216,20 @@ def test_ndarray():
         g(0)
 
 
-def test_random_state_wrapper():
-    @myia
-    def f(seed) -> RandomStateWrapper:
-        rstate: RandomStateWrapper = random_initialize(np.uint32(seed))
+def test_random_state_wrapper(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
+    def f() -> RandomStateWrapper:
+        rstate: RandomStateWrapper = random_initialize(10)
         r0, _ = random_uint32(rstate, ())
         return r0
 
-    @myia
+    @myia(backend=backend)
     def g(rstate: RandomStateWrapper):
         return rstate
 
-    g(f(10))
+    g(f())
 
     with pytest.raises(AnnotationMismatchError):
         # wrong argument type

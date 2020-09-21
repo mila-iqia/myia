@@ -57,6 +57,7 @@ from myia.testing.common import (
     af32_of,
     f32,
     i16,
+    i32,
     to_abstract_test,
 )
 from myia.utils import (

@@ -2,7 +2,15 @@ import pytest
 
 from myia import myia
 from myia.abstract import macro, myia_static
+from myia.compile.backends import get_backend_names
 from myia.utils import InferenceError, InternalInferenceError
+
+
+@pytest.fixture(
+    params=[pytest.param(backend) for backend in get_backend_names()]
+)
+def _backend_fixture(request):
+    return request.param
 
 
 @macro
@@ -14,9 +22,11 @@ def test_repr():
     assert repr(mackerel) == "<Macro mackerel>"
 
 
-def test_bad_macro():
+def test_bad_macro(_backend_fixture):
     from myia.ir import Graph
     from myia.operations import primitives as P
+
+    backend = _backend_fixture
 
     @macro
     async def bad(info, x):
@@ -30,7 +40,7 @@ def test_bad_macro():
         # badg. The error raised by Myia should reflect this.
         return info.graph.apply(P.transpose, badg.output)
 
-    @myia
+    @myia(backend=backend)
     def salmon(x, y):
         return bad(x + y)
 
@@ -46,13 +56,15 @@ def test_bad_macro_2():
             return info.nodes()[0]
 
 
-def test_bad_macro_3():
+def test_bad_macro_3(_backend_fixture):
+    backend = _backend_fixture
+
     @macro
     async def macncheese(info, x):
         # Should return a node
         return None
 
-    @myia
+    @myia(backend=backend)
     def pasta(x, y):
         return macncheese(x + y)
 
@@ -82,21 +94,23 @@ def test_myia_static_in_myia_static():
     static_blah(1, 2)
 
 
-def test_myia_static():
-    @myia
+def test_myia_static(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def get_fourth(xs):
         return xs[static_add(1, y=2)]
 
     assert get_fourth((1, 2, 3, 4, 5)) == 4
 
-    @myia
+    @myia(backend=backend)
     def get_fourth_bad(xs):
         return xs[static_add(1, x=2)]
 
     with pytest.raises(InferenceError):
         get_fourth_bad((1, 2, 3, 4, 5))
 
-    @myia
+    @myia(backend=backend)
     def add1_bad(x):
         return static_add(1, x)
 

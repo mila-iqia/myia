@@ -4,6 +4,7 @@ import pytest
 from myia.abstract.data import AbstractRandomState
 from myia.api import myia, to_device
 from myia.compile import closure_convert
+from myia.compile.backends import get_backend_names
 from myia.ir import clone
 from myia.operations import tuple_getitem
 from myia.pipeline import (
@@ -28,8 +29,17 @@ from myia.utils.misc import RandomStateWrapper
 from myia.xtype import Bool
 
 
-def test_myia():
-    @myia
+@pytest.fixture(
+    params=[pytest.param(backend) for backend in get_backend_names()]
+)
+def _backend_fixture(request):
+    return request.param
+
+
+def test_myia(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(x, y):
         return x + y
 
@@ -48,8 +58,10 @@ def test_myia():
         f(Thing(10), Thing(20))
 
 
-def test_myia_specialize_values():
-    @myia(specialize_values=["c"])
+def test_myia_specialize_values(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend, specialize_values=["c"])
     def f(c, x, y):
         if c:
             return x + y
@@ -64,8 +76,10 @@ def test_myia_specialize_values():
     assert ft is not ff
 
 
-def test_myia_struct_arg():
-    @myia
+def test_myia_struct_arg(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(pt):
         return pt.x
 
@@ -73,8 +87,10 @@ def test_myia_struct_arg():
     assert x == 5
 
 
-def test_myia_return_struct():
-    @myia
+def test_myia_return_struct(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(x, y):
         return Point(x, y)
 
@@ -82,8 +98,10 @@ def test_myia_return_struct():
     assert pt == Point(5, 6)
 
 
-def test_myia_dict_field():
-    @myia
+def test_myia_dict_field(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def f(d):
         return d["x"]
 
@@ -212,13 +230,14 @@ def test_from_canonical():
 
 
 @pytest.mark.xfail(reason="Cannot pass a function as an argument.")
-def test_function_arg():
+def test_function_arg(_backend_fixture):
     """Give a Python function as an argument."""
+    backend = _backend_fixture
 
     def square(x):
         return x * x
 
-    @myia
+    @myia(backend=backend)
     def f(fn, x, y):
         return fn(x + y)
 
@@ -226,8 +245,9 @@ def test_function_arg():
 
 
 @pytest.mark.xfail(reason="Cannot pass a function as an argument.")
-def test_function_in_tuple():
+def test_function_in_tuple(_backend_fixture):
     """Give a tuple of functions as an argument."""
+    backend = _backend_fixture
 
     def square(x):
         return x * x
@@ -235,7 +255,7 @@ def test_function_in_tuple():
     def double(x):
         return x + x
 
-    @myia
+    @myia(backend=backend)
     def f(fns, x, y):
         f0, f1 = fns
         return f1(f0(x + y))
@@ -384,8 +404,10 @@ def test_raise():
         raise Exception("Expected an exception")
 
 
-def test_return_backend():
-    @myia(return_backend=True)
+def test_return_backend(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend, return_backend=True)
     def f(a):
         return a
 
@@ -410,7 +432,9 @@ def _setflag2():
     return DoTrace({"/compile/exit": _set})
 
 
-def test_env_tracer(monkeypatch):
+def test_env_tracer(monkeypatch, _backend_fixture):
+    backend = _backend_fixture
+
     _flag1[0] = False
     _flag2[0] = False
 
@@ -418,7 +442,7 @@ def test_env_tracer(monkeypatch):
         "MYIATRACER", "tests.test_api._setflag1;tests.test_api._setflag2"
     )
 
-    @myia
+    @myia(backend=backend)
     def f(x, y):
         return x * y
 
