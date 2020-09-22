@@ -252,7 +252,7 @@ def sexp_to_graph(sexp):
     return g
 
 
-def print_graph(g):
+def print_graph(g, allow_cycles=True):
     """Returns a textual representation of a graph."""
     import io
 
@@ -272,7 +272,18 @@ def print_graph(g):
         else:
             return f"%{node.debug.debug_name}"
 
-    for node in toposort(g.output, allow_cycles=True):
+    seen_graphs = set([g])
+    def _succ_deep_once(node):
+        if node.is_constant_graph():
+            res = [node.value.return_] if node.value not in seen_graphs else []
+            seen_graphs.add(node.value)
+            return res
+        else:
+            return node.incoming
+
+    for node in _toposort(g.output, _succ_deep_once, allow_cycles=allow_cycles):
+        if (node.graph is not None and node.graph is not g) or node is g.return_:
+            continue
         if node.is_apply():
             print(f"  %{node.debug.debug_name} = ", end="", file=buf)
             print(f"{repr_node(node.inputs[0])}(", end="", file=buf)
