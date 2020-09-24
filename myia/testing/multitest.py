@@ -406,6 +406,15 @@ class __Module:
             ]
         )
 
+    def backend_except(self, *excluded_backends):
+        return Multiple(
+            *[
+                param
+                for backend, target, param in _get_backend_testing_parameters()
+                if target == "cpu" and backend not in excluded_backends
+            ]
+        )
+
     @property
     def run(self):
         return _run.configure(backend=self.backend_all)

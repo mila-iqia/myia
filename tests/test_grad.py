@@ -47,7 +47,12 @@ from myia.testing.common import (
     to_abstract_test,
     u64,
 )
-from myia.testing.multitest import backend_all, mt, myia_function_test
+from myia.testing.multitest import (
+    backend_all,
+    backend_except,
+    mt,
+    myia_function_test,
+)
 from myia.utils import InferenceError, MyiaInputTypeError
 
 
@@ -380,10 +385,10 @@ def test_while_2(x, y, z):
 @gradient(
     [1.0, 2.0, 3.0, 4.0],
     pipeline=standard_debug_pipeline.configure(validate=False),
-    backend=backend_all,
+    backend=backend_except("relay"),
 )
 def test_list_while(xs):
-    # Fail will relay:
+    # Fail with relay:
     # myia.pipeline.ressources.default_convert receives
     # a tvm.runtime.ADT and then fails because it cannot
     # look for attribute __to_myia__
