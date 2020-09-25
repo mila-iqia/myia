@@ -162,6 +162,7 @@ def to_abstract_test(
         EnvInstance,
     ),
 ):
+    """Convert a python value to a myia abstract object"""
     return AbstractScalar(
         {
             VALUE: x,
