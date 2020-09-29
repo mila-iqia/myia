@@ -8,8 +8,6 @@ from ..abstract import (
     AbstractFunction,
     AbstractFunctionUnique,
     AbstractJTagged,
-    CheckState,
-    CloneState,
     abstract_check,
     abstract_clone,
     build_value,
@@ -27,7 +25,7 @@ from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
 from ..utils import Partializable, tracer
-from ..utils.errors import untested_legacy
+from ..utils.errors import untested
 from ..utils.unify import Var, var
 from ..utils.variables import (
     C1,
@@ -973,7 +971,7 @@ def env_getitem_transform(orig_graph, key, default):
             graph.output = value
             break
     else:
-        with untested_legacy():
+        with untested():
             graph.output = graph.apply(P.env_getitem, out, key, default)
     graph.return_.abstract = key.abstract
     return graph
@@ -1134,13 +1132,13 @@ def expand_J(resources, node, equiv):
     return Constant(newg)
 
 
-@abstract_check.variant(initial_state=lambda: CheckState({}, "_noj"))
+@abstract_check.variant(initial_state=lambda: {"cache": {}, "prop": "_noj"})
 def _jelim_jfree(self, j: AbstractJTagged):
     return False
 
 
 @abstract_clone.variant(
-    initial_state=lambda: CloneState(cache={}, prop="_noj", check=_jelim_jfree)
+    initial_state=lambda: {"cache": {}, "prop": "_noj", "check": _jelim_jfree},
 )
 def _jelim_retype(self, j: AbstractJTagged):
     if not _jelim_nofunc(j.element):
@@ -1148,7 +1146,7 @@ def _jelim_retype(self, j: AbstractJTagged):
     return _jelim_retype(j.element)
 
 
-@abstract_check.variant(initial_state=lambda: CheckState({}, "_nofunc"))
+@abstract_check.variant(initial_state=lambda: {"cache": {}, "prop": "_nofunc"})
 def _jelim_nofunc(self, f: (AbstractFunction, AbstractFunctionUnique)):
     return False
 

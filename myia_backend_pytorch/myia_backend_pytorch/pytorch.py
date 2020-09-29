@@ -9,7 +9,7 @@ from myia.compile.cconv import closure_convert
 from myia.compile.transform import CompileGraphs, nonlinear_ops
 from myia.ir import manage
 from myia.operations import Primitive, primitives as P
-from myia.utils import RandomStateWrapper, TaggedValue, untested_legacy
+from myia.utils import RandomStateWrapper, TaggedValue, untested
 from myia.xtype import Bool, Float, Int, UInt, type_to_np_dtype
 
 from .pytorch_conv_grad import conv2d_weight
@@ -537,7 +537,7 @@ class PyTorchBackend(Backend):
     def to_numpy(self, v):
         """Make a numpy array from a torch tensor."""
         if v.is_cuda:
-            with untested_legacy():
+            with untested():
                 v = v.cpu()
         return v.detach().numpy()
 

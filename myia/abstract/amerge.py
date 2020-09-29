@@ -8,7 +8,7 @@ import numpy as np
 from ovld import ovld
 
 from .. import xtype
-from ..utils import MyiaTypeError, TypeMismatchError, untested_legacy
+from ..utils import MyiaTypeError, TypeMismatchError, untested
 from .data import (
     ABSENT,
     ANYTHING,
@@ -35,14 +35,7 @@ from .loop import (
     find_coherent_result_sync,
     is_simple,
 )
-from .utils import (
-    CheckState,
-    CloneState,
-    abstract_check,
-    broaden,
-    is_broad,
-    union_simplify,
-)
+from .utils import abstract_check, broaden, is_broad, union_simplify
 
 amerge_engine = ContextVar("amerge_engine", default=None)
 
@@ -52,7 +45,7 @@ amerge_engine = ContextVar("amerge_engine", default=None)
 ###################
 
 
-@is_broad.variant(initial_state=lambda: CheckState(cache={}, prop=None))
+@is_broad.variant(initial_state=lambda: {"cache": {}, "prop": None})
 def _is_tentative(self, x: (Possibilities, TaggedPossibilities), *, loop):
     return False
 
@@ -62,7 +55,9 @@ def _is_tentative(self, x: (Possibilities, TaggedPossibilities), *, loop):
 #############
 
 
-@broaden.variant(initial_state=lambda: CloneState({}, None, _is_tentative))
+@broaden.variant(
+    initial_state=lambda: {"cache": {}, "prop": None, "check": _is_tentative},
+)
 def tentative(self, p: Possibilities, *, loop):  # noqa: D417
     """Broaden an abstract value and make it tentative.
 
@@ -104,7 +99,7 @@ def nobottom(self, x: Pending):
 #########
 
 
-@ovld.dispatch(initial_state=dict, type_error=MyiaTypeError)
+@ovld.dispatch(initial_state=lambda: {"state": {}}, type_error=MyiaTypeError)
 def amerge(self, x1, x2, forced=False, bind_pending=True, accept_pending=True):
     """Merge two values.
 
@@ -349,7 +344,7 @@ def amerge(
 
 @ovld  # noqa: F811
 def amerge(self, x1: AbstractFunctionUnique, x2: AbstractFunction, forced, bp):
-    with untested_legacy():
+    with untested():
         vfn = x1
         poss = x2.get_sync()
 

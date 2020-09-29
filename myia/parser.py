@@ -319,12 +319,12 @@ class Parser:
         for node in dfs(main_block.graph.return_, succ_deeper):
             if node.is_constant_graph():
                 if node.value.return_ is None:
-                    current = node.value.debug
-                    while getattr(current, "about", None) is not None:
-                        current = getattr(current.about, "debug", None)
                     raise MyiaSyntaxError(
                         "Function doesn't return a value in all cases",
-                        current.location,
+                        node.value.debug.find(
+                            "location",
+                            skip={"while_after", "for_after", "if_after"},
+                        ),
                     )
 
         diff_cache = self.write_cache - self.read_cache
