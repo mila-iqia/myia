@@ -20,7 +20,7 @@ from .abstract import (
     abstract_check,
 )
 from .operations import Primitive
-from .operations.primitives import BackendPrimitive
+from .operations.primitives import BackendPrimitive, CompositePrimitive
 from .utils import ErrorPool, Partializable
 
 
@@ -141,7 +141,7 @@ class OperatorValidator(NodeValidator):
     def test_node(self, node):
         """Test that the node's operator is valid."""
         if node.is_constant(Primitive):
-            if not node.is_constant(BackendPrimitive):
+            if not node.is_constant((BackendPrimitive, CompositePrimitive)):
                 raise ValidationError(f"Illegal primitive: {node.value}")
 
 

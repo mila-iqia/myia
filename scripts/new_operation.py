@@ -13,6 +13,7 @@ For example, to create a new primitive walk(speed, gait):
 The following templates are available:
 
   prim: Create a new BackendPrimitive.
+  composite: Create a new CompositePrimitive.
   infprim: Create a new InferencePrimitive.
   macro: Create a new Macro.
   op: Create a new operation (generic).
@@ -72,10 +73,10 @@ def make_macro(subs):
     regen_operations()
 
 
-def make_prim(subs):
+def make_prim(subs, prim_type="prim"):
     subs = parse_subs(subs)
     name = subs["OPERATION"]
-    prim_contents = template("prim", subs)
+    prim_contents = template(prim_type, subs)
     test_contents = template("test_op", subs)
 
     filename = f"./myia/operations/prim_{name}.py"
@@ -97,6 +98,10 @@ def make_prim(subs):
     open(filename, "a").write(line)
 
     regen_operations()
+
+
+def make_composite(subs):
+    make_prim(subs, "composite")
 
 
 if __name__ == "__main__":

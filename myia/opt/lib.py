@@ -24,6 +24,7 @@ from ..operations import Primitive, primitives as P
 from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
+from ..operations.utils import CompositePrimitive
 from ..utils import Partializable, tracer
 from ..utils.errors import untested
 from ..utils.unify import Var, var
@@ -817,6 +818,27 @@ inline_inside_marked_caller = make_inliner(
 inline = make_inliner(
     inline_criterion=None, check_recursive=True, name="inline"
 )
+
+
+@pattern_replacer("just", X, interest=None)
+def expand_composite(resources, node, equiv):
+    """Expand a composite primitive."""
+    if node.is_apply():
+        operation = node.inputs[0]
+        parameters = node.inputs[1:]
+        if operation.is_constant() and isinstance(
+            operation.value, CompositePrimitive
+        ):
+            py_impl = operation.value.defaults()["python_implementation"]
+            from myia.parser import parse
+
+            g = parse(py_impl)
+            # sig = g.make_signature(parameters)
+            # g = g.generate_graph(sig)
+            clone = GraphCloner(inline=(g, node.graph, parameters), total=False)
+            output = clone[g.output]
+            return output
+    return node
 
 
 @pattern_replacer("just", G, interest=None)

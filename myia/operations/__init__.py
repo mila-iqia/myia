@@ -202,6 +202,10 @@ cell_set = Operation(
     name="cell_set", defaults="myia.operations.ops_universe.cell_set"
 )
 
+composite_full = Operation(
+    name="composite_full", defaults="myia.operations.prim_composite_full"
+)
+
 concat = Operation(name="concat", defaults="myia.operations.prim_concat")
 
 conv2d = Operation(name="conv2d", defaults="myia.operations.prim_conv2d")

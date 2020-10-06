@@ -12,7 +12,12 @@ subclass.
 # The script will search for all primitives it can find in myia.operations    #
 ###############################################################################
 
-from .utils import BackendPrimitive, InferencePrimitive, PlaceholderPrimitive
+from .utils import (
+    BackendPrimitive,
+    CompositePrimitive,
+    InferencePrimitive,
+    PlaceholderPrimitive,
+)
 
 J = PlaceholderPrimitive(name="J", defaults="myia.operations.prim_J")
 
@@ -74,6 +79,10 @@ broadcast_shape = BackendPrimitive(
 
 casttag = BackendPrimitive(
     name="casttag", defaults="myia.operations.prim_casttag"
+)
+
+composite_full = CompositePrimitive(
+    name="composite_full", defaults="myia.operations.prim_composite_full"
 )
 
 concat = BackendPrimitive(name="concat", defaults="myia.operations.prim_concat")

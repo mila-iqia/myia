@@ -263,6 +263,7 @@ step_opt = Optimizer.partial(
         main=[
             # Force constants
             optlib.force_constants,
+            optlib.expand_composite,
             # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,

@@ -30,6 +30,10 @@ class PlaceholderPrimitive(Primitive):
     """Represents a primitive that is eliminated during optimization."""
 
 
+class CompositePrimitive(Primitive):
+    """Represents a primitive that must be expanded during optimization."""
+
+
 class BackendPrimitive(Primitive):
     """Represents a primitive that must be implemented by the backend."""
 
