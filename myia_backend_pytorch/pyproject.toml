@@ -34,3 +34,6 @@ combine_as_imports = true
 
 [tool.poetry.plugins."myia.backend"]
 "pytorch" = "myia_backend_pytorch"
+
+[tool.poetry.plugins."myia.tests.backend"]
+"pytorch" = "myia_tests_backend_pytorch"

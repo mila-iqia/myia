@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from ovld import ovld
 
-from myia.compile.backends import get_backend_names, load_backend
+from myia.compile.backends import get_backend_names
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline
 from myia.utils import keyword_decorator, merge
@@ -350,7 +350,7 @@ def register_backend_testing(backend, target, options, identifier=None):
     :type options: dict
     :type identifier: str
     """
-    if backend not in _loaded_backends:
+    if backend not in get_backend_names():
         raise RuntimeError("Unknown backend: %s" % backend)
     if target not in ("cpu", "gpu"):
         raise RuntimeError("Unsupported target: %s" % target)
@@ -371,70 +371,57 @@ def _get_backend_testing_parameters():
                 yield backend, target, param
 
 
-def _load_backends():
-    """Load all backends without options.
+def _load_testable_backends():
+    """Load all backend testing configuration modules.
 
-    This should allow backends to make all necessary initializations,
-    e.g. register backend testings.
+    A conf module should make all necessary initializations at loading
+    to allow related backend to be tested, for e.g. register backend testings.
     """
-    for backend in _loaded_backends:
-        load_backend(backend)
+    import pkg_resources
+    import importlib
+
+    testable_backend = {
+        entry_point.name: entry_point.module_name
+        for entry_point in pkg_resources.iter_entry_points("myia.tests.backend")
+    }
+    for backend in get_backend_names():
+        if backend in testable_backend:
+            importlib.import_module(testable_backend[backend])
 
 
-class __Module:
-    """Helper to provide some module attributes at runtime.
-
-    Those attributes depend on backend testing options, which may
-    not be all known when module is loaded (e.g. if another backend
-    add some backend testings), so it should be better to generate
-    these attributes at runtime instead of hardcoding them.
-    """
-
-    @property
-    def backend_gpu(self):
-        return Multiple(
-            *[param for _, _, param in _get_backend_testing_parameters()]
-        )
-
-    @property
-    def backend_all(self):
-        return Multiple(
-            *[
-                param
-                for backend, target, param in _get_backend_testing_parameters()
-                if target == "cpu"
-            ]
-        )
-
-    def backend_except(self, *excluded_backends):
-        return Multiple(
-            *[
-                param
-                for backend, target, param in _get_backend_testing_parameters()
-                if target == "cpu" and backend not in excluded_backends
-            ]
-        )
-
-    @property
-    def run(self):
-        return _run.configure(backend=self.backend_all)
-
-    @property
-    def run_gpu(self):
-        return _run.configure(backend=self.backend_gpu)
-
-    @property
-    def run_debug(self):
-        return self.run.configure(
-            pipeline=standard_debug_pipeline, validate=False, backend=False
-        )
-
-
-_loaded_backends = get_backend_names()
+# Dictionary to store Pytest parameters for backend testing.
 _pytest_parameters = {}
-_load_backends()
-__module = __Module()
+# Load backend testing configurations into _pytest_parameters.
+_load_testable_backends()
+
+backend_gpu = Multiple(
+    *[param for _, _, param in _get_backend_testing_parameters()]
+)
+
+backend_all = Multiple(
+    *[
+        param
+        for _, target, param in _get_backend_testing_parameters()
+        if target == "cpu"
+    ]
+)
 
 
-def __getattr__(name):
-    return getattr(__module, name)
+def backend_except(self, *excluded_backends):
+    """Return backend_all without excluded backends."""
+    return Multiple(
+        *[
+            param
+            for backend, target, param in _get_backend_testing_parameters()
+            if target == "cpu" and backend not in excluded_backends
+        ]
+    )
+
+
+run = _run.configure(backend=backend_all)
+
+run_gpu = _run.configure(backend=backend_gpu)
+
+run_debug = run.configure(
+    pipeline=standard_debug_pipeline, validate=False, backend=False
+)

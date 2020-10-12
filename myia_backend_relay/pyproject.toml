@@ -35,3 +35,6 @@ combine_as_imports = true
 
 [tool.poetry.plugins."myia.backend"]
 "relay" = "myia_backend_relay"
+
+[tool.poetry.plugins."myia.tests.backend"]
+"relay" = "myia_tests_backend_relay"
