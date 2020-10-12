@@ -407,7 +407,7 @@ backend_all = Multiple(
 )
 
 
-def backend_except(self, *excluded_backends):
+def backend_except(*excluded_backends):
     """Return backend_all without excluded backends."""
     return Multiple(
         *[
