@@ -1,6 +1,11 @@
 import pytest
 
-from myia.compile.backends import LoadingError, UnknownBackend, load_backend
+from myia.compile.backends import (
+    LoadingError,
+    UnknownBackend,
+    load_backend,
+    parse_default,
+)
 from myia.operations import (
     array_reduce,
     array_to_scalar,
@@ -10,6 +15,27 @@ from myia.operations import (
 )
 from myia.testing.common import AN, MA
 from myia.testing.multitest import mt, run, run_gpu
+
+
+def test_default_backend():
+    import os
+
+    before = os.environ.get("MYIA_BACKEND", None)
+    try:
+        os.environ["MYIA_BACKEND"] = "pytorch"
+        assert parse_default() == ("pytorch", {})
+
+        os.environ["MYIA_BACKEND"] = "pytorch?target=cpu"
+        assert parse_default() == ("pytorch", {"target": "cpu"})
+
+        os.environ["MYIA_BACKEND"] = "relay?target=cpu&device_id=0"
+        assert parse_default() == ("relay", {"target": "cpu", "device_id": "0"})
+    finally:
+        # Make sure we don't switch the default for other tests.
+        if before is None:
+            del os.environ["MYIA_BACKEND"]
+        else:
+            os.environ["MYIA_BACKEND"] = before
 
 
 def test_load_backend_unknown():
