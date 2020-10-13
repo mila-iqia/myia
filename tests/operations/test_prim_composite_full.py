@@ -32,10 +32,10 @@ def test_composite_full(shape, fill_value, dtype):
     # Otherwise, output type should be specified d-type.
     infer(Shp(2, 3), i64, Ty(np.int16), result=ai16_of(2, 3)),
     infer(Shp(2, 3), i64, Ty(np.float16), result=af16_of(2, 3)),
-    infer(Shp(2, 3), f64, Ty(np.uint64), result=au64_of(2, 3)),
     infer(Shp(2, 3), i64, Ty(np.float64), result=af64_of(2, 3)),
     infer(Shp(2, 3), f64, Ty(np.int16), result=ai16_of(2, 3)),
     infer(Shp(2, 3), f64, Ty(np.int32), result=ai32_of(2, 3)),
+    infer(Shp(2, 3), f64, Ty(np.uint64), result=au64_of(2, 3)),
 )
 def test_infer_full(shape, value, dtype):
     return composite_full(shape, value, dtype)

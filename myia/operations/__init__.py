@@ -206,6 +206,10 @@ composite_full = Operation(
     name="composite_full", defaults="myia.operations.prim_composite_full"
 )
 
+composite_simple = Operation(
+    name="composite_simple", defaults="myia.operations.prim_composite_simple"
+)
+
 concat = Operation(name="concat", defaults="myia.operations.prim_concat")
 
 conv2d = Operation(name="conv2d", defaults="myia.operations.prim_conv2d")

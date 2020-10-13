@@ -3,6 +3,7 @@
 from ..lib import (
     SHAPE,
     TYPE,
+    VALUE,
     AbstractArray,
     AbstractScalar,
     AbstractType,
@@ -10,11 +11,11 @@ from ..lib import (
     core,
     distribute,
     force_pending,
-    myia_to_array,
     scalar_cast,
     standard_prim,
     u64tup_typecheck,
 )
+from ..xtype import NDArray
 from . import primitives as P
 
 
@@ -23,7 +24,8 @@ def pyimpl_composite_full(shape, fill_value, abstract_scalar_type):
     """Implement `composite_full`."""
     scalar_value = scalar_cast(fill_value, abstract_scalar_type)
     return distribute(
-        myia_to_array(scalar_value, abstract_array(shape, scalar_value)), shape
+        P.scalar_to_array(scalar_value, abstract_array(shape, scalar_value)),
+        shape,
     )
 
 
@@ -36,13 +38,20 @@ async def infer_composite_full(
     dtype: AbstractType,
 ):
     """Infer the return type of primitive `composite_full`."""
-    output_shape = tuple(
-        self.require_constant(e, argnum=f'"1:shape[{edx}]"')
-        for edx, e in enumerate(shape.elements)
-    )
     return AbstractArray(
-        dtype.element,
-        {SHAPE: output_shape, TYPE: await force_pending(dtype.element.xtype())},
+        AbstractScalar(
+            {
+                TYPE: await force_pending(dtype.element.xtype()),
+                VALUE: fill_value.xvalue(),
+            }
+        ),
+        {
+            SHAPE: tuple(
+                self.require_constant(e, argnum=f'"0:shape[{edx}]"')
+                for edx, e in enumerate(shape.elements)
+            ),
+            TYPE: NDArray,
+        },
     )
 
 

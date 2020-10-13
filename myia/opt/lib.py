@@ -829,13 +829,14 @@ def expand_composite(resources, node, equiv):
         if operation.is_constant() and isinstance(
             operation.value, CompositePrimitive
         ):
-            py_impl = operation.value.defaults()["python_implementation"]
             from myia.parser import parse
+            from myia.ir.anf import Graph
 
+            py_impl = operation.value.defaults()["python_implementation"]
             g = parse(py_impl)
-            # sig = g.make_signature(parameters)
-            # g = g.generate_graph(sig)
-            clone = GraphCloner(inline=(g, node.graph, parameters), total=False)
+            assert isinstance(g, Graph)
+            assert len(g.parameters) == len(parameters)
+            clone = GraphCloner(inline=[(g, node.graph, parameters)])
             output = clone[g.output]
             return output
     return node

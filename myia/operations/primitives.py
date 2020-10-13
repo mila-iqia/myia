@@ -85,6 +85,10 @@ composite_full = CompositePrimitive(
     name="composite_full", defaults="myia.operations.prim_composite_full"
 )
 
+composite_simple = CompositePrimitive(
+    name="composite_simple", defaults="myia.operations.prim_composite_simple"
+)
+
 concat = BackendPrimitive(name="concat", defaults="myia.operations.prim_concat")
 
 conv2d = BackendPrimitive(name="conv2d", defaults="myia.operations.prim_conv2d")
