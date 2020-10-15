@@ -238,6 +238,7 @@ def step_simplify_types(resources, graph, argspec, outspec):
 step_debug_opt = Optimizer.partial(
     phases=dict(
         main=[
+            optlib.expand_composite,
             # Branch culling
             optlib.simplify_always_true,
             optlib.simplify_always_false,

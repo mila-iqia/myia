@@ -9,7 +9,7 @@ from .examples.operations import composite_full, composite_simple
 
 
 def Shp(*values):
-    """Convert values to a tuple of numpy unsigned itnegers."""
+    """Convert values to a tuple of numpy unsigned integers."""
     return tuple(np.uint64(value) for value in values)
 
 
