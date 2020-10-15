@@ -1,10 +1,10 @@
 import numpy as np
 
+from myia.testing.common import Ty, af16_of, af64_of, ai16_of, ai32_of, au64_of
+from myia.testing.multitest import infer, mt, run
 from myia.utils.errors import MyiaTypeError
 from myia.xtype import f64, i32, i64
 
-from ..common import Ty, af16_of, af64_of, ai16_of, ai32_of, au64_of
-from ..multitest import infer, mt, run
 from .examples.operations import composite_full, composite_simple
 
 
