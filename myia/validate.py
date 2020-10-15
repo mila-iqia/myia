@@ -20,7 +20,7 @@ from .abstract import (
     abstract_check,
 )
 from .operations import Primitive
-from .operations.primitives import BackendPrimitive, CompositePrimitive
+from .operations.utils import BackendPrimitive, CompositePrimitive
 from .utils import ErrorPool, Partializable
 
 

@@ -1,6 +1,5 @@
 """Definitions for the primitive `composite_full`."""
-
-from ..lib import (
+from myia.lib import (
     SHAPE,
     TYPE,
     VALUE,
@@ -12,11 +11,10 @@ from ..lib import (
     distribute,
     force_pending,
     scalar_cast,
-    standard_prim,
     u64tup_typecheck,
 )
-from ..xtype import NDArray
-from . import primitives as P
+from myia.operations import primitives as P
+from myia.xtype import NDArray
 
 
 @core
@@ -29,7 +27,6 @@ def pyimpl_composite_full(shape, fill_value, abstract_scalar_type):
     )
 
 
-@standard_prim(P.composite_full)
 async def infer_composite_full(
     self,
     engine,
@@ -53,21 +50,3 @@ async def infer_composite_full(
             TYPE: NDArray,
         },
     )
-
-
-__operation_defaults__ = {
-    "name": "composite_full",
-    "registered_name": "composite_full",
-    "mapping": P.composite_full,
-    "python_implementation": pyimpl_composite_full,
-}
-
-
-__primitive_defaults__ = {
-    "name": "composite_full",
-    "registered_name": "composite_full",
-    "type": "composite",
-    "python_implementation": pyimpl_composite_full,
-    "inferrer_constructor": infer_composite_full,
-    "grad_transform": None,
-}
