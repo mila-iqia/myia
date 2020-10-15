@@ -1,9 +1,9 @@
 from myia.lib import from_value
 from myia.operations import scalar_mul, tagged
 from myia.pipeline import standard_pipeline
+from myia.testing.common import Pair, f64, i64
+from myia.testing.multitest import backend_all, mt, run, run_debug
 
-from .common import Pair, f64, i64
-from .multitest import backend_all, mt, run, run_debug
 from .test_grad import gradient
 from .test_infer import infer_scalar
 from .test_monomorphize import mono_scalar

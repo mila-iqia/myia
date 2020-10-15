@@ -6,10 +6,20 @@ from myia import lib
 from myia.hypermap import HyperMap
 from myia.lib import InferenceError
 from myia.operations import hyper_map, scalar_add
+from myia.testing.common import (
+    MA,
+    MB,
+    Point,
+    Point3D,
+    U,
+    af64_of,
+    ai64_of,
+    f64,
+    i64,
+)
+from myia.testing.multitest import mt, run, run_debug
 from myia.utils import tags
 
-from ..common import MA, MB, Point, Point3D, U, af64_of, ai64_of, f64, i64
-from ..multitest import mt, run, run_debug
 from ..test_algos import make_tree
 from ..test_infer import infer_scalar
 

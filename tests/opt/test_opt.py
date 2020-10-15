@@ -11,11 +11,10 @@ from myia.opt import (
     pattern_replacer,
 )
 from myia.pipeline import scalar_pipeline, steps
+from myia.testing.common import i64, to_abstract_test
 from myia.utils import InferenceError, Merge
 from myia.utils.unify import Var, var
 from myia.validate import ValidationError
-
-from ..common import i64, to_abstract_test
 
 X = Var("X")
 Y = Var("Y")

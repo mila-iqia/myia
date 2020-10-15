@@ -8,10 +8,7 @@ from myia.lib import Empty, HandleInstance, core
 from myia.operations import cell_get, cell_set, make_cell
 from myia.pipeline import standard_pipeline, steps
 
-try:
-    load_backend("relay")
-except Exception:
-    pytestmark = pytest.mark.skip("Requires relay")
+load_backend("relay")
 
 
 upipeline = standard_pipeline.insert_after("parse", resolve=steps.step_resolve)

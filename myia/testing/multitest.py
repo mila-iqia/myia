@@ -1,3 +1,4 @@
+"""Common testing utilities."""
 from itertools import product
 from types import FunctionType
 
@@ -5,6 +6,7 @@ import numpy as np
 import pytest
 from ovld import ovld
 
+from myia.compile.backends import get_backend_names
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline
 from myia.utils import keyword_decorator, merge
@@ -42,11 +44,20 @@ def eqtest(x: object, y, **kwargs):
     return x == y
 
 
+@ovld  # noqa: F811
+def to_numpy(value: object):
+    """Convert a value to a numpy array. Used in _run below."""
+    return value
+
+
 infer_pipeline = standard_pipeline.select("resources", "parse", "infer")
 
 
 class Multiple:
+    """Wrapper class for pytest options."""
+
     def __init__(self, *params, **options):
+        """Initialize multiple options."""
         self.options = []
         for i, param in enumerate(params):
             assert isinstance(param, ParameterSet)
@@ -212,9 +223,11 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     """Inference test.
 
     Arguments:
+        self: auto-passed MyiaFunctionTest object.
         fn: The Myia function to test.
         args: The argspec for the function.
         result: The expected result, or an exception subclass.
+        pipeline: pipeline to use for inference
     """
     args = [to_abstract_test(arg) for arg in args]
 
@@ -239,10 +252,13 @@ def _run(
     validate=True,
     pipeline=standard_pipeline,
     backend=None,
+    numpy_compat=False,
+    **kwargs,
 ):
     """Test a Myia function.
 
     Arguments:
+        self: auto-passed MyiaFunctionTest object.
         fn: The Myia function to test.
         args: The args for the function.
         result: The expected result, or an exception subclass. If result is
@@ -254,6 +270,8 @@ def _run(
             default, broaden all arguments.
         validate: Whether to run the validation step.
         pipeline: The pipeline to use.
+        backend: backends to use. Tuple (backend name, backend options)
+        numpy_compat: if True, check if args can be converted to numpy arrays.
     """
 
     if backend:
@@ -288,61 +306,122 @@ def _run(
     if result is None:
         result = fn(*args)
 
-    self.check(out, args, result)
+    self.check(out, args, result, **kwargs)
 
+    if numpy_compat:
+        args_torch = args
+        args = ()
+        for _ in args_torch:
+            args += (to_numpy(_),)
+
+        if abstract is None:
+            if broad_specs is None:
+                broad_specs = (True,) * len(args)
+            argspec = tuple(
+                from_value(arg, broaden=bs)
+                for bs, arg in zip(broad_specs, args)
+            )
+        else:
+            argspec = tuple(to_abstract_test(a) for a in abstract)
+
+        out(args)
+
+
+def _generate_pytest_parameter(backend, target, options, identifier=None):
+    if identifier is None:
+        identifier = "%s-%s" % (backend, target)
+    marks = [getattr(pytest.mark, backend)]
+    if target == "gpu":
+        marks.append(getattr(pytest.mark, target))
+    return pytest.param((backend, options), id=identifier, marks=marks)
+
+
+def register_backend_testing(backend, target, options, identifier=None):
+    """Register some backend options to test a backend.
+
+    :param backend: name of backend to register parameters
+    :param target: device to register parameters.
+        Currently either "cpu" or "gpu".
+    :param options: dictionary of options to pass to backend loader
+    :param identifier: a unique identifier for this testing.
+        By default: "<backend>-<target>"
+    :type backend: str
+    :type target: str
+    :type options: dict
+    :type identifier: str
+    """
+    if backend not in get_backend_names():
+        raise RuntimeError("Unknown backend: %s" % backend)
+    if target not in ("cpu", "gpu"):
+        raise RuntimeError("Unsupported target: %s" % target)
+    _pytest_parameters.setdefault(backend, {}).setdefault(target, []).append(
+        _generate_pytest_parameter(backend, target, options, identifier)
+    )
+
+
+def get_backend_testing_options(backend, target):
+    """Return registered options for given backend and target."""
+    return [param.values[0][1] for param in _pytest_parameters[backend][target]]
+
+
+def _get_backend_testing_parameters():
+    for backend, targets in _pytest_parameters.items():
+        for target, params in targets.items():
+            for param in params:
+                yield backend, target, param
+
+
+def _load_testable_backends():
+    """Load all backend testing configuration modules.
+
+    A conf module should make all necessary initializations at loading
+    to allow related backend to be tested, for e.g. register backend testings.
+    """
+    import pkg_resources
+    import importlib
+
+    testable_backend = {
+        entry_point.name: entry_point.module_name
+        for entry_point in pkg_resources.iter_entry_points("myia.tests.backend")
+    }
+    for backend in get_backend_names():
+        if backend in testable_backend:
+            importlib.import_module(testable_backend[backend])
+
+
+# Dictionary to store Pytest parameters for backend testing.
+_pytest_parameters = {}
+# Load backend testing configurations into _pytest_parameters.
+_load_testable_backends()
 
 backend_gpu = Multiple(
-    pytest.param(
-        ("relay", {"target": "cpu", "device_id": 0}),
-        id="relay-cpu",
-        marks=pytest.mark.relay,
-    ),
-    pytest.param(
-        ("relay", {"target": "cuda", "device_id": 0}),
-        id="relay-cuda",
-        marks=[pytest.mark.relay, pytest.mark.gpu],
-    ),
-    pytest.param(
-        ("pytorch", {"device": "cpu"}),
-        id="pytorch-cpu",
-        marks=pytest.mark.pytorch,
-    ),
-    pytest.param(
-        ("pytorch", {"device": "cuda"}),
-        id="pytorch-cuda",
-        marks=[pytest.mark.pytorch, pytest.mark.gpu],
-    ),
+    *[param for _, _, param in _get_backend_testing_parameters()]
 )
+
 backend_all = Multiple(
-    pytest.param(
-        ("relay", {"target": "cpu", "device_id": 0}),
-        id="relay-cpu",
-        marks=pytest.mark.relay,
-    ),
-    pytest.param(
-        ("pytorch", {"device": "cpu"}),
-        id="pytorch-cpu",
-        marks=pytest.mark.pytorch,
-    ),
+    *[
+        param
+        for _, target, param in _get_backend_testing_parameters()
+        if target == "cpu"
+    ]
 )
-backend_no_relay = Multiple(
-    pytest.param(
-        ("pytorch", {"device": "cpu"}),
-        id="pytorch-cpu",
-        marks=pytest.mark.pytorch,
+
+
+def backend_except(*excluded_backends):
+    """Return backend_all without excluded backends."""
+    return Multiple(
+        *[
+            param
+            for backend, target, param in _get_backend_testing_parameters()
+            if target == "cpu" and backend not in excluded_backends
+        ]
     )
-)
+
+
 run = _run.configure(backend=backend_all)
-run_relay_debug = _run.configure(
-    backend=Multiple(
-        pytest.param(
-            ("relay", {"exec_kind": "debug"}),
-            id="relay-cpu-debug",
-            marks=pytest.mark.relay,
-        )
-    )
-)
+
 run_gpu = _run.configure(backend=backend_gpu)
+
 run_debug = run.configure(
     pipeline=standard_debug_pipeline, validate=False, backend=False
 )

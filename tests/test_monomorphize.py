@@ -14,9 +14,8 @@ from myia.operations import (
     tagged,
 )
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
-
-from .common import Point, U, f64, i64, mysum
-from .multitest import mt, run
+from myia.testing.common import Point, U, f64, i64, mysum
+from myia.testing.multitest import mt, run
 
 specialize_pipeline = scalar_debug_pipeline.select(
     "resources",

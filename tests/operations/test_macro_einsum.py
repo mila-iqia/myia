@@ -2,9 +2,8 @@ import pytest
 
 from myia.lib import InferenceError
 from myia.operations import einsum
-
-from ..common import MA, MB
-from ..multitest import infer, mt, run_debug
+from myia.testing.common import MA, MB
+from myia.testing.multitest import infer, mt, run_debug
 
 
 @run_debug(MA(1, 4)[0])

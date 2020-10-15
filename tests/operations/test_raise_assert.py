@@ -1,9 +1,9 @@
 from myia.lib import InferenceError
 from myia.operations import hastype
 from myia.pipeline import standard_debug_pipeline
+from myia.testing.common import U, f64, i32, i64
+from myia.testing.multitest import mt, run_debug
 
-from ..common import U, f64, i32, i64
-from ..multitest import mt, run_debug
 from ..test_grad import gradient
 from ..test_infer import infer_scalar, infer_standard
 

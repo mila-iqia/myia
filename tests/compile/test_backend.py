@@ -13,9 +13,8 @@ from myia.operations import (
     scalar_add,
     scalar_to_array,
 )
-
-from ..common import AN, MA
-from ..multitest import mt, run, run_gpu
+from myia.testing.common import AN, MA
+from myia.testing.multitest import mt, run, run_gpu
 
 
 def test_default_backend():

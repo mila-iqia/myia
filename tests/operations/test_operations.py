@@ -3,10 +3,7 @@ import math
 import numpy as np
 
 from myia import operations
-from myia.utils.errors import MyiaTypeError
-from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
-
-from ..common import (
+from myia.testing.common import (
     MA,
     Ty,
     af16_of,
@@ -17,7 +14,9 @@ from ..common import (
     ai64_of,
     au64_of,
 )
-from ..multitest import infer, mt, run
+from myia.testing.multitest import infer, mt, run
+from myia.utils.errors import MyiaTypeError
+from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
 
 
 def Shp(*values):

@@ -7,6 +7,7 @@ from pytest import mark
 
 from myia.abstract import from_value, ndarray_aliasable
 from myia.api import myia
+from myia.compile.backends import get_backend_names
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.operations import (
     array_map,
@@ -36,13 +37,28 @@ from myia.pipeline import (
     standard_resources,
     steps,
 )
+from myia.testing.common import (
+    AA,
+    MA,
+    MB,
+    Point3D,
+    U,
+    f64,
+    to_abstract_test,
+    u64,
+)
+from myia.testing.multitest import (
+    backend_all,
+    backend_except,
+    mt,
+    myia_function_test,
+)
 from myia.utils import InferenceError, MyiaInputTypeError
 
-from .common import AA, MA, MB, Point3D, U, f64, to_abstract_test, u64
-from .multitest import backend_all, mt, myia_function_test
 
-
-@pytest.fixture(params=[pytest.param("pytorch"), pytest.param("relay")])
+@pytest.fixture(
+    params=[pytest.param(backend) for backend in get_backend_names()]
+)
 def _backend_fixture(request):
     return request.param
 
@@ -206,36 +222,36 @@ def test_prim_grads(prim, cases):
         _grad_test(pyi[prim], prim, case)
 
 
-@gradient(13.0, 14.0)
+@gradient(13.0, 14.0, backend=backend_all)
 def test_null(x, y):
     """Test null gradient."""
     return 10.0 + 28.0 / 43.0
 
 
-@mt(gradient(1.0, 4.0), gradient(5.0, -13.0))
+@mt(gradient(1.0, 4.0), gradient(5.0, -13.0), backend=backend_all)
 def test_grad_add(x, y):
     return x + y
 
 
-@gradient(3.0, 4.0)
+@gradient(3.0, 4.0, backend=backend_all)
 def test_grad_expr(x, y):
     return x ** 3.0 * y ** 4.0
 
 
-@gradient(3.0)
+@gradient(3.0, backend=backend_all)
 def test_constant(x):
     """Test the use of a literal in the expression."""
     return 18.0 * x
 
 
-@gradient(3.0)
+@gradient(3.0, backend=backend_all)
 def test_dup_args_in_call(x):
     """The naive gradient update rule fails when a function's arguments
     contain the same variable more than once."""
     return x * x
 
 
-@gradient(3.0)
+@gradient(3.0, backend=backend_all)
 def test_quadruple_args_in_call(x):
     """Test that duplicated arguments still cause no problem even if
     there are four of them."""
@@ -246,7 +262,7 @@ def test_quadruple_args_in_call(x):
     return g(x, x, x, x)
 
 
-@gradient(3.0, 5.0)
+@gradient(3.0, 5.0, backend=backend_all)
 def test_tuples(x, y):
     tup = x + y, x * y
     z = tup[0] + tup[1]
@@ -263,7 +279,7 @@ def test_dataclass_2(pt):
     return pt.abs()
 
 
-@gradient(4.0, 5.0)
+@gradient(4.0, 5.0, backend=backend_all)
 def test_hof(a, b):
     """Test higher order functions."""
 
@@ -279,7 +295,7 @@ def test_hof(a, b):
 @mark.xfail(
     reason="Further optimizations are currently needed to support this."
 )
-@gradient(4.0, 5.0)
+@gradient(4.0, 5.0, backend=backend_all)
 def test_hof_tup(a, b):
     """Test higher order functions."""
 
@@ -291,7 +307,7 @@ def test_hof_tup(a, b):
     return f((scalar_add, scalar_mul), a, b)
 
 
-@gradient(4.0, 5.0)
+@gradient(4.0, 5.0, backend=backend_all)
 def test_simple_closure(a, b):
     """Test some trivial closures."""
 
@@ -304,7 +320,7 @@ def test_simple_closure(a, b):
     return f() * g()
 
 
-@gradient(4.0)
+@gradient(4.0, backend=backend_all)
 def test_closure(a):
     """This is the closure test in the paper."""
 
@@ -319,7 +335,7 @@ def test_closure(a):
     return x3
 
 
-@mt(gradient(4.0, 5.0), gradient(6.4, -7.8))
+@mt(gradient(4.0, 5.0), gradient(6.4, -7.8), backend=backend_all)
 def test_if(a, b):
     # This is max, but what this is really testing is the most basic
     # if statement, so I prefer to name the test 'test_if'
@@ -329,7 +345,7 @@ def test_if(a, b):
         return b
 
 
-@mt(gradient(4.0, 5.0), gradient(6.4, -7.8))
+@mt(gradient(4.0, 5.0), gradient(6.4, -7.8), backend=backend_all)
 def test_if2(a, b):
     if a > b:
         return a * a
@@ -348,7 +364,7 @@ def test_fact_opt(x):
     return fact()
 
 
-@gradient(4.0)
+@gradient(4.0, backend=backend_all)
 def test_while(x):
     rval = x
     while rval < 100:
@@ -356,7 +372,7 @@ def test_while(x):
     return rval
 
 
-@gradient(4.0, 5.0, 2.0)
+@gradient(4.0, 5.0, 2.0, backend=backend_all)
 def test_while_2(x, y, z):
     rval = 0
     # Cannot compare to 0 or finite diff is unstable
@@ -369,8 +385,14 @@ def test_while_2(x, y, z):
 @gradient(
     [1.0, 2.0, 3.0, 4.0],
     pipeline=standard_debug_pipeline.configure(validate=False),
+    backend=backend_except("relay"),
 )
 def test_list_while(xs):
+    # Fail with relay:
+    # myia.pipeline.ressources.default_convert receives
+    # a tvm.runtime.ADT and then fails because it cannot
+    # look for attribute __to_myia__
+    # TypeError: runtime.ADT is not registered via TVM_REGISTER_NODE_TYPE
     y = 1.0
     index = 0
     while index < len(xs):
@@ -387,7 +409,7 @@ def test_list_for(xs):
     return y
 
 
-@mt(gradient(4.5), gradient(-7.9))
+@mt(gradient(4.5), gradient(-7.9), backend=backend_all)
 def test_nested_closure(x):
     a = x * x
 
@@ -405,7 +427,7 @@ def test_nested_closure(x):
     return f()()
 
 
-@gradient(4.3, pipeline=standard_pipeline)
+@gradient(4.3, pipeline=standard_pipeline, backend=backend_all)
 def test_recursive_closure(x):
     def f(y):
         if y <= 0:
@@ -416,7 +438,7 @@ def test_recursive_closure(x):
     return f(7)
 
 
-@gradient(4.5, 6.7)
+@gradient(4.5, 6.7, backend=backend_all)
 def test_functions_in_tuples(x, y):
     tup = scalar_add, scalar_mul
     f, g = tup
@@ -424,7 +446,7 @@ def test_functions_in_tuples(x, y):
 
 
 @mark.xfail(reason="A DummyInferrer ends up being called")
-@gradient(4.5, 6.7)
+@gradient(4.5, 6.7, backend=backend_all)
 def test_closures_in_tuples(x, y):
     def f():
         return x * y
@@ -437,14 +459,14 @@ def test_closures_in_tuples(x, y):
     return ff() + gg()
 
 
-@gradient(MA(2, 3), MB(2, 3))
+@gradient(MA(2, 3), MB(2, 3), backend=backend_all)
 def test_array_operations(xs, ys):
     div = array_map(scalar_div, xs, ys)
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)
 
 
-@gradient(3.1, 7.6)
+@gradient(3.1, 7.6, backend=backend_all)
 def test_array_operations_distribute(x, y):
     xs = distribute(scalar_to_array(x, AA), (4, 3))
     ys = distribute(scalar_to_array(y, AA), (4, 3))
@@ -453,7 +475,7 @@ def test_array_operations_distribute(x, y):
     return array_to_scalar(sm)
 
 
-@gradient(MA(2, 3), MB(2, 3))
+@gradient(MA(2, 3), MB(2, 3), backend=backend_all)
 def test_array_operations_reshape(xs, ys):
     xs = reshape(xs, (6,))
     ys = reshape(ys, (6,))
@@ -462,21 +484,21 @@ def test_array_operations_reshape(xs, ys):
     return array_to_scalar(sm)
 
 
-@gradient(MA(2, 3), MB(2, 3))
+@gradient(MA(2, 3), MB(2, 3), backend=backend_all)
 def test_array_operations_std(xs, ys):
     div = xs / ys
     sm = array_reduce(scalar_add, div, ())
     return array_to_scalar(sm)
 
 
-@gradient(MA(2, 3), MB(3, 4))
+@gradient(MA(2, 3), MB(3, 4), backend=backend_all)
 def test_dot(x, y):
     d = dot(x, y)
     sm = array_reduce(scalar_add, d, ())
     return array_to_scalar(sm)
 
 
-@gradient(MA(3, 4), MB(2, 3))
+@gradient(MA(3, 4), MB(2, 3), backend=backend_all)
 def test_transpose(x, y):
     xt = transpose(x, (1, 0))
     yt = transpose(y, (1, 0))
@@ -485,7 +507,7 @@ def test_transpose(x, y):
     return array_to_scalar(sm)
 
 
-@gradient(MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0))
+@gradient(MA(3, 4), MB(2, 3), NoTestGrad(1), NoTestGrad(0), backend=backend_all)
 def test_transpose2(x, y, axis1, axis2):
     perm = (scalar_cast(axis1, u64), scalar_cast(axis2, u64))
     xt = transpose(x, perm)
@@ -543,29 +565,35 @@ def test_freegraph_outside_grad():
     assert _runwith(f, 5.0, 8.0) == 25.0
 
 
-def test_grad_prim():
-    @myia
+def test_grad_prim(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def peach(x, y):
         return grad(scalar_mul)(x, y)
 
     assert peach(4.0, 52.0) == 52.0
 
 
-def test_grad_metagraph():
-    @myia
+def test_grad_metagraph(_backend_fixture):
+    backend = _backend_fixture
+
+    @myia(backend=backend)
     def apple(x, y):
         return grad(gadd)(x, y)
 
     assert apple(4.0, 52.0) == 1.0
 
 
-def test_grad_interface():
+def test_grad_interface(_backend_fixture):
+    backend = _backend_fixture
+
     def f(x, y):
         a = x ** 3
         b = y ** 4
         return a * b
 
-    @myia
+    @myia(backend=backend)
     def grads(x, y):
         return (
             grad(f, "x")(x, y),
@@ -577,50 +605,50 @@ def test_grad_interface():
             grad(f, return_value=True)(x, y),
         )
 
-    @myia
+    @myia(backend=backend)
     def gradbad(x, y):
         return grad(f, (0, 1))(x, y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad2(x, y):
         return grad(f, "z")(x, y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad3(x, y, z):
         return grad(f, z)(x, y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad4(x, y, z):
         return grad(f, 2)(x, y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad5(x, y, z):
         return grad(f)(x=x, y=y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad6(x, y, z):
         return grad(f, 0, "*")(x, y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad7(x, y, z):
         return grad(f, raturn_velue=True)(x, y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad8(x, y):
         def klojure(q):
             return q + y
 
         return grad(klojure)(x)
 
-    @myia
+    @myia(backend=backend)
     def gradbad9(x, y):
         return grad(x)(y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad10(x, y):
         return grad(partial(f, x))(y)
 
-    @myia
+    @myia(backend=backend)
     def gradbad11(x, y):
         return grad(P.scalar_mod)(x, y)
 
@@ -673,7 +701,9 @@ def test_grad_interface():
         print(gradbad11(x, y))
 
 
-def test_aliasing():
+def test_aliasing(_backend_fixture):
+    backend = _backend_fixture
+
     def _chk(x, y):
         x1, x2, (x3, x4) = x
         y1, y2, (y3, y4) = y
@@ -686,7 +716,7 @@ def test_aliasing():
         a, b, (c, d) = x
         return sum(a + b + c + d + y)
 
-    @myia(alias_tracker=ndarray_aliasable)
+    @myia(backend=backend, alias_tracker=ndarray_aliasable)
     def f(x, y):
         return grad(g)(x, y)
 
@@ -746,7 +776,9 @@ def test_aliasing_list(_backend_fixture):
         print(f([a, b, c, d], a))
 
 
-def test_aliasing_other():
+def test_aliasing_other(_backend_fixture):
+    backend = _backend_fixture
+
     def _chk(x, y):
         np.testing.assert_allclose(x["a"], y["a"])
         np.testing.assert_allclose(x["b"].x, y["b"].x)
@@ -758,7 +790,7 @@ def test_aliasing_other():
         pt = x["b"]
         return sum(a + pt.x + pt.y + pt.z + y)
 
-    @myia(alias_tracker=ndarray_aliasable)
+    @myia(backend=backend, alias_tracker=ndarray_aliasable)
     def f(xs, y):
         return grad(g)(xs, y)
 
@@ -790,11 +822,13 @@ def test_bad_bprop_def():
 
 
 @mark.xfail(reason="Second order gradients are not supported yet")
-def test_second_order():
+def test_second_order(_backend_fixture):
+    backend = _backend_fixture
+
     def square(x):
         return x * x
 
-    @myia
+    @myia(backend=backend)
     def f(x):
         return grad(grad(square))(x)
 

@@ -49,14 +49,23 @@ from myia.classes import Cons, Empty
 from myia.ir import Constant
 from myia.operations import primitives as P
 from myia.pipeline import standard_resources
+from myia.testing.common import (
+    Point,
+    S,
+    Ty,
+    U,
+    af32_of,
+    f32,
+    i16,
+    i32,
+    to_abstract_test,
+)
 from myia.utils import (
     InferenceError,
     InternalInferenceError,
     MyiaTypeError,
     SymbolicKeyInstance,
 )
-
-from .common import Point, S, Ty, U, af32_of, f32, i16, i32, to_abstract_test
 
 
 def test_to_abstract_skey():

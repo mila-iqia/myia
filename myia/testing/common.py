@@ -1,3 +1,4 @@
+"""Common testing symbols."""
 import inspect
 import typing
 from dataclasses import dataclass, is_dataclass
@@ -47,6 +48,7 @@ AN = AbstractArray(ANYTHING, {SHAPE: ANYTHING, TYPE: xtype.NDArray})
 
 
 def arr_of(t, shp, value):
+    """Generate symbolic array."""
     return AbstractArray(
         AbstractScalar({VALUE: value, TYPE: t}),
         {SHAPE: shp, TYPE: xtype.NDArray},
@@ -54,34 +56,42 @@ def arr_of(t, shp, value):
 
 
 def ai64_of(*shp, value=ANYTHING):
+    """Generate symbolic array of int64."""
     return arr_of(i64, shp, value)
 
 
 def ai32_of(*shp, value=ANYTHING):
+    """Generate symbolic array of int32."""
     return arr_of(i32, shp, value)
 
 
 def ai16_of(*shp, value=ANYTHING):
+    """Generate symbolic array of int16."""
     return arr_of(i16, shp, value)
 
 
 def au64_of(*shp, value=ANYTHING):
+    """Generate symbolic array of uint64."""
     return arr_of(u64, shp, value)
 
 
 def af64_of(*shp, value=ANYTHING):
+    """Generate symbolic array of float64."""
     return arr_of(f64, shp, value)
 
 
 def af32_of(*shp, value=ANYTHING):
+    """Generate symbolic array of float32."""
     return arr_of(f32, shp, value)
 
 
 def af16_of(*shp, value=ANYTHING):
+    """Generate symbolic array of float16."""
     return arr_of(f16, shp, value)
 
 
 def D(__d=None, **dct):
+    """Generate a symbolic dict from parsing given dict."""
     if __d is None:
         d = {}
     else:
@@ -93,38 +103,46 @@ def D(__d=None, **dct):
 
 
 def JT(a):
+    """Generate a symbolic AbstractJTagged."""
     return AbstractJTagged(to_abstract_test(a))
 
 
 def H(a):
+    """Generate a symbolic AbstractHandle."""
     return AbstractHandle(to_abstract_test(a))
 
 
 def S(x=ANYTHING, t=None):
+    """Generate a symbolic scalar."""
     return AbstractScalar(
         {VALUE: x, TYPE: t or xtype.pytype_to_myiatype(type(x))}
     )
 
 
 def Ex(x, t=None):
+    """Generate a symbolic AbstractExternal."""
     return AbstractExternal({VALUE: x, TYPE: t or type(x)})
 
 
 def Shp(*vals):
+    """Generate a symbolic shape."""
     return to_abstract_test(tuple(S(v, u64) for v in vals))
 
 
 def Ty(t):
+    """Generate a symbolic type."""
     t = t if t is ANYTHING else type_to_abstract(t)
     return AbstractType(t)
 
 
 def U(*opts):
+    """Generate a symbolic union."""
     opts = [to_abstract_test(x) for x in opts]
     return AbstractUnion(opts)
 
 
 def TU(**opts):
+    """Generate a symbolic AbstractTaggedUnion."""
     opts = [[int(i[1:]), to_abstract_test(x)] for i, x in opts.items()]
     return AbstractTaggedUnion(opts)
 
@@ -144,6 +162,7 @@ def to_abstract_test(
         EnvInstance,
     ),
 ):
+    """Convert a python value to a myia abstract object"""
     return AbstractScalar(
         {
             VALUE: x,
@@ -237,32 +256,42 @@ def to_abstract_test(self, x: object):
 
 @dataclass(frozen=True)
 class Thing:
+    """Common dataclass to use for tests."""
+
     contents: object
 
     def __call__(self):
+        """Overload of call."""
         return self.contents * 2
 
 
 @dataclass(frozen=True)
 class Point(ArithmeticData):
+    """Common dataclass for a 2D point."""
+
     x: i64
     y: i64
 
     def abs(self):
+        """Compute distance from this point to origin."""
         return (self.x ** 2 + self.y ** 2) ** 0.5
 
     @property
     def absprop(self):
+        """Return abs as a property."""
         return self.abs()
 
 
 @dataclass(frozen=True)
 class Point3D(ArithmeticData):
+    """Common dataclass for a 3D point."""
+
     x: object
     y: object
     z: object
 
     def abs(self):
+        """Compute distance from origin to this point."""
         return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
 
 
@@ -277,6 +306,8 @@ Thing_ftup = from_value(Thing((1.0, 2.0)), broaden=True)
 
 @dataclass(frozen=True)
 class Pair(ADT):
+    """Common dataclass representing a pair."""
+
     left: object
     right: object
 

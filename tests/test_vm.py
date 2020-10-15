@@ -2,9 +2,7 @@ import numpy as np
 
 from myia.operations import array_map, array_reduce, array_scan, scalar_usub
 from myia.pipeline import scalar_debug_compile as compile
-
-from .multitest import mt
-from .test_lang import run_debug
+from myia.testing.multitest import mt, run_debug
 
 
 @mt(run_debug(2, 3), run_debug(2.0, 3.0))
