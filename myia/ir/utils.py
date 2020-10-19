@@ -258,19 +258,19 @@ def print_graph(g, allow_cycles=True):
 
     buf = io.StringIO()
     print(
-        f"graph {g.debug.debug_name}("
-        + ", ".join(f"%{p.debug.debug_name}" for p in g.parameters)
+        f"graph {str(g)}("
+        + ", ".join(f"%{str(p)}" for p in g.parameters)
         + ") {",
         file=buf,
     )
 
     def repr_node(node):
         if node.is_constant_graph():
-            return f"@{node.value.debug.debug_name}"
+            return f"@{str(node.value)}"
         elif node.is_constant():
             return str(node.value)
         else:
-            return f"%{node.debug.debug_name}"
+            return f"%{str(node)}"
 
     seen_graphs = set([g])
     def _succ_deep_once(node):
@@ -285,7 +285,7 @@ def print_graph(g, allow_cycles=True):
         if (node.graph is not None and node.graph is not g) or node is g.return_:
             continue
         if node.is_apply():
-            print(f"  %{node.debug.debug_name} = ", end="", file=buf)
+            print(f"  %{str(node)} = ", end="", file=buf)
             print(f"{repr_node(node.inputs[0])}(", end="", file=buf)
             print(
                 ", ".join(repr_node(a) for a in node.inputs[1:]),
@@ -300,7 +300,7 @@ def print_graph(g, allow_cycles=True):
         else:  # pragma: no cover
             print(f"UNK: {node}", file=buf)
 
-    print(f"  return %{g.output.debug.debug_name}", file=buf)
+    print(f"  return %{str(g.output)}", file=buf)
     print("}", file=buf)
     return buf.getvalue()
 
