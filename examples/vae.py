@@ -3,23 +3,19 @@
 Myia is still a work in progress, and this example may change in the future.
 """
 
-
 import time
 from dataclasses import dataclass
 
 import numpy
+import torch
 from numpy.random import RandomState
+from torchvision import datasets, transforms
 
+import myia.public_api as pub
 from myia import ArithmeticData, myia, value_and_grad
 from myia.api import to_device
 from myia.debug import traceback  # noqa
-
-import myia.public_api as pub
 from myia.operations import array_exp, array_pow, random_initialize
-
-import torch
-from torchvision import datasets, transforms
-
 
 ###########
 # Options #
@@ -40,7 +36,6 @@ backend_options_dict = {
 }
 
 backend_options = backend_options_dict[backend]
-
 
 ###############
 # Hyperparams #
@@ -135,23 +130,15 @@ class Sequential(ArithmeticData):
 class VAE(ArithmeticData):
     """Sequential layer, applies all sub-layers in order."""
 
-    fc1: "fc1"
-    fc21: "fc21"
-    fc22: "fc22"
-    fc3: "fc3"
-    fc4: "fc4"
+    fc1: "layer fc1"
+    fc21: "layer fc21"
+    fc22: "layer fc22"
+    fc3: "layer fc3"
+    fc4: "layer fc4"
 
     def encode(self, x):
         h1 = pub.relu(self.fc1.apply(x))
         return self.fc21.apply(h1), self.fc22.apply(h1)
-
-    """
-    def reparameterize(self, mu, logvar):
-        std = array_exp(0.5*logvar)
-        #eps = pub.randn_like(std)
-        #return mu + eps*std
-        return mu + std
-        #"""
 
     def reparameterize(self, mu, logvar, rstate):
         std = array_exp(0.5 * logvar)
@@ -167,29 +154,31 @@ class VAE(ArithmeticData):
         z, rstate = self.reparameterize(mu, logvar, rstate)
         return self.decode(z), mu, logvar, rstate
 
-params = (
-         mlp_parameters(*(784, 400))[0],
-         mlp_parameters(*(400, 20))[0],
-         mlp_parameters(*(400, 20))[0],
-         mlp_parameters(*(20, 400))[0],
-         mlp_parameters(*(400, 784))[0]
-         )
 
-model = VAE(
-        Linear(params[0][0], params[0][1]),
-        Linear(params[1][0], params[1][1]),
-        Linear(params[2][0], params[2][1]),
-        Linear(params[3][0], params[3][1]),
-        Linear(params[4][0], params[4][1])
+params = (
+    mlp_parameters(*(784, 400))[0],
+    mlp_parameters(*(400, 20))[0],
+    mlp_parameters(*(400, 20))[0],
+    mlp_parameters(*(20, 400))[0],
+    mlp_parameters(*(400, 784))[0],
 )
 
+model = VAE(
+    Linear(params[0][0], params[0][1]),
+    Linear(params[1][0], params[1][1]),
+    Linear(params[2][0], params[2][1]),
+    Linear(params[3][0], params[3][1]),
+    Linear(params[4][0], params[4][1]),
+)
 
 model = to_device(model, backend, backend_options, broaden=False)
 
 
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, logvar):
-    BCE = pub.binary_cross_entropy(recon_x, pub.reshape(x, (-1, 784)), reduction='sum')
+    BCE = pub.binary_cross_entropy(
+        recon_x, pub.reshape(x, (-1, 784)), reduction="sum"
+    )
 
     # see Appendix B from VAE paper:
     # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
@@ -201,9 +190,10 @@ def loss_function(recon_x, x, mu, logvar):
 
 
 def cost(model, data, rstate):
-    recon_batch, mu, logvar = model.forward(data, rstate)
+    recon_batch, mu, logvar, _rstate = model.forward(data, rstate)
     loss = loss_function(recon_batch, data, mu, logvar)
-    return loss
+    return loss.item(), _rstate
+
 
 @myia(backend=backend, backend_options=backend_options, return_backend=True)
 def step(model, data, lr, rstate):
@@ -213,21 +203,22 @@ def step(model, data, lr, rstate):
     The 'model' argument can be omitted: by default the derivative wrt
     the first argument is returned.
     """
-    #_cost, dmodel = value_and_grad(cost, "model")(model, data, rstate)
-    #_cost = cost(model, data, rstate)
-    #_, _rstate = pub.uniform(rstate, (2, 20), -1.0, 1.0)
-    #return _cost, model - lr * dmodel, rstate
-    return rstate, model, rstate
+    (_cost, rstate), dmodel = value_and_grad(cost, "model")(
+        model, data, rstate, dout=(1, random_initialize(0))
+    )
+    return _cost, model - lr * dmodel, rstate
+
 
 @myia(backend=backend, backend_options=backend_options, return_backend=True)
-def step_eval(model, data):
+def step_eval(model, data, rstate):
     """Returns the loss and parameter gradients.
 
     value_and_grad will return cost(model, x, y) and dcost(...)/dmodel.
     The 'model' argument can be omitted: by default the derivative wrt
     the first argument is returned.
     """
-    return cost(model, data)
+    return cost(model, data, rstate)
+
 
 @myia(backend=backend, backend_options=backend_options, return_backend=True)
 def step_init_seed():
@@ -246,57 +237,56 @@ if __name__ == "__main__":
     seed = 123
     cuda = False
     batch_size = 2
-    #epochs = 2
     epochs = 1
 
     torch.manual_seed(seed)
 
     device = torch.device("cuda" if cuda else "cpu")
 
-    kwargs = {'num_workers': 1, 'pin_memory': True} if cuda else {}
+    kwargs = {"num_workers": 1, "pin_memory": True} if cuda else {}
     train_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=True, download=True,
-                       transform=transforms.ToTensor()),
-        batch_size=batch_size, shuffle=True, **kwargs)
+        datasets.MNIST(
+            "../data",
+            train=True,
+            download=True,
+            transform=transforms.ToTensor(),
+        ),
+        batch_size=batch_size,
+        shuffle=True,
+        **kwargs,
+    )
 
     rand_state = step_init_seed()
-    rand_state_init = rand_state
-    #breakpoint()
 
     for _ in range(epochs):
         costs = []
         t0 = time.time()
-        for i ,(data, _) in enumerate(train_loader):
-            print("i", i)
-            cost, model, rand_state = step(model, data.reshape((batch_size, 784)).numpy(), lr, rand_state)
-            #breakpoint()
-            #costs.append(cost)
+        for i, (data, _) in enumerate(train_loader):
+            print("i", i + 1, "/", len(train_loader))
+            _cost, model, rand_state = step(
+                model, data.reshape((batch_size, 784)).numpy(), lr, rand_state
+            )
+            costs.append(_cost)
         costs = [float(c.from_device()) for c in costs]
         c = sum(costs) / len(costs)
         t = time.time() - t0
         print(f"Cost: {c:15.10f}\tTime: {t:15.10f}")
 
     test_loader = torch.utils.data.DataLoader(
-        datasets.MNIST('../data', train=False, transform=transforms.ToTensor()),
-        batch_size=batch_size, shuffle=True, **kwargs)
+        datasets.MNIST("../data", train=False, transform=transforms.ToTensor()),
+        batch_size=batch_size,
+        shuffle=True,
+        **kwargs,
+    )
 
     costs = []
     t0 = time.time()
-    for i ,(data, _) in enumerate(test_loader):
-        cost = step_eval(model, data.reshape((batch_size, 784)).numpy())
-        costs.append(cost)
+    for i, (data, _) in enumerate(test_loader):
+        _cost, rand_state = step_eval(
+            model, data.reshape((batch_size, 784)).numpy(), rand_state
+        )
+        costs.append(_cost)
     costs = [float(c.from_device()) for c in costs]
     c = sum(costs) / len(costs)
     t = time.time() - t0
     print(f"Cost: {c:15.10f}\tTime: {t:15.10f}")
-
-    """
-    for epoch in range(1, args.epochs + 1):
-        train(epoch)
-        test(epoch)
-        with torch.no_grad():
-            sample = torch.randn(64, 20).to(device)
-            sample = model.decode(sample).cpu()
-            save_image(sample.view(64, 1, 28, 28),
-                       'results/sample_' + str(epoch) + '.png')
-    #"""

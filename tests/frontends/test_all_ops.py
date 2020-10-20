@@ -351,17 +351,17 @@ def test_torch_eq(x, y):
 
 
 @mt(
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.randn(3, 5)),
         nn.Parameter(torch.randn(3, 5), requires_grad=False),
         "mean",
     ),
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.randn(3, 5)),
         nn.Parameter(torch.randn(3, 5), requires_grad=False),
         "none",
     ),
-    fwd_and_bwd_no_relay(
+    fwd_and_bwd(
         nn.Parameter(torch.randn(3, 5)),
         nn.Parameter(torch.randn(3, 5), requires_grad=False),
         "sum",
@@ -369,7 +369,9 @@ def test_torch_eq(x, y):
     broad_specs=(True, True, False),
 )
 def test_torch_binary_cross_entropy(inp, target, reduction):
-    return F.binary_cross_entropy(torch.sigmoid(inp), target, reduction=reduction)
+    return F.binary_cross_entropy(
+        torch.sigmoid(inp), target, reduction=reduction
+    )
 
 
 @fwd_and_bwd(

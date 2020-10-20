@@ -267,7 +267,10 @@ def argmax(self, dim=None, keepdim=False):
 @core
 def binary_cross_entropy(input, target, reduction="mean"):
     """Map of method torch.nn.functional.binary_cross_entropy."""
-    out = -(operations.array_log(input) * target + (1. - target) * operations.array_log(1. - input))
+    out = -(
+        operations.array_log(input) * target
+        + (1.0 - target) * operations.array_log(1.0 - input)
+    )
     if reduction == "none":
         out = out
     elif reduction == "mean":
@@ -772,7 +775,7 @@ def transpose(a, dim0, dim1):
 
 @core
 def uniform(rstate, size, _min, _max, dtype=f32):
-    """Returns samples from uniform distribution bounded by _min and _max"""
+    """Returns samples from uniform distribution bounded by _min and _max."""
     r0, v0 = P.random_uint32(rstate, size)
     _min = P.scalar_to_array(_min, AA)
     _max = P.scalar_to_array(_max, AA)

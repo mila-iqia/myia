@@ -5,11 +5,13 @@ import numpy as np
 import pytest
 from pytest import mark
 
+from myia import xtype
 from myia.abstract import from_value, ndarray_aliasable
 from myia.api import myia
 from myia.compile.backends import get_backend_names
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.operations import (
+    array_cast,
     array_map,
     array_reduce,
     array_to_scalar,
@@ -19,6 +21,8 @@ from myia.operations import (
     grad,
     partial,
     primitives as P,
+    random_initialize,
+    random_uint32,
     reshape,
     scalar_add,
     scalar_cast,
@@ -515,6 +519,16 @@ def test_transpose2(x, y, axis1, axis2):
     d = dot(xt, yt)
     sm = array_reduce(scalar_add, d, ())
     return array_to_scalar(sm)
+
+
+@gradient(4.0, 5.0, backend=backend_all)
+def test_with_random(a, b):
+    rstate = random_initialize(123)
+    rstate, v0 = random_uint32(rstate, (2, 3))
+    _, v1 = random_uint32(rstate, (2, 3))
+    v0 = array_cast(v0, xtype.f64)
+    v1 = array_cast(v1, xtype.f64)
+    return a * np.sum(v0).item() + b * np.sum(v1).item()
 
 
 @mt(

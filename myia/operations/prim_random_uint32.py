@@ -12,9 +12,10 @@ from ..lib import (
     AbstractRandomState,
     AbstractScalar,
     AbstractTuple,
+    bprop_to_grad_transform,
     standard_prim,
 )
-from . import primitives as P
+from . import primitives as P, zeros_like
 
 
 def pyimpl_random_uint32(rstate, shape):
@@ -44,6 +45,12 @@ async def infer_random_uint32(
     return AbstractTuple((AbstractRandomState(), value_type))
 
 
+@bprop_to_grad_transform(P.random_uint32)
+def bprop_random_uint32(rstate, shape, out, dout):
+    """Backpropagator for primitive `random_uint32`."""
+    return zeros_like(rstate), zeros_like(shape)
+
+
 __operation_defaults__ = {
     "name": "random_uint32",
     "registered_name": "random_uint32",
@@ -58,5 +65,5 @@ __primitive_defaults__ = {
     "type": "backend",
     "python_implementation": pyimpl_random_uint32,
     "inferrer_constructor": infer_random_uint32,
-    "grad_transform": None,
+    "grad_transform": bprop_random_uint32,
 }
