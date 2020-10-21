@@ -17,7 +17,7 @@ from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
 from myia.testing.common import Point, U, f64, i64, mysum
 from myia.testing.multitest import mt, run
 
-specialize_pipeline = scalar_debug_pipeline.select(
+mono_pipeline = scalar_debug_pipeline.select(
     "resources",
     "parse",
     "infer",
@@ -31,7 +31,7 @@ specialize_pipeline = scalar_debug_pipeline.select(
 ).configure({"opt2.phases.main": []})
 
 
-specialize_pipeline_std = standard_debug_pipeline.select(
+mono_pipeline_std = standard_debug_pipeline.select(
     "resources",
     "parse",
     "infer",
@@ -46,34 +46,8 @@ specialize_pipeline_std = standard_debug_pipeline.select(
 )
 
 
-def specializer_decorator(pipeline):
-    def deco(*entries, abstract=None, validate=True):
-        mtentries = []
-        for args in entries:
-            if isinstance(args, Exception):
-                result = type(args)
-                args = args.args
-            else:
-                result = None
-            mtentry = run(
-                *args,
-                result=result,
-                abstract=abstract,
-                validate=validate,
-                pipeline=pipeline
-            )
-            mtentries.append(mtentry)
-        return mt(*mtentries)
-
-    return deco
-
-
-specialize = specializer_decorator(specialize_pipeline)
-specialize_std = specializer_decorator(specialize_pipeline_std)
-
-
-mono_scalar = run.configure(pipeline=specialize_pipeline, backend=False)
-mono_standard = run.configure(pipeline=specialize_pipeline_std, backend=False)
+mono_scalar = run.configure(pipeline=mono_pipeline, backend=False)
+mono_standard = run.configure(pipeline=mono_pipeline_std, backend=False)
 
 
 int1 = 13
