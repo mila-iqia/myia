@@ -38,7 +38,7 @@ from ..xtype import UniverseType
 # Optimizer is used for multiple steps
 
 
-class Optimizer(Partializable):
+class Optimizer:
     """Pipeline step to optimize a graph.
 
     Inputs:
@@ -235,7 +235,7 @@ def step_simplify_types(resources, graph, argspec, outspec):
 
 
 # For debugging purposes, less optimizations
-step_debug_opt = Optimizer.partial(
+step_debug_opt = Optimizer(
     phases=dict(
         main=[
             optlib.expand_composite,
@@ -259,7 +259,7 @@ step_debug_opt = Optimizer.partial(
 
 
 # Standard optimizations
-step_opt = Optimizer.partial(
+step_opt = Optimizer(
     phases=dict(
         main=[
             # Force constants
@@ -349,7 +349,7 @@ step_opt = Optimizer.partial(
 )
 
 
-step_opt2 = Optimizer.partial(
+step_opt2 = Optimizer(
     phases=dict(
         rmunused=GraphInterfaceRewriterOpt.partial(
             rewriter=RemoveUnusedParameters
@@ -375,6 +375,17 @@ step_opt2 = Optimizer.partial(
             optlib.setitem_dead,
             optlib.elim_stop_gradient,
         ],
+        cse=CSE.partial(report_changes=False),
+    )
+)
+
+
+step_opt2_no_main = Optimizer(
+    phases=dict(
+        rmunused=GraphInterfaceRewriterOpt.partial(
+            rewriter=RemoveUnusedParameters
+        ),
+        dde=DeadDataElimination.partial(),
         cse=CSE.partial(report_changes=False),
     )
 )
