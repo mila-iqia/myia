@@ -13,7 +13,7 @@ from myia.operations import (
     switch,
     tagged,
 )
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
+from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline, steps
 from myia.testing.common import Point, U, f64, i64, mysum
 from myia.testing.multitest import mt, run
 
@@ -23,12 +23,12 @@ mono_pipeline = scalar_debug_pipeline.select(
     "infer",
     "specialize",
     "simplify_types",
-    "opt2",
+    {"opt2": steps.step_opt2_no_main},
     "llift",
     "validate",
     "export",
     "wrap",
-).configure({"opt2.phases.main": []})
+)
 
 
 mono_pipeline_std = standard_debug_pipeline.select(

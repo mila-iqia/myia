@@ -11,6 +11,7 @@ from myia.opt import (
     pattern_replacer,
 )
 from myia.pipeline import scalar_pipeline, steps
+from myia.pipeline.steps import Optimizer
 from myia.testing.common import i64, to_abstract_test
 from myia.utils import InferenceError, Merge
 from myia.utils.unify import Var, var
@@ -328,9 +329,9 @@ def test_type_tracking():
         "infer",
         "specialize",
         "simplify_types",
-        "opt",
+        {"opt": Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1]))},
         "validate",
-    ).configure({"opt.phases.main": [opt_ok1, opt_ok2, opt_err1]})
+    )
 
     def fn_ok1(x, y):
         return x + y
@@ -366,9 +367,9 @@ def test_type_tracking_2():
         "infer",
         "specialize",
         "simplify_types",
-        "opt",
+        {"opt": Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1]))},
         "validate",
-    ).configure({"opt.phases.main": [opt_ok1, opt_ok2, opt_err1]})
+    )
 
     def fn_err3(x, y):
         return x - y + x

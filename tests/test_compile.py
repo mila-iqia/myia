@@ -13,7 +13,18 @@ from myia.testing.common import MA, MB, Point
 from myia.testing.multitest import mt, run
 
 run_no_opt = run.configure(
-    pipeline=standard_pipeline.configure({"opt.phases.main": []})
+    pipeline=standard_pipeline.select(
+        "resources",
+        "parse",
+        "infer",
+        "specialize",
+        "simplify_types",
+        "opt2",
+        "llift",
+        "validate",
+        "compile",
+        "wrap",
+    )
 )
 
 
