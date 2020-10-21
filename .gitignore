@@ -8,4 +8,6 @@ prof/
 myia_debug/
 .benchmarks/
 .DS_Store
+docs/_build/
+docs/source/
 /.idea
