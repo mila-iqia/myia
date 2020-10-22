@@ -2,6 +2,8 @@
 
 from ovld import ovld
 
+from myia.parser import parse
+
 from .. import operations
 from ..abstract import (
     DEAD,
@@ -820,25 +822,25 @@ inline = make_inliner(
 )
 
 
-@pattern_replacer("just", X, interest=None)
+@pattern_replacer("just", C, interest=None)
 def expand_composite(resources, node, equiv):
     """Expand a composite primitive."""
-    if node.is_apply():
-        operation = node.inputs[0]
-        parameters = node.inputs[1:]
-        if operation.is_constant() and isinstance(
-            operation.value, CompositePrimitive
-        ):
-            from myia.parser import parse
-            from myia.ir.anf import Graph
-
-            py_impl = operation.value.defaults()["python_implementation"]
-            g = parse(py_impl)
-            assert isinstance(g, Graph)
-            assert len(g.parameters) == len(parameters)
-            clone = GraphCloner(inline=[(g, node.graph, parameters)])
-            output = clone[g.output]
-            return output
+    data = equiv[C].value
+    if isinstance(data, CompositePrimitive):
+        py_impl = data.defaults()["python_implementation"]
+        # Parser function caches graphs, so it will be compiled only
+        # once even if parse(py_impl) is called multiple times.
+        g = parse(py_impl)
+        # Then, a graph already parsed may be returned above and passed to
+        # resources.incorporate() which wants to set a manager for the graph.
+        # But manager from a second call might be different from first call
+        # (e.g. in a test script running same function on different backends)
+        # which will cause an exception. To prevent this, we should better
+        # clone graph before incorporation.
+        clone = GraphCloner(g)
+        vfn = node.abstract
+        newg = resources.incorporate(clone[g], vfn.args, vfn.output)
+        return Constant(newg)
     return node
 
 

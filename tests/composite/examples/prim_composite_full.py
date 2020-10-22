@@ -7,7 +7,6 @@ from myia.lib import (
     AbstractScalar,
     AbstractType,
     abstract_array,
-    core,
     distribute,
     force_pending,
     scalar_cast,
@@ -17,7 +16,6 @@ from myia.operations import primitives as P
 from myia.xtype import NDArray
 
 
-@core
 def pyimpl_composite_full(shape, fill_value, abstract_scalar_type):
     """Implement `composite_full`."""
     scalar_value = scalar_cast(fill_value, abstract_scalar_type)
