@@ -15,24 +15,22 @@ from myia.operations import (
 )
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline, steps
 from myia.pipeline.standard import standard_resources, scalar_object_map, \
-    Environment, Pipeline
+    Pipeline
 from myia.testing.common import Point, U, f64, i64, mysum
 from myia.testing.multitest import mt, run
 
 
-mono_pipeline = Environment(
+mono_pipeline = Pipeline(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_simplify_types,
+    steps.step_opt2_no_main,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_debug_export,
+    steps.step_wrap,
     resources=standard_resources,
-    pipeline=Pipeline(
-        steps.step_parse,
-        steps.step_infer,
-        steps.step_specialize,
-        steps.step_simplify_types,
-        steps.step_opt2_no_main,
-        steps.step_llift,
-        steps.step_validate,
-        steps.step_debug_export,
-        steps.step_wrap,
-    )
 ).configure(
     {
         "convert.object_map": scalar_object_map,

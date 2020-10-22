@@ -15,7 +15,7 @@ from ..public_api import item
 from ..utils import Registry
 from ..validate import AbstractValidator, MultiValidator, OperatorValidator
 from . import steps
-from .pipeline import Pipeline, Environment
+from .pipeline import Pipeline
 from .resources import (
     BackendResource,
     ConverterResource,
@@ -297,20 +297,18 @@ standard_resources = Resources.partial(
 ######################
 
 
-standard_pipeline = Environment(
+standard_pipeline = Pipeline(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_simplify_types,
+    steps.step_opt,
+    steps.step_opt2,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_compile,
+    steps.step_wrap,
     resources=standard_resources,
-    pipeline=Pipeline(
-        steps.step_parse,
-        steps.step_infer,
-        steps.step_specialize,
-        steps.step_simplify_types,
-        steps.step_opt,
-        steps.step_opt2,
-        steps.step_llift,
-        steps.step_validate,
-        steps.step_compile,
-        steps.step_wrap,
-    )
 )
 
 scalar_pipeline = standard_pipeline.configure(
@@ -318,20 +316,18 @@ scalar_pipeline = standard_pipeline.configure(
 )
 
 
-standard_debug_pipeline = Environment(
+standard_debug_pipeline = Pipeline(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_simplify_types,
+    steps.step_opt,
+    steps.step_opt2,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_debug_export,
+    steps.step_wrap,
     resources=standard_resources,
-    pipeline=Pipeline(
-        steps.step_parse,
-        steps.step_infer,
-        steps.step_specialize,
-        steps.step_simplify_types,
-        steps.step_opt,
-        steps.step_opt2,
-        steps.step_llift,
-        steps.step_validate,
-        steps.step_debug_export,
-        steps.step_wrap,
-    )
 ).configure({"backend.name": False})
 
 

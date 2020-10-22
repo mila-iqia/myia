@@ -40,7 +40,6 @@ from myia.pipeline import (
     standard_resources,
     steps,
     Pipeline,
-    Environment,
 )
 from myia.testing.common import (
     AA,
@@ -86,17 +85,15 @@ def grad_wrap(graph, argspec):
     return {"graph": g}
 
 
-grad_pipeline = Environment(
+grad_pipeline = Pipeline(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_debug_opt,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_debug_export,
     resources=standard_resources,
-    pipeline=Pipeline(
-        steps.step_parse,
-        steps.step_infer,
-        steps.step_specialize,
-        steps.step_debug_opt,
-        steps.step_llift,
-        steps.step_validate,
-        steps.step_debug_export,
-    )
 )
 
 

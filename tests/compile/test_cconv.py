@@ -41,7 +41,7 @@ def cconv(*arglists, use_llift=False):
     def decorate(fn):
         def run_test(args):
             result_py = fn(*args)
-            res = cconv_pipeline.make()(input=fn, use_llift=use_llift)
+            res = cconv_pipeline(input=fn, use_llift=use_llift)
             check_no_free_variables(res["graph"])
             result_final = res["output"](*args)
             assert result_py == result_final

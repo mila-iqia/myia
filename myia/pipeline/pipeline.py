@@ -1,13 +1,69 @@
 
 from types import FunctionType
-from ..utils import partition_keywords
+from ..utils import Partial, partition_keywords
 
 
-class Pipeline(list):
-    def __init__(self, *steps):
-        super().__init__(steps)
+class Pipeline:
+    def __init__(self, *steps, **kwargs):
+        self.steps = steps
+        self.kwargs = kwargs
+
+    def __iter__(self):
+        return iter(self.steps)
+
+    def __getitem__(self, x):
+        return self.steps[x]
+
+    def configure(self, config={}, **kwargs):
+        return type(self)(
+            *self,
+            resources=self.kwargs["resources"].configure(config, **kwargs),
+        )
+
+    def with_pipeline(self, *steps):
+        return type(self)(
+            *steps,
+            **self.kwargs
+        )
+
+    def without_step(self, step):
+        idx = self.steps.index(step)
+        return self.with_pipeline(
+            *self[:idx],
+            *self[idx + 1:]
+        )
+
+    def insert_after(self, base_step, *more_steps):
+        idx = self.steps.index(base_step) + 1
+        return self.with_pipeline(
+            *self[:idx],
+            *more_steps,
+            *self[idx:]
+        )
+
+    def make_transformer(self, in_key, out_key):
+        """Create a callable for specific input and output keys.
+
+        Arguments:
+            in_key: The name of the pipeline input to use for the
+                callable's argument.
+            out_key: The name of the pipeline output to return.
+
+        """
+        def run(arg):
+            res = self(**{in_key: arg})
+            return res[out_key]
+
+        return run
+
+    def _instantiate_kwargs(self):
+        return {
+            k: v() if isinstance(v, Partial) else v
+            for k, v in self.kwargs.items()
+        }
 
     def __call__(self, **kwargs):
+        kwargs = {**self._instantiate_kwargs(), **kwargs}
         for fn in self:
             if not isinstance(fn, FunctionType):
                 fn = fn.__call__
@@ -22,67 +78,69 @@ class Pipeline(list):
             kwargs = {**kwargs, **results}
         return kwargs
 
+    run = __call__
 
-class Environment:
-    def __init__(self, resources, pipeline):
-        self.resources = resources
-        self.pipeline = pipeline
 
-    def configure(self, config={}, **kwargs):
-        return Environment(
-            resources=self.resources.configure(config, **kwargs),
-            pipeline=self.pipeline,
-        )
+# class Environment:
+#     def __init__(self, resources, pipeline):
+#         self.resources = resources
+#         self.pipeline = pipeline
 
-    def with_pipeline(self, *steps):
-        return Environment(
-            resources=self.resources,
-            pipeline=Pipeline(*steps),
-        )
+#     def configure(self, config={}, **kwargs):
+#         return Environment(
+#             resources=self.resources.configure(config, **kwargs),
+#             pipeline=self.pipeline,
+#         )
 
-    def without_step(self, step):
-        idx = self.pipeline.index(step)
-        return Environment(
-            resources=self.resources,
-            pipeline=Pipeline(
-                *self.pipeline[:idx],
-                *self.pipeline[idx + 1:]
-            )
-        )
+#     def with_pipeline(self, *steps):
+#         return Environment(
+#             resources=self.resources,
+#             pipeline=Pipeline(*steps),
+#         )
 
-    def insert_after(self, base_step, *more_steps):
-        idx = self.pipeline.index(base_step) + 1
-        return Environment(
-            resources=self.resources,
-            pipeline=Pipeline(
-                *self.pipeline[:idx],
-                *more_steps,
-                *self.pipeline[idx:]
-            )
-        )
+#     def without_step(self, step):
+#         idx = self.pipeline.index(step)
+#         return Environment(
+#             resources=self.resources,
+#             pipeline=Pipeline(
+#                 *self.pipeline[:idx],
+#                 *self.pipeline[idx + 1:]
+#             )
+#         )
 
-    def make(self):
-        return self
+#     def insert_after(self, base_step, *more_steps):
+#         idx = self.pipeline.index(base_step) + 1
+#         return Environment(
+#             resources=self.resources,
+#             pipeline=Pipeline(
+#                 *self.pipeline[:idx],
+#                 *more_steps,
+#                 *self.pipeline[idx:]
+#             )
+#         )
 
-    def run(self, **kwargs):
-        return self.pipeline(resources=self.resources(), **kwargs)
+#     def make(self):
+#         return self
 
-    def make_transformer(self, in_key, out_key):
-        """Create a callable for specific input and output keys.
+#     def run(self, **kwargs):
+#         return self.pipeline(resources=self.resources(), **kwargs)
 
-        Arguments:
-            in_key: The name of the pipeline input to use for the
-                callable's argument.
-            out_key: The name of the pipeline output to return.
+#     def make_transformer(self, in_key, out_key):
+#         """Create a callable for specific input and output keys.
 
-        """
-        def run(arg):
-            res = self.run(**{in_key: arg})
-            return res[out_key]
+#         Arguments:
+#             in_key: The name of the pipeline input to use for the
+#                 callable's argument.
+#             out_key: The name of the pipeline output to return.
 
-        return run
+#         """
+#         def run(arg):
+#             res = self.run(**{in_key: arg})
+#             return res[out_key]
 
-    __call__ = run
+#         return run
+
+#     __call__ = run
 
 
 

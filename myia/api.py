@@ -6,7 +6,7 @@ import os
 from .abstract import ABSENT, find_aliases, from_value
 from .compile.backends import Backend, load_backend
 from .compile.utils import BackendValue
-from .pipeline import standard_pipeline, standard_resources, Pipeline, Environment
+from .pipeline import standard_pipeline
 from .simplify_types import to_canonical
 from .utils import (
     MultiTrace,
@@ -103,7 +103,7 @@ class MyiaFunction:
         if argspec not in self._cache:
             if self.tracer:
                 self.tracer.__enter__()
-            self._cache[argspec] = self.pip.run(
+            self._cache[argspec] = self.pip(
                 input=self.fn,
                 argspec=argspec,
                 aliasspec=(self.alias_tracker, aid_to_paths),
@@ -128,7 +128,7 @@ class MyiaFunction:
 
     def to_device(self, v, *, broaden=True, vm_t=None, orig_t=None):
         """Move value to the function's accelerator hardware."""
-        backr = self.pip.resources.keywords["backend"].keywords
+        backr = self.pip.kwargs["resources"].keywords["backend"].keywords
         return to_device(
             v,
             backr["name"],

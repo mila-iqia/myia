@@ -8,8 +8,7 @@ from ovld import ovld
 
 from myia.compile.backends import get_backend_names
 from myia.lib import concretize_abstract, from_value
-from myia.pipeline import standard_debug_pipeline, standard_pipeline, steps, \
-    Environment
+from myia.pipeline import standard_debug_pipeline, standard_pipeline, steps
 from myia.utils import keyword_decorator, merge
 
 from .common import to_abstract_test
@@ -236,8 +235,7 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     args = [to_abstract_test(arg) for arg in args]
 
     def out(args):
-        pip = pipeline.make()
-        res = pip(input=fn, argspec=args)
+        res = pipeline(input=fn, argspec=args)
         rval = res["outspec"]
         rval = concretize_abstract(rval)
         return rval
@@ -302,8 +300,7 @@ def _run(
         pipeline = pipeline.configure(validator=None)
 
     def out(args):
-        pip = pipeline.make()
-        mfn = pip(input=fn, argspec=argspec)
+        mfn = pipeline(input=fn, argspec=argspec)
         rval = mfn["output"](*args)
         return rval
 
