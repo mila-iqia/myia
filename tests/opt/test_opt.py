@@ -33,20 +33,13 @@ parse = (
             )
         }
     )
-    .with_pipeline(
-        steps.step_parse,
-        steps.step_resolve,
-    )
+    .with_pipeline(steps.step_parse, steps.step_resolve,)
     .make_transformer("input", "graph")
 )
 
 
 specialize = scalar_pipeline.configure(
-    {
-        "convert.object_map": Merge(
-            {operations.getitem: prim.tuple_getitem}
-        )
-    }
+    {"convert.object_map": Merge({operations.getitem: prim.tuple_getitem})}
 ).with_pipeline(
     steps.step_parse,
     steps.step_resolve,

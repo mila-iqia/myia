@@ -1,6 +1,6 @@
-
 from types import FunctionType
-from ..utils import Partial, partition_keywords
+
+from ..utils import Partial, partition_keywords, tracer
 
 
 class Pipeline:
@@ -21,25 +21,15 @@ class Pipeline:
         )
 
     def with_pipeline(self, *steps):
-        return type(self)(
-            *steps,
-            **self.kwargs
-        )
+        return type(self)(*steps, **self.kwargs)
 
     def without_step(self, step):
         idx = self.steps.index(step)
-        return self.with_pipeline(
-            *self[:idx],
-            *self[idx + 1:]
-        )
+        return self.with_pipeline(*self[:idx], *self[idx + 1 :])
 
     def insert_after(self, base_step, *more_steps):
         idx = self.steps.index(base_step) + 1
-        return self.with_pipeline(
-            *self[:idx],
-            *more_steps,
-            *self[idx:]
-        )
+        return self.with_pipeline(*self[:idx], *more_steps, *self[idx:])
 
     def make_transformer(self, in_key, out_key):
         """Create a callable for specific input and output keys.
@@ -50,6 +40,7 @@ class Pipeline:
             out_key: The name of the pipeline output to return.
 
         """
+
         def run(arg):
             res = self(**{in_key: arg})
             return res[out_key]
@@ -64,18 +55,26 @@ class Pipeline:
 
     def __call__(self, **kwargs):
         kwargs = {**self._instantiate_kwargs(), **kwargs}
-        for fn in self:
-            if not isinstance(fn, FunctionType):
-                fn = fn.__call__
-            valid_args, rest = partition_keywords(fn, kwargs)
-            results = fn(**valid_args)
-            if (
-                not isinstance(results, dict)
-                and len(valid_args) == 1
-            ):
-                (field_name,) = valid_args.keys()
-                results = {field_name: results}
-            kwargs = {**kwargs, **results}
+        with tracer("compile"):
+            for idx, fn in enumerate(self):
+                step_name = getattr(fn, "__name__", str(idx))
+                with tracer(step_name, step=fn, **kwargs) as tr:
+                    try:
+                        if not isinstance(fn, FunctionType):
+                            fn = fn.__call__
+                        valid_args, rest = partition_keywords(fn, kwargs)
+                        results = fn(**valid_args)
+                        if (
+                            not isinstance(results, dict)
+                            and len(valid_args) == 1
+                        ):
+                            (field_name,) = valid_args.keys()
+                            results = {field_name: results}
+                        kwargs = {**kwargs, **results}
+                        tr.set_results(**kwargs)
+                    except Exception as err:
+                        tracer().emit_error(error=err)
+                        raise
         return kwargs
 
     run = __call__
@@ -141,7 +140,6 @@ class Pipeline:
 #         return run
 
 #     __call__ = run
-
 
 
 # """Tools to generate and configure Myia's operation pipeline."""

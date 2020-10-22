@@ -51,8 +51,7 @@ def to_numpy(value: object):
 
 
 infer_pipeline = standard_pipeline.with_pipeline(
-    steps.step_parse,
-    steps.step_infer,
+    steps.step_parse, steps.step_infer,
 )
 
 
@@ -281,10 +280,7 @@ def _run(
         backend_options = backend[1]
 
         pipeline = pipeline.configure(
-            {
-                "backend.name": backend_name,
-                "backend.options": backend_options,
-            }
+            {"backend.name": backend_name, "backend.options": backend_options,}
         )
 
     if abstract is None:

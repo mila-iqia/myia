@@ -58,7 +58,7 @@ from myia.operations import (
     zeros_like,
 )
 from myia.operations.utils import InferencePrimitive
-from myia.pipeline import steps, scalar_pipeline, standard_pipeline
+from myia.pipeline import scalar_pipeline, standard_pipeline, steps
 from myia.testing.common import (
     AN,
     JT,
@@ -135,13 +135,11 @@ def _to_i64(x: Number) -> Int[64]:
 
 
 infer_pipeline = scalar_pipeline.with_pipeline(
-    steps.step_parse,
-    steps.step_infer
+    steps.step_parse, steps.step_infer
 )
 
 infer_pipeline_std = standard_pipeline.with_pipeline(
-    steps.step_parse,
-    steps.step_infer
+    steps.step_parse, steps.step_infer
 )
 
 

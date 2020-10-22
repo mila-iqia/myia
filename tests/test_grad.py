@@ -34,12 +34,12 @@ from myia.operations import (
 from myia.operations.macro_grad import GradOperation
 from myia.operations.primitives import J
 from myia.pipeline import (
+    Pipeline,
     py_registry as pyi,
     standard_debug_pipeline,
     standard_pipeline,
     standard_resources,
     steps,
-    Pipeline,
 )
 from myia.testing.common import (
     AA,
@@ -194,10 +194,7 @@ def gradient(
         backend_options = backend[1]
 
         pipeline = pipeline.configure(
-            {
-                "backend.name": backend_name,
-                "backend.options": backend_options,
-            }
+            {"backend.name": backend_name, "backend.options": backend_options,}
         )
 
     _grad_test(

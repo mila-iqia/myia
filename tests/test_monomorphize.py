@@ -14,11 +14,13 @@ from myia.operations import (
     tagged,
 )
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline, steps
-from myia.pipeline.standard import standard_resources, scalar_object_map, \
-    Pipeline
+from myia.pipeline.standard import (
+    Pipeline,
+    scalar_object_map,
+    standard_resources,
+)
 from myia.testing.common import Point, U, f64, i64, mysum
 from myia.testing.multitest import mt, run
-
 
 mono_pipeline = Pipeline(
     steps.step_parse,
@@ -31,12 +33,7 @@ mono_pipeline = Pipeline(
     steps.step_debug_export,
     steps.step_wrap,
     resources=standard_resources,
-).configure(
-    {
-        "convert.object_map": scalar_object_map,
-        "backend.name": False
-    }
-)
+).configure({"convert.object_map": scalar_object_map, "backend.name": False})
 
 
 mono_pipeline_std = standard_debug_pipeline

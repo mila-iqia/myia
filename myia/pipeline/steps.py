@@ -48,11 +48,15 @@ class Optimizer:
         graph: The optimized graph.
     """
 
-    def __init__(self, phases, run_only_once=False, use_tracker=True):
+    def __init__(
+        self, phases, run_only_once=False, use_tracker=True, name=None
+    ):
         """Initialize an Optimizer."""
         self.run_only_once = run_only_once
         self.phases = phases
         self.use_tracker = use_tracker
+        if name is not None:
+            self.__name__ = name
 
     def __call__(self, resources, graph, argspec=None, outspec=None):
         """Optimize the graph using the given patterns."""
@@ -260,6 +264,7 @@ step_debug_opt = Optimizer(
 
 # Standard optimizations
 step_opt = Optimizer(
+    name="step_opt",
     phases=dict(
         main=[
             # Force constants
@@ -345,11 +350,12 @@ step_opt = Optimizer(
         grad=[optlib.expand_J],
         cse=CSE.partial(report_changes=False),
         jelim=optlib.JElim.partial(),
-    )
+    ),
 )
 
 
 step_opt2 = Optimizer(
+    name="step_opt2",
     phases=dict(
         rmunused=GraphInterfaceRewriterOpt.partial(
             rewriter=RemoveUnusedParameters
@@ -376,18 +382,19 @@ step_opt2 = Optimizer(
             optlib.elim_stop_gradient,
         ],
         cse=CSE.partial(report_changes=False),
-    )
+    ),
 )
 
 
 step_opt2_no_main = Optimizer(
+    name="step_opt2_no_main",
     phases=dict(
         rmunused=GraphInterfaceRewriterOpt.partial(
             rewriter=RemoveUnusedParameters
         ),
         dde=DeadDataElimination.partial(),
         cse=CSE.partial(report_changes=False),
-    )
+    ),
 )
 
 
