@@ -297,7 +297,17 @@ standard_resources = Resources.partial(
 ######################
 
 
-standard_pipeline = Pipeline(
+base_pipeline = Pipeline(arguments={"resources": standard_resources})
+base_debug_pipeline = base_pipeline.configure({"backend.name": False})
+base_scalar_pipeline = base_pipeline.configure(
+    {"convert.object_map": scalar_object_map}
+)
+base_scalar_debug_pipeline = base_pipeline.configure(
+    {"convert.object_map": scalar_object_map, "backend.name": False}
+)
+
+
+standard_pipeline = base_pipeline.with_steps(
     steps.step_parse,
     steps.step_infer,
     steps.step_specialize,
@@ -308,7 +318,6 @@ standard_pipeline = Pipeline(
     steps.step_validate,
     steps.step_compile,
     steps.step_wrap,
-    resources=standard_resources,
 )
 
 scalar_pipeline = standard_pipeline.configure(
@@ -316,7 +325,7 @@ scalar_pipeline = standard_pipeline.configure(
 )
 
 
-standard_debug_pipeline = Pipeline(
+standard_debug_pipeline = base_pipeline.with_steps(
     steps.step_parse,
     steps.step_infer,
     steps.step_specialize,
@@ -327,7 +336,6 @@ standard_debug_pipeline = Pipeline(
     steps.step_validate,
     steps.step_debug_export,
     steps.step_wrap,
-    resources=standard_resources,
 ).configure({"backend.name": False})
 
 
@@ -358,6 +366,10 @@ scalar_debug_compile = scalar_debug_pipeline.with_steps(
 
 __consolidate__ = True
 __all__ = [
+    "base_debug_pipeline",
+    "base_pipeline",
+    "base_scalar_pipeline",
+    "base_scalar_debug_pipeline",
     "py_registry",
     "scalar_debug_compile",
     "scalar_debug_pipeline",

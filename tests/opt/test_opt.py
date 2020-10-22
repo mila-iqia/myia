@@ -334,9 +334,7 @@ def test_type_tracking():
     def fn_ok1(x, y):
         return x + y
 
-    pip(
-        input=fn_ok1, argspec=(to_abstract_test(i64), to_abstract_test(i64))
-    )
+    pip(input=fn_ok1, argspec=(to_abstract_test(i64), to_abstract_test(i64)))
 
     def fn_ok2(x):
         return -x

@@ -134,9 +134,7 @@ def _to_i64(x: Number) -> Int[64]:
     return int(x)
 
 
-infer_pipeline = scalar_pipeline.with_steps(
-    steps.step_parse, steps.step_infer
-)
+infer_pipeline = scalar_pipeline.with_steps(steps.step_parse, steps.step_infer)
 
 infer_pipeline_std = standard_pipeline.with_steps(
     steps.step_parse, steps.step_infer

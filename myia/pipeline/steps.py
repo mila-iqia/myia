@@ -20,13 +20,7 @@ from ..opt import (
 )
 from ..parser import parse
 from ..simplify_types import from_canonical, simplify_types, to_canonical
-from ..utils import (
-    InferenceError,
-    MyiaInputTypeError,
-    Partializable,
-    new_universe,
-    tracer,
-)
+from ..utils import InferenceError, MyiaInputTypeError, new_universe, tracer
 from ..validate import ValidationError
 from ..xtype import UniverseType
 

@@ -4,18 +4,22 @@ from ..utils import Partial, partition_keywords, tracer
 
 
 class Pipeline:
-    def __init__(self, *steps, **kwargs):
+    def __init__(self, *steps, arguments={}):
         self.steps = steps
-        self.kwargs = kwargs
+        self.arguments = arguments
 
     def configure(self, config={}, **kwargs):
         return type(self)(
             *self,
-            resources=self.kwargs["resources"].configure(config, **kwargs),
+            arguments={
+                "resources": self.arguments["resources"].configure(
+                    config, **kwargs
+                )
+            }
         )
 
     def with_steps(self, *steps):
-        return type(self)(*steps, **self.kwargs)
+        return type(self)(*steps, arguments=self.arguments)
 
     def without_step(self, step):
         idx = self.steps.index(step)
@@ -41,14 +45,14 @@ class Pipeline:
 
         return run
 
-    def _instantiate_kwargs(self):
+    def _instantiate_arguments(self):
         return {
             k: v() if isinstance(v, Partial) else v
-            for k, v in self.kwargs.items()
+            for k, v in self.arguments.items()
         }
 
     def __call__(self, **kwargs):
-        kwargs = {**self._instantiate_kwargs(), **kwargs}
+        kwargs = {**self._instantiate_arguments(), **kwargs}
         with tracer("compile"):
             for idx, fn in enumerate(self):
                 step_name = getattr(fn, "__name__", str(idx))

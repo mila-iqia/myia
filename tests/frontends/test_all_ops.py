@@ -150,7 +150,7 @@ def _fwd_and_bwd(
         backend_options = backend[1]
 
         pipeline = pipeline.configure(
-            {"backend.name": backend_name, "backend.options": backend_options,}
+            {"backend.name": backend_name, "backend.options": backend_options}
         )
 
     def mksens(x):

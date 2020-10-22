@@ -34,11 +34,10 @@ from myia.operations import (
 from myia.operations.macro_grad import GradOperation
 from myia.operations.primitives import J
 from myia.pipeline import (
-    Pipeline,
+    base_pipeline,
     py_registry as pyi,
     standard_debug_pipeline,
     standard_pipeline,
-    standard_resources,
     steps,
 )
 from myia.testing.common import (
@@ -85,7 +84,7 @@ def grad_wrap(graph, argspec):
     return {"graph": g}
 
 
-grad_pipeline = Pipeline(
+grad_pipeline = base_pipeline.with_steps(
     steps.step_parse,
     steps.step_infer,
     steps.step_specialize,
@@ -93,7 +92,6 @@ grad_pipeline = Pipeline(
     steps.step_llift,
     steps.step_validate,
     steps.step_debug_export,
-    resources=standard_resources,
 )
 
 
@@ -194,7 +192,7 @@ def gradient(
         backend_options = backend[1]
 
         pipeline = pipeline.configure(
-            {"backend.name": backend_name, "backend.options": backend_options,}
+            {"backend.name": backend_name, "backend.options": backend_options}
         )
 
     _grad_test(
