@@ -153,10 +153,10 @@ def _grad_test(
         argspec = tuple(to_abstract_test(x) for x in argspec)
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
-        res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
+        res = pipeline(input=obj, argspec=[*argspec, sens_type])
     else:
         pip = pipeline.without_step(steps.step_parse)
-        res = pip.run(graph=obj, argspec=[*argspec, sens_type])
+        res = pip(graph=obj, argspec=[*argspec, sens_type])
     gtest = GradTester(
         fn=fn,
         gfn=res["output"],
@@ -545,7 +545,7 @@ def test_union(x):
 
 def _runwith(f, *args):
     argspec = tuple(from_value(arg, broaden=True) for arg in args)
-    res = grad_pipeline.run(input=f, argspec=argspec)
+    res = grad_pipeline(input=f, argspec=argspec)
     return res["output"](*args)
 
 

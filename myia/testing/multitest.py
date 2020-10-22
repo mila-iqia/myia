@@ -50,7 +50,7 @@ def to_numpy(value: object):
     return value
 
 
-infer_pipeline = standard_pipeline.with_pipeline(
+infer_pipeline = standard_pipeline.with_steps(
     steps.step_parse, steps.step_infer,
 )
 

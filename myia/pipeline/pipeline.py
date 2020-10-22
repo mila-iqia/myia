@@ -8,28 +8,22 @@ class Pipeline:
         self.steps = steps
         self.kwargs = kwargs
 
-    def __iter__(self):
-        return iter(self.steps)
-
-    def __getitem__(self, x):
-        return self.steps[x]
-
     def configure(self, config={}, **kwargs):
         return type(self)(
             *self,
             resources=self.kwargs["resources"].configure(config, **kwargs),
         )
 
-    def with_pipeline(self, *steps):
+    def with_steps(self, *steps):
         return type(self)(*steps, **self.kwargs)
 
     def without_step(self, step):
         idx = self.steps.index(step)
-        return self.with_pipeline(*self[:idx], *self[idx + 1 :])
+        return self.with_steps(*self[:idx], *self[idx + 1 :])
 
     def insert_after(self, base_step, *more_steps):
         idx = self.steps.index(base_step) + 1
-        return self.with_pipeline(*self[:idx], *more_steps, *self[idx:])
+        return self.with_steps(*self[:idx], *more_steps, *self[idx:])
 
     def make_transformer(self, in_key, out_key):
         """Create a callable for specific input and output keys.
@@ -76,6 +70,12 @@ class Pipeline:
                         tracer().emit_error(error=err)
                         raise
         return kwargs
+
+    def __iter__(self):
+        return iter(self.steps)
+
+    def __getitem__(self, x):
+        return self.steps[x]
 
     run = __call__
 

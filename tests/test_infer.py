@@ -134,11 +134,11 @@ def _to_i64(x: Number) -> Int[64]:
     return int(x)
 
 
-infer_pipeline = scalar_pipeline.with_pipeline(
+infer_pipeline = scalar_pipeline.with_steps(
     steps.step_parse, steps.step_infer
 )
 
-infer_pipeline_std = standard_pipeline.with_pipeline(
+infer_pipeline_std = standard_pipeline.with_steps(
     steps.step_parse, steps.step_infer
 )
 
@@ -1805,7 +1805,7 @@ def test_bad_metagraph(x):
 #     for argspec in [[{'type': i64}, {'type': i64}],
 #                     [{'type': i64}, {'type': f64}]]:
 
-#         results = pip.run(input=fn, argspec=argspec)
+#         results = pip(input=fn, argspec=argspec)
 #         rval = results['outspec']
 
 #         assert rval['type'] == f64
@@ -1827,7 +1827,7 @@ def test_bad_metagraph(x):
 
 #     # Test correct
 
-#     results = pip.run(
+#     results = pip(
 #         input=fn,
 #         argspec=[{'type': i64}, {'type': i64}]
 #     )
@@ -1838,7 +1838,7 @@ def test_bad_metagraph(x):
 #     # Test mismatch
 
 #     with pytest.raises(InferenceError):
-#         results = pip.run(
+#         results = pip(
 #             input=fn,
 #             argspec=[{'type': i64}, {'type': f64}]
 #         )
@@ -1849,7 +1849,7 @@ def test_bad_metagraph(x):
 #         return fn(x)
 
 #     with pytest.raises(InferenceError):
-#         results = pip.run(
+#         results = pip(
 #             input=fn2,
 #             argspec=[{'type': i64}]
 #         )

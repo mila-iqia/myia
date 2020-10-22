@@ -143,7 +143,7 @@ def test_forward_reference():
         return h()
 
     # No resolve
-    parse2 = scalar_pipeline.with_pipeline(steps.step_parse).make_transformer(
+    parse2 = scalar_pipeline.with_steps(steps.step_parse).make_transformer(
         "input", "graph"
     )
 

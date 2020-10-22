@@ -341,17 +341,17 @@ scalar_debug_pipeline = standard_debug_pipeline.configure(
 ######################
 
 
-standard_parse = standard_pipeline.with_pipeline(
+standard_parse = standard_pipeline.with_steps(
     steps.step_parse
 ).make_transformer("input", "graph")
 
 
-scalar_parse = scalar_pipeline.with_pipeline(
+scalar_parse = scalar_pipeline.with_steps(
     steps.step_parse, steps.step_resolve,
 ).make_transformer("input", "graph")
 
 
-scalar_debug_compile = scalar_debug_pipeline.with_pipeline(
+scalar_debug_compile = scalar_debug_pipeline.with_steps(
     steps.step_parse, steps.step_resolve, steps.step_debug_export,
 ).make_transformer("input", "output")
 

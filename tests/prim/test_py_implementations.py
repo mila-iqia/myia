@@ -543,7 +543,7 @@ def test_env():
 
         return (a, b, c)
 
-    res = scalar_debug_pipeline.run(
+    res = scalar_debug_pipeline(
         input=f, argspec=(to_abstract_test(i64), to_abstract_test(i64))
     )["output"](3, 4)
     assert res == (110, 20, 0)

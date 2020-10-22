@@ -33,14 +33,14 @@ parse = (
             )
         }
     )
-    .with_pipeline(steps.step_parse, steps.step_resolve,)
+    .with_steps(steps.step_parse, steps.step_resolve,)
     .make_transformer("input", "graph")
 )
 
 
 specialize = scalar_pipeline.configure(
     {"convert.object_map": Merge({operations.getitem: prim.tuple_getitem})}
-).with_pipeline(
+).with_steps(
     steps.step_parse,
     steps.step_resolve,
     steps.step_infer,
@@ -82,9 +82,9 @@ def _check_transform(
     else:
         if argspec_after is None:
             argspec_after = argspec
-        gbefore = specialize.run(input=before, argspec=argspec)["graph"]
+        gbefore = specialize(input=before, argspec=argspec)["graph"]
         if argspec_after:
-            gafter = specialize.run(input=after, argspec=argspec)["graph"]
+            gafter = specialize(input=after, argspec=argspec)["graph"]
         else:
             gafter = parse(after)
     gbefore = GraphCloner(gbefore, total=True)[gbefore]
@@ -322,7 +322,7 @@ opt_err1 = psub(
 
 def test_type_tracking():
 
-    pip = scalar_pipeline.with_pipeline(
+    pip = scalar_pipeline.with_steps(
         steps.step_parse,
         steps.step_infer,
         steps.step_specialize,
@@ -334,20 +334,20 @@ def test_type_tracking():
     def fn_ok1(x, y):
         return x + y
 
-    pip.run(
+    pip(
         input=fn_ok1, argspec=(to_abstract_test(i64), to_abstract_test(i64))
     )
 
     def fn_ok2(x):
         return -x
 
-    pip.run(input=fn_ok2, argspec=(to_abstract_test(i64),))
+    pip(input=fn_ok2, argspec=(to_abstract_test(i64),))
 
     def fn_err1(x, y):
         return x - y
 
     with pytest.raises(ValidationError):
-        pip.run(
+        pip(
             input=fn_err1,
             argspec=(to_abstract_test(i64), to_abstract_test(i64)),
         )
@@ -359,7 +359,7 @@ def test_type_tracking():
 )
 def test_type_tracking_2():
 
-    pip = scalar_pipeline.with_pipeline(
+    pip = scalar_pipeline.with_steps(
         steps.step_parse,
         steps.step_infer,
         steps.step_specialize,
@@ -372,7 +372,7 @@ def test_type_tracking_2():
         return x - y + x
 
     with pytest.raises(InferenceError):
-        pip.run(
+        pip(
             input=fn_err3,
             argspec=(to_abstract_test(i64), to_abstract_test(i64)),
         )

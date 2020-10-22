@@ -14,7 +14,7 @@ def step_rmunused(resources):
         pass
 
 
-rmunused = scalar_pipeline.with_pipeline(
+rmunused = scalar_pipeline.with_steps(
     steps.step_parse, steps.step_resolve, step_rmunused,
 ).make_transformer("input", "graph")
 
@@ -176,7 +176,7 @@ def test_rmunused_switch_edge_case():
 #######################
 
 
-llift = scalar_pipeline.with_pipeline(
+llift = scalar_pipeline.with_steps(
     steps.step_parse, steps.step_resolve, steps.step_llift,
 ).make_transformer("input", "graph")
 

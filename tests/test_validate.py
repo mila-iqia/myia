@@ -9,7 +9,7 @@ from myia.validate import ValidationError, validate, validate_abstract
 Point_a = Point(i64, i64)
 
 
-pip = scalar_pipeline.with_pipeline(
+pip = scalar_pipeline.with_steps(
     steps.step_parse,
     steps.step_infer,
     steps.step_specialize,
@@ -17,7 +17,7 @@ pip = scalar_pipeline.with_pipeline(
 )
 
 
-pip_ec = scalar_pipeline.with_pipeline(
+pip_ec = scalar_pipeline.with_steps(
     steps.step_parse,
     steps.step_infer,
     steps.step_specialize,
@@ -27,7 +27,7 @@ pip_ec = scalar_pipeline.with_pipeline(
 
 
 def run(pip, fn, types):
-    res = pip.run(input=fn, argspec=[to_abstract_test(t) for t in types])
+    res = pip(input=fn, argspec=[to_abstract_test(t) for t in types])
     return res["graph"]
 
 

@@ -15,7 +15,7 @@ def step_cconv(resources, graph, use_llift):
     return {"graph": graph}
 
 
-cconv_pipeline = scalar_debug_pipeline.with_pipeline(
+cconv_pipeline = scalar_debug_pipeline.with_steps(
     steps.step_parse, steps.step_resolve, step_cconv, steps.step_debug_export,
 )
 

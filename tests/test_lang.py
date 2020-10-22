@@ -4,7 +4,7 @@ from myia.pipeline import scalar_debug_pipeline, steps
 from myia.testing.common import Point, mysum
 from myia.testing.multitest import mt, run, run_debug
 
-lang_pipeline = scalar_debug_pipeline.with_pipeline(
+lang_pipeline = scalar_debug_pipeline.with_steps(
     steps.step_parse,
     steps.step_resolve,
     steps.step_llift,
@@ -346,7 +346,7 @@ def test_closure_recur():
             return f(x, g(y))
 
     py_result = fn(1, 2)
-    myia_fn = lang_pipeline.run(input=fn)["output"]
+    myia_fn = lang_pipeline(input=fn)["output"]
     myia_result = myia_fn(1, 2)
     assert py_result == myia_result
 

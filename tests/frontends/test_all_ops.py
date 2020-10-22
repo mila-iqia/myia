@@ -163,7 +163,7 @@ def _fwd_and_bwd(
 
     ref_result = fn(*map(copy, args))
     argspec = make_argspec(args, broad_specs)
-    res = pipeline.run(input=fn, argspec=argspec)
+    res = pipeline(input=fn, argspec=argspec)
     myia_fn = res["output"]
     myia_result = myia_fn(*map(copy, args))
 
@@ -181,7 +181,7 @@ def _fwd_and_bwd(
     gpipeline = pipeline.insert_after(steps.step_parse, grad_wrap)
     sens_type = to_abstract_test(sens_type)
     assert isinstance(fn, FunctionType)
-    res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])
+    res = gpipeline(input=fn, argspec=[*argspec, sens_type])
 
     myia_grads = res["output"](*args, sens)
     assert eqtest(pytorch_grads, myia_grads, rtol=grad_rtol, atol=grad_atol)
@@ -215,7 +215,7 @@ def _fwd_and_bwd(
             )
 
         argspec = make_argspec(args, broad_specs)
-        res = pipeline.run(input=fn, argspec=argspec)
+        res = pipeline(input=fn, argspec=argspec)
         myia_fn = res["output"]
         myia_result = myia_fn(*map(copy, args))
 
@@ -229,7 +229,7 @@ def _fwd_and_bwd(
         gpipeline = pipeline.insert_after(steps.step_parse, grad_wrap)
         sens_type = to_abstract_test(sens_type)
         assert isinstance(fn, FunctionType)
-        res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])
+        res = gpipeline(input=fn, argspec=[*argspec, sens_type])
 
         myia_grads = res["output"](*args, sens)
 
