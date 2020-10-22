@@ -14,36 +14,34 @@ from myia.operations import (
     tagged,
 )
 from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline, steps
+from myia.pipeline.standard import standard_resources, scalar_object_map, \
+    Environment, Pipeline
 from myia.testing.common import Point, U, f64, i64, mysum
 from myia.testing.multitest import mt, run
 
-mono_pipeline = scalar_debug_pipeline.select(
-    "resources",
-    "parse",
-    "infer",
-    "specialize",
-    "simplify_types",
-    {"opt2": steps.step_opt2_no_main},
-    "llift",
-    "validate",
-    "export",
-    "wrap",
+
+mono_pipeline = Environment(
+    resources=standard_resources,
+    pipeline=Pipeline(
+        steps.step_parse,
+        steps.step_infer,
+        steps.step_specialize,
+        steps.step_simplify_types,
+        steps.step_opt2_no_main,
+        steps.step_llift,
+        steps.step_validate,
+        steps.step_debug_export,
+        steps.step_wrap,
+    )
+).configure(
+    {
+        "convert.object_map": scalar_object_map,
+        "backend.name": False
+    }
 )
 
 
-mono_pipeline_std = standard_debug_pipeline.select(
-    "resources",
-    "parse",
-    "infer",
-    "specialize",
-    "simplify_types",
-    "opt",
-    "opt2",
-    "llift",
-    "validate",
-    "export",
-    "wrap",
-)
+mono_pipeline_std = standard_debug_pipeline
 
 
 mono_scalar = run.configure(pipeline=mono_pipeline, backend=False)

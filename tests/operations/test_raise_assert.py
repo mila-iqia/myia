@@ -34,7 +34,7 @@ def test_assert_msg(x):
     infer_scalar(i32, result=i32),
     run_debug(4.5, result=4.5 ** 0.5),
     run_debug(-5, result=Exception),
-    gradient(4.5, pipeline=standard_debug_pipeline.configure(validate=False)),
+    gradient(4.5, pipeline=standard_debug_pipeline.configure(validator=None)),
 )
 def test_raise(x):
     if x >= 0:

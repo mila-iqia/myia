@@ -2,20 +2,27 @@ import pytest
 
 from myia.abstract import AbstractFunction, TypedPrimitive
 from myia.operations import partial, primitives as P
-from myia.pipeline import scalar_parse, scalar_pipeline
+from myia.pipeline import scalar_parse, scalar_pipeline, steps
 from myia.testing.common import Point, i64, to_abstract_test
 from myia.validate import ValidationError, validate, validate_abstract
 
 Point_a = Point(i64, i64)
 
 
-pip = scalar_pipeline.select(
-    "resources", "parse", "infer", "specialize", "validate"
+pip = scalar_pipeline.with_pipeline(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_validate,
 )
 
 
-pip_ec = scalar_pipeline.select(
-    "resources", "parse", "infer", "specialize", "simplify_types", "validate"
+pip_ec = scalar_pipeline.with_pipeline(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_simplify_types,
+    steps.step_validate,
 )
 
 

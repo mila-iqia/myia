@@ -60,12 +60,32 @@ class Partial:
         """Refine this Partial with additional keywords."""
         return merge(self, keywords)
 
+    def configure(self, changes={}, **kwchanges):
+        """More advanced version of `partial`.
+
+        Changes can be expressed in the form `x.y.z`.
+        """
+        new_data = {}
+        changes = {**changes, **kwchanges}
+        for path, delta in changes.items():
+            top, *parts = path.split(".")
+            for part in reversed(parts):
+                delta = {part: delta}
+            if top in new_data:
+                new_data[top] = merge(new_data[top], delta, mode="override")
+            else:
+                new_data[top] = delta
+        return self.partial(**new_data)
+
     def __call__(self, **kwargs):
         """Merge stored arguments with kwargs and call the function."""
         return self.func(**self.keywords, **kwargs)
 
     def __merge__(self, partial, mode):
         """Combine arguments from two partials."""
+        if partial is None:
+            return None
+
         if isinstance(partial, dict):
             partial = Partial(self.func, **partial)
 

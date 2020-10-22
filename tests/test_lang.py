@@ -4,8 +4,11 @@ from myia.pipeline import scalar_debug_pipeline, steps
 from myia.testing.common import Point, mysum
 from myia.testing.multitest import mt, run, run_debug
 
-lang_pipeline = scalar_debug_pipeline.select(
-    "resources", "parse", {"resolve": steps.step_resolve}, "llift", "export"
+lang_pipeline = scalar_debug_pipeline.with_pipeline(
+    steps.step_parse,
+    steps.step_resolve,
+    steps.step_llift,
+    steps.step_debug_export,
 )
 
 

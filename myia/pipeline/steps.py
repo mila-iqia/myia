@@ -431,7 +431,8 @@ def step_validate(resources, graph, outspec=None):
             "The output type of the graph changed during optimization"
             f" from {outspec} to {graph.output.abstract}"
         )
-    resources.validator(graph)
+    if resources.validator:
+        resources.validator(graph)
     return {"graph": graph}
 
 

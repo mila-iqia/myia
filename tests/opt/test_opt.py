@@ -25,7 +25,7 @@ V = var(lambda n: n.is_constant())
 parse = (
     scalar_pipeline.configure(
         {
-            "resources.convert.object_map": Merge(
+            "convert.object_map": Merge(
                 {
                     operations.getitem: prim.tuple_getitem,
                     operations.user_switch: prim.switch,
@@ -33,19 +33,25 @@ parse = (
             )
         }
     )
-    .select("resources", "parse", {"resolve": steps.step_resolve})
+    .with_pipeline(
+        steps.step_parse,
+        steps.step_resolve,
+    )
     .make_transformer("input", "graph")
 )
 
 
 specialize = scalar_pipeline.configure(
     {
-        "resources.convert.object_map": Merge(
+        "convert.object_map": Merge(
             {operations.getitem: prim.tuple_getitem}
         )
     }
-).select(
-    "resources", "parse", {"resolve": steps.step_resolve}, "infer", "specialize"
+).with_pipeline(
+    steps.step_parse,
+    steps.step_resolve,
+    steps.step_infer,
+    steps.step_specialize,
 )
 
 
@@ -323,14 +329,13 @@ opt_err1 = psub(
 
 def test_type_tracking():
 
-    pip = scalar_pipeline.select(
-        "resources",
-        "parse",
-        "infer",
-        "specialize",
-        "simplify_types",
-        {"opt": Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1]))},
-        "validate",
+    pip = scalar_pipeline.with_pipeline(
+        steps.step_parse,
+        steps.step_infer,
+        steps.step_specialize,
+        steps.step_simplify_types,
+        Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1])),
+        steps.step_validate,
     )
 
     def fn_ok1(x, y):
@@ -361,14 +366,13 @@ def test_type_tracking():
 )
 def test_type_tracking_2():
 
-    pip = scalar_pipeline.select(
-        "resources",
-        "parse",
-        "infer",
-        "specialize",
-        "simplify_types",
-        {"opt": Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1]))},
-        "validate",
+    pip = scalar_pipeline.with_pipeline(
+        steps.step_parse,
+        steps.step_infer,
+        steps.step_specialize,
+        steps.step_simplify_types,
+        Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1])),
+        steps.step_validate,
     )
 
     def fn_err3(x, y):

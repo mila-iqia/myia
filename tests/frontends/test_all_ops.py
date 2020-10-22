@@ -15,7 +15,7 @@ from myia.abstract.data import (
 )
 from myia.debug.finite_diff import NoTestGrad, clean_args
 from myia.frontends import activate_frontend  # noqa: E402
-from myia.pipeline import standard_pipeline
+from myia.pipeline import standard_pipeline, steps
 from myia.testing.common import MA, MB, to_abstract_test
 from myia.testing.multitest import (
     backend_all,
@@ -151,8 +151,8 @@ def _fwd_and_bwd(
 
         pipeline = pipeline.configure(
             {
-                "resources.backend.name": backend_name,
-                "resources.backend.options": backend_options,
+                "backend.name": backend_name,
+                "backend.options": backend_options,
             }
         )
 
@@ -181,7 +181,7 @@ def _fwd_and_bwd(
 
     pytorch_grads = pt_fn_grads(fn, *args)
 
-    gpipeline = pipeline.insert_after("parse", grad_wrap=grad_wrap)
+    gpipeline = pipeline.insert_after(steps.step_parse, grad_wrap)
     sens_type = to_abstract_test(sens_type)
     assert isinstance(fn, FunctionType)
     res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])
@@ -204,8 +204,8 @@ def _fwd_and_bwd(
 
             pipeline = pipeline.configure(
                 {
-                    "resources.backend.name": backend_name,
-                    "resources.backend.options": backend_options,
+                    "backend.name": backend_name,
+                    "backend.options": backend_options,
                 }
             )
 
@@ -229,7 +229,7 @@ def _fwd_and_bwd(
             sens_type = mksens(myia_result)
             sens = _make_sens_numpy(myia_result)
 
-        gpipeline = pipeline.insert_after("parse", grad_wrap=grad_wrap)
+        gpipeline = pipeline.insert_after(steps.step_parse, grad_wrap)
         sens_type = to_abstract_test(sens_type)
         assert isinstance(fn, FunctionType)
         res = gpipeline.run(input=fn, argspec=[*argspec, sens_type])

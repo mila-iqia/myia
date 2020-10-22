@@ -8,7 +8,8 @@ from ovld import ovld
 
 from myia.compile.backends import get_backend_names
 from myia.lib import concretize_abstract, from_value
-from myia.pipeline import standard_debug_pipeline, standard_pipeline
+from myia.pipeline import standard_debug_pipeline, standard_pipeline, steps, \
+    Environment
 from myia.utils import keyword_decorator, merge
 
 from .common import to_abstract_test
@@ -50,7 +51,10 @@ def to_numpy(value: object):
     return value
 
 
-infer_pipeline = standard_pipeline.select("resources", "parse", "infer")
+infer_pipeline = standard_pipeline.with_pipeline(
+    steps.step_parse,
+    steps.step_infer,
+)
 
 
 class Multiple:
@@ -280,8 +284,8 @@ def _run(
 
         pipeline = pipeline.configure(
             {
-                "resources.backend.name": backend_name,
-                "resources.backend.options": backend_options,
+                "backend.name": backend_name,
+                "backend.options": backend_options,
             }
         )
 
@@ -295,7 +299,7 @@ def _run(
         argspec = tuple(to_abstract_test(a) for a in abstract)
 
     if not validate:
-        pipeline = pipeline.configure(validate=False)
+        pipeline = pipeline.configure(validator=None)
 
     def out(args):
         pip = pipeline.make()

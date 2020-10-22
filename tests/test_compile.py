@@ -8,22 +8,21 @@ from myia.operations import (
     scalar_add,
     tagged,
 )
-from myia.pipeline import standard_pipeline
+from myia.pipeline import standard_pipeline, steps
 from myia.testing.common import MA, MB, Point
 from myia.testing.multitest import mt, run
 
 run_no_opt = run.configure(
-    pipeline=standard_pipeline.select(
-        "resources",
-        "parse",
-        "infer",
-        "specialize",
-        "simplify_types",
-        "opt2",
-        "llift",
-        "validate",
-        "compile",
-        "wrap",
+    pipeline=standard_pipeline.with_pipeline(
+        steps.step_parse,
+        steps.step_infer,
+        steps.step_specialize,
+        steps.step_simplify_types,
+        steps.step_opt2,
+        steps.step_llift,
+        steps.step_validate,
+        steps.step_compile,
+        steps.step_wrap,
     )
 )
 
