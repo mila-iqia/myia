@@ -297,7 +297,9 @@ standard_resources = Resources.partial(
 ######################
 
 
-base_pipeline = Pipeline(arguments={"resources": standard_resources})
+base_pipeline = Pipeline(
+    arguments={"resources": standard_resources}, name="compile"
+)
 base_debug_pipeline = base_pipeline.configure({"backend.name": False})
 base_scalar_pipeline = base_pipeline.configure(
     {"convert.object_map": scalar_object_map}

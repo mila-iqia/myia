@@ -4,28 +4,53 @@ from ..utils import Partial, partition_keywords, tracer
 
 
 class Pipeline:
-    def __init__(self, *steps, arguments={}):
+    """Represents a sequence of function applications.
+
+    Pipeline(f, g, h, arguments=args)(x=1, y=2) is roughly equivalent to
+    h(**g(**f(x=1, y=2, **args))).
+
+    * Each function in the sequence only receives the arguments it can accept.
+    * Any Partial in the dict of default arguments will be called in order to
+      instantiate them.
+
+    Arguments:
+        steps: A sequence of functions to call.
+        arguments: Default arguments for the first invocation.
+        name: The name of the Pipeline.
+    """
+
+    def __init__(self, *steps, arguments={}, name="pipeline"):
+        """Initialize a Pipeline."""
         self.steps = steps
         self.arguments = arguments
+        self.name = name
 
     def configure(self, config={}, **kwargs):
+        """Configure the default arguments to the Pipeline."""
         return type(self)(
             *self,
             arguments={
                 "resources": self.arguments["resources"].configure(
                     config, **kwargs
                 )
-            }
+            },
+            name=self.name,
         )
 
     def with_steps(self, *steps):
-        return type(self)(*steps, arguments=self.arguments)
+        """Return a new Pipeline using the given sequence of steps."""
+        return type(self)(*steps, arguments=self.arguments, name=self.name)
 
     def without_step(self, step):
+        """Return a new Pipeline without the given step."""
         idx = self.steps.index(step)
         return self.with_steps(*self[:idx], *self[idx + 1 :])
 
     def insert_after(self, base_step, *more_steps):
+        """Insert new steps after the given step.
+
+        This returns a new Pipeline.
+        """
         idx = self.steps.index(base_step) + 1
         return self.with_steps(*self[:idx], *more_steps, *self[idx:])
 
@@ -36,7 +61,6 @@ class Pipeline:
             in_key: The name of the pipeline input to use for the
                 callable's argument.
             out_key: The name of the pipeline output to return.
-
         """
 
         def run(arg):
@@ -52,8 +76,9 @@ class Pipeline:
         }
 
     def __call__(self, **kwargs):
+        """Execute the function sequence."""
         kwargs = {**self._instantiate_arguments(), **kwargs}
-        with tracer("compile"):
+        with tracer(self.name):
             for idx, fn in enumerate(self):
                 step_name = getattr(fn, "__name__", str(idx))
                 with tracer(step_name, step=fn, **kwargs) as tr:
@@ -80,8 +105,6 @@ class Pipeline:
 
     def __getitem__(self, x):
         return self.steps[x]
-
-    run = __call__
 
 
 # class Environment:
