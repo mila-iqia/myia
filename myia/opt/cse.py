@@ -5,7 +5,7 @@ from collections import defaultdict
 
 from ..graph_utils import toposort
 from ..ir import succ_incoming
-from ..utils import Partializable, tracer
+from ..utils import tracer
 
 
 def group_nodes(root, manager):
@@ -72,29 +72,25 @@ def cse(root, manager):
     return changes
 
 
-class CSE(Partializable):
+class CSE:
     """Common subexpression elimination."""
 
-    def __init__(self, resources, report_changes=True):
+    def __init__(self, report_changes=True, name="cse"):
         """Initialize CSE."""
-        self.resources = resources
         self.report_changes = report_changes
-        self.name = "cse"
+        self.name = name
 
-    def __call__(self, root):
-        """Apply CSE on root."""
+    def __call__(self, resources, graph):
+        """Apply CSE on graph."""
         args = dict(
-            opt=self,
-            node=None,
-            manager=self.resources.opt_manager,
-            profile=False,
+            opt=self, node=None, manager=resources.opt_manager, profile=False,
         )
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
-            chg = cse(root, self.resources.opt_manager)
+            chg = cse(graph, resources.opt_manager)
             if chg:
                 tracer().emit_success(**args, new_node=None)
-            return chg and self.report_changes
+            return {"changes": chg and self.report_changes}
 
 
 __all__ = ["CSE", "cse"]

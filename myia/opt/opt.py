@@ -163,20 +163,22 @@ class NodeMap:
 class LocalPassOptimizer:
     """Apply a set of local optimizations in bfs order."""
 
-    def __init__(self, node_map, resources=None):
+    def __init__(self, *opts, name="_local_opt"):
         """Initialize a LocalPassOptimizer."""
-        self.node_map = node_map
-        self.resources = resources
+        self.name = name
+        self.node_map = NodeMap()
+        for opt in opts:
+            self.node_map.register(getattr(opt, "interest", None), opt)
 
-    def __call__(self, graph):
+    def __call__(self, graph, resources=None):
         """Apply optimizations on given graphs in node order.
 
         This will visit the nodes from the output to the inputs in a
         bfs manner while avoiding parts of the graph that are dropped
         due to optimizations.
         """
-        if self.resources is not None:
-            mng = self.resources.opt_manager
+        if resources is not None:
+            mng = resources.opt_manager
             mng.add_graph(graph)
         else:
             mng = manage(graph)
@@ -192,7 +194,7 @@ class LocalPassOptimizer:
                 continue
             seen.add(n)
 
-            new, chg = self.apply_opt(mng, n)
+            new, chg = self.apply_opt(resources, mng, n)
 
             changes |= chg
 
@@ -209,9 +211,9 @@ class LocalPassOptimizer:
                 seen.difference_update(uses)
                 todo.extendleft(uses)
 
-        return changes
+        return {"changes": changes}
 
-    def apply_opt(self, mng, n):
+    def apply_opt(self, resources, mng, n):
         """Apply optimizations passes according to the node map."""
         loop = True
         changes = False
@@ -222,7 +224,7 @@ class LocalPassOptimizer:
                 with tracer("opt", **args) as tr:
                     tr.set_results(success=False, **args)
                     with About(n.debug, "opt", transformer.name):
-                        new = transformer(self.resources, n)
+                        new = transformer(resources, n)
                     if new is not None and new is not n:
                         tracer().emit_match(**args, new_node=new)
                     if new is True:
@@ -232,8 +234,8 @@ class LocalPassOptimizer:
                         mng.replace(n, new)
                         tracer().emit_success(**args, new_node=new)
                         tr.set_results(success=True, **args)
-                        if self.resources and self.resources.live_inferrer:
-                            self.resources.live_inferrer()
+                        if resources and resources.live_inferrer:
+                            resources.live_inferrer()
                         n = new
                         loop = True
                         changes = True

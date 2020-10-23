@@ -5,13 +5,11 @@ from myia.ir import Constant, GraphCloner, isomorphic, sexp_to_graph
 from myia.operations import Primitive, primitives as prim
 from myia.opt import (
     LocalPassOptimizer,
-    NodeMap,
     PatternSubstitutionOptimization as psub,
     cse,
     pattern_replacer,
 )
 from myia.pipeline import scalar_pipeline, steps
-from myia.pipeline.steps import Optimizer
 from myia.testing.common import i64, to_abstract_test
 from myia.utils import InferenceError, Merge
 from myia.utils.unify import Var, var
@@ -88,15 +86,12 @@ def _check_transform(
         else:
             gafter = parse(after)
     gbefore = GraphCloner(gbefore, total=True)[gbefore]
-    transform(gbefore)
+    transform(graph=gbefore)
     assert isomorphic(gbefore, gafter)
 
 
 def _check_opt(before, after, *opts, argspec=None, argspec_after=None):
-    nmap = NodeMap()
-    for opt in opts:
-        nmap.register(getattr(opt, "interest", None), opt)
-    eq = LocalPassOptimizer(nmap)
+    eq = LocalPassOptimizer(*opts)
     _check_transform(before, after, eq, argspec, argspec_after)
 
 
@@ -327,7 +322,7 @@ def test_type_tracking():
         steps.step_infer,
         steps.step_specialize,
         steps.step_simplify_types,
-        Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1])),
+        LocalPassOptimizer(opt_ok1, opt_ok2, opt_err1),
         steps.step_validate,
     )
 
@@ -362,7 +357,7 @@ def test_type_tracking_2():
         steps.step_infer,
         steps.step_specialize,
         steps.step_simplify_types,
-        Optimizer(phases=dict(main=[opt_ok1, opt_ok2, opt_err1])),
+        LocalPassOptimizer(opt_ok1, opt_ok2, opt_err1),
         steps.step_validate,
     )
 

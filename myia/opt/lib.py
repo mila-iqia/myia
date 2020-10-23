@@ -25,7 +25,7 @@ from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
 from ..operations.utils import CompositePrimitive
-from ..utils import Partializable, tracer
+from ..utils import tracer
 from ..utils.errors import untested
 from ..utils.unify import Var, var
 from ..utils.variables import (
@@ -1165,43 +1165,35 @@ def _jelim_nofunc(self, f: (AbstractFunction, AbstractFunctionUnique)):
     return False
 
 
-class JElim(Partializable):
+def opt_jelim(resources):
     """Eliminate J, iff it is only applied to non-functions."""
+    mng = resources.opt_manager
+    args = dict(opt=opt_jelim, node=None, manager=mng)
+    with tracer("opt", **args) as tr:
+        tr.set_results(success=False, **args)
+        nodes = []
+        typesubs = []
+        for node in mng.all_nodes:
+            try:
+                newtype = _jelim_retype(node.abstract)
+            except TypeError:
+                return {"changes": False}
+            if node.is_apply(P.J) or node.is_apply(P.Jinv):
+                if not _jelim_nofunc(node.abstract):
+                    return {"changes": False}
+                _, x = node.inputs
+                nodes.append((node, x))
+            if newtype is not node.abstract:
+                typesubs.append((node, newtype))
 
-    def __init__(self, resources):
-        """Initialize JElim."""
-        self.resources = resources
-        self.name = "jelim"
+        with mng.transact() as tr:
+            for node, repl in nodes:
+                tr.replace(node, repl)
 
-    def __call__(self, root):
-        """Apply JElim on root."""
-        mng = self.resources.opt_manager
-        args = dict(opt=self, node=None, manager=mng)
-        with tracer("opt", **args) as tr:
-            tr.set_results(success=False, **args)
-            nodes = []
-            typesubs = []
-            for node in mng.all_nodes:
-                try:
-                    newtype = _jelim_retype(node.abstract)
-                except TypeError:
-                    return False
-                if node.is_apply(P.J) or node.is_apply(P.Jinv):
-                    if not _jelim_nofunc(node.abstract):
-                        return False
-                    _, x = node.inputs
-                    nodes.append((node, x))
-                if newtype is not node.abstract:
-                    typesubs.append((node, newtype))
+        for node, newtype in typesubs:
+            node.abstract = newtype
 
-            with mng.transact() as tr:
-                for node, repl in nodes:
-                    tr.replace(node, repl)
+        if len(nodes) > 0:
+            tracer().emit_success(**args, new_node=None)
 
-            for node, newtype in typesubs:
-                node.abstract = newtype
-
-            if len(nodes) > 0:
-                tracer().emit_success(**args, new_node=None)
-
-            return len(nodes) > 0
+        return {"changes": len(nodes) > 0}
