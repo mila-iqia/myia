@@ -1,6 +1,7 @@
 """Optimizations that rewrite graph interfaces."""
 
 import operator
+from dataclasses import dataclass
 from functools import lru_cache, reduce
 from types import SimpleNamespace as NS
 
@@ -55,7 +56,7 @@ class GraphInterfaceRewriter:
     @classmethod
     def as_step(cls):
         """Return a Pipeline step that applies this optimization."""
-        return GraphInterfaceRewriterStep(rewriter=cls)
+        return GraphInterfaceRewriterStep(rewriter=cls, name=cls.__name__)
 
     def __init__(self, manager, graphs=None):
         """Initialize a GraphInterfaceRewriter.
@@ -439,19 +440,18 @@ class LambdaLiftRewriter(GraphInterfaceRewriter):
 #     return h(y, x)
 
 
+@dataclass
 class GraphInterfaceRewriterStep:
-    """Implements optimizer interface for GraphInferfaceRewriter."""
+    """Implements optimizer interface for GraphInferfaceRewriter.
 
-    def __init__(self, rewriter):
-        """Initialize GraphInterfaceRewriterStep.
+    Attributes:
+        rewriter: A subclass of GraphInterfaceRewriter. It will be
+            instantiated in the __call__ method.
+        name: The name of the optimization.
+    """
 
-        Arguments:
-            resources: The resources object associated to the pipeline.
-            rewriter: A subclass of GraphInterfaceRewriter. It will be
-                instantiated in the __call__ method.
-        """
-        self.rewriter = rewriter
-        self.name = rewriter.__name__
+    rewriter: type
+    name: str
 
     def __call__(self, resources):
         """Apply the rewriter on root."""

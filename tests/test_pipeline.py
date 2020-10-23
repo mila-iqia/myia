@@ -32,9 +32,7 @@ class Shoe(Partializable):
 
 
 def test_Resources():
-    rdef = Resources.partial(
-        quack=1, sandal=Shoe.partial(model="sandal")
-    )
+    rdef = Resources.partial(quack=1, sandal=Shoe.partial(model="sandal"))
     rdef2 = rdef.configure({"sandal.model": "running"})
 
     r = rdef()

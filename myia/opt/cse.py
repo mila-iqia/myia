@@ -2,6 +2,7 @@
 
 
 from collections import defaultdict
+from dataclasses import dataclass
 
 from ..graph_utils import toposort
 from ..ir import succ_incoming
@@ -72,13 +73,12 @@ def cse(root, manager):
     return changes
 
 
+@dataclass
 class CSE:
     """Common subexpression elimination."""
 
-    def __init__(self, report_changes=True, name="cse"):
-        """Initialize CSE."""
-        self.report_changes = report_changes
-        self.name = name
+    report_changes: bool = True
+    name: str = "cse"
 
     def __call__(self, resources, graph):
         """Apply CSE on graph."""
