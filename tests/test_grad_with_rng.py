@@ -35,7 +35,7 @@ def test_rstate_and_compute(_backend_fixture):
         # Here it seems mandatory to use the `dout` parameters to get grad,
         # to help myia handle rstate grad correctly.
         (_rs, _val), _grad = value_and_grad(rstate_and_compute, "x")(
-            rstate, x, dout=(random_initialize(0), 1)
+            rstate, x, dout=(1, 1)
         )
         return _rs, _val + _grad
 

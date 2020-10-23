@@ -18,7 +18,7 @@ from ..lib import (
 )
 from ..operations import myia_to_array, typeof
 from ..xtype import Bool, Nil, Number
-from .primitives import distribute, random_initialize, scalar_cast, shape
+from .primitives import distribute, scalar_cast, shape
 
 _leaf_zeros_like = MultitypeGraph("zeros_like")
 
@@ -63,8 +63,8 @@ def _array_zero(xs):
 @_leaf_zeros_like.register(AbstractRandomState)
 @core
 def _rng_zero(x):
-    """Return random_initialize with seed 0 by default."""
-    return random_initialize(0)
+    """Return zero scalar, according to sensitivity_transform."""
+    return 0
 
 
 zeros_like = HyperMap(

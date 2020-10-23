@@ -204,7 +204,7 @@ def step(model, data, lr, rstate):
     the first argument is returned.
     """
     (_cost, rstate), dmodel = value_and_grad(cost, "model")(
-        model, data, rstate, dout=(1, random_initialize(0))
+        model, data, rstate, dout=(1, 1)
     )
     return _cost, model - lr * dmodel, rstate
 
