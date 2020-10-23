@@ -2,8 +2,6 @@
 
 from ovld import ovld
 
-from myia.parser import parse
-
 from .. import operations
 from ..abstract import (
     DEAD,
@@ -828,18 +826,9 @@ def expand_composite(resources, node, equiv):
     data = equiv[C].value
     if isinstance(data, CompositePrimitive):
         py_impl = data.defaults()["python_implementation"]
-        # Parser function caches graphs, so it will be compiled only
-        # once even if parse(py_impl) is called multiple times.
-        g = parse(py_impl)
-        # Then, a graph already parsed may be returned above and passed to
-        # resources.incorporate() which wants to set a manager for the graph.
-        # But manager from a second call might be different from first call
-        # (e.g. in a test script running same function on different backends)
-        # which will cause an exception. To prevent this, we should better
-        # clone graph before incorporation.
-        clone = GraphCloner(g)
+        g = resources.convert(py_impl)
         vfn = node.abstract
-        newg = resources.incorporate(clone[g], vfn.args, vfn.output)
+        newg = resources.incorporate(g, vfn.args, vfn.output)
         return Constant(newg)
     return node
 
