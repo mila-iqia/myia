@@ -15,7 +15,7 @@ from ..public_api import item
 from ..utils import Registry
 from ..validate import AbstractValidator, MultiValidator, OperatorValidator
 from . import steps
-from .pipeline import Pipeline
+from .pipeline import MyiaPipeline
 from .resources import (
     BackendResource,
     ConverterResource,
@@ -297,9 +297,7 @@ standard_resources = Resources.partial(
 ######################
 
 
-base_pipeline = Pipeline(
-    arguments={"resources": standard_resources}, name="compile"
-)
+base_pipeline = MyiaPipeline(resources=standard_resources, name="compile")
 base_debug_pipeline = base_pipeline.configure({"backend.name": False})
 base_scalar_pipeline = base_pipeline.configure(
     {"convert.object_map": scalar_object_map}

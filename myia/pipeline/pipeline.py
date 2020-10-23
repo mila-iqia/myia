@@ -25,18 +25,6 @@ class Pipeline:
         self.arguments = arguments
         self.name = name
 
-    def configure(self, config={}, **kwargs):
-        """Configure the default arguments to the Pipeline."""
-        return type(self)(
-            *self,
-            arguments={
-                "resources": self.arguments["resources"].configure(
-                    config, **kwargs
-                )
-            },
-            name=self.name,
-        )
-
     def with_steps(self, *steps):
         """Return a new Pipeline using the given sequence of steps."""
         return type(self)(*steps, arguments=self.arguments, name=self.name)
@@ -105,6 +93,38 @@ class Pipeline:
 
     def __getitem__(self, x):
         return self.steps[x]
+
+
+class MyiaPipeline(Pipeline):
+    """Pipeline class for Myia.
+
+    This is essentially the same thing as a Pipeline, but with special
+    handling for the resources argument.
+    """
+
+    def __init__(self, *steps, resources=None, arguments={}, name="pipeline"):
+        """Initialize a MyiaPipeline."""
+        if resources is not None:
+            arguments = {**arguments, "resources": resources}
+        super().__init__(*steps, arguments=arguments, name=name)
+
+    @property
+    def resources(self):
+        """Return the resources for this Pipeline."""
+        return self.arguments["resources"]
+
+    def with_resources(self, resources):
+        """Return a Pipeline using the given resources."""
+        return type(self)(
+            *self,
+            resources=resources,
+            arguments=self.arguments,
+            name=self.name,
+        )
+
+    def configure(self, config={}, **kwargs):
+        """Configure the default arguments to the Pipeline."""
+        return self.with_resources(self.resources.configure(config, **kwargs))
 
 
 # class Environment:

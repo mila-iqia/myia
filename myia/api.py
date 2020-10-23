@@ -128,7 +128,7 @@ class MyiaFunction:
 
     def to_device(self, v, *, broaden=True, vm_t=None, orig_t=None):
         """Move value to the function's accelerator hardware."""
-        backr = self.pip.arguments["resources"].keywords["backend"].keywords
+        backr = self.pip.resources.keywords["backend"].keywords
         return to_device(
             v,
             backr["name"],

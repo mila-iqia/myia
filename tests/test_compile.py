@@ -135,7 +135,7 @@ def test_switch_nontail():
 
     i64 = from_value(1, broaden=True)
     argspec = (i64, i64)
-    myia_fn = standard_pipeline.run(input=fn, argspec=argspec)["output"]
+    myia_fn = standard_pipeline(input=fn, argspec=argspec)["output"]
 
     for test in [(6, 23, 23 ** 2), (67, 23, 67 ** 2)]:
         *args, expected = test
