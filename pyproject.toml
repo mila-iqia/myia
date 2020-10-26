@@ -19,7 +19,7 @@ colorama = "^0.4.3"
 numpy = "^1.16"
 opt_einsum = "^3.1.0"
 prettyprinter = "^0.18.0"
-ovld = "^0.2.3"
+ovld = "^0.2.6"
 
 [tool.poetry.dev-dependencies]
 black = "~19.10b0"
