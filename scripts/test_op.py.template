@@ -1,7 +1,7 @@
 
 from myia.operations import OPERATION
 
-from ..multitest import infer, mt, run_debug
+from ..multitest import infer, mt, run
 
 
 @mt(

@@ -24,6 +24,7 @@ from ..operations import Primitive, primitives as P
 from ..operations.macro_typeof import typeof
 from ..operations.op_gadd import gadd
 from ..operations.op_zeros_like import zeros_like
+from ..operations.utils import CompositePrimitive
 from ..utils import Partializable, tracer
 from ..utils.errors import untested
 from ..utils.unify import Var, var
@@ -817,6 +818,19 @@ inline_inside_marked_caller = make_inliner(
 inline = make_inliner(
     inline_criterion=None, check_recursive=True, name="inline"
 )
+
+
+@pattern_replacer("just", C, interest=None)
+def expand_composite(resources, node, equiv):
+    """Expand a composite primitive."""
+    data = equiv[C].value
+    if isinstance(data, CompositePrimitive):
+        py_impl = data.defaults()["python_implementation"]
+        g = resources.convert(py_impl)
+        vfn = node.abstract
+        newg = resources.incorporate(g, vfn.args, vfn.output)
+        return Constant(newg)
+    return node
 
 
 @pattern_replacer("just", G, interest=None)

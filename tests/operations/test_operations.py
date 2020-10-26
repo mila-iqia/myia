@@ -20,7 +20,7 @@ from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
 
 
 def Shp(*values):
-    """Convert values to a tuple of numpy unsigned itnegers."""
+    """Convert values to a tuple of numpy unsigned integers."""
     return tuple(np.uint64(value) for value in values)
 
 

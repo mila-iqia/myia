@@ -41,7 +41,7 @@ subclass.
 # The script will search for all primitives it can find in myia.operations    #
 ###############################################################################
 
-from .utils import BackendPrimitive, InferencePrimitive, PlaceholderPrimitive'''  # noqa
+from .utils import BackendPrimitive, CompositePrimitive, InferencePrimitive, PlaceholderPrimitive'''  # noqa
 
 
 # Format for an Operation
@@ -80,6 +80,7 @@ def regen_operations():
         data["path"] = module_name
         primclass = {
             "backend": "BackendPrimitive",
+            "composite": "CompositePrimitive",
             "inference": "InferencePrimitive",
             "placeholder": "PlaceholderPrimitive",
         }[data["type"]]
