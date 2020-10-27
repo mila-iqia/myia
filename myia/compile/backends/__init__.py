@@ -113,10 +113,10 @@ def get_backend_names():
 def get_default():
     """Returns the default backend.
 
-    This is fetched from the MYIA_BACKEND environement variable or
+    This is fetched from the MYIA_BACKEND environment variable or
     from the built-in defaults.
 
-    The syntax for specifiying a backend is
+    The syntax for specifying a backend is
     'name?option1=value1&option2=value2' when name is the name of the
     backend and option1 is a valid keyword option for that backend.
     This is strongly inspired by HTTP query syntax except you don't
@@ -135,7 +135,7 @@ def get_default():
 def parse_default():
     """Parses the default backend.
 
-    Returns name and options from the environement or builtin default.
+    Returns name and options from the environment or builtin default.
     See the documentation of get_default() for the backend string syntax.
     """
     backend_spec = os.environ.get("MYIA_BACKEND", "pytorch")
@@ -199,7 +199,7 @@ def register_backend(name, load_fn, defaults_fn):
     Arguments:
         name (str): Name of the backend, must be unique
         load_fn: function that will load the backend.  This must
-                 return a callable that will take keyword arguemnts
+                 return a callable that will take keyword arguments
                  for options.
         defaults_fn: function that takes the same default arguments as
                      load_fn and maps them to canonical and/or default

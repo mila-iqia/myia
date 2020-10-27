@@ -7,6 +7,7 @@ from ..lib import (
     AbstractDict,
     AbstractError,
     AbstractFunction,
+    AbstractRandomState,
     AbstractTaggedUnion,
     AbstractTuple,
     AbstractUnion,
@@ -57,6 +58,13 @@ def _scalar_zero(x):
 def _array_zero(xs):
     scalar_zero = scalar_cast(0, typeof(xs).element)
     return distribute(myia_to_array(scalar_zero, typeof(xs)), shape(xs))
+
+
+@_leaf_zeros_like.register(AbstractRandomState)
+@core
+def _rng_zero(x):
+    """Return zero scalar, according to sensitivity_transform."""
+    return 0
 
 
 zeros_like = HyperMap(

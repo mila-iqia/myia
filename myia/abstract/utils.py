@@ -22,6 +22,7 @@ from .data import (
     AbstractFunctionUnique,
     AbstractJTagged,
     AbstractKeywordArgument,
+    AbstractRandomState,
     AbstractScalar,
     AbstractStructure,
     AbstractTaggedUnion,
@@ -496,6 +497,7 @@ def sensitivity_transform(self, x: (AbstractFunction, AbstractFunctionUnique)):
 
     * The sensitivity of a function is an Env
     * The sensitivity of J(x) is x
+    * We set the sensitivity of a random state as a nil scalar
     """
     return AbstractScalar({VALUE: ANYTHING, TYPE: xtype.EnvType})
 
@@ -503,6 +505,11 @@ def sensitivity_transform(self, x: (AbstractFunction, AbstractFunctionUnique)):
 @ovld  # noqa: F811
 def sensitivity_transform(self, x: AbstractJTagged):
     return self(x.element)
+
+
+@ovld  # noqa: F811
+def sensitivity_transform(self, x: AbstractRandomState):
+    return AbstractScalar({VALUE: 0, TYPE: xtype.Int[64]})
 
 
 #################

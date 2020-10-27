@@ -402,6 +402,11 @@ def pytype_to_abstract(main: AbstractArray, args):
 
 
 @ovld  # noqa: F811
+def pytype_to_abstract(main: AbstractRandomState, args):
+    return AbstractRandomState()
+
+
+@ovld  # noqa: F811
 def pytype_to_abstract(main: RandomStateWrapper, args):
     return AbstractRandomState()
 
