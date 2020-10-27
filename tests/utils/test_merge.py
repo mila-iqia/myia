@@ -75,6 +75,9 @@ def test_merge_modes():
     assert merge(a, b) == c
     assert merge(a, b, mode="override") == d
 
+    a = {"a": [1, 2]}
+    assert merge(a, Merge(a=[3, 4])) == {"a": [1, 2, 3, 4]}
+
 
 def test_cleanup():
     a = dict(a=1, b=[2, Merge(3)], c=Override(4), d=DELETE)
