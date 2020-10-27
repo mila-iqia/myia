@@ -110,6 +110,16 @@ class Pipeline:
 
 
 class LoopPipeline(Pipeline):
+    """Pipeline that loops over its steps while the "changes" argument is True.
+
+    Arguments:
+        steps: A sequence of functions to call.
+        arguments: Default arguments for the first invocation.
+        name: The name of the Pipeline.
+        changes_field: The name of the field that tracks whether there were
+            changes or not. Defaults to "changes".
+    """
+
     def __init__(
         self, *steps, arguments={}, name="pipeline", changes_field="changes"
     ):
