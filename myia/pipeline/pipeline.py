@@ -18,8 +18,8 @@ def _nameof(step, default):
 class Pipeline:
     """Represents a sequence of function applications.
 
-    Pipeline(f, g, h, arguments=args)(x=1, y=2) is roughly equivalent to
-    h(**g(**f(x=1, y=2, **args))).
+    ``Pipeline(f, g, h, arguments=args)(x=1, y=2)`` is roughly equivalent to
+    ``h(**g(**f(x=1, y=2, **args)))``.
 
     * Each function in the sequence only receives the arguments it can accept.
     * Any Partial in the dict of default arguments will be called in order to
