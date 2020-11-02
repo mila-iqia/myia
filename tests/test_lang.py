@@ -6,10 +6,10 @@ from myia.testing.multitest import mt, run, run_debug
 
 lang_pipeline = scalar_debug_pipeline.with_steps(
     steps.step_parse,
-    steps.step_resolve,
+    steps.step_copy,
     steps.step_llift,
     steps.step_debug_export,
-)
+).configure(preresolve=True)
 
 
 run_lang = run.configure(pipeline=lang_pipeline, backend=False)

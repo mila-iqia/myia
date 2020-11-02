@@ -170,14 +170,17 @@ class LocalPassOptimizer:
         for opt in opts:
             self.node_map.register(getattr(opt, "interest", None), opt)
 
-    def __call__(self, graph, resources=None):
+    def __call__(self, graph, resources=None, manager=None):
         """Apply optimizations on given graphs in node order.
 
         This will visit the nodes from the output to the inputs in a
         bfs manner while avoiding parts of the graph that are dropped
         due to optimizations.
         """
-        if resources is not None:
+        if manager is not None:
+            mng = manager
+            mng.add_graph(graph)
+        elif resources is not None:
             mng = resources.opt_manager
             mng.add_graph(graph)
         else:

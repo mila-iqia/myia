@@ -9,10 +9,13 @@ from .. import parser, xtype
 from ..abstract import InferenceEngine, LiveInferenceEngine, type_to_abstract
 from ..compile import load_backend
 from ..ir import Graph, clone
+from ..modules.impl import core_modules
 from ..monomorphize import Monomorphizer
 from ..operations.utils import Operation
+from ..opt import LocalPassOptimizer, lib as optlib
 from ..utils import MyiaConversionError, Partial, Partializable, tracer
 from ..vm import VM
+from .pipeline import Pipeline
 
 #####################
 # ConverterResource #
@@ -34,6 +37,16 @@ def default_convert(env, g: Graph):
     mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
+        if env.resources.preresolve:
+            opt_pass = Pipeline(
+                LocalPassOptimizer(optlib.resolve_globals, name="resolve")
+            )
+            results = opt_pass(
+                graph=g2,
+                resources=env.resources,
+                manager=env.resources.infer_manager,
+            )
+            g2 = clone(g2)
         env.object_map[g] = g2
         return g2
     else:

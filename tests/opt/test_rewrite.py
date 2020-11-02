@@ -14,9 +14,13 @@ def step_rmunused(resources):
         pass
 
 
-rmunused = scalar_pipeline.with_steps(
-    steps.step_parse, steps.step_resolve, step_rmunused,
-).make_transformer("input", "graph")
+rmunused = (
+    scalar_pipeline.with_steps(
+        steps.step_parse, steps.step_copy, step_rmunused,
+    )
+    .configure(preresolve=True)
+    .make_transformer("input", "graph")
+)
 
 
 def test_rmunused_simple():
@@ -176,9 +180,13 @@ def test_rmunused_switch_edge_case():
 #######################
 
 
-llift = scalar_pipeline.with_steps(
-    steps.step_parse, steps.step_resolve, steps.step_llift,
-).make_transformer("input", "graph")
+llift = (
+    scalar_pipeline.with_steps(
+        steps.step_parse, steps.step_copy, steps.step_llift,
+    )
+    .configure(preresolve=True)
+    .make_transformer("input", "graph")
+)
 
 
 def test_lambda_lift_simple():

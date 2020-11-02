@@ -23,27 +23,26 @@ V = var(lambda n: n.is_constant())
 parse = (
     scalar_pipeline.configure(
         {
+            "preresolve": True,
             "convert.object_map": Merge(
                 {
                     operations.getitem: prim.tuple_getitem,
                     operations.user_switch: prim.switch,
                 }
-            )
+            ),
         }
     )
-    .with_steps(steps.step_parse, steps.step_resolve,)
+    .with_steps(steps.step_parse, steps.step_copy)
     .make_transformer("input", "graph")
 )
 
 
 specialize = scalar_pipeline.configure(
-    {"convert.object_map": Merge({operations.getitem: prim.tuple_getitem})}
-).with_steps(
-    steps.step_parse,
-    steps.step_resolve,
-    steps.step_infer,
-    steps.step_specialize,
-)
+    {
+        "convert.object_map": Merge({operations.getitem: prim.tuple_getitem}),
+        "preresolve": True,
+    }
+).with_steps(steps.step_parse, steps.step_infer, steps.step_specialize)
 
 
 # We will optimize patterns of these fake primitives

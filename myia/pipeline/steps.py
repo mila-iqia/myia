@@ -52,20 +52,14 @@ def step_parse(resources, input, argspec=None):
 ###########
 
 
-def step_resolve(resources, graph, argspec=None, outspec=None):
-    """Resolve all global symbols in the graph.
-
-    This will remove all resolve(...) calls in the graph.
+def step_copy(resources, graph):
+    """Copy the graph into opt_manager for optimization/execution.
 
     This step is unnecessary if the infer/specialize steps are in the pipeline.
     """
     new_graph = clone(graph, total=True)
     resources.opt_manager.add_graph(new_graph, root=True)
-    resources.infer_manager = resources.opt_manager
-    opt_pass = Pipeline(
-        LocalPassOptimizer(optlib.resolve_globals, name="resolve")
-    )
-    return opt_pass(graph=new_graph, resources=resources)
+    return {"graph": new_graph}
 
 
 #########
