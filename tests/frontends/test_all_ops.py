@@ -630,6 +630,7 @@ def test_torch_tensor_get2(x):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
     broad_specs=(True, False),
+    atol=1e-5,
 )
 def test_torch_log_softmax(x, y):
     return torch.log_softmax(x, y)
@@ -640,6 +641,7 @@ def test_torch_log_softmax(x, y):
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), 1),
     fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))), -1),
     broad_specs=(True, False),
+    atol=1e-5,
 )
 def test_torch_functional_log_softmax(x, y):
     return torch.nn.functional.log_softmax(x, y)
@@ -698,6 +700,32 @@ def test_torch_tensor_max_3_arg(x, y, z):
 )
 def test_torch_max_pool2d(x, ri):
     return torch.nn.functional.max_pool2d(x, (2, 2), (1, 1), 0, 1, False, ri)
+
+
+@mt(
+    fwd_and_bwd(nn.Parameter(torch.randn(2, 4, 3, 5)), False),
+    fwd_and_bwd(
+        nn.Parameter(
+            torch.tensor(
+                [
+                    [
+                        [
+                            [1.0, 2.0, 3.0, 4.0],
+                            [5.0, 6.0, 7.0, 8.0],
+                            [13.0, 14.0, 15.0, 16.0],
+                            [9.0, 10.0, 11.0, 12.0],
+                        ]
+                    ]
+                ]
+            )
+        ),
+        False,
+    ),
+    broad_specs=(True, False, False, False, False, False, True),
+)
+def test_torch_max_pool2d_pad1_big_stride(x, ri):
+    """Test max_pool2d with pad != 0 and stride > kernel_size"""
+    return torch.nn.functional.max_pool2d(x, (2, 2), (1, 3), 1, 1, False, ri)
 
 
 @fwd_and_bwd(nn.Parameter(torch.Tensor(MA(2, 3))))

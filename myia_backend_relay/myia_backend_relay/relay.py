@@ -657,7 +657,7 @@ class RelayMapper:
             self.register_complex(complex_map)
 
     def register(self, prim, fn):
-        """Register the conversion function for a primitve."""
+        """Register the conversion function for a primitive."""
         assert prim not in self.mapping
         self.mapping[prim] = fn
 

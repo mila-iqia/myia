@@ -1,4 +1,4 @@
-"""Test myi public API."""
+"""Test RNG for Relay backend."""
 
 import numpy as np
 

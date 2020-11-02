@@ -225,7 +225,7 @@ def test_module_2_layer_mlp_bwd(_backend_fixture):
 
     loss, grad = step(model, inp, target)
 
-    assert loss == 42.759910583496094
+    np.testing.assert_allclose(loss, 42.759910583496094)
 
     expected_grads = [
         torch.Tensor(
@@ -275,7 +275,7 @@ def test_module_2_layer_mlp_update(_backend_fixture):
 
     loss, model = step(model, inp, target)
 
-    assert loss == 42.759910583496094
+    np.testing.assert_allclose(loss, 42.759910583496094)
 
     expected_model = [
         torch.Tensor(
@@ -329,7 +329,7 @@ def test_module_2_layer_mlp_update__to_device(_backend_fixture):
 
     loss, model = step(model, inp, target)
 
-    assert loss == 42.759910583496094
+    np.testing.assert_allclose(loss, 42.759910583496094)
 
     expected_model = [
         torch.Tensor(

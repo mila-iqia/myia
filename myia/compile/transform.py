@@ -416,7 +416,7 @@ class CompileGraphs:
     def __init__(self, lin_convert, cut_list, backend):
         """Create a compiler.
 
-        This use the specifed implementation for linear parts and a
+        This use the specified implementation for linear parts and a
         list of excluded ops that will be covered by the built-in VM.
 
         """
