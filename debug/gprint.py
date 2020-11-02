@@ -803,10 +803,7 @@ def cosmetic_transformer(g):
         _opt_fancy_tagged,
         # careful=True
     )
-    nmap = NodeMap()
-    for optim in spec:
-        nmap.register(getattr(optim, "interest", None), optim)
-    optim = LocalPassOptimizer(nmap)
+    optim = LocalPassOptimizer(*spec)
     optim(g)
     return g
 
