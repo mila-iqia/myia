@@ -325,25 +325,14 @@ class Resources(Partializable):
 
     def __init__(self, **members):
         """Initialize the Resources."""
-        self._members = members
-        self._inst = {}
-
-    def __getattr__(self, attr):
-        if attr in self._inst:
-            return self._inst[attr]
-
-        if attr in self._members:
-            inst = self._members[attr]
+        for attr, inst in members.items():
             if isinstance(inst, Partial):
                 try:
                     inst = inst.partial(resources=self)
                 except TypeError:
                     pass
                 inst = inst()
-            self._inst[attr] = inst
-            return inst
-
-        raise AttributeError(f"No resource named {attr}.")
+            setattr(self, attr, inst)
 
 
 __consolidate__ = True
