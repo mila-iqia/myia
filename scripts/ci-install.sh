@@ -45,6 +45,9 @@ poetry install
 cd myia_backend_pytorch
 poetry install
 
+cd ../myia_backend_python
+poetry install
+
 cd ../myia_backend_relay
 poetry install
 
@@ -61,6 +64,10 @@ conda env update --file environment.yml
 cd myia_backend_pytorch
 ./scripts/gen_conda_env_file.sh
 conda env update --file environment-${DEV}.yml
+
+cd ../myia_backend_python
+./scripts/gen_conda_env_file.sh
+conda env update --file environment.yml
 
 cd ../myia_backend_relay
 ./scripts/gen_conda_env_file.sh

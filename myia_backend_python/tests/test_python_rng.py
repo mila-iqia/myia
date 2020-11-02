@@ -1,4 +1,4 @@
-"""Test RNG for Pytorch backend."""
+"""Test RNG for Python backend."""
 
 import numpy as np
 
@@ -7,13 +7,13 @@ from myia.operations import random_initialize, random_uint32
 
 EXPECTED = (
     np.asarray(
-        [[3422054626, 1376353668], [825546192, 1797302575]], dtype="uint32"
+        [[1055721139, 3422054626], [2561641375, 1376353668]], dtype="uint32"
     ),
     np.asarray(
-        [[1514647480, 548814914], [3847607334, 2603396401]], dtype="uint32"
+        [[1540998321, 825546192], [1627406507, 1797302575]], dtype="uint32"
     ),
-    np.asarray([1379542846], dtype="uint32"),
-    1617509384,
+    np.asarray([105017825], dtype="uint32"),
+    1514647480,
 )
 TWO_EXP_32 = np.uint64(np.iinfo(np.uint32).max) + np.uint64(1)
 
@@ -29,7 +29,7 @@ def _test_output(_, *generated_values):
 
 
 def test_init_random_combined():
-    backend = "pytorch"
+    backend = "python"
 
     @myia(backend=backend)
     def fn():
@@ -44,7 +44,7 @@ def test_init_random_combined():
 
 
 def test_init_random_separated():
-    backend = "pytorch"
+    backend = "python"
 
     @myia(backend=backend)
     def init():

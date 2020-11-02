@@ -1,3 +1,2 @@
-__version__ = "0.1.0"
-
+"""Myia Pytorch frontend."""
 from .pytorch import *

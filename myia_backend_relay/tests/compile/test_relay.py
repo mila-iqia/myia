@@ -1,4 +1,4 @@
-# Most of the tests ar in test_backend, this is just for relay-specific
+# Most of the tests are in test_backend, this is just for relay-specific
 # tests that can't be made generic.
 
 import pytest
