@@ -14,13 +14,9 @@ def step_rmunused(resources):
         pass
 
 
-rmunused = (
-    scalar_pipeline.with_steps(
-        steps.step_parse, steps.step_copy, step_rmunused,
-    )
-    .configure(preresolve=True)
-    .make_transformer("input", "graph")
-)
+rmunused = scalar_pipeline.with_steps(
+    steps.step_parse, steps.step_copy, step_rmunused,
+).make_transformer("input", "graph")
 
 
 def test_rmunused_simple():

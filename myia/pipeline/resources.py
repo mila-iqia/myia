@@ -9,7 +9,6 @@ from .. import parser, xtype
 from ..abstract import InferenceEngine, LiveInferenceEngine, type_to_abstract
 from ..compile import load_backend
 from ..ir import Graph, clone
-from ..modules.impl import core_modules
 from ..monomorphize import Monomorphizer
 from ..operations.utils import Operation
 from ..opt import LocalPassOptimizer, lib as optlib

@@ -23,7 +23,6 @@ V = var(lambda n: n.is_constant())
 parse = (
     scalar_pipeline.configure(
         {
-            "preresolve": True,
             "convert.object_map": Merge(
                 {
                     operations.getitem: prim.tuple_getitem,
@@ -38,10 +37,7 @@ parse = (
 
 
 specialize = scalar_pipeline.configure(
-    {
-        "convert.object_map": Merge({operations.getitem: prim.tuple_getitem}),
-        "preresolve": True,
-    }
+    {"convert.object_map": Merge({operations.getitem: prim.tuple_getitem})}
 ).with_steps(steps.step_parse, steps.step_infer, steps.step_specialize)
 
 

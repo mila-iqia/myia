@@ -11,7 +11,7 @@ from myia.pipeline import standard_pipeline, steps
 load_backend("relay")
 
 
-upipeline = standard_pipeline.insert_after(steps.step_parse, steps.step_resolve)
+upipeline = standard_pipeline
 
 umyia = myia(
     use_universe=True,

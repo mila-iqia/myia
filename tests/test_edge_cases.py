@@ -9,7 +9,7 @@ from myia import myia
 from myia.compile.backends import get_backend_names
 from myia.lib import core
 from myia.operations import array_map
-from myia.pipeline import standard_pipeline, steps
+from myia.pipeline import standard_pipeline
 from myia.testing.multitest import eqtest
 
 pipeline2 = standard_pipeline.configure(preresolve=True)
