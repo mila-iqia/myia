@@ -514,7 +514,8 @@ def Jimpl(other: object, resources, node):
 default_grad_flags = {"ignore_values": True, "core": True, "reference": True}
 
 
-_is_mktuple = ((operations.resolve, operations_ns, "make_tuple"), Xs)
+_is_mktuple_resolve = ((operations.resolve, operations_ns, "make_tuple"), Xs)
+_is_mktuple_direct = (P.make_tuple, Xs)
 _is_raise = (P.raise_, Xs)
 
 
@@ -530,7 +531,9 @@ def _make_grad_transform(prim, fn, flags):
     bprop.debug.about = About(info, "grad_bprop")  # type: ignore
     if bprop.output.match(_is_raise):
         pass
-    elif bprop.output.match(_is_mktuple):
+    elif bprop.output.match(_is_mktuple_resolve) or bprop.output.match(
+        _is_mktuple_direct
+    ):
         bprop.output = bprop.apply(
             P.make_tuple, newenv, *bprop.output.inputs[1:]
         )
