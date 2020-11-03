@@ -8,12 +8,22 @@ from myia.operations import (
     scalar_add,
     tagged,
 )
-from myia.pipeline import standard_pipeline
+from myia.pipeline import standard_pipeline, steps
 from myia.testing.common import MA, MB, Point
 from myia.testing.multitest import mt, run
 
 run_no_opt = run.configure(
-    pipeline=standard_pipeline.configure({"opt.phases.main": []})
+    pipeline=standard_pipeline.with_steps(
+        steps.step_parse,
+        steps.step_infer,
+        steps.step_specialize,
+        steps.step_simplify_types,
+        steps.step_opt2,
+        steps.step_llift,
+        steps.step_validate,
+        steps.step_compile,
+        steps.step_wrap,
+    )
 )
 
 
@@ -125,7 +135,7 @@ def test_switch_nontail():
 
     i64 = from_value(1, broaden=True)
     argspec = (i64, i64)
-    myia_fn = standard_pipeline.run(input=fn, argspec=argspec)["output"]
+    myia_fn = standard_pipeline(input=fn, argspec=argspec)["output"]
 
     for test in [(6, 23, 23 ** 2), (67, 23, 67 ** 2)]:
         *args, expected = test

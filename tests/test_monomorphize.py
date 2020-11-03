@@ -13,67 +13,32 @@ from myia.operations import (
     switch,
     tagged,
 )
-from myia.pipeline import scalar_debug_pipeline, standard_debug_pipeline
+from myia.pipeline import (
+    base_scalar_debug_pipeline,
+    standard_debug_pipeline,
+    steps,
+)
 from myia.testing.common import Point, U, f64, i64, mysum
 from myia.testing.multitest import mt, run
 
-specialize_pipeline = scalar_debug_pipeline.select(
-    "resources",
-    "parse",
-    "infer",
-    "specialize",
-    "simplify_types",
-    "opt2",
-    "llift",
-    "validate",
-    "export",
-    "wrap",
-).configure({"opt2.phases.main": []})
-
-
-specialize_pipeline_std = standard_debug_pipeline.select(
-    "resources",
-    "parse",
-    "infer",
-    "specialize",
-    "simplify_types",
-    "opt",
-    "opt2",
-    "llift",
-    "validate",
-    "export",
-    "wrap",
+mono_pipeline = base_scalar_debug_pipeline.with_steps(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_simplify_types,
+    steps.step_opt2_no_main,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_debug_export,
+    steps.step_wrap,
 )
 
 
-def specializer_decorator(pipeline):
-    def deco(*entries, abstract=None, validate=True):
-        mtentries = []
-        for args in entries:
-            if isinstance(args, Exception):
-                result = type(args)
-                args = args.args
-            else:
-                result = None
-            mtentry = run(
-                *args,
-                result=result,
-                abstract=abstract,
-                validate=validate,
-                pipeline=pipeline
-            )
-            mtentries.append(mtentry)
-        return mt(*mtentries)
-
-    return deco
+mono_pipeline_std = standard_debug_pipeline
 
 
-specialize = specializer_decorator(specialize_pipeline)
-specialize_std = specializer_decorator(specialize_pipeline_std)
-
-
-mono_scalar = run.configure(pipeline=specialize_pipeline, backend=False)
-mono_standard = run.configure(pipeline=specialize_pipeline_std, backend=False)
+mono_scalar = run.configure(pipeline=mono_pipeline, backend=False)
+mono_standard = run.configure(pipeline=mono_pipeline_std, backend=False)
 
 
 int1 = 13

@@ -3,94 +3,23 @@
 The steps are listed in roughly the same order they should be called.
 """
 
-from itertools import count
-
 from ..abstract import AbstractTuple, find_aliases, nobottom, type_to_abstract
 from ..compile import BackendValue
 from ..ir import Graph, clone
 from ..opt import (
     CSE,
-    DeadDataElimination,
-    GraphInterfaceRewriterOpt,
     LambdaLiftRewriter,
     LocalPassOptimizer,
-    NodeMap,
     RemoveUnusedParameters,
+    dde,
     lib as optlib,
 )
 from ..parser import parse
 from ..simplify_types import from_canonical, simplify_types, to_canonical
-from ..utils import (
-    InferenceError,
-    MyiaInputTypeError,
-    Partializable,
-    new_universe,
-    tracer,
-)
+from ..utils import InferenceError, MyiaInputTypeError, new_universe
 from ..validate import ValidationError
 from ..xtype import UniverseType
-
-#############
-# Optimizer #
-#############
-
-
-# Optimizer is used for multiple steps
-
-
-class Optimizer(Partializable):
-    """Pipeline step to optimize a graph.
-
-    Inputs:
-        graph: The graph to optimize.
-
-    Outputs:
-        graph: The optimized graph.
-    """
-
-    def __init__(self, phases, run_only_once=False, use_tracker=True):
-        """Initialize an Optimizer."""
-        self.run_only_once = run_only_once
-        self.phases = phases
-        self.use_tracker = use_tracker
-
-    def __call__(self, resources, graph, argspec=None, outspec=None):
-        """Optimize the graph using the given patterns."""
-        if self.use_tracker:
-            resources.tracker.activate()
-        final_phases = []
-        names = []
-        for name, spec in self.phases.items():
-            if isinstance(spec, list):
-                nmap = NodeMap()
-                for opt in spec:
-                    nmap.register(getattr(opt, "interest", None), opt)
-                spec = LocalPassOptimizer(nmap, resources=resources)
-            else:
-                spec = spec(resources=resources)
-            names.append(name)
-            final_phases.append(spec)
-
-        if len(final_phases) == 1:
-            run_only_once = True
-        else:
-            run_only_once = self.run_only_once
-
-        counter = count(1)
-        changes = True
-        while changes:
-            with tracer(f"lap{next(counter)}"):
-                changes = False
-                nn = iter(names)
-                for opt in final_phases:
-                    with tracer(next(nn)):
-                        if opt(graph):
-                            changes = True
-                if run_only_once:
-                    break
-        res = {"graph": graph}
-        return res
-
+from .pipeline import LoopPipeline, Pipeline
 
 #########
 # Parse #
@@ -133,14 +62,10 @@ def step_resolve(resources, graph, argspec=None, outspec=None):
     new_graph = clone(graph, total=True)
     resources.opt_manager.add_graph(new_graph, root=True)
     resources.infer_manager = resources.opt_manager
-    opt = Optimizer(
-        run_only_once=True,
-        phases=dict(resolve=[optlib.resolve_globals]),
-        use_tracker=False,
+    opt_pass = Pipeline(
+        LocalPassOptimizer(optlib.resolve_globals, name="resolve")
     )
-    return opt(
-        resources=resources, graph=new_graph, argspec=argspec, outspec=outspec
-    )
+    return opt_pass(graph=new_graph, resources=resources)
 
 
 #########
@@ -234,149 +159,165 @@ def step_simplify_types(resources, graph, argspec, outspec):
 ############
 
 
+def step_activate_tracker(resources):
+    resources.tracker.activate()
+    return {}
+
+
 # For debugging purposes, less optimizations
-step_debug_opt = Optimizer.partial(
-    phases=dict(
-        main=[
-            optlib.expand_composite,
-            # Branch culling
-            optlib.simplify_always_true,
-            optlib.simplify_always_false,
-            # Safe inlining
-            optlib.inline_core,
-            optlib.simplify_partial,
-            optlib.elim_identity,
-            # Miscellaneous
-            optlib.elim_j_jinv,
-            optlib.elim_jinv_j,
-            optlib.replace_Jinv_on_graph,
-        ],
-        grad=[optlib.expand_J],
-        cse=CSE.partial(report_changes=False),
-        jelim=optlib.JElim.partial(),
-    )
+step_debug_opt = LoopPipeline(
+    step_activate_tracker,
+    LocalPassOptimizer(
+        optlib.expand_composite,
+        # Branch culling
+        optlib.simplify_always_true,
+        optlib.simplify_always_false,
+        # Safe inlining
+        optlib.inline_core,
+        optlib.simplify_partial,
+        optlib.elim_identity,
+        # Miscellaneous
+        optlib.elim_j_jinv,
+        optlib.elim_jinv_j,
+        optlib.replace_Jinv_on_graph,
+        name="main",
+    ),
+    LocalPassOptimizer(optlib.expand_J, name="grad"),
+    CSE(report_changes=False),
+    optlib.opt_jelim,
+    name="step_debug_opt",
 )
 
 
 # Standard optimizations
-step_opt = Optimizer.partial(
-    phases=dict(
-        main=[
-            # Force constants
-            optlib.force_constants,
-            optlib.expand_composite,
-            # Branch culling
-            optlib.simplify_always_true,
-            optlib.simplify_always_false,
-            optlib.simplify_switch1,
-            optlib.simplify_switch2,
-            optlib.simplify_switch_idem,
-            optlib.combine_switches,
-            optlib.combine_switches_array,
-            # Safe inlining
-            optlib.inline_trivial,
-            optlib.inline_unique_uses,
-            optlib.inline_inside_marked_caller,
-            optlib.inline_core,
-            optlib.simplify_partial,
-            optlib.replace_applicator,
-            # # Specialization
-            # optlib.specialize_on_graph_arguments,
-            # Arithmetic simplifications
-            optlib.multiply_by_one_l,
-            optlib.multiply_by_one_r,
-            optlib.multiply_by_zero_l,
-            optlib.multiply_by_zero_r,
-            optlib.add_zero_l,
-            optlib.add_zero_r,
-            optlib.not_eq,
-            optlib.multiply_by_one_l_map,
-            optlib.multiply_by_one_r_map,
-            optlib.multiply_by_zero_l_map,
-            optlib.multiply_by_zero_r_map,
-            optlib.add_zero_l_map,
-            optlib.add_zero_r_map,
-            optlib.usub_cancel_map,
-            optlib.usub_sink_mul_l_map,
-            optlib.usub_sink_mul_r_map,
-            optlib.usub_sink_div_l_map,
-            optlib.usub_sink_div_r_map,
-            optlib.add_usub_map,
-            optlib.sub_usub_map,
-            optlib.not_eq_map,
-            # Array simplifications
-            optlib.elim_distribute,
-            optlib.elim_array_reduce,
-            optlib.merge_transposes,
-            optlib.elim_transpose,
-            # Miscellaneous
-            optlib.elim_identity,
-            optlib.getitem_tuple,
-            optlib.getitem_constant_tuple,
-            optlib.getitem_setitem_tuple,
-            optlib.setitem_tuple,
-            optlib.setitem_tuple_ct,
-            optlib.cancel_tuple_reconstruction,
-            optlib.elim_j_jinv,
-            optlib.elim_jinv_j,
-            optlib.replace_Jinv_on_graph,
-            optlib.cancel_env_set_get,
-            optlib.getitem_newenv,
-            # TODO: reintegrate the getitem_env_add optimization
-            # optlib.getitem_env_add,
-            optlib.simplify_array_map,
-            optlib.gadd_zero_l,
-            optlib.gadd_zero_r,
-            optlib.gadd_switch,
-            optlib.incorporate_call_through_switch,
-        ],
-        main2=[
-            # Costlier optimizations
-            optlib.float_tuple_getitem_through_switch,
-            optlib.float_env_getitem_through_switch,
-            # We may reactivate those later, but they are slow
-            # optlib.incorporate_getitem,
-            # optlib.incorporate_env_getitem,
-            # optlib.incorporate_call,
-            # optlib.incorporate_getitem_through_switch,
-            # optlib.incorporate_env_getitem_through_switch,
-            # optlib.incorporate_call_through_switch,
-        ],
-        grad=[optlib.expand_J],
-        cse=CSE.partial(report_changes=False),
-        jelim=optlib.JElim.partial(),
-    )
+step_opt = LoopPipeline(
+    step_activate_tracker,
+    LocalPassOptimizer(
+        # Force constants
+        optlib.force_constants,
+        optlib.expand_composite,
+        # Branch culling
+        optlib.simplify_always_true,
+        optlib.simplify_always_false,
+        optlib.simplify_switch1,
+        optlib.simplify_switch2,
+        optlib.simplify_switch_idem,
+        optlib.combine_switches,
+        optlib.combine_switches_array,
+        # Safe inlining
+        optlib.inline_trivial,
+        optlib.inline_unique_uses,
+        optlib.inline_inside_marked_caller,
+        optlib.inline_core,
+        optlib.simplify_partial,
+        optlib.replace_applicator,
+        # # Specialization
+        # optlib.specialize_on_graph_arguments,
+        # Arithmetic simplifications
+        optlib.multiply_by_one_l,
+        optlib.multiply_by_one_r,
+        optlib.multiply_by_zero_l,
+        optlib.multiply_by_zero_r,
+        optlib.add_zero_l,
+        optlib.add_zero_r,
+        optlib.not_eq,
+        optlib.multiply_by_one_l_map,
+        optlib.multiply_by_one_r_map,
+        optlib.multiply_by_zero_l_map,
+        optlib.multiply_by_zero_r_map,
+        optlib.add_zero_l_map,
+        optlib.add_zero_r_map,
+        optlib.usub_cancel_map,
+        optlib.usub_sink_mul_l_map,
+        optlib.usub_sink_mul_r_map,
+        optlib.usub_sink_div_l_map,
+        optlib.usub_sink_div_r_map,
+        optlib.add_usub_map,
+        optlib.sub_usub_map,
+        optlib.not_eq_map,
+        # Array simplifications
+        optlib.elim_distribute,
+        optlib.elim_array_reduce,
+        optlib.merge_transposes,
+        optlib.elim_transpose,
+        # Miscellaneous
+        optlib.elim_identity,
+        optlib.getitem_tuple,
+        optlib.getitem_constant_tuple,
+        optlib.getitem_setitem_tuple,
+        optlib.setitem_tuple,
+        optlib.setitem_tuple_ct,
+        optlib.cancel_tuple_reconstruction,
+        optlib.elim_j_jinv,
+        optlib.elim_jinv_j,
+        optlib.replace_Jinv_on_graph,
+        optlib.cancel_env_set_get,
+        optlib.getitem_newenv,
+        # TODO: reintegrate the getitem_env_add optimization
+        # optlib.getitem_env_add,
+        optlib.simplify_array_map,
+        optlib.gadd_zero_l,
+        optlib.gadd_zero_r,
+        optlib.gadd_switch,
+        optlib.incorporate_call_through_switch,
+        name="main",
+    ),
+    LocalPassOptimizer(
+        # Costlier optimizations
+        optlib.float_tuple_getitem_through_switch,
+        optlib.float_env_getitem_through_switch,
+        # We may reactivate those later, but they are slow
+        # optlib.incorporate_getitem,
+        # optlib.incorporate_env_getitem,
+        # optlib.incorporate_call,
+        # optlib.incorporate_getitem_through_switch,
+        # optlib.incorporate_env_getitem_through_switch,
+        # optlib.incorporate_call_through_switch,
+        name="main2",
+    ),
+    LocalPassOptimizer(optlib.expand_J, name="grad"),
+    CSE(report_changes=False),
+    optlib.opt_jelim,
+    name="step_opt",
 )
 
 
-step_opt2 = Optimizer.partial(
-    phases=dict(
-        rmunused=GraphInterfaceRewriterOpt.partial(
-            rewriter=RemoveUnusedParameters
-        ),
-        dde=DeadDataElimination.partial(),
-        main=[
-            optlib.force_constants,
-            optlib.unfuse_composite,
-            optlib.getitem_tuple,
-            optlib.getitem_constant_tuple,
-            optlib.getitem_setitem_tuple,
-            optlib.setitem_tuple,
-            optlib.setitem_tuple_ct,
-            optlib.float_tuple_getitem_through_switch,
-            optlib.inline_trivial,
-            optlib.inline_unique_uses,
-            optlib.inline_inside_marked_caller,
-            optlib.inline_core,
-            optlib.combine_switches_array,
-            optlib.gadd_zero_l,
-            optlib.gadd_zero_r,
-            optlib.gadd_switch,
-            optlib.setitem_dead,
-            optlib.elim_stop_gradient,
-        ],
-        cse=CSE.partial(report_changes=False),
-    )
+step_opt2 = LoopPipeline(
+    step_activate_tracker,
+    RemoveUnusedParameters.as_step(),
+    dde,
+    LocalPassOptimizer(
+        optlib.force_constants,
+        optlib.unfuse_composite,
+        optlib.getitem_tuple,
+        optlib.getitem_constant_tuple,
+        optlib.getitem_setitem_tuple,
+        optlib.setitem_tuple,
+        optlib.setitem_tuple_ct,
+        optlib.float_tuple_getitem_through_switch,
+        optlib.inline_trivial,
+        optlib.inline_unique_uses,
+        optlib.inline_inside_marked_caller,
+        optlib.inline_core,
+        optlib.combine_switches_array,
+        optlib.gadd_zero_l,
+        optlib.gadd_zero_r,
+        optlib.gadd_switch,
+        optlib.setitem_dead,
+        optlib.elim_stop_gradient,
+        name="main",
+    ),
+    CSE(report_changes=False),
+    name="step_opt2",
+)
+
+
+step_opt2_no_main = LoopPipeline(
+    step_activate_tracker,
+    RemoveUnusedParameters.as_step(),
+    dde,
+    CSE(report_changes=False),
+    name="step_opt2_no_main",
 )
 
 
@@ -420,7 +361,8 @@ def step_validate(resources, graph, outspec=None):
             "The output type of the graph changed during optimization"
             f" from {outspec} to {graph.output.abstract}"
         )
-    resources.validator(graph)
+    if resources.validator:
+        resources.validator(graph)
     return {"graph": graph}
 
 
@@ -547,4 +489,4 @@ def step_debug_export(resources, graph):
 
 
 __consolidate__ = True
-__all__ = ["Optimizer"]
+__all__ = []

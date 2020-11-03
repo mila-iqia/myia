@@ -1,13 +1,14 @@
 """Optimizations that rewrite graph interfaces."""
 
 import operator
+from dataclasses import dataclass
 from functools import lru_cache, reduce
 from types import SimpleNamespace as NS
 
 from ..info import About
 from ..ir import Graph, Parameter
 from ..operations import primitives as P
-from ..utils import OrderedSet, Partializable, WorkSet, tracer
+from ..utils import OrderedSet, WorkSet, tracer
 from .dde import make_dead
 
 
@@ -51,6 +52,11 @@ class GraphInterfaceRewriter:
     """
 
     relation = None
+
+    @classmethod
+    def as_step(cls):
+        """Return a Pipeline step that applies this optimization."""
+        return GraphInterfaceRewriterStep(rewriter=cls, name=cls.__name__)
 
     def __init__(self, manager, graphs=None):
         """Initialize a GraphInterfaceRewriter.
@@ -434,24 +440,22 @@ class LambdaLiftRewriter(GraphInterfaceRewriter):
 #     return h(y, x)
 
 
-class GraphInterfaceRewriterOpt(Partializable):
-    """Implements optimizer interface for GraphInferfaceRewriter."""
+@dataclass
+class GraphInterfaceRewriterStep:
+    """Implements optimizer interface for GraphInferfaceRewriter.
 
-    def __init__(self, resources, rewriter):
-        """Initialize GraphInterfaceRewriterOpt.
+    Attributes:
+        rewriter: A subclass of GraphInterfaceRewriter. It will be
+            instantiated in the __call__ method.
+        name: The name of the optimization.
+    """
 
-        Arguments:
-            resources: The resources object associated to the pipeline.
-            rewriter: A subclass of GraphInterfaceRewriter. It will be
-                instantiated in the __call__ method.
-        """
-        self.resources = resources
-        self.rewriter = rewriter
-        self.name = rewriter.__name__
+    rewriter: type
+    name: str
 
-    def __call__(self, root):
+    def __call__(self, resources):
         """Apply the rewriter on root."""
-        mng = self.resources.opt_manager
+        mng = resources.opt_manager
         args = dict(opt=self, node=None, manager=mng, profile=False,)
         with tracer("opt", **args) as tr:
             tr.set_results(success=False, **args)
@@ -460,12 +464,12 @@ class GraphInterfaceRewriterOpt(Partializable):
             chg = rewriter.run()
             if chg:
                 tracer().emit_success(**args, new_node=None)
-            return chg
+            return {"changes": chg}
 
 
 __all__ = [
     "GraphInterfaceRewriter",
-    "GraphInterfaceRewriterOpt",
+    "GraphInterfaceRewriterStep",
     "LambdaLiftRewriter",
     "RemoveUnusedParameters",
 ]

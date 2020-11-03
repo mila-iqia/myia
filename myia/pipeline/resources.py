@@ -333,10 +333,6 @@ class Resources(Partializable):
 
         raise AttributeError(f"No resource named {attr}.")
 
-    def __call__(self):
-        """Run the Resources as a pipeline step."""
-        return {"resources": self}
-
 
 __consolidate__ = True
 __all__ = [

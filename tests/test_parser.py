@@ -13,7 +13,7 @@ from myia.parser import (
     MyiaSyntaxError,
     parse as raw_parse,
 )
-from myia.pipeline import scalar_parse as parse, scalar_pipeline
+from myia.pipeline import scalar_parse as parse, scalar_pipeline, steps
 
 
 def test_undefined():
@@ -143,7 +143,7 @@ def test_forward_reference():
         return h()
 
     # No resolve
-    parse2 = scalar_pipeline.select("resources", "parse").make_transformer(
+    parse2 = scalar_pipeline.with_steps(steps.step_parse).make_transformer(
         "input", "graph"
     )
 

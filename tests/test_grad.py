@@ -34,11 +34,10 @@ from myia.operations import (
 from myia.operations.macro_grad import GradOperation
 from myia.operations.primitives import J
 from myia.pipeline import (
-    PipelineDefinition,
+    base_pipeline,
     py_registry as pyi,
     standard_debug_pipeline,
     standard_pipeline,
-    standard_resources,
     steps,
 )
 from myia.testing.common import (
@@ -85,15 +84,14 @@ def grad_wrap(graph, argspec):
     return {"graph": g}
 
 
-grad_pipeline = PipelineDefinition(
-    resources=standard_resources,
-    parse=steps.step_parse,
-    infer=steps.step_infer,
-    specialize=steps.step_specialize,
-    opt=steps.step_debug_opt,
-    llift=steps.step_llift,
-    validate=steps.step_validate,
-    export=steps.step_debug_export,
+grad_pipeline = base_pipeline.with_steps(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_debug_opt,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_debug_export,
 )
 
 
@@ -144,7 +142,7 @@ def _grad_test(
     rel_error=1e-3,
     argspec=None,
 ):
-    pipeline = pipeline.insert_after("parse", grad_wrap=grad_wrap)
+    pipeline = pipeline.insert_after(steps.step_parse, grad_wrap)
     if argspec is None:
         argspec = tuple(
             from_value(arg, broaden=True) for arg in clean_args(args)
@@ -153,10 +151,10 @@ def _grad_test(
         argspec = tuple(to_abstract_test(x) for x in argspec)
     sens_type = to_abstract_test(sens_type)
     if isinstance(obj, FunctionType):
-        res = pipeline.run(input=obj, argspec=[*argspec, sens_type])
+        res = pipeline(input=obj, argspec=[*argspec, sens_type])
     else:
-        pip = pipeline.configure(parse=False)
-        res = pip.run(graph=obj, argspec=[*argspec, sens_type])
+        pip = pipeline.without_step(steps.step_parse)
+        res = pip(graph=obj, argspec=[*argspec, sens_type])
     gtest = GradTester(
         fn=fn,
         gfn=res["output"],
@@ -194,10 +192,7 @@ def gradient(
         backend_options = backend[1]
 
         pipeline = pipeline.configure(
-            {
-                "resources.backend.name": backend_name,
-                "resources.backend.options": backend_options,
-            }
+            {"backend.name": backend_name, "backend.options": backend_options}
         )
 
     _grad_test(
@@ -388,7 +383,7 @@ def test_while_2(x, y, z):
 
 @gradient(
     [1.0, 2.0, 3.0, 4.0],
-    pipeline=standard_debug_pipeline.configure(validate=False),
+    pipeline=standard_debug_pipeline.configure(validator=None),
     backend=backend_except("relay"),
 )
 def test_list_while(xs):
@@ -548,7 +543,7 @@ def test_union(x):
 
 def _runwith(f, *args):
     argspec = tuple(from_value(arg, broaden=True) for arg in args)
-    res = grad_pipeline.run(input=f, argspec=argspec)
+    res = grad_pipeline(input=f, argspec=argspec)
     return res["output"](*args)
 
 

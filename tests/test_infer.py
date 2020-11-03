@@ -58,7 +58,7 @@ from myia.operations import (
     zeros_like,
 )
 from myia.operations.utils import InferencePrimitive
-from myia.pipeline import scalar_pipeline, standard_pipeline
+from myia.pipeline import scalar_pipeline, standard_pipeline, steps
 from myia.testing.common import (
     AN,
     JT,
@@ -134,9 +134,11 @@ def _to_i64(x: Number) -> Int[64]:
     return int(x)
 
 
-infer_pipeline = scalar_pipeline.select("resources", "parse", "infer")
+infer_pipeline = scalar_pipeline.with_steps(steps.step_parse, steps.step_infer)
 
-infer_pipeline_std = standard_pipeline.select("resources", "parse", "infer")
+infer_pipeline_std = standard_pipeline.with_steps(
+    steps.step_parse, steps.step_infer
+)
 
 
 infer_standard = mt_infer.configure(pipeline=infer_pipeline_std)
@@ -1801,7 +1803,7 @@ def test_bad_metagraph(x):
 #     for argspec in [[{'type': i64}, {'type': i64}],
 #                     [{'type': i64}, {'type': f64}]]:
 
-#         results = pip.run(input=fn, argspec=argspec)
+#         results = pip(input=fn, argspec=argspec)
 #         rval = results['outspec']
 
 #         assert rval['type'] == f64
@@ -1823,7 +1825,7 @@ def test_bad_metagraph(x):
 
 #     # Test correct
 
-#     results = pip.run(
+#     results = pip(
 #         input=fn,
 #         argspec=[{'type': i64}, {'type': i64}]
 #     )
@@ -1834,7 +1836,7 @@ def test_bad_metagraph(x):
 #     # Test mismatch
 
 #     with pytest.raises(InferenceError):
-#         results = pip.run(
+#         results = pip(
 #             input=fn,
 #             argspec=[{'type': i64}, {'type': f64}]
 #         )
@@ -1845,7 +1847,7 @@ def test_bad_metagraph(x):
 #         return fn(x)
 
 #     with pytest.raises(InferenceError):
-#         results = pip.run(
+#         results = pip(
 #             input=fn2,
 #             argspec=[{'type': i64}]
 #         )

@@ -15,7 +15,7 @@ from ..public_api import item
 from ..utils import Registry
 from ..validate import AbstractValidator, MultiValidator, OperatorValidator
 from . import steps
-from .pipeline import PipelineDefinition
+from .pipeline import MyiaPipeline
 from .resources import (
     BackendResource,
     ConverterResource,
@@ -297,43 +297,50 @@ standard_resources = Resources.partial(
 ######################
 
 
-standard_pipeline = PipelineDefinition(
-    resources=standard_resources,
-    parse=steps.step_parse,
-    infer=steps.step_infer,
-    specialize=steps.step_specialize,
-    simplify_types=steps.step_simplify_types,
-    opt=steps.step_opt,
-    opt2=steps.step_opt2,
-    llift=steps.step_llift,
-    validate=steps.step_validate,
-    compile=steps.step_compile,
-    wrap=steps.step_wrap,
+base_pipeline = MyiaPipeline(resources=standard_resources, name="compile")
+base_debug_pipeline = base_pipeline.configure({"backend.name": False})
+base_scalar_pipeline = base_pipeline.configure(
+    {"convert.object_map": scalar_object_map}
+)
+base_scalar_debug_pipeline = base_pipeline.configure(
+    {"convert.object_map": scalar_object_map, "backend.name": False}
 )
 
+
+standard_pipeline = base_pipeline.with_steps(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_simplify_types,
+    steps.step_opt,
+    steps.step_opt2,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_compile,
+    steps.step_wrap,
+)
 
 scalar_pipeline = standard_pipeline.configure(
-    {"resources.convert.object_map": scalar_object_map}
+    {"convert.object_map": scalar_object_map}
 )
 
 
-standard_debug_pipeline = PipelineDefinition(
-    resources=standard_resources,
-    parse=steps.step_parse,
-    infer=steps.step_infer,
-    specialize=steps.step_specialize,
-    simplify_types=steps.step_simplify_types,
-    opt=steps.step_opt,
-    opt2=steps.step_opt2,
-    llift=steps.step_llift,
-    validate=steps.step_validate,
-    export=steps.step_debug_export,
-    wrap=steps.step_wrap,
-).configure({"resources.backend.name": False})
+standard_debug_pipeline = base_pipeline.with_steps(
+    steps.step_parse,
+    steps.step_infer,
+    steps.step_specialize,
+    steps.step_simplify_types,
+    steps.step_opt,
+    steps.step_opt2,
+    steps.step_llift,
+    steps.step_validate,
+    steps.step_debug_export,
+    steps.step_wrap,
+).configure({"backend.name": False})
 
 
 scalar_debug_pipeline = standard_debug_pipeline.configure(
-    {"resources.convert.object_map": scalar_object_map}
+    {"convert.object_map": scalar_object_map}
 )
 
 
@@ -342,23 +349,27 @@ scalar_debug_pipeline = standard_debug_pipeline.configure(
 ######################
 
 
-standard_parse = standard_pipeline.select(
-    "resources", "parse"
+standard_parse = standard_pipeline.with_steps(
+    steps.step_parse
 ).make_transformer("input", "graph")
 
 
-scalar_parse = scalar_pipeline.select(
-    "resources", "parse", {"resolve": steps.step_resolve}
+scalar_parse = scalar_pipeline.with_steps(
+    steps.step_parse, steps.step_resolve,
 ).make_transformer("input", "graph")
 
 
-scalar_debug_compile = scalar_debug_pipeline.select(
-    "resources", "parse", {"resolve": steps.step_resolve}, "export"
+scalar_debug_compile = scalar_debug_pipeline.with_steps(
+    steps.step_parse, steps.step_resolve, steps.step_debug_export,
 ).make_transformer("input", "output")
 
 
 __consolidate__ = True
 __all__ = [
+    "base_debug_pipeline",
+    "base_pipeline",
+    "base_scalar_pipeline",
+    "base_scalar_debug_pipeline",
     "py_registry",
     "scalar_debug_compile",
     "scalar_debug_pipeline",

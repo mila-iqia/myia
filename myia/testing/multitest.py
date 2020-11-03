@@ -8,7 +8,7 @@ from ovld import ovld
 
 from myia.compile.backends import get_backend_names
 from myia.lib import concretize_abstract, from_value
-from myia.pipeline import standard_debug_pipeline, standard_pipeline
+from myia.pipeline import standard_debug_pipeline, standard_pipeline, steps
 from myia.utils import keyword_decorator, merge
 
 from .common import to_abstract_test
@@ -50,7 +50,9 @@ def to_numpy(value: object):
     return value
 
 
-infer_pipeline = standard_pipeline.select("resources", "parse", "infer")
+infer_pipeline = standard_pipeline.with_steps(
+    steps.step_parse, steps.step_infer,
+)
 
 
 class Multiple:
@@ -232,8 +234,7 @@ def infer(self, fn, args, result=None, pipeline=infer_pipeline):
     args = [to_abstract_test(arg) for arg in args]
 
     def out(args):
-        pip = pipeline.make()
-        res = pip(input=fn, argspec=args)
+        res = pipeline(input=fn, argspec=args)
         rval = res["outspec"]
         rval = concretize_abstract(rval)
         return rval
@@ -279,10 +280,7 @@ def _run(
         backend_options = backend[1]
 
         pipeline = pipeline.configure(
-            {
-                "resources.backend.name": backend_name,
-                "resources.backend.options": backend_options,
-            }
+            {"backend.name": backend_name, "backend.options": backend_options}
         )
 
     if abstract is None:
@@ -295,11 +293,10 @@ def _run(
         argspec = tuple(to_abstract_test(a) for a in abstract)
 
     if not validate:
-        pipeline = pipeline.configure(validate=False)
+        pipeline = pipeline.configure(validator=None)
 
     def out(args):
-        pip = pipeline.make()
-        mfn = pip(input=fn, argspec=argspec)
+        mfn = pipeline(input=fn, argspec=argspec)
         rval = mfn["output"](*args)
         return rval
 

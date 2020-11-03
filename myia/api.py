@@ -58,10 +58,10 @@ class MyiaFunction:
         self.specialize_values = set(specialize_values)
         self.pip = pipeline.configure(
             {
-                "resources.universal": use_universe,
-                "resources.backend.name": backend,
-                "resources.backend.options": backend_options,
-                "resources.return_backend": return_backend,
+                "universal": use_universe,
+                "backend.name": backend,
+                "backend.options": backend_options,
+                "return_backend": return_backend,
             }
         )
         self._cache = {}
@@ -103,7 +103,7 @@ class MyiaFunction:
         if argspec not in self._cache:
             if self.tracer:
                 self.tracer.__enter__()
-            self._cache[argspec] = self.pip.run(
+            self._cache[argspec] = self.pip(
                 input=self.fn,
                 argspec=argspec,
                 aliasspec=(self.alias_tracker, aid_to_paths),
@@ -128,7 +128,7 @@ class MyiaFunction:
 
     def to_device(self, v, *, broaden=True, vm_t=None, orig_t=None):
         """Move value to the function's accelerator hardware."""
-        backr = self.pip.steps["resources"].keywords["backend"].keywords
+        backr = self.pip.resources.keywords["backend"].keywords
         return to_device(
             v,
             backr["name"],
