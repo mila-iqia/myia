@@ -40,12 +40,11 @@ def default_convert(env, g: Graph):
             opt_pass = Pipeline(
                 LocalPassOptimizer(optlib.resolve_globals, name="resolve")
             )
-            results = opt_pass(
+            opt_pass(
                 graph=g2,
                 resources=env.resources,
                 manager=env.resources.infer_manager,
             )
-            g2 = clone(g2)
         env.object_map[g] = g2
         return g2
     else:
