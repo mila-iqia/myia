@@ -6,7 +6,7 @@ from myia import myia
 from myia.compile.backends import load_backend
 from myia.lib import Empty, HandleInstance, core
 from myia.operations import cell_get, cell_set, make_cell
-from myia.pipeline import standard_pipeline, steps
+from myia.pipeline import standard_pipeline
 
 load_backend("relay")
 
