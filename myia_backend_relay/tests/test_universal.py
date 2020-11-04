@@ -6,12 +6,12 @@ from myia import myia
 from myia.compile.backends import load_backend
 from myia.lib import Empty, HandleInstance, core
 from myia.operations import cell_get, cell_set, make_cell
-from myia.pipeline import standard_pipeline, steps
+from myia.pipeline import standard_pipeline
 
 load_backend("relay")
 
 
-upipeline = standard_pipeline.insert_after(steps.step_parse, steps.step_resolve)
+upipeline = standard_pipeline
 
 umyia = myia(
     use_universe=True,

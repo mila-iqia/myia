@@ -289,6 +289,7 @@ standard_resources = Resources.partial(
     incorporate=Incorporator.partial(),
     return_backend=False,
     universal=False,
+    preresolve=True,
 )
 
 
@@ -349,18 +350,20 @@ scalar_debug_pipeline = standard_debug_pipeline.configure(
 ######################
 
 
-standard_parse = standard_pipeline.with_steps(
-    steps.step_parse
-).make_transformer("input", "graph")
+standard_parse = (
+    standard_pipeline.with_steps(steps.step_parse)
+    .configure(preresolve=False)
+    .make_transformer("input", "graph")
+)
 
 
 scalar_parse = scalar_pipeline.with_steps(
-    steps.step_parse, steps.step_resolve,
+    steps.step_parse, steps.step_copy
 ).make_transformer("input", "graph")
 
 
 scalar_debug_compile = scalar_debug_pipeline.with_steps(
-    steps.step_parse, steps.step_resolve, steps.step_debug_export,
+    steps.step_parse, steps.step_copy, steps.step_debug_export
 ).make_transformer("input", "output")
 
 

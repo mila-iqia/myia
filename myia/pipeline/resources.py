@@ -11,8 +11,10 @@ from ..compile import load_backend
 from ..ir import Graph, clone
 from ..monomorphize import Monomorphizer
 from ..operations.utils import Operation
+from ..opt import LocalPassOptimizer, lib as optlib
 from ..utils import MyiaConversionError, Partial, Partializable, tracer
 from ..vm import VM
+from .pipeline import Pipeline
 
 #####################
 # ConverterResource #
@@ -34,6 +36,15 @@ def default_convert(env, g: Graph):
     mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
+        if env.resources.preresolve:
+            opt_pass = Pipeline(
+                LocalPassOptimizer(optlib.resolve_globals, name="resolve")
+            )
+            opt_pass(
+                graph=g2,
+                resources=env.resources,
+                manager=env.resources.infer_manager,
+            )
         env.object_map[g] = g2
         return g2
     else:
@@ -313,25 +324,14 @@ class Resources(Partializable):
 
     def __init__(self, **members):
         """Initialize the Resources."""
-        self._members = members
-        self._inst = {}
-
-    def __getattr__(self, attr):
-        if attr in self._inst:
-            return self._inst[attr]
-
-        if attr in self._members:
-            inst = self._members[attr]
+        for attr, inst in members.items():
             if isinstance(inst, Partial):
                 try:
                     inst = inst.partial(resources=self)
                 except TypeError:
                     pass
                 inst = inst()
-            self._inst[attr] = inst
-            return inst
-
-        raise AttributeError(f"No resource named {attr}.")
+            setattr(self, attr, inst)
 
 
 __consolidate__ = True
