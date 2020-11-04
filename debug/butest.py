@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from itertools import count
 
 import pytest
-from buche import BucheDb, CodeGlobals, H, Reader, Repl, buche
+from buche import CodeGlobals, H, Reader, Repl, buche
 
+from . import bupdb
 from .gprint import mcss
 
 template_path = f"{os.path.dirname(__file__)}/test_template.html"
@@ -231,23 +232,8 @@ def pytest_runtest_setup(item):
     if id in _infos:
         raise Exception(id)
     interactor = ReportInteractor(id, item)
+    bupdb.global_interactor = interactor
     _infos[id] = Information(item, None, interactor)
-
-    class Db(BucheDb):
-        def __init__(self, skip=None):
-            super().__init__(None, skip=skip)
-
-        def set_trace(self, frame=None):
-            interactor.show(synchronous=True)
-            self.repl = interactor.repl
-            super().set_trace(frame)
-
-        def interaction(self, frame, tb):
-            interactor.show(synchronous=True)
-            self.repl = interactor.repl
-            super().interaction(frame, tb)
-
-    pytest.__pytestPDB._pdb_cls = Db
 
 
 def pytest_report_teststatus(report):
