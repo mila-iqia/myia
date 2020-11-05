@@ -25,10 +25,9 @@ from .pipeline import Pipeline
 def default_convert(env, fn: FunctionType):
     """Default converter for Python types."""
     g = parser.parse(fn)
-    if isinstance(g, Graph):
-        g = clone(g)
-    env.object_map[fn] = g
-    return g
+    rval = env(g)
+    env.object_map[fn] = rval
+    return rval
 
 
 @ovld  # noqa: F811
@@ -36,6 +35,7 @@ def default_convert(env, g: Graph):
     mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
+        env.object_map[g] = g2
         if env.resources.preresolve:
             opt_pass = Pipeline(
                 LocalPassOptimizer(optlib.resolve_globals, name="resolve")
@@ -45,7 +45,6 @@ def default_convert(env, g: Graph):
                 resources=env.resources,
                 manager=env.resources.infer_manager,
             )
-        env.object_map[g] = g2
         return g2
     else:
         return g
@@ -60,7 +59,7 @@ def default_convert(env, seq: (tuple, list)):
 def default_convert(env, x: Operation):
     dflt = x.defaults()
     if "mapping" in dflt:
-        return default_convert(env, dflt["mapping"])
+        return env(dflt["mapping"])
     else:
         raise MyiaConversionError(f"Cannot convert '{x}'")
 
@@ -83,7 +82,7 @@ def default_convert(env, x: type):
 
 @ovld  # noqa: F811
 def default_convert(env, x: np.dtype):
-    return default_convert(env, xtype.np_dtype_to_type(x.name))
+    return env(xtype.np_dtype_to_type(x.name))
 
 
 class _Unconverted:
