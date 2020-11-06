@@ -26,7 +26,7 @@ def default_convert(env, fn: FunctionType, manage):
     """Default converter for Python types."""
     g = parser.parse(fn)
     rval = env(g, manage)
-    env.object_map[fn] = rval
+    env.set_cached(fn, rval)
     return rval
 
 
@@ -38,7 +38,7 @@ def default_convert(env, g: Graph, manage):
     mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
-        env.object_map[g] = g2
+        env.set_cached(g, g2)
         if manage:
             env.resources.infer_manager.add_graph(g2)
         if env.resources.preresolve:
@@ -72,7 +72,10 @@ def default_convert(env, x: Operation, manage):
 @ovld  # noqa: F811
 def default_convert(env, x: object, manage):
     if hasattr(x, "__to_myia__"):
-        return x.__to_myia__()
+        rval = x.__to_myia__()
+        if rval is not x:
+            rval = env(rval, manage)
+        return rval
     else:
         return x
 
@@ -90,19 +93,13 @@ def default_convert(env, x: np.dtype, manage):
     return env(xtype.np_dtype_to_type(x.name), manage)
 
 
-class _Unconverted:
-    # This is just used by Converter to delay conversion of graphs associated
-    # to operators or methods until they are actually needed.
-    def __init__(self, value):
-        self.value = value
-
-
 class ConverterResource(Partializable):
     """Convert a Python object into an object that can be in a Myia graph."""
 
     def __init__(self, resources, object_map):
         """Initialize a Converter."""
         self.resources = resources
+        self.uncured = {}
         self.object_map = {}
         for k, v in object_map.items():
             seen = set()
@@ -112,18 +109,37 @@ class ConverterResource(Partializable):
                     raise Exception(f"Operation {v} maps to itself.")
                 seen.add(idv)
                 v = object_map[v]
-            self.object_map[k] = _Unconverted(v)
+            self.uncured[k] = v
 
     def __call__(self, value, manage=True):
         """Convert a value."""
         try:
-            v = self.object_map[value]
-            if isinstance(v, _Unconverted):
-                v = default_convert(self, v.value, manage)
-                self.object_map[value] = v
+            v = self.get_cached(value)
         except (TypeError, KeyError):
-            v = default_convert(self, value, manage)
-        return v
+            try:
+                v = self.uncured[value]
+            except (TypeError, KeyError):
+                v = default_convert(self, value, manage)
+                self.set_cached(value, v)
+                return v
+            else:
+                del self.uncured[value]
+                v = default_convert(self, v, manage)
+                self.set_cached(value, v)
+                return v
+        else:
+            return v
+
+    def get_cached(self, obj):
+        """Get the cached converted value."""
+        return self.object_map[type(obj), obj]
+
+    def set_cached(self, key, obj):
+        """Cached a converted value."""
+        try:
+            self.object_map[type(key), key] = obj
+        except (TypeError, KeyError):
+            pass
 
 
 class Tracker(Partializable):
