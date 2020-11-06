@@ -22,20 +22,25 @@ from .pipeline import Pipeline
 
 
 @ovld
-def default_convert(env, fn: FunctionType):
+def default_convert(env, fn: FunctionType, manage):
     """Default converter for Python types."""
     g = parser.parse(fn)
-    rval = env(g)
+    rval = env(g, manage)
     env.object_map[fn] = rval
     return rval
 
 
 @ovld  # noqa: F811
-def default_convert(env, g: Graph):
+def default_convert(env, g: Graph, manage):
+    if g.abstract is not None:
+        return g
+
     mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
         env.object_map[g] = g2
+        if manage:
+            env.resources.infer_manager.add_graph(g2)
         if env.resources.preresolve:
             opt_pass = Pipeline(
                 LocalPassOptimizer(optlib.resolve_globals, name="resolve")
@@ -51,21 +56,21 @@ def default_convert(env, g: Graph):
 
 
 @ovld  # noqa: F811
-def default_convert(env, seq: (tuple, list)):
-    return type(seq)(env(x) for x in seq)
+def default_convert(env, seq: (tuple, list), manage):
+    return type(seq)(env(x, manage) for x in seq)
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: Operation):
+def default_convert(env, x: Operation, manage):
     dflt = x.defaults()
     if "mapping" in dflt:
-        return env(dflt["mapping"])
+        return env(dflt["mapping"], manage)
     else:
         raise MyiaConversionError(f"Cannot convert '{x}'")
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: object):
+def default_convert(env, x: object, manage):
     if hasattr(x, "__to_myia__"):
         return x.__to_myia__()
     else:
@@ -73,7 +78,7 @@ def default_convert(env, x: object):
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: type):
+def default_convert(env, x: type, manage):
     try:
         return type_to_abstract(x)
     except TypeError:
@@ -81,8 +86,8 @@ def default_convert(env, x: type):
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: np.dtype):
-    return env(xtype.np_dtype_to_type(x.name))
+def default_convert(env, x: np.dtype, manage):
+    return env(xtype.np_dtype_to_type(x.name), manage)
 
 
 class _Unconverted:
@@ -111,19 +116,13 @@ class ConverterResource(Partializable):
 
     def __call__(self, value, manage=True):
         """Convert a value."""
-        if isinstance(value, Graph) and value.abstract is not None:
-            return value
-
         try:
             v = self.object_map[value]
             if isinstance(v, _Unconverted):
-                v = default_convert(self, v.value)
+                v = default_convert(self, v.value, manage)
                 self.object_map[value] = v
         except (TypeError, KeyError):
-            v = default_convert(self, value)
-
-        if manage and isinstance(v, Graph):
-            self.resources.infer_manager.add_graph(v)
+            v = default_convert(self, value, manage)
         return v
 
 

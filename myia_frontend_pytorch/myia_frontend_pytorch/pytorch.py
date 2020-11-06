@@ -273,8 +273,8 @@ def _to_abstract(self, v: torch.nn.Parameter, alias_map={}, **kwargs):
 
 
 @default_convert.register  # noqa: F811
-def _default_convert(env, x: torch.dtype):
-    return default_convert(env, pytorch_dtype_to_type(x))
+def _default_convert(env, x: torch.dtype, manage):
+    return env(pytorch_dtype_to_type(x), manage)
 
 
 __all__ = ["pytorch_dtype_to_type"]
