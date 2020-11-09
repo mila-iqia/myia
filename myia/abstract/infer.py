@@ -237,10 +237,12 @@ class InferenceEngine(metaclass=OvldMC):
             fut = self.loop.schedule(coro)
             self.loop.run_forever()
             self.errors.extend(self.loop.collect_errors())
-            for err in self.errors[errs_before:]:
+            new_errors = self.errors[errs_before:]
+            for err in new_errors:
                 err.engine = self
-            if errs_before < len(self.errors):
-                raise self.errors[errs_before]
+            if new_errors:
+                new_errors.sort(key=lambda err: -getattr(err, "priority", 1000))
+                raise new_errors[0]
             return fut.result()
         finally:
             for task in asyncio.all_tasks(self.loop):
@@ -320,6 +322,7 @@ class InferenceEngine(metaclass=OvldMC):
             return await self.loop.schedule(
                 execute_inferrers(self, infs, ref, argrefs),
                 context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
+                ref=ref,
             )
 
         elif isinstance(fn, AbstractFunctionUnique):
@@ -327,6 +330,7 @@ class InferenceEngine(metaclass=OvldMC):
             return await self.loop.schedule(
                 execute_inferrers(self, infs, ref, argrefs),
                 context_map={infer_trace: {**infer_trace.get(), ctx: ref}},
+                ref=ref,
             )
 
         else:
@@ -931,7 +935,8 @@ async def _run_trace(inf, engine, outref, argrefs):
             " to a tuple would cause a stack overflow here because"
             " the return type of that function is the union over N"
             " of all tuples of length N and the inferrer is trying"
-            " to enumerate that infinite union."
+            " to enumerate that infinite union.",
+            priority=-1,
         )
     tracer().emit_call(**tracer_args)
     result = await inf.run(engine, outref, argrefs)
@@ -970,7 +975,9 @@ async def execute_inferrers(engine, inferrers, outref, argrefs):
         for inf in inferrers:
             p = engine.loop.create_pending(resolve=None, priority=lambda: None)
             pending.append(p)
-            engine.loop.schedule(_inf_helper(engine, inf, outref, argrefs, p))
+            engine.loop.schedule(
+                _inf_helper(engine, inf, outref, argrefs, p), ref=outref
+            )
 
         return bind(engine.loop, None, [], pending)
 
