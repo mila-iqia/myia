@@ -4,6 +4,7 @@ from ovld import ovld
 
 from .. import lib, operations
 from ..lib import Constant, MetaGraph, core, macro
+from ..utils import untested
 
 
 @core(universal=True)
@@ -76,7 +77,8 @@ async def universal(info, fn):
         return Constant(StatePassthrough(fn.node.value))
 
     else:
-        return info.graph.apply(universal_wrapper, fn.node)
+        with untested():
+            return info.graph.apply(universal_wrapper, fn.node)
 
 
 __operation_defaults__ = {
