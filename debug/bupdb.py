@@ -1,7 +1,7 @@
 import os
 import pdb
-from buche import BucheDb
 
+from buche import BucheDb
 
 global_interactor = None
 
