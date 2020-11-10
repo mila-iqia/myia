@@ -22,20 +22,25 @@ from .pipeline import Pipeline
 
 
 @ovld
-def default_convert(env, fn: FunctionType):
+def default_convert(env, fn: FunctionType, manage):
     """Default converter for Python types."""
     g = parser.parse(fn)
-    if isinstance(g, Graph):
-        g = clone(g)
-    env.object_map[fn] = g
-    return g
+    rval = env(g, manage)
+    env.set_cached(fn, rval)
+    return rval
 
 
 @ovld  # noqa: F811
-def default_convert(env, g: Graph):
+def default_convert(env, g: Graph, manage):
+    if g.abstract is not None:
+        return g
+
     mng = env.resources.infer_manager
     if g._manager is not mng:
         g2 = clone(g)
+        env.set_cached(g, g2)
+        if manage:
+            env.resources.infer_manager.add_graph(g2)
         if env.resources.preresolve:
             opt_pass = Pipeline(
                 LocalPassOptimizer(optlib.resolve_globals, name="resolve")
@@ -45,36 +50,38 @@ def default_convert(env, g: Graph):
                 resources=env.resources,
                 manager=env.resources.infer_manager,
             )
-        env.object_map[g] = g2
         return g2
     else:
         return g
 
 
 @ovld  # noqa: F811
-def default_convert(env, seq: (tuple, list)):
-    return type(seq)(env(x) for x in seq)
+def default_convert(env, seq: (tuple, list), manage):
+    return type(seq)(env(x, manage) for x in seq)
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: Operation):
+def default_convert(env, x: Operation, manage):
     dflt = x.defaults()
     if "mapping" in dflt:
-        return default_convert(env, dflt["mapping"])
+        return env(dflt["mapping"], manage)
     else:
         raise MyiaConversionError(f"Cannot convert '{x}'")
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: object):
+def default_convert(env, x: object, manage):
     if hasattr(x, "__to_myia__"):
-        return x.__to_myia__()
+        rval = x.__to_myia__()
+        if rval is not x:
+            rval = env(rval, manage)
+        return rval
     else:
         return x
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: type):
+def default_convert(env, x: type, manage):
     try:
         return type_to_abstract(x)
     except TypeError:
@@ -82,15 +89,8 @@ def default_convert(env, x: type):
 
 
 @ovld  # noqa: F811
-def default_convert(env, x: np.dtype):
-    return default_convert(env, xtype.np_dtype_to_type(x.name))
-
-
-class _Unconverted:
-    # This is just used by Converter to delay conversion of graphs associated
-    # to operators or methods until they are actually needed.
-    def __init__(self, value):
-        self.value = value
+def default_convert(env, x: np.dtype, manage):
+    return env(xtype.np_dtype_to_type(x.name), manage)
 
 
 class ConverterResource(Partializable):
@@ -99,6 +99,7 @@ class ConverterResource(Partializable):
     def __init__(self, resources, object_map):
         """Initialize a Converter."""
         self.resources = resources
+        self.uncured = {}
         self.object_map = {}
         for k, v in object_map.items():
             seen = set()
@@ -108,24 +109,37 @@ class ConverterResource(Partializable):
                     raise Exception(f"Operation {v} maps to itself.")
                 seen.add(idv)
                 v = object_map[v]
-            self.object_map[k] = _Unconverted(v)
+            self.uncured[k] = v
 
     def __call__(self, value, manage=True):
         """Convert a value."""
-        if isinstance(value, Graph) and value.abstract is not None:
-            return value
-
         try:
-            v = self.object_map[value]
-            if isinstance(v, _Unconverted):
-                v = default_convert(self, v.value)
-                self.object_map[value] = v
+            v = self.get_cached(value)
         except (TypeError, KeyError):
-            v = default_convert(self, value)
+            try:
+                v = self.uncured[value]
+            except (TypeError, KeyError):
+                v = default_convert(self, value, manage)
+                self.set_cached(value, v)
+                return v
+            else:
+                del self.uncured[value]
+                v = default_convert(self, v, manage)
+                self.set_cached(value, v)
+                return v
+        else:
+            return v
 
-        if manage and isinstance(v, Graph):
-            self.resources.infer_manager.add_graph(v)
-        return v
+    def get_cached(self, obj):
+        """Get the cached converted value."""
+        return self.object_map[type(obj), obj]
+
+    def set_cached(self, key, obj):
+        """Cached a converted value."""
+        try:
+            self.object_map[type(key), key] = obj
+        except (TypeError, KeyError):
+            pass
 
 
 class Tracker(Partializable):

@@ -336,7 +336,9 @@ class InferenceEngine(metaclass=OvldMC):
 
     async def infer_constant(self, ctref):
         """Infer the type of a ref of a Constant node."""
-        if getattr(ctref.node, "_converted", False):
+        cvt = self.resources.convert(ctref.node.value)
+
+        if cvt is ctref.node.value:
             return to_abstract(
                 ctref.node.value,
                 context=ctref.context,
@@ -345,8 +347,9 @@ class InferenceEngine(metaclass=OvldMC):
             )
 
         else:
-            newct = Constant(self.resources.convert(ctref.node.value))
-            newct._converted = True
+            # The current Constant's value is not compatible with the
+            # pipeline so we redirect to a correct one.
+            newct = Constant(cvt)
             new = self.ref(newct, ctref.context)
             return await self.reroute(ctref, new)
 
