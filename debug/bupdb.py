@@ -7,6 +7,7 @@ global_interactor = None
 
 
 if os.environ.get("BUCHE"):
+
     class BuDb(BucheDb):
         def __init__(self):
             super().__init__(None)
@@ -21,6 +22,7 @@ if os.environ.get("BUCHE"):
             self.interactor.show(synchronous=True)
             self.repl = self.interactor.repl
             super().interaction(frame, tb)
+
 
 else:
     BuDb = pdb.Pdb
