@@ -1,5 +1,6 @@
 """Tools to intern the instances of certain classes."""
 
+from collections import deque
 import weakref
 
 from .misc import Named
@@ -144,8 +145,6 @@ def deep_eqkey(obj, path=frozenset()):
 
 
 def _bfs(obj):
-    from collections import deque
-
     queue = deque()
     queue.append(obj)
 
