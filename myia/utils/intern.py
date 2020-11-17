@@ -1,11 +1,53 @@
 """Tools to intern the instances of certain classes."""
 
-from collections import deque
+from collections import defaultdict, deque
 import weakref
 
 from .misc import Named
 
-_intern_pool = weakref.WeakValueDictionary()
+
+class CanonStore:
+    """Store of canonical objects."""
+
+    def __init__(self):
+        """Initialize a CanonStore."""
+        self.hashes = defaultdict(weakref.WeakSet)
+        self.to_gc = set()
+
+    def get_canonical(self, x):
+        """Get the canonical object corresponding to x."""
+        if len(self.to_gc) > 1000:
+            self.gc()
+
+        hsh = hash(x)
+        if hsh not in self.hashes:
+            return None
+
+        for entry in self.hashes[hsh]:
+            if eq(entry, x):
+                return entry
+
+        return None
+
+    def set_canonical(self, x):
+        """Add a canonical object."""
+        hsh = hash(x)
+        try:
+            self.hashes[hsh].add(x)
+        except TypeError:
+            return
+        weakref.finalize(x, self.to_gc.add, hsh)
+
+    def gc(self):
+        """Garbage-collect unused canonical objects."""
+        to_gc = list(self.to_gc)
+        self.to_gc.clear()
+        for hsh in to_gc:
+            if not self.hashes[hsh]:
+                del self.hashes[hsh]
+
+
+canon_store = CanonStore()
 
 
 pyhash = hash
@@ -243,20 +285,6 @@ def eq(obj1, obj2):
         return key1 == key2
 
 
-class Wrapper:
-    """Wraps an object and uses eq/hash for equality."""
-
-    def __init__(self, obj):
-        """Initialize a Wrapper."""
-        self._obj = weakref.ref(obj)
-
-    def __eq__(self, other):
-        return eq(self._obj(), other._obj())
-
-    def __hash__(self):
-        return hash(self._obj())
-
-
 class InternedMC(type):
     """Metaclass for a class where all members are interned."""
 
@@ -314,17 +342,11 @@ def intern(inst):
     canon = getattr(inst, "$intern_canonical", None)
     if canon is not None:
         return canon
-    try:
-        wrap = Wrapper(inst)
-    except TypeError:
-        wrap = None
-        existing = None
-    else:
-        existing = _intern_pool.get(wrap, None)
+
+    existing = canon_store.get_canonical(inst)
 
     if existing is None:
-        if wrap is not None:
-            _intern_pool[wrap] = inst
+        canon_store.set_canonical(inst)
         eqk = eqkey(inst)
         eqk.canonicalize()
         return inst

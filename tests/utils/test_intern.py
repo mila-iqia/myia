@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+import gc
 
 import pytest
 
 from myia.utils.intern import (
     AttrEK,
+    CanonStore,
     IncompleteException,
     Interned,
     eq,
@@ -13,7 +15,7 @@ from myia.utils.intern import (
 )
 
 
-@dataclass
+@dataclass(eq=False)
 class Point(Interned):
     x: object
     y: object
@@ -134,3 +136,19 @@ def test_canonical():
     assert p1 is p2
     assert p1.x is p3.x
     assert p2.x is p3.x
+
+
+class C:
+    pass
+
+
+def test_weakrefs():
+    c = C()
+    store = CanonStore()
+    store.set_canonical(c)
+    store.gc()
+    assert len(store.hashes) == 1
+    del c
+    gc.collect()
+    store.gc()
+    assert len(store.hashes) == 0
