@@ -9,29 +9,31 @@ from .misc import Named
 class CanonStore:
     """Store of canonical objects."""
 
-    def __init__(self):
+    def __init__(self, hashfn, eqfn):
         """Initialize a CanonStore."""
         self.hashes = defaultdict(weakref.WeakSet)
         self.to_gc = set()
+        self.hashfn = hashfn
+        self.eqfn = eqfn
 
     def get_canonical(self, x):
         """Get the canonical object corresponding to x."""
         if len(self.to_gc) > 1000:
             self.gc()
 
-        hsh = hash(x)
+        hsh = self.hashfn(x)
         if hsh not in self.hashes:
             return None
 
         for entry in self.hashes[hsh]:
-            if eq(entry, x):
+            if self.eqfn(entry, x):
                 return entry
 
         return None
 
     def set_canonical(self, x):
         """Add a canonical object."""
-        hsh = hash(x)
+        hsh = self.hashfn(x)
         try:
             self.hashes[hsh].add(x)
         except TypeError:
@@ -45,9 +47,6 @@ class CanonStore:
         for hsh in to_gc:
             if not self.hashes[hsh]:
                 del self.hashes[hsh]
-
-
-canon_store = CanonStore()
 
 
 pyhash = hash
@@ -283,6 +282,9 @@ def eq(obj1, obj2):
     else:
         key2 = deep_eqkey(obj2)
         return key1 == key2
+
+
+canon_store = CanonStore(hashfn=hash, eqfn=eq)
 
 
 class InternedMC(type):

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import gc
+import operator
 
 import pytest
 
@@ -144,7 +145,7 @@ class C:
 
 def test_weakrefs():
     c = C()
-    store = CanonStore()
+    store = CanonStore(hashfn=hash, eqfn=operator.eq)
     store.set_canonical(c)
     store.gc()
     assert len(store.hashes) == 1
