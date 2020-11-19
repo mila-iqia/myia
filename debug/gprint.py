@@ -1234,6 +1234,17 @@ class _AbstractScalar:
         )
 
 
+@mixin(abstract.AbstractFunction)
+class _AbstractFunction:
+    def __hrepr__(self, H, hrepr):
+        v = self.values[VALUE]
+        return hrepr.stdrepr_iterable(
+            v if isinstance(v, Possibilities) else [v],
+            before="★Function",
+            cls="abstract",
+        )
+
+
 @mixin(abstract.AbstractJTagged)
 class _AbstractJTagged:
     def __hrepr__(self, H, hrepr):
@@ -1333,7 +1344,7 @@ class _AbstractTuple:
         )
 
 
-@mixin(abstract.AbstractChoices)
+@mixin(abstract.AbstractUnion)
 class _AbstractUnion:
     def __hrepr__(self, H, hrepr):
         return hrepr.stdrepr_iterable(
