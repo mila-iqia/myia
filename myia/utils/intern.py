@@ -1,7 +1,7 @@
 """Tools to intern the instances of certain classes."""
 
-from collections import defaultdict, deque
 import weakref
+from collections import defaultdict, deque
 
 from .misc import Named
 

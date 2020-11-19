@@ -1,6 +1,6 @@
-from dataclasses import dataclass
 import gc
 import operator
+from dataclasses import dataclass
 
 import pytest
 
