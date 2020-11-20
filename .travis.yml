@@ -8,9 +8,15 @@ install:
 env:
   - TEST_SUITE=static
   - TEST_SUITE=unit
+  - TEST_SUITE=python
+  - TEST_SUITE=pytorch
+  - TEST_SUITE=relay
 script:
   - if [[ $TEST_SUITE == "static" ]]; then source activate test && ./scripts/check.sh; fi
   - if [[ $TEST_SUITE == "static" ]]; then source activate test && ./scripts/build-doc.sh; fi
-  - if [[ $TEST_SUITE == "unit" ]]; then source activate test && pytest tests --cov=./ --cov-report term-missing; fi
+  - if [[ $TEST_SUITE == "unit" ]]; then source activate test && pytest -m "not python and not pytorch and not relay" --cov=./ --cov-report term-missing; fi
+  - if [[ $TEST_SUITE == "python" ]]; then source activate test && pytest -m "python" --cov=./ --cov-report term-missing; fi
+  - if [[ $TEST_SUITE == "pytorch" ]]; then source activate test && pytest -m "pytorch" --cov=./ --cov-report term-missing; fi
+  - if [[ $TEST_SUITE == "relay" ]]; then source activate test && pytest -m "relay" --cov=./ --cov-report term-missing; fi
 after_success:
   - if [[ $TEST_SUITE == "unit" ]]; then codecov; fi
