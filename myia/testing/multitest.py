@@ -256,6 +256,7 @@ def _run(
     pipeline=standard_pipeline,
     backend=None,
     numpy_compat=False,
+    primitives=None,
     **kwargs,
 ):
     """Test a Myia function.
@@ -275,11 +276,22 @@ def _run(
         pipeline: The pipeline to use.
         backend: backends to use. Tuple (backend name, backend options)
         numpy_compat: if True, check if args can be converted to numpy arrays.
+        primitives: optional list of primitives or groups of primitives
+            (as PrimGroup objects) required for this test.
+            If a backend does not support any of given primitives or groups,
+            then related test is explicitly skipped.
     """
 
     if backend:
         backend_name = backend[0]
         backend_options = backend[1]
+
+        if primitives:
+            b = load_backend(backend_name, backend_options)
+            for p in primitives:
+                g = PrimGroup.ensure(p)
+                if not b.supports_prim_group(g):
+                    pytest.skip(f"Backend {backend_name} does not support {g}")
 
         pipeline = pipeline.configure(
             {"backend.name": backend_name, "backend.options": backend_options}
@@ -426,24 +438,22 @@ run_debug = run.configure(
 )
 
 
-def bt(*primitives_or_groups):
+def bt(*primitives):
     """Backend testing.
 
     Generate a decorator to parametrize a test with backend names.
     Decorated test function must expected an argument named "backend"
     that will receive backend name to test with.
 
-    :param primitives_or_groups: list of primitives or primitive groups
-        required for this test.
+    :param primitives: list of primitives or groups of primitives
+        (as PrimGroup objects) required for this test.
         If a backend does not support any of given primitives or groups,
         then related test is explicitly skipped.
     :return: a decorator
     """
 
-    if primitives_or_groups:
-        prim_groups = [PrimGroup.ensure(p) for p in primitives_or_groups]
-    else:
-        prim_groups = None
+    if primitives:
+        primitives = [PrimGroup.ensure(p) for p in primitives]
 
     backends = [
         pytest.param(backend, id=backend, marks=[getattr(pytest.mark, backend)])
@@ -454,13 +464,13 @@ def bt(*primitives_or_groups):
         @functools.wraps(fn)
         def wrapper_fn(*args, **kwargs):
 
-            if prim_groups:
+            if primitives:
                 backend = kwargs["backend"]
                 bck = load_backend(backend)
-                for prim_group in prim_groups:
+                for prim_group in primitives:
                     if not bck.supports_prim_group(prim_group):
                         pytest.skip(
-                            f"Backend {backend} does not support `{prim_group}`"
+                            f"Backend {backend} does not support {prim_group}"
                         )
 
             return fn(*args, **kwargs)

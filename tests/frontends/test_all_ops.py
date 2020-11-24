@@ -15,6 +15,7 @@ from myia.abstract.data import (
 )
 from myia.debug.finite_diff import NoTestGrad, clean_args
 from myia.frontends import activate_frontend  # noqa: E402
+from myia.operations import primitives as P
 from myia.pipeline import standard_pipeline, steps
 from myia.testing.common import MA, MB, to_abstract_test
 from myia.testing.multitest import (
@@ -305,6 +306,7 @@ def test_torch_tensor_argmax_1_arg(x):
     run(nn.Parameter(torch.Tensor(MA(2, 3))), 1, True),
     run(nn.Parameter(torch.Tensor(MA(2, 3))), 0, True),
     broad_specs=(True, False, False),
+    primitives=[P.argmax],
 )
 def test_torch_tensor_argmax_3_arg(x, y, z):
     return torch.argmax(x, y, z)
