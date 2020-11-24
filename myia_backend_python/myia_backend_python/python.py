@@ -832,8 +832,8 @@ class PythonBackend(Backend):
         # Then compile the graph.
         return self.compiler.run(graph, self.debug)
 
-    def supports_computation(self, name, primitives):
-        return all(MAP.has(prim) for prim in primitives)
+    def supports_prim_group(self, prim_group):
+        return all(MAP.has(prim) for prim in prim_group.primitives)
 
 
 def load_options(debug=False):

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import pytest
 
 from myia import myia
+from myia.compile.backends import prim_groups as G
 from myia.lib import Empty, HandleInstance, core
 from myia.operations import cell_get, cell_set, make_cell
 from myia.pipeline import standard_pipeline
@@ -34,7 +35,7 @@ def increment(h):
     return cell_set(h, add_one(cell_get(h)))
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_increment(backend):
     @_umyia(backend)
     def plus4(x):
@@ -49,7 +50,7 @@ def test_increment(backend):
     assert plus4(10) == 14
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_increment_interleave(backend):
     @_umyia(backend)
     def plus2(x, y):
@@ -65,7 +66,7 @@ def test_increment_interleave(backend):
     assert plus2(10, -21) == (12, -19)
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_increment_loop(backend):
     @_umyia(backend)
     def plus(x, y):
@@ -80,7 +81,7 @@ def test_increment_loop(backend):
     assert plus(10, 13) == 23
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_increment_recursion(backend):
     @_umyia(backend)
     def length(h, xs):
@@ -94,7 +95,7 @@ def test_increment_recursion(backend):
     assert length(hb, [1, 2, 3, 4]) == 4
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_give_handle(backend):
     @_umyia(backend)
     def plus(h, y):
@@ -117,7 +118,7 @@ def test_give_handle(backend):
 
 
 @pytest.mark.xfail(reason="Backend does not properly update free handles")
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_handle_free_variable(backend):
 
     h = HandleInstance(0)
@@ -135,7 +136,7 @@ def test_handle_free_variable(backend):
     assert plus(30) == 34
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_return_handle(backend):
     @_umyia(backend)
     def plus2(h):
@@ -170,7 +171,7 @@ class Counter:
         return cell_get(self._count)
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_count(backend):
     @_umyia(backend)
     def calc(counter, n):
@@ -182,7 +183,7 @@ def test_count(backend):
     assert calc(cnt, 5) == 15
 
 
-@bt("universe_operations")
+@bt(G.universe_operations)
 def test_count_keepstate(backend):
     if backend == "relay":
         pytest.skip("Backend does not find handles in dataclasses")

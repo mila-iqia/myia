@@ -8,7 +8,7 @@ import pytest
 from ovld import ovld
 
 from myia.compile.backends import get_backend_names, load_backend
-from myia.compile.backends.computations import get_computation, has_computation
+from myia.compile.backends.prim_groups import PrimGroup
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline, steps
 from myia.utils import keyword_decorator, merge
@@ -426,24 +426,24 @@ run_debug = run.configure(
 )
 
 
-def bt(*computations):
+def bt(*primitives_or_groups):
     """Backend testing.
 
     Generate a decorator to parametrize a test with backend names.
     Decorated test function must expected an argument named "backend"
     that will receive backend name to test with.
 
-    :param computations: computations required for this test.
-        If a backend does not support one of given computations,
+    :param primitives_or_groups: list of primitives or primitive groups
+        required for this test.
+        If a backend does not support any of given primitives or groups,
         then related test is explicitly skipped.
     :return: a decorator
     """
 
-    if computations:
-        for computation in computations:
-            assert has_computation(
-                computation
-            ), f"Unknown computation {computation}"
+    if primitives_or_groups:
+        prim_groups = [PrimGroup.ensure(p) for p in primitives_or_groups]
+    else:
+        prim_groups = None
 
     backends = [
         pytest.param(backend, id=backend, marks=[getattr(pytest.mark, backend)])
@@ -454,15 +454,13 @@ def bt(*computations):
         @functools.wraps(fn)
         def wrapper_fn(*args, **kwargs):
 
-            if computations:
+            if prim_groups:
                 backend = kwargs["backend"]
                 bck = load_backend(backend)
-                for comp in computations:
-                    if not bck.supports_computation(
-                        comp, get_computation(comp)
-                    ):
+                for prim_group in prim_groups:
+                    if not bck.supports_prim_group(prim_group):
                         pytest.skip(
-                            f"Backend {backend} does not support `{comp}`"
+                            f"Backend {backend} does not support `{prim_group}`"
                         )
 
             return fn(*args, **kwargs)
