@@ -6,25 +6,16 @@ import numpy as np
 import pytest
 
 from myia import myia
-from myia.compile.backends import get_backend_names
 from myia.lib import core
 from myia.operations import array_map
 from myia.pipeline import standard_pipeline
-from myia.testing.multitest import eqtest
+from myia.testing.multitest import bt, eqtest
 
 pipeline2 = standard_pipeline.configure(preresolve=True)
 
 
-@pytest.fixture(
-    params=[pytest.param(backend) for backend in get_backend_names()]
-)
-def _backend_fixture(request):
-    return request.param
-
-
-def test_static_inline_array_map(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_static_inline_array_map(backend):
     @core(static_inline=True)
     def inl(x, y):
         return x + y
@@ -36,10 +27,9 @@ def test_static_inline_array_map(_backend_fixture):
     assert eqtest(f(np.ones((2, 2)), np.ones((2, 2))), 2 * np.ones((2, 2)))
 
 
-def test_call_opdef(_backend_fixture):
+@bt()
+def test_call_opdef(backend):
     from myia.operations.utils import to_opdef
-
-    backend = _backend_fixture
 
     @to_opdef
     def f(x, y):

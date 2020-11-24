@@ -8,7 +8,6 @@ from pytest import mark
 from myia import xtype
 from myia.abstract import from_value, ndarray_aliasable
 from myia.api import myia
-from myia.compile.backends import get_backend_names
 from myia.debug.finite_diff import GradTester, NoTestGrad, clean_args
 from myia.operations import (
     array_cast,
@@ -53,17 +52,11 @@ from myia.testing.common import (
 from myia.testing.multitest import (
     backend_all,
     backend_except,
+    bt,
     mt,
     myia_function_test,
 )
 from myia.utils import InferenceError, MyiaInputTypeError
-
-
-@pytest.fixture(
-    params=[pytest.param(backend) for backend in get_backend_names()]
-)
-def _backend_fixture(request):
-    return request.param
 
 
 @dataclass
@@ -574,9 +567,8 @@ def test_freegraph_outside_grad():
     assert _runwith(f, 5.0, 8.0) == 25.0
 
 
-def test_grad_prim(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_grad_prim(backend):
     @myia(backend=backend)
     def peach(x, y):
         return grad(scalar_mul)(x, y)
@@ -584,9 +576,8 @@ def test_grad_prim(_backend_fixture):
     assert peach(4.0, 52.0) == 52.0
 
 
-def test_grad_metagraph(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_grad_metagraph(backend):
     @myia(backend=backend)
     def apple(x, y):
         return grad(gadd)(x, y)
@@ -594,9 +585,8 @@ def test_grad_metagraph(_backend_fixture):
     assert apple(4.0, 52.0) == 1.0
 
 
-def test_grad_interface(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_grad_interface(backend):
     def f(x, y):
         a = x ** 3
         b = y ** 4
@@ -710,9 +700,8 @@ def test_grad_interface(_backend_fixture):
         print(gradbad11(x, y))
 
 
-def test_aliasing(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_aliasing(backend):
     def _chk(x, y):
         x1, x2, (x3, x4) = x
         y1, y2, (y3, y4) = y
@@ -747,8 +736,9 @@ def test_aliasing(_backend_fixture):
     _chk(res3, (3 * o, 2 * o, (2 * o, 3 * o)))
 
 
-def test_aliasing_list(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_aliasing_list(backend):
+
     from myia.compile.backends import LoadingError, load_backend
 
     try:
@@ -785,9 +775,8 @@ def test_aliasing_list(_backend_fixture):
         print(f([a, b, c, d], a))
 
 
-def test_aliasing_other(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_aliasing_other(backend):
     def _chk(x, y):
         np.testing.assert_allclose(x["a"], y["a"])
         np.testing.assert_allclose(x["b"].x, y["b"].x)
@@ -831,9 +820,8 @@ def test_bad_bprop_def():
 
 
 @mark.xfail(reason="Second order gradients are not supported yet")
-def test_second_order(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_second_order(backend):
     def square(x):
         return x * x
 

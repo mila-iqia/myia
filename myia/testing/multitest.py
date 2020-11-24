@@ -422,3 +422,31 @@ run_gpu = _run.configure(backend=backend_gpu)
 run_debug = run.configure(
     pipeline=standard_debug_pipeline, validate=False, backend=False
 )
+
+
+def bt(exclude=None):
+    """Backend testing.
+
+    Generate a decorator to parametrize a test with backend names.
+    Decorated test function must expected an argument named "backend"
+    that will receive backend name to test with.
+
+    :param exclude: backend (str) or sequence of backends (str) to exclude.
+        If None or empty sequence, no backend is excluded.
+    :return: a decorator
+    """
+
+    if exclude is None:
+        exclude = []
+    elif not isinstance(exclude, (list, tuple, set)):
+        exclude = [exclude]
+
+    backends = [
+        pytest.param(backend, id=backend, marks=[getattr(pytest.mark, backend)])
+        for backend in sorted(set(_pytest_parameters) - set(exclude))
+    ]
+
+    def deco(fn):
+        return pytest.mark.parametrize("backend", backends)(fn)
+
+    return deco
