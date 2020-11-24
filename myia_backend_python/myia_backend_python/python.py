@@ -308,6 +308,10 @@ class PythonMapper:
         """Get the mapping for the primitive."""
         return self.mapping[fn]
 
+    def has(self, fn):
+        """Return True if given primitive is registered."""
+        return fn in self.mapping
+
 
 MAP = PythonMapper(simple_map=SIMPLE_MAP, complex_map=COMPLEX_MAP)
 
@@ -827,6 +831,9 @@ class PythonBackend(Backend):
         graph = convert_grad(graph)
         # Then compile the graph.
         return self.compiler.run(graph, self.debug)
+
+    def supports_computation(self, name, primitives):
+        return all(MAP.has(prim) for prim in primitives)
 
 
 def load_options(debug=False):

@@ -1071,6 +1071,9 @@ class RelayBackend(Backend):
             graph, self.context, self.target, self.exec_kind
         )
 
+    def supports_computation(self, name, primitives):
+        return all(MAP.get(prim) for prim in primitives)
+
 
 def load_options(target="cpu", device_id=0, exec_kind="vm"):
     """Format options for relay."""

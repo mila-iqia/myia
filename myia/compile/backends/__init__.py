@@ -232,6 +232,15 @@ class Backend:
         """Convert an intermediate value to a backend value."""
         raise NotImplementedError("to_backend_value")
 
+    def supports_computation(self, name, primitives):
+        """Return True if given computation is supported.
+
+        Computation is defined with computation name (str) and
+        related primitives (sequence). Backend can use either
+        given name or given primitives list to check support.
+        """
+        raise NotImplementedError("supports_computation")
+
 
 class Converter:
     """Converts values between representations for backends."""

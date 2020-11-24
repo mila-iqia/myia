@@ -1,4 +1,5 @@
 """Common testing utilities."""
+import functools
 from itertools import product
 from types import FunctionType
 
@@ -6,7 +7,8 @@ import numpy as np
 import pytest
 from ovld import ovld
 
-from myia.compile.backends import get_backend_names
+from myia.compile.backends import get_backend_names, load_backend
+from myia.compile.backends.computations import get_computation, has_computation
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline, steps
 from myia.utils import keyword_decorator, merge
@@ -424,29 +426,47 @@ run_debug = run.configure(
 )
 
 
-def bt(exclude=None):
+def bt(*computations):
     """Backend testing.
 
     Generate a decorator to parametrize a test with backend names.
     Decorated test function must expected an argument named "backend"
     that will receive backend name to test with.
 
-    :param exclude: backend (str) or sequence of backends (str) to exclude.
-        If None or empty sequence, no backend is excluded.
+    :param computations: computations required for this test.
+        If a backend does not support one of given computations,
+        then related test is explicitly skipped.
     :return: a decorator
     """
 
-    if exclude is None:
-        exclude = []
-    elif not isinstance(exclude, (list, tuple, set)):
-        exclude = [exclude]
+    if computations:
+        for computation in computations:
+            assert has_computation(
+                computation
+            ), f"Unknown computation {computation}"
 
     backends = [
         pytest.param(backend, id=backend, marks=[getattr(pytest.mark, backend)])
-        for backend in sorted(set(_pytest_parameters) - set(exclude))
+        for backend in sorted(_pytest_parameters)
     ]
 
     def deco(fn):
-        return pytest.mark.parametrize("backend", backends)(fn)
+        @functools.wraps(fn)
+        def wrapper_fn(*args, **kwargs):
+
+            if computations:
+                backend = kwargs["backend"]
+                bck = load_backend(backend)
+                for comp in computations:
+                    if not bck.supports_computation(
+                        comp, get_computation(comp)
+                    ):
+                        pytest.skip(
+                            f"Backend {backend} does not support `{comp}`"
+                        )
+
+            return fn(*args, **kwargs)
+
+        return pytest.mark.parametrize("backend", backends)(wrapper_fn)
 
     return deco
