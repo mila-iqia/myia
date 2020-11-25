@@ -61,7 +61,8 @@ tuple_operations = PrimGroup(
     "tuple_operations", [P.make_tuple, P.tuple_getitem, P.tuple_setitem]
 )
 universe_operations = PrimGroup(
-    "universe_operations", [P.universe_getitem, P.universe_setitem]
+    "universe_operations",
+    [P.make_handle, P.universe_getitem, P.universe_setitem],
 )
 rng_operations = PrimGroup(
     "rng_operations", [P.random_initialize, P.random_uint32]
@@ -134,7 +135,6 @@ scalar_operations = PrimGroup(
 
 
 # Ignored primitives:
-# P.make_handle
 # P.unsafe_static_cast
 # P.array_scan
 # P.broadcast_shape

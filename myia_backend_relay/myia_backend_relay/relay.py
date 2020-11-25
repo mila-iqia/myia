@@ -9,7 +9,7 @@ from tvm.relay import adt
 from tvm.relay.backend import interpreter
 
 from myia.abstract import AbstractTaggedUnion
-from myia.compile.backends import Backend, Converter
+from myia.compile.backends import Backend, Converter, prim_groups as G
 from myia.compile.transform import convert_grad, get_prim_graph, return_handles
 from myia.graph_utils import toposort
 from myia.ir import Graph, manage, sexp_to_node
@@ -1072,6 +1072,10 @@ class RelayBackend(Backend):
         )
 
     def supports_prim_group(self, prim_group):
+        if prim_group is G.universe_operations:
+            # Relay does not explicitly implement primitive make_handle
+            # but still supports universe operations.
+            return True
         return all(MAP.get(prim) for prim in prim_group.primitives)
 
 

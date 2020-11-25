@@ -48,6 +48,11 @@ class MyiaFunction:
         pipeline=standard_pipeline,
     ):
         """Initialize a MyiaFunction."""
+        # Change this once relay becomes the default backend.
+        if use_universe and backend not in ("python", "relay"):
+            raise RuntimeError(  # pragma: no cover
+                "Universe is only supported for python and relay backend."
+            )
         self.fn = fn
         self.alias_tracker = alias_tracker
         self.specialize_values = set(specialize_values)
