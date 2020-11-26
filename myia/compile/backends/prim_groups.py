@@ -21,9 +21,11 @@ class PrimGroup:
         self.primitives = primitives  # type: list
 
     def __str__(self):
-        if self.name is None and len(self.primitives) == 1:
-            return f"Primitive({self.primitives[0].name})"
-        return f"PrimGroup[{self.name}]({', '.join(p.name for p in self.primitives)})"
+        return (
+            f"Primitive({self.primitives[0].name})"
+            if (self.name is None and len(self.primitives) == 1)
+            else f"PrimGroup[{self.name}]({', '.join(p.name for p in self.primitives)})"
+        )
 
     @classmethod
     def ensure(cls, prim_or_group):
