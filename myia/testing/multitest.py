@@ -1,4 +1,5 @@
 """Common testing utilities."""
+import functools
 from itertools import product
 from types import FunctionType
 
@@ -6,7 +7,8 @@ import numpy as np
 import pytest
 from ovld import ovld
 
-from myia.compile.backends import get_backend_names
+from myia.compile.backends import get_backend_names, load_backend
+from myia.compile.backends.prim_groups import PrimGroup
 from myia.lib import concretize_abstract, from_value
 from myia.pipeline import standard_debug_pipeline, standard_pipeline, steps
 from myia.utils import keyword_decorator, merge
@@ -254,6 +256,7 @@ def _run(
     pipeline=standard_pipeline,
     backend=None,
     numpy_compat=False,
+    primitives=None,
     **kwargs,
 ):
     """Test a Myia function.
@@ -273,11 +276,22 @@ def _run(
         pipeline: The pipeline to use.
         backend: backends to use. Tuple (backend name, backend options)
         numpy_compat: if True, check if args can be converted to numpy arrays.
+        primitives: optional list of primitives or groups of primitives
+            (as PrimGroup objects) required for this test.
+            If a backend does not support any of given primitives or groups,
+            then related test is explicitly skipped.
     """
 
     if backend:
         backend_name = backend[0]
         backend_options = backend[1]
+
+        if primitives:
+            b = load_backend(backend_name, backend_options)
+            for p in primitives:
+                g = PrimGroup.ensure(p)
+                if not b.supports_prim_group(g):
+                    pytest.skip(f"Backend {backend_name} does not support {g}")
 
         pipeline = pipeline.configure(
             {"backend.name": backend_name, "backend.options": backend_options}
@@ -422,3 +436,45 @@ run_gpu = _run.configure(backend=backend_gpu)
 run_debug = run.configure(
     pipeline=standard_debug_pipeline, validate=False, backend=False
 )
+
+
+def bt(*primitives):
+    """Backend testing.
+
+    Generate a decorator to parametrize a test with backend names.
+    Decorated test function must expected an argument named "backend"
+    that will receive backend name to test with.
+
+    :param primitives: list of primitives or groups of primitives
+        (as PrimGroup objects) required for this test.
+        If a backend does not support any of given primitives or groups,
+        then related test is explicitly skipped.
+    :return: a decorator
+    """
+
+    if primitives:
+        primitives = [PrimGroup.ensure(p) for p in primitives]
+
+    backends = [
+        pytest.param(backend, id=backend, marks=[getattr(pytest.mark, backend)])
+        for backend in sorted(_pytest_parameters)
+    ]
+
+    def deco(fn):
+        @functools.wraps(fn)
+        def wrapper_fn(*args, **kwargs):
+
+            if primitives:
+                backend = kwargs["backend"]
+                bck = load_backend(backend)
+                for prim_group in primitives:
+                    if not bck.supports_prim_group(prim_group):
+                        pytest.skip(
+                            f"Backend {backend} does not support {prim_group}"
+                        )
+
+            return fn(*args, **kwargs)
+
+        return pytest.mark.parametrize("backend", backends)(wrapper_fn)
+
+    return deco

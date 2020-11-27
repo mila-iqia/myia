@@ -618,6 +618,9 @@ class PyTorchBackend(Backend):
         else:
             raise NotImplementedError(f"to_backend_value for {t}")
 
+    def supports_prim_group(self, prim_group):
+        return all(prim in _mapping for prim in prim_group.primitives)
+
 
 def load_options(device="cpu:0"):
     """Format options for pytorch."""

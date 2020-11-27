@@ -5,6 +5,7 @@ from myia.compile.backends import (
     UnknownBackend,
     load_backend,
     parse_default,
+    prim_groups as G,
 )
 from myia.operations import (
     array_reduce,
@@ -100,6 +101,15 @@ def test_bool_and_nil_args(x):
 @run(3)
 def test_return_tuple(x):
     return (1, 2, x)
+
+
+# Currently, this test should be skipped for all backends.
+@run(0, primitives=[G.exception_operations])
+def test_raise(x):
+    if x > 0:
+        return -x
+    else:
+        raise Exception("x <= 0")
 
 
 @pytest.mark.xfail  # MyiaTypeError: AbstractTuple vs AbstractTaggedUnion

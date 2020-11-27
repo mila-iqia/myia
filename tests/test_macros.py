@@ -2,15 +2,8 @@ import pytest
 
 from myia import myia
 from myia.abstract import macro, myia_static
-from myia.compile.backends import get_backend_names
+from myia.testing.multitest import bt
 from myia.utils import InferenceError, InternalInferenceError
-
-
-@pytest.fixture(
-    params=[pytest.param(backend) for backend in get_backend_names()]
-)
-def _backend_fixture(request):
-    return request.param
 
 
 @macro
@@ -22,11 +15,10 @@ def test_repr():
     assert repr(mackerel) == "<Macro mackerel>"
 
 
-def test_bad_macro(_backend_fixture):
+@bt()
+def test_bad_macro(backend):
     from myia.ir import Graph
     from myia.operations import primitives as P
-
-    backend = _backend_fixture
 
     @macro
     async def bad(info, x):
@@ -56,9 +48,8 @@ def test_bad_macro_2():
             return info.nodes()[0]
 
 
-def test_bad_macro_3(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_bad_macro_3(backend):
     @macro
     async def macncheese(info, x):
         # Should return a node
@@ -94,9 +85,8 @@ def test_myia_static_in_myia_static():
     static_blah(1, 2)
 
 
-def test_myia_static(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_myia_static(backend):
     @myia(backend=backend)
     def get_fourth(xs):
         return xs[static_add(1, y=2)]

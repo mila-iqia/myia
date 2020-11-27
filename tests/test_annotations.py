@@ -4,22 +4,14 @@ import numpy as np
 import pytest
 
 from myia import myia
-from myia.compile.backends import get_backend_names
 from myia.operations import random_initialize, random_uint32
+from myia.testing.multitest import bt
 from myia.utils import AnnotationMismatchError
 from myia.utils.misc import RandomStateWrapper
 
 
-@pytest.fixture(
-    params=[pytest.param(backend) for backend in get_backend_names()]
-)
-def _backend_fixture(request):
-    return request.param
-
-
-def test_scalar(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_scalar(backend):
     @myia(backend=backend)
     def f(x: int, y: float) -> np.float32:
         return np.float32(np.float64(x) * np.float64(y))
@@ -58,9 +50,8 @@ def test_scalar(_backend_fixture):
         h(1, 2)
 
 
-def test_tuple(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_tuple(backend):
     @myia(backend=backend)
     def f(x: tuple):
         return x[0] + x[1]
@@ -105,9 +96,8 @@ def test_tuple(_backend_fixture):
         j(7)
 
 
-def test_list(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_list(backend):
     @myia(backend=backend)
     def f(x: list):
         return x[0] + 2
@@ -139,9 +129,8 @@ def test_list(_backend_fixture):
         h((5, 3))
 
 
-def test_dict(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_dict(backend):
     @myia(backend=backend)
     def f(x: Dict[str, np.float32]):
         return np.float32(x["value"]) * np.float32(2.5)
@@ -190,9 +179,8 @@ def test_dict(_backend_fixture):
         k(d1)
 
 
-def test_ndarray(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_ndarray(backend):
     @myia(backend=backend)
     def f(a, b: np.ndarray) -> np.ndarray:
         return a * b
@@ -216,9 +204,8 @@ def test_ndarray(_backend_fixture):
         g(0)
 
 
-def test_random_state_wrapper(_backend_fixture):
-    backend = _backend_fixture
-
+@bt()
+def test_random_state_wrapper(backend):
     @myia(backend=backend)
     def f() -> RandomStateWrapper:
         rstate: RandomStateWrapper = random_initialize(10)

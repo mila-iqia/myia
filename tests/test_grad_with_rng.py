@@ -1,22 +1,13 @@
 import numpy as np
-import pytest
 
 from myia import myia, value_and_grad, xtype
-from myia.compile.backends import get_backend_names
 from myia.operations import primitives as P, random_initialize, random_uint32
+from myia.testing.multitest import bt
 
 
-@pytest.fixture(
-    params=[pytest.param(backend) for backend in get_backend_names()]
-)
-def _backend_fixture(request):
-    return request.param
-
-
-def test_rstate_and_compute(_backend_fixture):
+@bt()
+def test_rstate_and_compute(backend):
     """Test grad in a function that uses and returns a rstate."""
-
-    backend = _backend_fixture
 
     def rstate_and_compute(rstate, x):
         """Uses and returns a rstate with a computed value."""
@@ -45,9 +36,9 @@ def test_rstate_and_compute(_backend_fixture):
     print(v1, v2)
 
 
-def test_only_compute(_backend_fixture):
+@bt()
+def test_only_compute(backend):
     """Test grad on a function that uses but does not return a rstate."""
-    backend = _backend_fixture
 
     @myia(backend=backend)
     def step_init():

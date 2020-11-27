@@ -8,6 +8,7 @@ import weakref
 import pkg_resources
 
 from ... import abstract, xtype
+from .prim_groups import PrimGroup
 
 
 class UnknownBackend(Exception):
@@ -231,6 +232,13 @@ class Backend:
     def to_backend_value(self, v, t):
         """Convert an intermediate value to a backend value."""
         raise NotImplementedError("to_backend_value")
+
+    def supports_prim_group(self, prim_group: PrimGroup):
+        """Return True if given primitive group is supported.
+
+        :param prim_group: a PrimitiveGroup object
+        """
+        raise NotImplementedError("supports_prim_group")
 
 
 class Converter:

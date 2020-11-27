@@ -3,19 +3,17 @@ from dataclasses import dataclass
 import pytest
 
 from myia import myia
+from myia.compile.backends import prim_groups as G
 from myia.lib import Empty, HandleInstance, core
 from myia.operations import cell_get, cell_set, make_cell
 from myia.pipeline import standard_pipeline
+from myia.testing.multitest import bt
 
-
-@pytest.fixture(
-    params=[pytest.param(backend) for backend in ("python", "relay")]
-)
-def _backend_fixture(request):
-    return request.param
-
-
-_backend_options = {"python": {}, "relay": {"exec_kind": "debug"}}
+_backend_options = {
+    "python": {},
+    "relay": {"exec_kind": "debug"},
+    "pytorch": {},
+}
 
 
 def _umyia(backend):
@@ -37,9 +35,8 @@ def increment(h):
     return cell_set(h, add_one(cell_get(h)))
 
 
-def test_increment(_backend_fixture):
-    backend = _backend_fixture
-
+@bt(G.universe_operations)
+def test_increment(backend):
     @_umyia(backend)
     def plus4(x):
         h = make_cell(x)
@@ -53,9 +50,8 @@ def test_increment(_backend_fixture):
     assert plus4(10) == 14
 
 
-def test_increment_interleave(_backend_fixture):
-    backend = _backend_fixture
-
+@bt(G.universe_operations)
+def test_increment_interleave(backend):
     @_umyia(backend)
     def plus2(x, y):
         h1 = make_cell(x)
@@ -70,9 +66,8 @@ def test_increment_interleave(_backend_fixture):
     assert plus2(10, -21) == (12, -19)
 
 
-def test_increment_loop(_backend_fixture):
-    backend = _backend_fixture
-
+@bt(G.universe_operations)
+def test_increment_loop(backend):
     @_umyia(backend)
     def plus(x, y):
         h = make_cell(x)
@@ -86,9 +81,8 @@ def test_increment_loop(_backend_fixture):
     assert plus(10, 13) == 23
 
 
-def test_increment_recursion(_backend_fixture):
-    backend = _backend_fixture
-
+@bt(G.universe_operations)
+def test_increment_recursion(backend):
     @_umyia(backend)
     def length(h, xs):
         if not isinstance(xs, Empty):
@@ -101,9 +95,8 @@ def test_increment_recursion(_backend_fixture):
     assert length(hb, [1, 2, 3, 4]) == 4
 
 
-def test_give_handle(_backend_fixture):
-    backend = _backend_fixture
-
+@bt(G.universe_operations)
+def test_give_handle(backend):
     @_umyia(backend)
     def plus(h, y):
         i = y
@@ -125,8 +118,8 @@ def test_give_handle(_backend_fixture):
 
 
 @pytest.mark.xfail(reason="Backend does not properly update free handles")
-def test_handle_free_variable(_backend_fixture):
-    backend = _backend_fixture
+@bt(G.universe_operations)
+def test_handle_free_variable(backend):
 
     h = HandleInstance(0)
 
@@ -143,9 +136,8 @@ def test_handle_free_variable(_backend_fixture):
     assert plus(30) == 34
 
 
-def test_return_handle(_backend_fixture):
-    backend = _backend_fixture
-
+@bt(G.universe_operations)
+def test_return_handle(backend):
     @_umyia(backend)
     def plus2(h):
         increment(h)
@@ -179,9 +171,8 @@ class Counter:
         return cell_get(self._count)
 
 
-def test_count(_backend_fixture):
-    backend = _backend_fixture
-
+@bt(G.universe_operations)
+def test_count(backend):
     @_umyia(backend)
     def calc(counter, n):
         for i in range(n):
@@ -192,8 +183,8 @@ def test_count(_backend_fixture):
     assert calc(cnt, 5) == 15
 
 
-def test_count_keepstate(_backend_fixture):
-    backend = _backend_fixture
+@bt(G.universe_operations)
+def test_count_keepstate(backend):
     if backend == "relay":
         pytest.skip("Backend does not find handles in dataclasses")
 

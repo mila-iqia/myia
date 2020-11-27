@@ -3,10 +3,9 @@ import pytest
 
 from myia import grad, myia, value_and_grad
 from myia.api import to_device
-from myia.compile.backends import get_backend_names
 from myia.frontends import activate_frontend
 from myia.testing.common import MA
-from myia.testing.multitest import eqtest, get_backend_testing_options, run
+from myia.testing.multitest import bt, eqtest, get_backend_testing_options, run
 from myia.utils import MyiaInputTypeError, MyiaTypeError, MyiaValueError
 
 torch = pytest.importorskip("torch")
@@ -42,13 +41,6 @@ def get_backend_options(args, backend):
     return backend_options
 
 
-@pytest.fixture(
-    params=[pytest.param(backend) for backend in get_backend_names()]
-)
-def _backend_fixture(request):
-    return request.param
-
-
 class Args:
     def __init__(self):
         # device used
@@ -75,8 +67,8 @@ def test_module_matmul_fwd(model, inp):
     return model(inp)
 
 
-def test_module_matmul_bwd(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_matmul_bwd(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -117,8 +109,8 @@ def test_module_matmul_bwd(_backend_fixture):
     assert torch.allclose(grad.W, grad_expected)
 
 
-def test_module_matmul_update(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_matmul_update(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -174,8 +166,8 @@ class MLP_2_Layers(nn.Module):
         return x
 
 
-def test_module_2_layer_mlp_fwd(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_2_layer_mlp_fwd(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -199,8 +191,8 @@ def test_module_2_layer_mlp_fwd(_backend_fixture):
     assert torch.allclose(output, output_expected)
 
 
-def test_module_2_layer_mlp_bwd(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_2_layer_mlp_bwd(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -249,8 +241,8 @@ def test_module_2_layer_mlp_bwd(_backend_fixture):
         assert torch.allclose(g, eg)
 
 
-def test_module_2_layer_mlp_update(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_2_layer_mlp_update(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -299,8 +291,8 @@ def test_module_2_layer_mlp_update(_backend_fixture):
         assert torch.allclose(p, ep)
 
 
-def test_module_2_layer_mlp_update__to_device(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_2_layer_mlp_update__to_device(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -353,8 +345,8 @@ def test_module_2_layer_mlp_update__to_device(_backend_fixture):
         assert torch.allclose(p, ep)
 
 
-def test_pytorch_inference_errors(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_pytorch_inference_errors(backend):
     backend_options = get_backend_options(args, backend)
 
     @myia(backend=backend, backend_options=backend_options)
@@ -375,8 +367,8 @@ def test_pytorch_inference_errors(_backend_fixture):
         c = step_dot(_a, _b)  # noqa: F841
 
 
-def test_pytorch_scalar(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_pytorch_scalar(backend):
     backend_options = get_backend_options(args, backend)
 
     _a = 42.759910583496094
@@ -416,8 +408,8 @@ class Linear_Seq(nn.Module):
 
 
 @pytest.mark.xfail
-def test_module_2_layer_mlp_seq_fwd(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_2_layer_mlp_seq_fwd(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -442,8 +434,8 @@ def test_module_2_layer_mlp_seq_fwd(_backend_fixture):
 
 
 @pytest.mark.xfail
-def test_module_linear_seq_bwd(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_module_linear_seq_bwd(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -508,8 +500,8 @@ class Linear_List(nn.Module):
         return x
 
 
-def test_alias_list_error(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_alias_list_error(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -539,8 +531,8 @@ def test_alias_list_error(_backend_fixture):
         print(f([a, b, c, a], e))
 
 
-def test_nn_max_pool2d_fwd(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_nn_max_pool2d_fwd(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -572,8 +564,8 @@ def test_nn_max_pool2d_fwd(_backend_fixture):
     assert torch.allclose(my_out, pt_out)
 
 
-def test_nn_max_pool2d_update(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_nn_max_pool2d_update(backend):
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
@@ -614,8 +606,8 @@ def test_nn_max_pool2d_update(_backend_fixture):
 
 # TODO: Should this eventually be in a different test file?
 #       It's currently here because it needs to have 'torch' imported.
-def test_shp_explicit_errors(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_shp_explicit_errors(backend):
     backend_options = get_backend_options(args, backend)
 
     input = torch.ones(2, 3)
@@ -653,8 +645,8 @@ def test_shp_explicit_errors(_backend_fixture):
 
 # TODO: Should this eventually be in a different test file?
 #       It's currently here because it needs to have 'torch' imported.
-def test_sum_keepdim_error(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_sum_keepdim_error(backend):
     backend_options = get_backend_options(args, backend)
 
     input = torch.ones(2, 3)
@@ -670,8 +662,8 @@ def test_sum_keepdim_error(_backend_fixture):
         ret1 = step1(input, True)  # noqa: F841
 
 
-def test_switch_input_types(_backend_fixture):
-    backend = _backend_fixture
+@bt()
+def test_switch_input_types(backend):
     backend_options = get_backend_options(args, backend)
 
     @myia(backend=backend, backend_options=backend_options)
@@ -683,7 +675,8 @@ def test_switch_input_types(_backend_fixture):
 
 
 # This is mostly here to cover inst_tuple_setitem method in myia.compile.vm
-def test_optim_setitem(_backend_fixture):
+@bt()
+def test_optim_setitem(backend):
     from myia.abstract import macro
     from myia.operations import primitives as P
     from myia.ir import sexp_to_node
@@ -713,7 +706,6 @@ def test_optim_setitem(_backend_fixture):
 
         return new_model
 
-    backend = _backend_fixture
     backend_options = get_backend_options(args, backend)
 
     torch.manual_seed(123)
