@@ -3,7 +3,7 @@ import pytest
 
 from myia import grad, myia, value_and_grad
 from myia.api import to_device
-from myia.frontends import activate_frontend
+from myia.frontends import activate_frontend, UnknownFrontend
 from myia.testing.common import MA
 from myia.testing.multitest import bt, eqtest, get_backend_testing_options, run
 from myia.utils import MyiaInputTypeError, MyiaTypeError, MyiaValueError
@@ -11,7 +11,11 @@ from myia.utils import MyiaInputTypeError, MyiaTypeError, MyiaValueError
 torch = pytest.importorskip("torch")
 nn = torch.nn
 
-activate_frontend("pytorch")
+try:
+    activate_frontend("pytorch")
+except UnknownFrontend:
+    pytestmark = pytest.mark.skip('pytorch frontend is not available')
+
 myia_frontend_pytorch = pytest.importorskip("myia_frontend_pytorch.pytorch")
 tensor_pytorch_aliasable = myia_frontend_pytorch.tensor_pytorch_aliasable
 pytorch_dtype_to_type = myia_frontend_pytorch.pytorch_dtype_to_type

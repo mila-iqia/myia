@@ -14,7 +14,7 @@ from myia.abstract.data import (
     AbstractTuple,
 )
 from myia.debug.finite_diff import NoTestGrad, clean_args
-from myia.frontends import activate_frontend  # noqa: E402
+from myia.frontends import activate_frontend, UnknownFrontend # noqa: E402
 from myia.operations import primitives as P
 from myia.pipeline import standard_pipeline, steps
 from myia.testing.common import MA, MB, to_abstract_test
@@ -34,7 +34,11 @@ torch = pytest.importorskip("torch")
 nn = torch.nn
 F = torch.nn.functional
 
-activate_frontend("pytorch")
+try:
+    activate_frontend("pytorch")
+except UnknownFrontend:
+    pytestmark = pytest.mark.skip('pytorch frontend is not available')
+
 pytorch_abstract_types = pytest.importorskip(
     "myia_frontend_pytorch.pytorch_abstract_types"
 )
