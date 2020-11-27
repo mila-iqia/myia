@@ -9,7 +9,7 @@ global_interactor = None
 if os.environ.get("BUCHE"):
 
     class BuDb(BucheDb):
-        def __init__(self):
+        def __init__(self, **kw):
             super().__init__(None)
             self.interactor = global_interactor
 

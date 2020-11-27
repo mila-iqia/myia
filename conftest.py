@@ -52,12 +52,21 @@ def pytest_addoption(parser):
         default=False,
         help="Import Myia debug functions",
     )
+    parser.addoption(
+        "--bw",
+        action="store",
+        dest="breakword",
+        default=None,
+        help="Use the given breakword",
+    )
 
 
 def pytest_configure(config):
     listener_pairs = []
     if config.option.usepdb:
         os.environ["MYIA_PYTEST_USE_PDB"] = "1"
+    if config.option.breakword:
+        os.environ["BREAKWORD"] = config.option.breakword
     if config.option.do_inject:
         from debug import do_inject  # noqa
     if config.option.tracer:
