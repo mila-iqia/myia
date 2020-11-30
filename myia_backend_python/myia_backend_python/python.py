@@ -462,6 +462,82 @@ def nested_list_to_code_string(structure, indentation=""):
     return code
 
 
+class PdbCall:
+    """Helper class to run generated code with PDB.
+
+    Compiled code contains only closures and main function, but a call
+    must provide main function inputs, which may be integers or
+    numpy arrays. To deal with it, this class uses pickle to dump/load
+    main inputs/output, and extends generated code to produce a valid
+    script which will handle pickled data from temporary files.
+    """
+
+    def __init__(self, code, pdb_fn_name):
+        """ Initialize.
+
+        :param code: generated code
+        :param pdb_fn_name: a name for the main function that will be
+            called from generated script.
+        """
+        self.code = code
+        self.pdb_fn_name = pdb_fn_name
+
+    def __call__(self, *args):
+        """Execute main function with given args."""
+        import os
+        import pickle
+        import subprocess
+        import tempfile
+
+        # File for generated script.
+        code_fd, code_path = tempfile.mkstemp(
+            prefix="myia_backend_python_code_", suffix=".py"
+        )
+        # File to pickle main function args.
+        args_fd, args_path = tempfile.mkstemp()
+        # File to pickle main function return value,
+        out_fd, out_path = tempfile.mkstemp()
+        # Extension code to call main function.
+        # Load main function args from args_path.
+        # Save main function output into out_path.
+        pdb_code = f"""
+def {self.pdb_fn_name}():
+    import pickle
+    with open("{args_path}", "rb") as input_file:
+        main_parameters = pickle.load(input_file)
+    main_output = main(*main_parameters)
+    with open("{out_path}", "wb") as output_file:
+        pickle.dump(main_output, output_file)
+
+if __name__ == "__main__":
+    {self.pdb_fn_name}()
+"""
+        # Generate script code.
+        final_code = self.code + pdb_code
+        try:
+            # Save script.
+            with open(code_path, "w") as code_file:
+                code_file.write(final_code)
+            # Save main args.
+            with open(args_path, "wb") as input_file:
+                pickle.dump(args, input_file)
+            # Run script.
+            subprocess.run(["python", "-m", "pdb", code_path])
+            # Get main output.
+            with open(out_path, "rb") as output_file:
+                output = pickle.load(output_file)
+        finally:
+            # In any case, we must close and delete temporar files.
+            os.close(code_fd)
+            os.close(args_fd)
+            os.close(out_fd)
+            os.remove(code_path)
+            os.remove(args_path)
+            os.remove(out_path)
+        # Return main output.
+        return output
+
+
 class _Compiler:
     """Base class for Python backend compiler."""
 
@@ -722,11 +798,10 @@ class PythonCompiler(_Compiler):
         count = self.name_counter[label]
         return label if count == 1 else f"{label}_v{count}"
 
-    def run(self, graph, debug=None):
+    def run(self, graph, backend):
         """Compile given graph.
 
-        If provided, debug must be an output stream in which
-        generated code will be written.
+        :type backend: PythonBackend
         """
         mng = manage(graph)
         mng.keep_roots(graph)
@@ -759,13 +834,17 @@ class PythonCompiler(_Compiler):
                 fn_signature = f"def {fn_name}({', '.join(fn_params)}):"
                 other_functions.append(fn_signature)
                 other_functions.append(fn_body)
+
         final_structure = (
             pre_code + other_functions + [main_signature, main_body]
         )
         final_code = nested_list_to_code_string(final_structure)
 
-        if debug:
-            debug.write(f"\n{final_code}")
+        if backend.debug:
+            backend.debug.write(f"\n{final_code}")
+
+        if backend.pdb:
+            return PdbCall(final_code, self.get_new_name("pdb_main"))
 
         # Compile code string to a Python executable function
         # reference: https://stackoverflow.com/a/19850183
@@ -803,13 +882,14 @@ class PythonCompiler(_Compiler):
 class PythonBackend(Backend):
     """Python backend."""
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, pdb=False):
         """ Initialize.
 
         :param debug: if False or None, do nothing.
             If True, print generated code in stdout.
             Otherwise, should be an output stream (e.g. stdout or a StringIO)
             and generated code will be written into given stream.
+        :param pdb: if True, compiled function will be run in a pdb instance
         """
         if debug:
             debug = sys.stdout if debug is True else debug
@@ -819,6 +899,7 @@ class PythonBackend(Backend):
         self.to_backend_value = PythonInputConverter()
         self.from_backend_value = PythonOutputConverter()
         self.debug = debug
+        self.pdb = bool(pdb)
 
     def compile(self, graph, argspec, outspec):
         """Compile the group of graphs rooted at `graph`.
@@ -830,15 +911,15 @@ class PythonBackend(Backend):
         # Remove symbolic key instances.
         graph = convert_grad(graph)
         # Then compile the graph.
-        return self.compiler.run(graph, self.debug)
+        return self.compiler.run(graph, self)
 
     def supports_prim_group(self, prim_group):
         return all(MAP.has(prim) for prim in prim_group.primitives)
 
 
-def load_options(debug=False):
-    """Load backend options (no options for now)."""
-    return {"debug": debug}
+def load_options(debug=True, pdb=True):
+    """Load backend options."""
+    return {"debug": debug, "pdb": pdb}
 
 
 def load_backend(options):
