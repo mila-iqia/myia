@@ -917,7 +917,7 @@ class PythonBackend(Backend):
         return all(MAP.has(prim) for prim in prim_group.primitives)
 
 
-def load_options(debug=True, pdb=True):
+def load_options(debug=False, pdb=False):
     """Load backend options."""
     return {"debug": debug, "pdb": pdb}
 
