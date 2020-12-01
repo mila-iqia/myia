@@ -462,80 +462,48 @@ def nested_list_to_code_string(structure, indentation=""):
     return code
 
 
-class PdbCall:
-    """Helper class to run generated code with PDB.
+class PdbRunCall:
+    """Helper class to run code with PDB.
 
-    Compiled code contains only closures and main function, but a call
-    must provide main function inputs, which may be integers or
-    numpy arrays. To deal with it, this class uses pickle to dump/load
-    main inputs/output, and extends generated code to produce a valid
-    script which will handle pickled data from temporary files.
+    We want PDB to be able to display code using `list .` command, so
+    we need to save code into a file and import it as a valid module later.
     """
 
-    def __init__(self, code, pdb_fn_name):
-        """ Initialize.
-
-        :param code: generated code
-        :param pdb_fn_name: a name for the main function that will be
-            called from generated script.
-        """
+    def __init__(self, code):
+        """Initialize."""
         self.code = code
-        self.pdb_fn_name = pdb_fn_name
 
     def __call__(self, *args):
         """Execute main function with given args."""
+        import importlib
         import os
-        import pickle
-        import subprocess
+        import pdb
         import tempfile
+        import sys
 
-        # File for generated script.
+        # Create temporary code file.
         code_fd, code_path = tempfile.mkstemp(
             prefix="myia_backend_python_code_", suffix=".py"
         )
-        # File to pickle main function args.
-        args_fd, args_path = tempfile.mkstemp()
-        # File to pickle main function return value,
-        out_fd, out_path = tempfile.mkstemp()
-        # Extension code to call main function.
-        # Load main function args from args_path.
-        # Save main function output into out_path.
-        pdb_code = f"""
-def {self.pdb_fn_name}():
-    import pickle
-    with open("{args_path}", "rb") as input_file:
-        main_parameters = pickle.load(input_file)
-    main_output = main(*main_parameters)
-    with open("{out_path}", "wb") as output_file:
-        pickle.dump(main_output, output_file)
-
-if __name__ == "__main__":
-    {self.pdb_fn_name}()
-"""
-        # Generate script code.
-        final_code = self.code + pdb_code
+        # Get module directory and name.
+        module_dir = os.path.dirname(code_path)
+        module_name = os.path.splitext(os.path.basename(code_path))[0]
+        # Add module to sys.path
+        sys.path.append(module_dir)
         try:
-            # Save script.
+            # Save code into module file.
             with open(code_path, "w") as code_file:
-                code_file.write(final_code)
-            # Save main args.
-            with open(args_path, "wb") as input_file:
-                pickle.dump(args, input_file)
-            # Run script.
-            subprocess.run(["python", "-m", "pdb", code_path])
-            # Get main output.
-            with open(out_path, "rb") as output_file:
-                output = pickle.load(output_file)
+                code_file.write(self.code)
+            # Import module.
+            module = importlib.import_module(module_name)
+            # Run main function.
+            return pdb.runcall(getattr(module, "main"), *args)
         finally:
-            # In any case, we must close and delete temporar files.
+            # Reset sys.path
+            sys.path.remove(module_dir)
+            # Close and delete code file.
             os.close(code_fd)
-            os.close(args_fd)
-            os.close(out_fd)
             os.remove(code_path)
-            os.remove(args_path)
-            os.remove(out_path)
-        # Return main output.
-        return output
 
 
 class _Compiler:
@@ -844,7 +812,7 @@ class PythonCompiler(_Compiler):
             backend.debug.write(f"\n{final_code}")
 
         if backend.pdb:
-            return PdbCall(final_code, self.get_new_name("pdb_main"))
+            return PdbRunCall(final_code)
 
         # Compile code string to a Python executable function
         # reference: https://stackoverflow.com/a/19850183
