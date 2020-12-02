@@ -497,13 +497,14 @@ class PdbRunCall:
             # Import module.
             module = importlib.import_module(module_name)
             # Run main function.
-            return pdb.runcall(getattr(module, "main"), *args)
+            output = pdb.runcall(getattr(module, "main"), *args)
         finally:
             # Reset sys.path
             sys.path.remove(module_dir)
             # Close and delete code file.
             os.close(code_fd)
             os.remove(code_path)
+        return output
 
 
 class _Compiler:
