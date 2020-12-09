@@ -803,7 +803,6 @@ class PythonCompiler(_Compiler):
                 fn_signature = f"def {fn_name}({', '.join(fn_params)}):"
                 other_functions.append(fn_signature)
                 other_functions.append(fn_body)
-
         final_structure = (
             pre_code + other_functions + [main_signature, main_body]
         )
