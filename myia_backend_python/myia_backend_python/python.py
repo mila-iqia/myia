@@ -498,13 +498,17 @@ class PdbRunCall:
             module = importlib.import_module(module_name)
             # Run main function.
             output = pdb.runcall(getattr(module, "main"), *args)
-        finally:
+
+        # NB: I don't know why, but code executed after PDB call is
+        # systematically reported as uncovered by pytest-cov, so I am
+        # excluding following lines from coverage.
+        finally:  # pragma: no cover
             # Reset sys.path
             sys.path.remove(module_dir)
             # Close and delete code file.
             os.close(code_fd)
             os.remove(code_path)
-        return output
+        return output  # pragma: no cover
 
 
 class _Compiler:
