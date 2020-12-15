@@ -462,6 +462,55 @@ def nested_list_to_code_string(structure, indentation=""):
     return code
 
 
+class PdbRunCall:
+    """Helper class to run code with PDB.
+
+    We want PDB to be able to display code using `list .` command, so
+    we need to save code into a file and import it as a valid module later.
+    """
+
+    def __init__(self, code):
+        """Initialize."""
+        self.code = code
+
+    def __call__(self, *args):
+        """Execute main function with given args."""
+        import importlib
+        import os
+        import pdb
+        import tempfile
+        import sys
+
+        # Create temporary code file.
+        code_fd, code_path = tempfile.mkstemp(
+            prefix="myia_backend_python_code_", suffix=".py"
+        )
+        # Get module directory and name.
+        module_dir = os.path.dirname(code_path)
+        module_name = os.path.splitext(os.path.basename(code_path))[0]
+        # Add module to sys.path
+        sys.path.append(module_dir)
+        try:
+            # Save code into module file.
+            with open(code_path, "w") as code_file:
+                code_file.write(self.code)
+            # Import module.
+            module = importlib.import_module(module_name)
+            # Run main function.
+            output = pdb.runcall(getattr(module, "main"), *args)
+
+        # NB: I don't know why, but code executed after PDB call is
+        # systematically reported as uncovered by pytest-cov, so I am
+        # excluding following lines from coverage.
+        finally:  # pragma: no cover
+            # Reset sys.path
+            sys.path.remove(module_dir)
+            # Close and delete code file.
+            os.close(code_fd)
+            os.remove(code_path)
+        return output  # pragma: no cover
+
+
 class _Compiler:
     """Base class for Python backend compiler."""
 
@@ -722,11 +771,10 @@ class PythonCompiler(_Compiler):
         count = self.name_counter[label]
         return label if count == 1 else f"{label}_v{count}"
 
-    def run(self, graph, debug=None):
+    def run(self, graph, backend):
         """Compile given graph.
 
-        If provided, debug must be an output stream in which
-        generated code will be written.
+        :type backend: PythonBackend
         """
         mng = manage(graph)
         mng.keep_roots(graph)
@@ -764,8 +812,11 @@ class PythonCompiler(_Compiler):
         )
         final_code = nested_list_to_code_string(final_structure)
 
-        if debug:
-            debug.write(f"\n{final_code}")
+        if backend.debug:
+            backend.debug.write(f"\n{final_code}")
+
+        if backend.pdb:
+            return PdbRunCall(final_code)
 
         # Compile code string to a Python executable function
         # reference: https://stackoverflow.com/a/19850183
@@ -803,13 +854,14 @@ class PythonCompiler(_Compiler):
 class PythonBackend(Backend):
     """Python backend."""
 
-    def __init__(self, debug=False):
+    def __init__(self, debug=False, pdb=False):
         """ Initialize.
 
         :param debug: if False or None, do nothing.
             If True, print generated code in stdout.
             Otherwise, should be an output stream (e.g. stdout or a StringIO)
             and generated code will be written into given stream.
+        :param pdb: if True, compiled function will be run in a pdb instance
         """
         if debug:
             debug = sys.stdout if debug is True else debug
@@ -819,6 +871,7 @@ class PythonBackend(Backend):
         self.to_backend_value = PythonInputConverter()
         self.from_backend_value = PythonOutputConverter()
         self.debug = debug
+        self.pdb = bool(pdb)
 
     def compile(self, graph, argspec, outspec):
         """Compile the group of graphs rooted at `graph`.
@@ -830,15 +883,15 @@ class PythonBackend(Backend):
         # Remove symbolic key instances.
         graph = convert_grad(graph)
         # Then compile the graph.
-        return self.compiler.run(graph, self.debug)
+        return self.compiler.run(graph, self)
 
     def supports_prim_group(self, prim_group):
         return all(MAP.has(prim) for prim in prim_group.primitives)
 
 
-def load_options(debug=False):
-    """Load backend options (no options for now)."""
-    return {"debug": debug}
+def load_options(debug=False, pdb=False):
+    """Load backend options."""
+    return {"debug": debug, "pdb": pdb}
 
 
 def load_backend(options):

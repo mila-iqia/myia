@@ -4,7 +4,7 @@ Myia's main intermediate representation (IR) is a graph-based version of ANF.
 Each function definition (lambda) is defined as a graph, consisting of a series
 of function applications.
 
-A function can be applied to a node from another funtion's graph; this
+A function can be applied to a node from another function's graph; this
 implicitly creates a nested function. Functions are first-class objects, so
 returning a nested function creates a closure.
 
