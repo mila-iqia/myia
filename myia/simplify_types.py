@@ -491,6 +491,11 @@ def from_canonical(self, arg, orig_t: AbstractUnion):
         raise AssertionError(f"Badly formed TaggedValue")
 
 
+@ovld  # noqa: F811
+def from_canonical(self, arg, orig_t: AbstractType):
+    return arg
+
+
 __consolidate__ = True
 __all__ = [
     "from_canonical",

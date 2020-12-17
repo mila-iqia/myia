@@ -437,3 +437,17 @@ def test_env_tracer(monkeypatch, backend):
 
     assert _flag1[0] is True
     assert _flag2[0] is True
+
+
+@bt()
+def test_convert_type(backend):
+    @myia(backend=backend)
+    def f(v):
+        return tuple
+
+    @myia(backend=backend)
+    def g():
+        return np.float16
+
+    assert f((1, 2)) is tuple
+    assert g() is np.float16
