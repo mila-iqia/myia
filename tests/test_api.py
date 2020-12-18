@@ -442,12 +442,12 @@ def test_env_tracer(monkeypatch, backend):
 @bt()
 def test_convert_type(backend):
     @myia(backend=backend)
-    def f(v):
+    def f():
         return tuple
 
     @myia(backend=backend)
     def g():
         return np.float16
 
-    assert f((1, 2)) is tuple
+    assert f() is tuple
     assert g() is np.float16

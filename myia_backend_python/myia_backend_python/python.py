@@ -442,13 +442,14 @@ class PythonConstantConverter(_PythonConverter):
 
     def convert_type(self, v, t):
         # Return type name as a string.
-        myia_type = t.element.xtype()
-        if myia_type is None:
-            if isinstance(v, AbstractHandle):
-                return "HandleInstance"
-        if myia_type is Tuple:
-            return "tuple"
-        return f"np.{type_to_np_dtype(myia_type)}"
+        if isinstance(v, AbstractHandle):
+            return "HandleInstance"
+        else:
+            myia_type = t.element.xtype()
+            if myia_type is Tuple:
+                return "tuple"
+            else:
+                return f"np.{type_to_np_dtype(myia_type)}"
 
     def convert_handle(self, v, t):
         return f"HandleInstance({self(v.state, v.abstract or to_abstract(v.state))})"
