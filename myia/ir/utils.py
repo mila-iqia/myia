@@ -271,7 +271,10 @@ def _print_node(node, buf, offset=0):
             end="",
             file=buf,
         )
-        print(")", file=buf)
+        print(")", file=buf, end="")
+        if node.abstract is not None:
+            print(f" ; type={node.abstract}", file=buf, end="")
+        print("", file=buf)
     elif node.is_constant() or node.is_parameter():
         pass
     else:  # pragma: no cover
@@ -298,12 +301,12 @@ def print_graph(g, allow_cycles=True):
     import io
 
     buf = io.StringIO()
-    print(
-        f"graph {str(g)}("
-        + ", ".join(f"%{str(p)}" for p in g.parameters)
-        + ") {",
-        file=buf,
-    )
+    print(f"graph {str(g)}(", file=buf, end="")
+    print(", ".join(f"%{str(p)}{' : ' + str(p.abstract) if p.abstract is not None else ''}" for p in g.parameters), file=buf, end="")
+    print(") ", file=buf, end="")
+    if g.abstract is not None:
+        print(f"-> {g.abstract.output} ", file=buf, end="")
+    print("{", file=buf)
 
     seen_graphs = set([g])
     def _succ_deep_once(node):
