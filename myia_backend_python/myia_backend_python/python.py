@@ -442,7 +442,7 @@ class PythonConstantConverter(_PythonConverter):
 
     def convert_type(self, v, t):
         # Return type name as a string.
-        if isinstance(v, AbstractHandle):
+        if isinstance(t.element, AbstractHandle):
             return "HandleInstance"
         else:
             myia_type = t.element.xtype()

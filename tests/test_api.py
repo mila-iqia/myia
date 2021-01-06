@@ -449,5 +449,10 @@ def test_convert_type(backend):
     def g():
         return np.float16
 
+    @myia(backend=backend)
+    def h():
+        return HandleInstance
+
     assert f() is tuple
     assert g() is np.float16
+    assert h() is HandleInstance

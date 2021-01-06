@@ -412,6 +412,11 @@ def pytype_to_abstract(main: RandomStateWrapper, args):
 
 
 @ovld  # noqa: F811
+def pytype_to_abstract(main: HandleInstance, args):
+    return AbstractHandle(None)
+
+
+@ovld  # noqa: F811
 def pytype_to_abstract(main: dict, args):
     if args is None:
         # Just provide an empty dict as entries.

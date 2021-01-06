@@ -1012,13 +1012,14 @@ class RelayOutputConverter(Converter):
         return RandomStateWrapper(tuple(el.asnumpy().item() for el in v))
 
     def convert_type(self, v, t):
-        myia_type = t.element.xtype()
-        if myia_type is None:
-            if isinstance(v, AbstractHandle):
-                return HandleInstance
-        if myia_type is Tuple:
-            return tuple
-        return getattr(np, type_to_np_dtype(myia_type))
+        if isinstance(t.element, AbstractHandle):
+            return HandleInstance
+        else:
+            myia_type = t.element.xtype()
+            if myia_type is Tuple:
+                return tuple
+            else:
+                return getattr(np, type_to_np_dtype(myia_type))
 
 
 def make_handle_to_make_cell(g):
