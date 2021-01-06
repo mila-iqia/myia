@@ -493,10 +493,7 @@ def from_canonical(self, arg, orig_t: AbstractUnion):
 
 @ovld  # noqa: F811
 def from_canonical(self, arg, orig_t: AbstractType):
-    if isinstance(orig_t.element, AbstractHandle):
-        return HandleInstance
-    else:
-        return arg
+    return arg
 
 
 __consolidate__ = True

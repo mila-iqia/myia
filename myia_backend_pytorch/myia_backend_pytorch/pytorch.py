@@ -10,6 +10,7 @@ from myia.compile.transform import CompileGraphs, nonlinear_ops
 from myia.ir import manage
 from myia.operations import Primitive, primitives as P
 from myia.utils import RandomStateWrapper, TaggedValue, untested
+from myia.utils.universe import HandleInstance
 from myia.xtype import Bool, Float, Int, UInt, type_to_np_dtype
 
 from .pytorch_conv_grad import conv2d_weight
@@ -583,10 +584,14 @@ class PyTorchBackend(Backend):
         elif isinstance(t, abstract.AbstractRandomState):
             return RandomStateWrapper(self.to_numpy(v))
         elif isinstance(t, abstract.AbstractType):
-            myia_type = t.element.xtype()
-            if myia_type in _type_map:
-                return getattr(np, type_to_np_dtype(myia_type))
-            return v
+            if isinstance(t.element, abstract.AbstractHandle):
+                return HandleInstance
+            else:
+                myia_type = t.element.xtype()
+                if myia_type in _type_map:
+                    return getattr(np, type_to_np_dtype(myia_type))
+                else:
+                    return v
         else:
             raise NotImplementedError(f"Don't know what to do for {t}")
 
