@@ -8,7 +8,7 @@ from tvm import relay
 from tvm.relay import adt
 from tvm.relay.backend import interpreter
 
-from myia.abstract import AbstractTaggedUnion
+from myia.abstract import AbstractHandle, AbstractTaggedUnion
 from myia.compile.backends import Backend, Converter
 from myia.compile.transform import convert_grad, get_prim_graph, return_handles
 from myia.graph_utils import toposort
@@ -17,7 +17,7 @@ from myia.operations import Primitive, primitives as P
 from myia.operations.primitives import BackendPrimitive
 from myia.utils import HandleInstance, RandomStateWrapper, TaggedValue
 from myia.utils.variables import X, Y
-from myia.xtype import type_to_np_dtype, u32
+from myia.xtype import Tuple, type_to_np_dtype, u32
 
 from . import relay_philox
 from .relay_helpers import (
@@ -778,6 +778,12 @@ class RelayConstantConverter(Converter):
         conv_val = self(v.value, real_t)
         return ctr(conv_val)
 
+    def convert_type(self, v, t):
+        # abstract type will be replaced with an integer type as placeholder
+        # (see to_relay_type(AbstractType), so we must return an integer
+        # of same type here.
+        return relay.const(0, "int32")
+
 
 class CompileGraph:
     """Step to convert a myia graph to a relay graph.
@@ -1004,6 +1010,16 @@ class RelayOutputConverter(Converter):
 
     def convert_random_state(self, v, t):
         return RandomStateWrapper(tuple(el.asnumpy().item() for el in v))
+
+    def convert_type(self, v, t):
+        if isinstance(t.element, AbstractHandle):
+            return HandleInstance
+        else:
+            myia_type = t.element.xtype()
+            if myia_type is Tuple:
+                return tuple
+            else:
+                return getattr(np, type_to_np_dtype(myia_type))
 
 
 def make_handle_to_make_cell(g):
