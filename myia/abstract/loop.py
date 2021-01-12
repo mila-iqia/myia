@@ -247,7 +247,7 @@ class PendingFromList(Pending):
     def set_result(self, res):
         """Set the result of this Pending."""
         # Sanity check
-        assert res in self.possibilities
+        assert res in self.possibilities, (res, self.possibilities)
         super().set_result(res)
 
 

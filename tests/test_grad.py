@@ -819,7 +819,18 @@ def test_bad_bprop_def():
             return dout + x + y
 
 
-@mark.xfail(reason="Second order gradients are not supported yet")
+@bt()
+def test_first_order(backend):
+    def square(x):
+        return x * x
+
+    @myia(backend=backend)
+    def f(x):
+        return grad(square)(x)
+
+    return f(10) == 20
+
+
 @bt()
 def test_second_order(backend):
     def square(x):

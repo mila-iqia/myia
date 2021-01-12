@@ -766,7 +766,9 @@ async def compute_jinv_type(x):
         fns = [await compute_jinv_type(f) for f in await x.get()]
         return AbstractFunction(*fns)
     else:
-        raise MyiaTypeError(f"Wrong type for jinv: {x}")
+        return x
+        # return AbstractJTagged(x)
+        # raise MyiaTypeError(f"Wrong type for jinv: {x}")
 
 
 class JInferrer(Inferrer):

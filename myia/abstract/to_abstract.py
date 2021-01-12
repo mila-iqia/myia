@@ -67,6 +67,7 @@ _number_types = [
     xtype.Float[16],
     xtype.Float[32],
     xtype.Float[64],
+    xtype.EnvType,
 ]
 
 

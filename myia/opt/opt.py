@@ -247,6 +247,65 @@ class LocalPassOptimizer:
         return n, changes
 
 
+def collect_nodes(n, sequence: list):
+    if isinstance(n, Graph):
+        sequence.append(n.output)
+        for inp in n.output.inputs:
+            if inp not in sequence:
+                sequence.append(inp)
+                collect_nodes(inp, sequence)
+    else:
+        for inp in n.inputs:
+            if inp not in sequence:
+                sequence.append(inp)
+                collect_nodes(inp, sequence)
+
+
+class LocalPassOptimizerReverse(LocalPassOptimizer):
+
+    def __call__(self, graph, resources=None, manager=None):
+        """Apply optimizations on given graphs in reverse (leaf to root) order."""
+
+        if manager is not None:
+            mng = manager
+            mng.add_graph(graph)
+        elif resources is not None:
+            mng = resources.opt_manager
+            mng.add_graph(graph)
+        else:
+            mng = manage(graph)
+
+        seq = []
+        collect_nodes(graph, seq)
+
+        seen = {graph}
+        todo = deque(seq)
+        changes = False
+
+        todo.append(graph.output)
+        todo.extend(graph.output.inputs)
+        while len(todo) > 0:
+            n = todo.pop()
+            if n in seen or n not in mng.all_nodes:
+                continue
+            seen.add(n)
+            new, chg = self.apply_opt(resources, mng, n)
+            changes |= chg
+            if new.is_constant(Graph):
+                if new.value not in seen:
+                    todo.append(new.value.output)
+                    todo.extend(new.value.output.inputs)
+                    seen.add(new.value)
+            else:
+                todo.extend(new.inputs)
+            if chg:
+                # Since there was changes, re-schedule the parent node(s)
+                uses = OrderedSet(u[0] for u in mng.uses[new])
+                seen.difference_update(uses)
+                todo.extendleft(uses)
+        return {"changes": changes}
+
+
 class GraphTransform:
     """Represents a graph transform.
 
@@ -279,6 +338,7 @@ class GraphTransform:
 __all__ = [
     "GraphTransform",
     "LocalPassOptimizer",
+    "LocalPassOptimizerReverse",
     "NodeMap",
     "PatternSubstitutionOptimization",
     "pattern_replacer",
