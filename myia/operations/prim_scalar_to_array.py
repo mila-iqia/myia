@@ -26,7 +26,7 @@ async def infer_scalar_to_array(
 ):
     """Infer the return type of primitive `scalar_to_array`."""
     tp = t.element
-    assert isinstance(tp, AbstractArray), tp
+    assert isinstance(tp, AbstractArray)
     return AbstractArray(a, {SHAPE: (), TYPE: tp.xtype()})
 
 

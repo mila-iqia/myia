@@ -1107,9 +1107,31 @@ def replace_Jinv_on_graph(resources, node, equiv):
     return ct
 
 
+def has_inner_j_on_function(node):
+    """Check if given node is a graph containing itself a J on a sub-graph."""
+    if isinstance(node, Graph):
+        todo = [node.output]
+        while todo:
+            n = todo.pop()
+            if n.inputs:
+                for inp in n.inputs:
+                    if inp.is_apply(P.J) and inp.inputs[1].is_constant(Graph):
+                        return True
+                    else:
+                        todo.append(inp)
+            elif n.is_constant_graph():
+                todo.append(n.value.output)
+    return False
+
+
 @pattern_replacer(P.J, C)
 def expand_J(resources, node, equiv):
     """Replaces a call to J(f) by the graph for J(f).
+
+    Skip less-in-depth J(graph) and expand only most-in-depth J(graph) nodes,
+    so that most-in-depth gradients are expanded first. This should prevent
+    less-in-depth gradients to have to deal with unexpected
+    gradient placeholders.
 
     This will not replace J(x) when x is not a constant graph.
     """
@@ -1117,6 +1139,8 @@ def expand_J(resources, node, equiv):
 
     resources.opt_manager.gc()
     arg = equiv[C].value
+    if has_inner_j_on_function(arg):
+        return node
 
     if not hasattr(resources, "grad_cache"):
         resources.grad_cache = {}

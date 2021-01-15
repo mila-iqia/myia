@@ -17,7 +17,7 @@ from ..lib import (
     newenv,
 )
 from ..operations import myia_to_array, typeof
-from ..xtype import Bool, Nil, Number, EnvType
+from ..xtype import Bool, Nil, Number
 from .primitives import distribute, scalar_cast, shape
 
 _leaf_zeros_like = MultitypeGraph("zeros_like")
@@ -51,13 +51,6 @@ def _nil_zero(_):
 @core
 def _scalar_zero(x):
     return scalar_cast(0, typeof(x))
-
-
-@_leaf_zeros_like.register(EnvType)
-@core
-def _envtype_zero(x):
-    """Return zero scalar."""
-    return 0
 
 
 @_leaf_zeros_like.register(AbstractArray)
