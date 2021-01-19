@@ -1110,6 +1110,7 @@ def replace_Jinv_on_graph(resources, node, equiv):
 def has_inner_j_on_function(node):
     """Check if given node is a graph containing itself a J on a sub-graph."""
     if isinstance(node, Graph):
+        seen = {node}
         todo = [node.output]
         while todo:
             n = todo.pop()
@@ -1119,7 +1120,8 @@ def has_inner_j_on_function(node):
                         return True
                     else:
                         todo.append(inp)
-            elif n.is_constant_graph():
+            elif n.is_constant_graph() and n.value not in seen:
+                seen.add(n.value)
                 todo.append(n.value.output)
     return False
 
