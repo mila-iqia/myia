@@ -861,3 +861,22 @@ def test_fourth_order(backend):
         return grad(grad(grad(grad(polynomial))))(x)
 
     assert f(-3) == -360
+
+
+@pytest.mark.xfail(
+    reason="InternalInferenceError: Missing a backpropagator for primitive 'env_getitem'"
+)
+@bt()
+def test_second_order_on_if(backend):
+    def g(x):
+        if x < 0:
+            return x * x
+        else:
+            return x * x * x
+
+    @myia(backend=backend)
+    def f(x):
+        return grad(grad(g))(x)
+
+    print(f(-1))
+    print(f(1))
