@@ -16,7 +16,7 @@ When a function is decorated with `@myia` and called with a list of arguments, i
 * **Compile:** The optimized graph is fed to the backend. Multiple backends are supported and the user is free to choose the one they prefer.
 * **Wrap:** This step wraps the compiled function. Mirroring the conversion that occurs in the simplify_types step, it converts the arguments from rich representations such as classes to tuples, and converts the result output by the backend from tuples to the original rich representations, to make it appear seamless to the user.
 
-The pipeline outputs a callable function. By default, when calling a Myia function, the arguments will be converted into the backend's representation (which might involve transferring the data to GPU memory). The return value will also be in the backend's reprensentation. The user can call a method to convert it to Python/Numpy, or they can feed it back to the Myia function, in which case they will not need to be converted (this allows iterative training a model entirely on the GPU).
+The pipeline outputs a callable function. By default, when calling a Myia function, the arguments will be converted into the backend's representation (which might involve transferring the data to GPU memory). The return value will also be in the backend's representation. The user can call a method to convert it to Python/Numpy, or they can feed it back to the Myia function, in which case they will not need to be converted (this allows iterative training a model entirely on the GPU).
 
 The standard pipeline is defined in `myia/pipeline/standard.py`.
 

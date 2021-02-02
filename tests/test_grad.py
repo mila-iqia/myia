@@ -819,7 +819,18 @@ def test_bad_bprop_def():
             return dout + x + y
 
 
-@mark.xfail(reason="Second order gradients are not supported yet")
+@bt()
+def test_first_order(backend):
+    def square(x):
+        return x * x
+
+    @myia(backend=backend)
+    def f(x):
+        return grad(square)(x)
+
+    return f(10) == 20
+
+
 @bt()
 def test_second_order(backend):
     def square(x):
@@ -830,3 +841,42 @@ def test_second_order(backend):
         return grad(grad(square))(x)
 
     assert f(10) == 2
+
+
+@bt()
+def test_fourth_order(backend):
+
+    # Function:
+    # x ** 5 + 2x
+    # Successive derivations:
+    # 5x ** 4 + 2
+    # 20x ** 3
+    # 60x ** 2
+    # 120x
+    def polynomial(x):
+        return x * x * x * x * x + 2 * x
+
+    @myia(backend=backend)
+    def f(x):
+        return grad(grad(grad(grad(polynomial))))(x)
+
+    assert f(-3) == -360
+
+
+@pytest.mark.xfail(
+    reason="InternalInferenceError: Missing a backpropagator for primitive 'env_getitem'"
+)
+@bt()
+def test_second_order_on_if(backend):
+    def g(x):
+        if x < 0:
+            return x * x
+        else:
+            return x * x * x
+
+    @myia(backend=backend)
+    def f(x):
+        return grad(grad(g))(x)
+
+    print(f(-1))
+    print(f(1))

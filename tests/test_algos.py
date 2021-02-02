@@ -1,8 +1,11 @@
+import pytest
+
+from myia import myia
 from myia.lib import from_value
-from myia.operations import scalar_mul, tagged
+from myia.operations import grad, scalar_mul, tagged
 from myia.pipeline import standard_pipeline
 from myia.testing.common import Pair, f64, i64
-from myia.testing.multitest import backend_all, mt, run, run_debug
+from myia.testing.multitest import backend_all, bt, mt, run, run_debug
 
 from .test_grad import gradient
 from .test_infer import infer_scalar
@@ -139,3 +142,17 @@ def test_sumtree(x):
 )
 def test_reducetree(t, init):
     return reducetree(scalar_mul, t, init)
+
+
+@pytest.mark.xfail(
+    reason="TypeDispatchError: `cast_helper` is not defined for argument types (AbstractScalar(<PendingFromList pending>), AbstractADT..."
+)
+@bt()
+def test_second_order_sumtree(backend):
+    @myia(backend=backend)
+    def f(x):
+        return grad(grad(sumtree))(x)
+
+    # Just make sure it compiles and runs.
+    print(f(make_tree(3, 1.0)))
+    print(f(countdown(4.0)))
