@@ -92,7 +92,7 @@ def toposort(
             if allow_cycles:
                 cycles.add(node)
             else:
-                raise ValueError('cycle')
+                raise ValueError("cycle")
         else:
             rank[node] = len(todo)
         cont = False

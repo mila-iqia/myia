@@ -267,9 +267,7 @@ def _print_node(node, buf, offset=0):
         print(f"{o}%{str(node)} = ", end="", file=buf)
         print(f"{repr_node(node.inputs[0])}(", end="", file=buf)
         print(
-            ", ".join(repr_node(a) for a in node.inputs[1:]),
-            end="",
-            file=buf,
+            ", ".join(repr_node(a) for a in node.inputs[1:]), end="", file=buf,
         )
         print(")", file=buf, end="")
         if node.abstract is not None:
@@ -302,13 +300,21 @@ def print_graph(g, allow_cycles=True):
 
     buf = io.StringIO()
     print(f"graph {str(g)}(", file=buf, end="")
-    print(", ".join(f"%{str(p)}{' : ' + str(p.abstract) if p.abstract is not None else ''}" for p in g.parameters), file=buf, end="")
+    print(
+        ", ".join(
+            f"%{str(p)}{' : ' + str(p.abstract) if p.abstract is not None else ''}"
+            for p in g.parameters
+        ),
+        file=buf,
+        end="",
+    )
     print(") ", file=buf, end="")
     if g.abstract is not None:
         print(f"-> {g.abstract.output} ", file=buf, end="")
     print("{", file=buf)
 
     seen_graphs = set([g])
+
     def _succ_deep_once(node):
         if node.is_constant_graph():
             res = [node.value.return_] if node.value not in seen_graphs else []
@@ -318,7 +324,9 @@ def print_graph(g, allow_cycles=True):
             return node.incoming
 
     for node in _toposort(g.output, _succ_deep_once, allow_cycles=allow_cycles):
-        if (node.graph is not None and node.graph is not g) or node is g.return_:
+        if (
+            node.graph is not None and node.graph is not g
+        ) or node is g.return_:
             continue
         _print_node(node, buf, offset=2)
 
