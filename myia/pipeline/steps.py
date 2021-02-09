@@ -269,7 +269,11 @@ step_opt = LoopPipeline(
         # optlib.incorporate_call_through_switch,
         name="main2",
     ),
-    LocalPassOptimizer(optlib.expand_J, name="grad"),
+    LocalPassOptimizer(
+        optlib.expand_J,
+        # optlib.expand_j_apply,
+        name="grad",
+    ),
     CSE(report_changes=False),
     optlib.opt_jelim,
     name="step_opt",

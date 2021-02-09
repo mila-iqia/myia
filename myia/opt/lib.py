@@ -2,6 +2,10 @@
 
 from ovld import ovld
 
+from debug.j_utils import lookup_j_in_subgraph
+from myia.abstract import data as abstract_types
+from myia.ir.utils import print_graph
+
 from .. import operations
 from ..abstract import (
     DEAD,
@@ -1126,6 +1130,51 @@ def has_inner_j_on_function(node):
     return False
 
 
+class NestedAbstractJTaggedException(Exception):
+    """Exception raised if found an AbstractJTagged nested to another one."""
+
+
+def _update_found(arg, found):
+    return found + (type(arg),)  # if found else found
+
+
+def _printable_found(found):
+    return tuple(typ.__name__ for typ in found)
+
+
+@ovld  # noqa: F811
+def deep_check_j(arg: AbstractFunctionUnique, found=()):
+    found = _update_found(arg, found)
+    for fn_arg in arg.args:
+        deep_check_j(fn_arg, found)
+    deep_check_j(arg.output, found)
+
+
+@ovld  # noqa: F811
+def deep_check_j(arg: AbstractJTagged, found=()):
+    if (
+        found
+        and AbstractJTagged in found
+        and sum(1 for t in found if t is AbstractFunctionUnique) == 1
+    ):
+        print("INNER", _printable_found(found), arg)
+        raise NestedAbstractJTaggedException()
+    print("FOUND", _printable_found(found), arg)
+    deep_check_j(arg.element, found=(found + (AbstractJTagged,)))
+
+
+@ovld  # noqa: F811
+def deep_check_j(arg: abstract_types.AbstractTuple, found=()):
+    found = _update_found(arg, found)
+    for element in arg.elements:
+        deep_check_j(element, found)
+
+
+@ovld  # noqa: F811
+def deep_check_j(arg: object, found=()):
+    print("DEEP CHECK", _printable_found(found), type(arg), arg)
+
+
 @pattern_replacer(P.J, C)
 def expand_J(resources, node, equiv):
     """Replaces a call to J(f) by the graph for J(f).
@@ -1139,9 +1188,31 @@ def expand_J(resources, node, equiv):
     """
     from ..grad import Jimpl
 
+    print("[BEFORE]")
+    print(print_graph(node.graph))
+    print("[/BEFORE]")
+
     resources.opt_manager.gc()
     arg = equiv[C].value
     if has_inner_j_on_function(arg):
+        return node
+
+    if arg is P.J:
+        print("EXPANDING J(J)")
+        return Constant(P.identity)
+
+    vfn = node.abstract
+    j_in_sub_graph = bool(lookup_j_in_subgraph(node))
+    print("@@@@@")
+    try:
+        deep_check_j(vfn)
+        print(vfn)
+        print(*node.inputs)
+        print("EXPANDED!", j_in_sub_graph, node.graph)
+    except NestedAbstractJTaggedException:
+        print(vfn)
+        print(*node.inputs)
+        print("SKIPPED!", j_in_sub_graph, node.graph)
         return node
 
     if not hasattr(resources, "grad_cache"):
@@ -1155,22 +1226,74 @@ def expand_J(resources, node, equiv):
     if key in resources.grad_cache:
         ct = Constant(resources.grad_cache[key])
         ct.abstract = ct.value.abstract
+        print("CACHED", ct)
         return ct
 
     try:
         newg = Jimpl(arg, resources, node)
     except NotImplementedError:
+        print("ERROR JIMPL", arg)
         return None
 
-    vfn = node.abstract
-    newg = resources.incorporate(newg, vfn.args, vfn.output)
+    try:
+        newg = resources.incorporate(newg, vfn.args, vfn.output)
+    except Exception as e:
+        print("[ERROR IN GRAPH]", "!" * 80)
+        related_graphs = set(node.graph.graphs_reachable) | set(
+            node.graph.scope
+        )
+        related_graphs -= {node.graph}
+        for rg in related_graphs:
+            print(print_graph(rg))
+        print(print_graph(node.graph))
+        print("[ERROR NODE]")
+        print(node, *node.inputs)
+        print("[ERROR VFN]")
+        print(vfn)
+        print("[J IN SUB-GRAPH]")
+        lookup_j_in_subgraph(node, True)
+        print("[/END ERROR]")
+        raise e
 
     if isinstance(arg, Graph):
         arg.transforms["grad"] = newg
 
     resources.grad_cache[key] = newg
 
+    print("OUTPUT", newg)
     return Constant(newg)
+
+
+def py_zeros_like(x):
+    """Default implementation for f(x) = 0."""
+    return zeros_like(x)
+
+
+@pattern_replacer(P.J, (X, Xs))
+def expand_j_apply(resources, node, equiv):
+    """Replace J(apply_node) with zeros_like(apply_node).
+
+    Some J(apply) nodes now appear in graph. If apply node just returns
+    a value (ie. not a function), then gradient of a value should be 0.
+    Still, doesn't seems to fix issues.
+    """
+    assert node.inputs[1].is_apply()
+    print("[APPLY]")
+    print(print_graph(node.graph))
+    print("[/APPLY]")
+    f = equiv[X]
+    args = list(equiv[Xs])
+
+    input_type = node.inputs[1].abstract
+    assert not isinstance(input_type, AbstractFunctionUnique)
+
+    print("J APPLY", f, input_type)
+    for v in args:
+        print("\t", v)
+
+    g = resources.convert(py_zeros_like)
+    newg = resources.incorporate(g, [input_type], input_type)
+    return sexp_to_node((Constant(newg), node.inputs[1]), node.graph)
 
 
 @abstract_check.variant(initial_state=lambda: {"cache": {}, "prop": "_noj"})

@@ -776,9 +776,15 @@ class _ValueTrack(Track):
 class _TypeTrack(Track):
     """Represents the TYPE track, for scalars."""
 
+    def default(self):
+        return ABSENT
+
 
 class _ShapeTrack(Track):
     """Represents the SHAPE track, for arrays."""
+
+    def default(self):
+        return ABSENT
 
 
 class _AliasIdTrack(Track):

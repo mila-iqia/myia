@@ -238,7 +238,19 @@ class LocalPassOptimizer:
                         tracer().emit_success(**args, new_node=new)
                         tr.set_results(success=True, **args)
                         if resources and resources.live_inferrer:
-                            resources.live_inferrer()
+                            from myia.ir.utils import print_graph
+
+                            try:
+                                resources.live_inferrer()
+                                print("REPORT/")
+                                print(print_graph(n.graph))
+                                print("/REPORT")
+                            except Exception as e:
+                                print("ERROR_REPORT/")
+                                print(print_graph(n.graph))
+                                print(n, *n.inputs)
+                                print("/ERROR_REPORT")
+                                raise e
                         n = new
                         loop = True
                         changes = True

@@ -1,7 +1,8 @@
 """Definitions for the primitive `env_getitem`."""
 
 from .. import xtype
-from ..lib import standard_prim
+from ..lib import bprop_to_grad_transform, standard_prim
+from ..operations import env_setitem, zeros_like
 from . import primitives as P
 
 
@@ -20,6 +21,16 @@ async def infer_env_getitem(
     return expected
 
 
+@bprop_to_grad_transform(P.env_getitem)
+def bprop_env_getitem(env, key, default, out, dout):
+    """Back propagator for env_getitem."""
+    return (
+        env_setitem(zeros_like(env), key, dout),
+        zeros_like(key),
+        zeros_like(default),
+    )
+
+
 __operation_defaults__ = {
     "name": "env_getitem",
     "registered_name": "env_getitem",
@@ -34,5 +45,5 @@ __primitive_defaults__ = {
     "type": "backend",
     "python_implementation": pyimpl_env_getitem,
     "inferrer_constructor": infer_env_getitem,
-    "grad_transform": None,
+    "grad_transform": bprop_env_getitem,
 }

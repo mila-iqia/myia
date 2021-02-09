@@ -128,7 +128,14 @@ class ValuePropagator:
         def _dofn(fn, inp):
             if isinstance(fn, Primitive):
                 for need in self.need[node]:
-                    vprop_registry[fn](self, need, inp, node)
+                    try:
+                        vprop_registry[fn](self, need, inp, node)
+                    except Exception as e:
+                        from myia.ir.utils import print_graph
+
+                        print(print_graph(node.graph))
+                        print(node, *node.inputs)
+                        raise e
             elif isinstance(fn, Graph):
                 for param, inp in zip(fn.parameters, node.inputs[1:]):
                     self.connect(inp, param)

@@ -863,9 +863,9 @@ def test_fourth_order(backend):
     assert f(-3) == -360
 
 
-@pytest.mark.xfail(
-    reason="InternalInferenceError: Missing a backpropagator for primitive 'env_getitem'"
-)
+# @pytest.mark.xfail(
+#     reason="InternalInferenceError: Missing a backpropagator for primitive 'env_getitem'"
+# )
 @bt()
 def test_second_order_on_if(backend):
     def g(x):

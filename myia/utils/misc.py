@@ -426,6 +426,8 @@ def core(fn=None, **flags):
         **flags,
     }
     fn._myia_flags = flags
+    fn.__name__ = flags.get("name", fn.__name__)
+
     return fn
 
 
