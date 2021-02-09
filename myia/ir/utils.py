@@ -280,6 +280,7 @@ def _print_node(node, buf, offset=0):
 
 
 def print_node(node):
+    """Return a textual representation of a node and its ancestors."""
     import io
 
     buf = io.StringIO()

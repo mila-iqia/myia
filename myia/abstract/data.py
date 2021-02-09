@@ -637,7 +637,7 @@ class AbstractJTagged(AbstractWrapper):
 
 
 class AbstractHandle(AbstractWrapper):
-    """Represents universe handle"""
+    """Represents universe handle."""
 
     def __init__(self, element, values={}):
         """Initialize an AbstractHandle."""

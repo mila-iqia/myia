@@ -76,6 +76,8 @@ def toposort(
             * Return 'follow' to include the node and follow its edges.
             * Return 'nofollow' to include the node but not follow its edges.
             * Return 'exclude' to not include the node, nor follow its edges.
+       allow_cycles: Return an arbitrary order for graphs with cycles instead
+           of an error
 
     """
     done: Set[T] = set()
