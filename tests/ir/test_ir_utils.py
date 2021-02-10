@@ -325,3 +325,32 @@ def test_print_cycle():
         print_graph(g, allow_cycles=False)
 
     print_graph(g)
+
+
+def test_print_closure():
+    g = Graph()
+    g.debug.name = "testfn"
+    p = g.add_parameter()
+    p.debug.name = "a"
+    n = g.apply("make_tuple", p, p)
+    n.debug.name = "_apply0"
+    g2 = Graph()
+    g2.debug.name = "sub"
+    n2 = g2.apply("tuple_getitem", n, 0)
+    n2.debug.name = "_apply1"
+    g2.output = n2
+    g.output = g.apply(g2)
+
+    s = print_graph(g2)
+
+    assert (
+        s
+        == """graph sub() {
+  %_apply1 = tuple_getitem(%_apply0, 0)
+  return %_apply1
+}
+"""
+    )
+    s = print_node(n2)
+
+    assert s == "%_apply1 = tuple_getitem(%_apply0, 0)\n"
