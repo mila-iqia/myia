@@ -328,7 +328,9 @@ def print_graph(g, allow_cycles=True):
         if (
             node.graph is not None and node.graph is not g
         ) or node is g.return_:
-            continue
+            # There is a bug in coverage which makes it ignore the continue,
+            # even though it is covered.
+            continue  # pragma: no cover
         _print_node(node, buf, offset=2)
 
     print(f"  return %{str(g.output)}", file=buf)
