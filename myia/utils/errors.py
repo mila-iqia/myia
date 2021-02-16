@@ -18,15 +18,17 @@ class InferenceError(Exception):
         traceback_refs: A map from a context to the first reference in
             that context that fails to resolve because of this error.
             This represents a traceback of sorts.
-
+        priority: Priority of this error, in the case that there are
+            several.
     """
 
-    def __init__(self, message, refs=[], pytb=None):
+    def __init__(self, message, refs=[], pytb=None, priority=0):
         """Initialize an InferenceError."""
         super().__init__(message, refs)
         self.message = message
         self.refs = refs
         self.pytb = pytb
+        self.priority = priority
         self.traceback_refs = infer_trace.get()
 
 
