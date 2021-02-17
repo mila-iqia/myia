@@ -24,3 +24,10 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 80
+
+[tool.isort]
+known_first_party = "myia"
+known_third_party = "ovld"
+multi_line_output = 3
+include_trailing_comma = true
+combine_as_imports = true
