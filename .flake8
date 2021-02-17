@@ -1,0 +1,5 @@
+[flake8]
+ignore = W503,W504,E241,F722,E501,E203
+per-file-ignores =
+  __init__.py:F401,F403
+  myia/lib.py:F401,F403
