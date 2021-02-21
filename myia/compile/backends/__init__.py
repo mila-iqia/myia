@@ -93,12 +93,21 @@ def collect_backend_plugins():
     :return: a dictionary mapping a backend name to a loader function
         to generate BackendLoader instances.
     """
-    return {
-        entry_point.name: BackendLoader.loader_callable_from_pkg(
-            entry_point.module_name
+    # Manually register Python backend from myia package.
+    backends = {
+        "python": BackendLoader.loader_callable_from_pkg(
+            "myia.compile.backends.python"
         )
-        for entry_point in pkg_resources.iter_entry_points("myia.backend")
     }
+    backends.update(
+        {
+            entry_point.name: BackendLoader.loader_callable_from_pkg(
+                entry_point.module_name
+            )
+            for entry_point in pkg_resources.iter_entry_points("myia.backend")
+        }
+    )
+    return backends
 
 
 _backends = collect_backend_plugins()

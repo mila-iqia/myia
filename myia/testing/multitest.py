@@ -404,6 +404,8 @@ def _load_testable_backends():
 _pytest_parameters = {}
 # Load backend testing configurations into _pytest_parameters.
 _load_testable_backends()
+# Manually register backend testing options for Python backend.
+register_backend_testing("python", "cpu", {})
 
 backend_gpu = Multiple(
     *[param for _, _, param in _get_backend_testing_parameters()]

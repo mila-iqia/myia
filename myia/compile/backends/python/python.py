@@ -169,6 +169,7 @@ def python_max_pool2d_grad(
 
 
 def python_make_handle(c, typ, universe):
+    """Implement primitive `make_handle`."""
     universe = c.ref(universe)
     handle = c.get_new_name("handle")
     return [f"{handle} = HandleInstance(None, None)", f"({universe}, {handle})"]
@@ -375,33 +376,43 @@ class _PythonConverter(Converter):
         return v
 
     def convert_array(self, v, t):
+        """Converts array values."""
         return self._default_convert(v, t)
 
     def convert_scalar(self, v, t):
+        """Convert numeric scalars."""
         return self._default_convert(v, t)
 
     def convert_nil(self, v, t):
+        """Convert Nil values."""
         return self._default_convert(v, t)
 
     def convert_bool(self, v, t):
+        """Convert boolean values."""
         return self._default_convert(v, t)
 
     def convert_universe(self, v, t):
+        """Convert a Universe."""
         return self._default_convert(v, t)
 
     def convert_handle(self, v, t):
+        """Convert a Handle."""
         return self._default_convert(v, t)
 
     def convert_tuple(self, v: tuple, t: AbstractTuple):
+        """Convert a tuple."""
         return self._default_convert(v, t)
 
     def convert_tagged(self, v, t):
+        """Convert a union value."""
         return self._default_convert(v, t)
 
     def convert_type(self, v, t):
+        """Convert a type value."""
         return self._default_convert(v, t)
 
     def convert_random_state(self, v, t):
+        """Convert a random state value."""
         return self._default_convert(v, t)
 
 
@@ -417,6 +428,7 @@ class PythonConstantConverter(_PythonConverter):
     """Convert constant values to printable values."""
 
     def convert_scalar(self, v, t):
+        """Convert numeric scalars."""
         numpy_typename = type_to_np_dtype(t)
         # For type names below, we return raw value.
         if numpy_typename in ("bool", "int64", "uint64", "float64"):
@@ -430,18 +442,21 @@ class PythonConstantConverter(_PythonConverter):
         return f"np.{numpy_typename}({v})"
 
     def convert_dead(self, v, t):
+        """Convert dead values."""
         return "None"
 
     def convert_env(self, v, t):
+        """Convert a grad env."""
         return "{}"
 
     def convert_tuple(self, v: tuple, t: AbstractTuple):
+        """Convert a tuple."""
         if len(v):
             return f"({', '.join(str(self(v[i], t.elements[i])) for i in range(len(v)))},)"
         return "()"
 
     def convert_type(self, v, t):
-        # Return type name as a string.
+        """Return type name as a string."""
         if isinstance(t.element, AbstractHandle):
             return "HandleInstance"
         else:
@@ -452,6 +467,7 @@ class PythonConstantConverter(_PythonConverter):
                 return f"np.{type_to_np_dtype(myia_type)}"
 
     def convert_handle(self, v, t):
+        """Convert a Handle."""
         return f"HandleInstance({self(v.state, v.abstract or to_abstract(v.state))})"
 
 
@@ -565,9 +581,11 @@ class FunctionCompiler(_Compiler):
         return self.node_to_name[node]
 
     def has_node(self, node):
+        """Return True if given node has already an associated name."""
         return node in self.node_to_name or self.parent.has_node(node)
 
     def has_constant(self, name):
+        """Return True if a constant with given name is already registered."""
         return (
             name in self.const_name_to_value
             or name in self.closure_name_to_code
@@ -575,9 +593,11 @@ class FunctionCompiler(_Compiler):
         )
 
     def get_new_name(self, desired_name):
+        """Generate a new unique variable name."""
         return self.parent.get_new_name(desired_name)
 
     def get_label(self, node):
+        """Generate a label for given node."""
         return self.parent.get_label(node)
 
     def ref(self, node):
@@ -600,9 +620,11 @@ class FunctionCompiler(_Compiler):
         return isinstance(const_value, (bool, int, float, type(None)))
 
     def get_graph_cache(self):
+        """Return graph cache (for graph compilation caching)."""
         return self.parent.get_graph_cache()
 
     def make_const(self, v, t):
+        """Convert a value to a Python constant."""
         return self.parent.make_const(v, t)
 
     def on_constant(self, node):
@@ -767,6 +789,7 @@ class PythonCompiler(_Compiler):
         return formatted_label
 
     def get_label(self, node):
+        """Generate a label for given node."""
         label = self.node_labeler.label(node)
         if not self.is_valid_python_name(label):
             label = self.convert_to_valid_python_name(label)
@@ -800,7 +823,7 @@ class PythonCompiler(_Compiler):
             "from myia.utils import RandomStateWrapper",
             "from myia.lib import TaggedValue",
             "from myia.utils.universe import HandleInstance",
-            "import myia_backend_python.implementations as IMPL",
+            "import myia.compile.backends.python.implementations as IMPL",
         ]
         other_functions = []
         main_body = None
@@ -832,9 +855,11 @@ class PythonCompiler(_Compiler):
         return getattr(module, "main")
 
     def has_node(self, node):
+        """Return True if given node has already an associated name."""
         return isinstance(node, Graph) and node in self.graph_to_name
 
     def has_constant(self, name):
+        """Return True if a constant with given name is already registered."""
         return name in self.fn_name_to_code
 
     def get_new_name(self, desired_name):
@@ -851,9 +876,11 @@ class PythonCompiler(_Compiler):
         return self.graph_to_name[node.value]
 
     def get_graph_cache(self):
+        """Return graph cache (for graph compilation caching)."""
         return self._prim_graph_cache
 
     def convert_func(self, graph):
+        """Convert a graph to Python function code."""
         return FunctionCompiler(graph, self).compile()
 
 
@@ -861,7 +888,7 @@ class PythonBackend(Backend):
     """Python backend."""
 
     def __init__(self, debug=False, pdb=False):
-        """ Initialize.
+        """Initialize.
 
         :param debug: if False or None, do nothing.
             If True, print generated code in stdout.
@@ -892,6 +919,7 @@ class PythonBackend(Backend):
         return self.compiler.run(graph, self)
 
     def supports_prim_group(self, prim_group):
+        """Return True if given primitive group is supported."""
         return all(MAP.has(prim) for prim in prim_group.primitives)
 
 

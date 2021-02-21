@@ -17,8 +17,10 @@ def _get_conv_shape_1axis(
 
     Parameters
     ----------
-    image_shape: int. Corresponds to the input image shape on a given axis.
-    kernel_shape: int. Corresponds to the kernel shape on a given axis.
+    image_shape: int
+        Corresponds to the input image shape on a given axis.
+    kernel_shape: int
+        Corresponds to the kernel shape on a given axis.
     border_mode: string or int. If it is a string, it must be
         'valid' or 'full'.
     subsample: int. It must correspond to the subsampling on the
@@ -123,7 +125,7 @@ def _get_conv_output_shape(
 
 
 def _conv2d(img, kern, mode="valid", dilation=(1, 1), groups=1):
-    """Basic slow Python 2D or 3D convolution for DebugMode
+    """Basic slow Python 2D or 3D convolution for DebugMode.
 
     Copied and simplified from Theano (2020/11/08):
     https://github.com/Theano/Theano/blob/master/theano/tensor/nnet/abstract_conv.py
