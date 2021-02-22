@@ -2,11 +2,13 @@
 
 Generate and compile a Python code string from graphs.
 """
+import operator
 import re
 import sys
 from collections import Counter
 from types import ModuleType
 
+from myia import operations
 from myia.abstract import to_abstract
 from myia.compile.backends import Backend, Converter
 from myia.compile.transform import convert_grad, get_prim_graph
@@ -14,7 +16,7 @@ from myia.debug.label import NodeLabeler
 from myia.graph_utils import toposort
 from myia.ir import Graph, manage
 from myia.lib import ANYTHING, AbstractArray, AbstractHandle, AbstractTuple
-from myia.operations import Primitive, primitives as P
+from myia.operations import Operation, Primitive, primitives as P
 from myia.xtype import Tuple, type_to_np_dtype
 
 
@@ -275,6 +277,37 @@ COMPLEX_MAP = {
     P.universe_getitem: python_universe_getitem,
     P.universe_setitem: python_universe_setitem,
 }
+OPERATION_MAP = {
+    operations.add: operator.add,
+    operations.sub: operator.sub,
+    operations.mul: operator.mul,
+    operations.mod: operator.mod,
+    operations.pow: operator.mod,
+    operations.eq: operator.eq,
+    operations.ne: operator.ne,
+    operations.lt: operator.lt,
+    operations.gt: operator.gt,
+    operations.le: operator.le,
+    operations.ge: operator.ge,
+    operations.pos: operator.pos,
+    operations.neg: operator.neg,
+    operations.not_: operator.not_,
+    operations.and_: operator.and_,
+    operations.or_: operator.or_,
+    operations.getitem: operator.getitem,
+    operations.bool: operator.truth,
+}
+
+
+def convert_operation(c, op, *inputs):
+    """Convert an operation apply node to a Python code."""
+    if op.value is operations.resolve:
+        namespace = inputs[0].value
+        name = inputs[1].value
+        resolved = namespace[name]
+        if resolved in OPERATION_MAP:
+            return f"operator.{OPERATION_MAP[resolved].__name__}"
+    raise NotImplementedError(f"Unsupported operation {op}")
 
 
 class PythonMapper:
@@ -470,6 +503,20 @@ class PythonConstantConverter(_PythonConverter):
         """Convert a Handle."""
         return f"HandleInstance({self(v.state, v.abstract or to_abstract(v.state))})"
 
+    def convert_default(self, v):
+        """Convert a value given without abstract type."""
+        # Return None for constants that must not appear in final code.
+        # As inline constants, they won't be converted to a variable,
+        # and associated nodes should be handled specifically
+        # (e.g. for inputs of operations.resolve apply nodes).
+        from myia.utils.misc import Namespace
+
+        if isinstance(v, (str, Namespace, Operation)):
+            return None
+        raise NotImplementedError(
+            f"No default conversion for value {v}, type {type(v)}"
+        )
+
 
 def nested_list_to_code_string(structure, indentation=""):
     """Convert a nested list of strings into a correctly indented Python code."""
@@ -657,6 +704,10 @@ class FunctionCompiler(_Compiler):
             if conv is not None:
                 return conv(self, *node.inputs[1:])
 
+        # Convert operation call to an inline code, if possible.
+        if node.inputs[0].is_constant(Operation):
+            return convert_operation(self, *node.inputs)
+
         # Otherwise generate a raw call.
         return f"{self.ref(node.inputs[0])}({', '.join(self.ref(n) for n in node.inputs[1:])})"
 
@@ -819,6 +870,7 @@ class PythonCompiler(_Compiler):
         # Compilation.
         pre_code = [
             "import math",
+            "import operator",
             "import numpy as np",
             "from myia.utils import RandomStateWrapper",
             "from myia.lib import TaggedValue",
@@ -921,6 +973,16 @@ class PythonBackend(Backend):
     def supports_prim_group(self, prim_group):
         """Return True if given primitive group is supported."""
         return all(MAP.has(prim) for prim in prim_group.primitives)
+
+
+def compile_graph(graph, **options):
+    """Easy-to-use public method to convert a graph to a Python function.
+
+    :param graph: myia graph to compile
+    :param options: backend options
+    :return: callable Python function representing compiled graph
+    """
+    return PythonBackend(**options).compile(graph, None, None)
 
 
 def load_options(debug=False, pdb=False):
