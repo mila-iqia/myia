@@ -7,6 +7,7 @@ SEQ = Named('$seq')
 class Graph:
     def __init__(self, parent=None):
         self.parent = parent
+        self.name = None
         self.parameters = []
         self.return_ = None
         self.flags = {}
@@ -39,10 +40,11 @@ class Graph:
 
 
 class Node:
+    __slots__ = ('graph', 'abstract', 'info')
     def __init__(self, graph):
         self.graph = graph
         self.abstract = None
-        self.annotation = None
+        self.info = None
 
     def is_apply(self, value):
         return False
@@ -58,6 +60,8 @@ class Node:
 
 
 class Edge:
+    __slots__ = ('label', 'node')
+
     def __init__(self, label, node):
         self.label = label
         self.node = node
@@ -73,6 +77,8 @@ def edgemap(edges):
 
         
 class Apply(Node):
+    __slots__ = ('edges',)
+
     def __init__(self, graph, *edges):
         super().__init__(graph)
         self.edges = edgemap(edges)
@@ -91,6 +97,7 @@ class Parameter(Node):
 
 
 class Constant(Node):
+    __slots__ = ('value',)
     def __init__(self, value):
         super().__init__(None)
         self.value = value
