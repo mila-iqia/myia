@@ -93,12 +93,21 @@ def collect_backend_plugins():
     :return: a dictionary mapping a backend name to a loader function
         to generate BackendLoader instances.
     """
-    return {
-        entry_point.name: BackendLoader.loader_callable_from_pkg(
-            entry_point.module_name
+    # Manually register Python backend from myia package.
+    backends = {
+        "python": BackendLoader.loader_callable_from_pkg(
+            "myia.compile.backends.python"
         )
-        for entry_point in pkg_resources.iter_entry_points("myia.backend")
     }
+    backends.update(
+        {
+            entry_point.name: BackendLoader.loader_callable_from_pkg(
+                entry_point.module_name
+            )
+            for entry_point in pkg_resources.iter_entry_points("myia.backend")
+        }
+    )
+    return backends
 
 
 _backends = collect_backend_plugins()
@@ -292,6 +301,10 @@ class Converter:
         """Convert a random state value."""
         raise NotImplementedError("convert_type")
 
+    def convert_default(self, v):
+        """Convert a value with no type hint."""
+        raise NotImplementedError("convert_default")
+
     def __call__(self, v, t):
         """Convert a value."""
         if v is abstract.DEAD:
@@ -321,5 +334,12 @@ class Converter:
             return self.convert_type(v, t)
         elif isinstance(t, abstract.AbstractHandle):
             return self.convert_handle(v, t)
+        elif t is None:
+            try:
+                # Try to get abstract type from given value.
+                return self(v, abstract.to_abstract(v))
+            except NotImplementedError:
+                # Otherwise, call default converter.
+                return self.convert_default(v)
         else:
-            raise NotImplementedError(f"convert for {t}")
+            raise NotImplementedError(f"convert for type {t}, value {v}")
