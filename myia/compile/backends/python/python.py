@@ -11,6 +11,7 @@ from types import ModuleType
 from myia import operations
 from myia.abstract import to_abstract
 from myia.compile.backends import Backend, Converter
+from myia.compile.backends.python import implementations as IMPL
 from myia.compile.transform import convert_grad, get_prim_graph
 from myia.debug.label import NodeLabeler
 from myia.graph_utils import toposort
@@ -297,6 +298,9 @@ OPERATION_MAP = {
     operations.getitem: operator.getitem,
     operations.bool: operator.truth,
 }
+IMPL_OPERATION_MAP = {
+    operations.user_switch: IMPL.user_switch,
+}
 
 
 def convert_operation(c, op, *inputs):
@@ -307,7 +311,11 @@ def convert_operation(c, op, *inputs):
         resolved = namespace[name]
         if resolved in OPERATION_MAP:
             return f"operator.{OPERATION_MAP[resolved].__name__}"
-    raise NotImplementedError(f"Unsupported operation {op}")
+        if resolved in IMPL_OPERATION_MAP:
+            return f"IMPL.{IMPL_OPERATION_MAP[resolved].__name__}"
+    raise NotImplementedError(
+        f"Unsupported operation {op} {' '.join(str(inp) for inp in inputs)}"
+    )
 
 
 class PythonMapper:
