@@ -637,7 +637,7 @@ class AbstractJTagged(AbstractWrapper):
 
 
 class AbstractHandle(AbstractWrapper):
-    """Represents a value (non-function) transformed through J."""
+    """Represents universe handle."""
 
     def __init__(self, element, values={}):
         """Initialize an AbstractHandle."""

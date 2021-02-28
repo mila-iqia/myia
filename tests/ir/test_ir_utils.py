@@ -1,3 +1,5 @@
+import pytest
+
 from myia.debug.label import short_labeler
 from myia.debug.utils import GraphIndex
 from myia.graph_utils import dfs as _dfs
@@ -12,6 +14,7 @@ from myia.ir import (
     freevars_boundary,
     isomorphic,
     print_graph,
+    print_node,
     succ_deep,
     succ_deeper,
     succ_incoming,
@@ -273,3 +276,81 @@ def test_print_graph():
 }
 """
     )
+
+    # We use fake types here because we only care about the printing logic,
+    # not the proper use of types.
+    p.abstract = "int64"
+    p2.abstract = "float32"
+    g.output.abstract = "bool"
+    g.return_.abstract = "bool"
+
+    s = print_graph(g)
+    assert (
+        s
+        == """graph testfn(%a : int64, %b : float32) -> bool {
+  %_apply0 = @testfn(1, %b) ; type=bool
+  return %_apply0
+}
+"""
+    )
+
+
+def test_print_node():
+    g = Graph()
+    g.debug.name = "testfn"
+    p = g.add_parameter()
+    p.debug.name = "a"
+    p2 = g.add_parameter()
+    p2.debug.name = "b"
+    c = g.constant(1)
+    g.output = g.apply(g, c, p2)
+    g.output.debug.name = "_apply0"
+    s = print_node(g.output)
+    assert s == "%_apply0 = @testfn(1, %b)\n"
+
+
+def test_print_cycle():
+    g = Graph()
+    g.debug.name = "testfn"
+    p = g.add_parameter()
+    p.debug.name = "a"
+    p2 = g.add_parameter()
+    p2.debug.name = "b"
+    node = g.apply("make_tuple", p)
+    node2 = g.apply("make_tuple", p2, node)
+    node.inputs.append(node2)
+    g.output = node2
+
+    with pytest.raises(ValueError, match="cycle"):
+        print_graph(g, allow_cycles=False)
+
+    print_graph(g)
+
+
+def test_print_closure():
+    g = Graph()
+    g.debug.name = "testfn"
+    p = g.add_parameter()
+    p.debug.name = "a"
+    n = g.apply("make_tuple", p, p)
+    n.debug.name = "_apply0"
+    g2 = Graph()
+    g2.debug.name = "sub"
+    n2 = g2.apply("tuple_getitem", n, 0)
+    n2.debug.name = "_apply1"
+    g2.output = n2
+    g.output = g.apply(g2)
+
+    s = print_graph(g2)
+
+    assert (
+        s
+        == """graph sub() {
+  %_apply1 = tuple_getitem(%_apply0, 0)
+  return %_apply1
+}
+"""
+    )
+    s = print_node(n2)
+
+    assert s == "%_apply1 = tuple_getitem(%_apply0, 0)\n"

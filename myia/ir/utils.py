@@ -95,9 +95,9 @@ def dfs(root: ANFNode, follow_graph: bool = False) -> Iterable[ANFNode]:
     return _dfs(root, succ_deep if follow_graph else succ_incoming)
 
 
-def toposort(root: ANFNode) -> Iterable[ANFNode]:
+def toposort(root: ANFNode, *, allow_cycles=False) -> Iterable[ANFNode]:
     """Order the nodes topologically."""
-    return _toposort(root, succ_incoming)
+    return _toposort(root, succ_incoming, allow_cycles=allow_cycles)
 
 
 ###############
@@ -252,44 +252,88 @@ def sexp_to_graph(sexp):
     return g
 
 
-def print_graph(g):
+def repr_node(node):
+    if node.is_constant_graph():
+        return f"@{str(node.value)}"
+    elif node.is_constant():
+        return str(node.value)
+    else:
+        return f"%{str(node)}"
+
+
+def _print_node(node, buf, offset=0):
+    o = " " * offset
+    if node.is_apply():
+        print(f"{o}%{str(node)} = ", end="", file=buf)
+        print(f"{repr_node(node.inputs[0])}(", end="", file=buf)
+        print(
+            ", ".join(repr_node(a) for a in node.inputs[1:]), end="", file=buf,
+        )
+        print(")", file=buf, end="")
+        if node.abstract is not None:
+            print(f" ; type={node.abstract}", file=buf, end="")
+        print("", file=buf)
+    elif node.is_constant() or node.is_parameter():
+        pass
+    else:  # pragma: no cover
+        print(f"{o}UNK: {node}", file=buf)
+
+
+def print_node(node):
+    """Return a textual representation of a node and its ancestors."""
+    import io
+
+    buf = io.StringIO()
+
+    g = node.graph
+
+    for n in toposort(node):
+        if n.graph is not None and n.graph is not g:
+            continue
+        _print_node(n, buf)
+
+    return buf.getvalue()
+
+
+def print_graph(g, allow_cycles=True):
     """Returns a textual representation of a graph."""
     import io
 
     buf = io.StringIO()
+    print(f"graph {str(g)}(", file=buf, end="")
     print(
-        f"graph {g.debug.debug_name}("
-        + ", ".join(f"%{p.debug.debug_name}" for p in g.parameters)
-        + ") {",
+        ", ".join(
+            f"%{str(p)}{' : ' + str(p.abstract) if p.abstract is not None else ''}"
+            for p in g.parameters
+        ),
         file=buf,
+        end="",
     )
+    print(") ", file=buf, end="")
+    if g.abstract is not None:
+        print(f"-> {g.abstract.output} ", file=buf, end="")
+    print("{", file=buf)
 
-    def repr_node(node):
+    seen_graphs = set([g])
+
+    def _succ_deep_once(node):
         if node.is_constant_graph():
-            return f"@{node.value.debug.debug_name}"
-        elif node.is_constant():
-            return str(node.value)
+            res = [node.value.return_] if node.value not in seen_graphs else []
+            seen_graphs.add(node.value)
+            return res
         else:
-            return f"%{node.debug.debug_name}"
+            return node.incoming
 
-    for node in toposort(g.output):
-        if node.is_apply():
-            print(f"  %{node.debug.debug_name} = ", end="", file=buf)
-            print(f"{repr_node(node.inputs[0])}(", end="", file=buf)
-            print(
-                ", ".join(repr_node(a) for a in node.inputs[1:]),
-                end="",
-                file=buf,
-            )
-            print(")", file=buf)
-        elif node.is_constant():
-            pass
-        elif node.is_parameter():
-            pass
-        else:  # pragma: no cover
-            print(f"UNK: {node}", file=buf)
+    for node in _toposort(g.output, _succ_deep_once, allow_cycles=allow_cycles):
+        if (
+            node.graph is not None and node.graph is not g
+        ) or node is g.return_:
+            # There is a bug in coverage which makes it ignore the continue,
+            # even though it is covered.
+            continue  # pragma: no cover
+        _print_node(node, buf, offset=2)
 
-    print(f"  return %{g.output.debug.debug_name}", file=buf)
+    print(f"  return %{str(g.output)}", file=buf)
     print("}", file=buf)
     return buf.getvalue()
 
@@ -300,6 +344,7 @@ __all__ = [
     "freevars_boundary",
     "isomorphic",
     "print_graph",
+    "print_node",
     "sexp_to_graph",
     "sexp_to_node",
     "succ_deep",

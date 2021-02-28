@@ -79,7 +79,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         else:
             raise AssertionError("call_exception_handler", ctx)
 
-    def schedule(self, x, context_map=None):
+    def schedule(self, x, context_map=None, ref=None):
         """Schedule a task."""
         if context_map:
             ctx = copy_context()
@@ -87,7 +87,7 @@ class InferenceLoop(asyncio.AbstractEventLoop):
             fut = ctx.run(asyncio.ensure_future, x, loop=self)
         else:
             fut = asyncio.ensure_future(x, loop=self)
-        self._tasks.append(fut)
+        self._tasks.append((ref, fut))
         return fut
 
     def collect_errors(self):
@@ -95,14 +95,18 @@ class InferenceLoop(asyncio.AbstractEventLoop):
         futs, self._tasks = self._tasks, []
         errors, self._errors = self._errors, []
         errors += [
-            fut.exception() for fut in futs if fut.done() and fut.exception()
+            fut.exception() for _, fut in futs if fut.done() and fut.exception()
         ]
-        if not errors and any(fut for fut in futs if not fut.done()):
+        not_done = [ref for ref, fut in futs if not fut.done()]
+        if not errors and not_done:
             exc = self.errtype(
                 f"Could not run inference to completion."
                 " There might be an infinite loop in the program"
-                " which prevents type inference from working.",
-                refs=[],
+                " which prevents type inference from working. "
+                " The above is the set of blocked calls and does not "
+                " necessarily constitute a stack trace.",
+                refs=[x for x in not_done if x],
+                priority=-2,
             )
             errors.append(exc)
         return errors
