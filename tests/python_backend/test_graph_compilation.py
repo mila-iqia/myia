@@ -1,10 +1,27 @@
 from myia.compile.backends.python.python import compile_graph
 from myia.ir import manage
 from myia.ir.utils import print_graph
+from myia.operations import (
+    grad,
+    random_initialize,
+    random_uint32,
+    value_and_grad,
+)
 from myia.parser import parse
 
 
-def _compile(fn):
+def _assert_match(expected, given, rel=1e-03):
+    """Assert two values match.
+
+    Use to check gradient output (computed using finite difference).
+    Inspired to gradient output checking in myia.debug.finite_diff.GradTester.
+    """
+    threshold = max(abs(rel * expected), abs(rel * given))
+    match = bool(abs(expected - given) <= threshold)
+    assert match, (expected, given, rel)
+
+
+def parse_and_compile(fn):
     g = parse(fn)
     manage(g)
     print(print_graph(g))
@@ -12,8 +29,115 @@ def _compile(fn):
     return cf
 
 
+def test_grad_first_order():
+    def square(x):
+        return x * x
+
+    @parse_and_compile
+    def f(x):
+        return grad(square)(x)
+
+    _assert_match(20, f(10))
+
+
+def test_grad_two_args():
+    def func(x, y):
+        return 2 * x * y + 2 * x * x - 3 * y * y
+
+    @parse_and_compile
+    def f(x, y):
+        return grad(func, "y")(x, y)
+
+    @parse_and_compile
+    def g(x, y):
+        return grad(func, "x")(x, y)
+
+    @parse_and_compile
+    def h(x, y):
+        return grad(func)(x, y)
+
+    _assert_match(-10, f(1, 2))
+    _assert_match(8, g(1, 2))
+
+    dx, dy = h(2, 3)
+    _assert_match(2 * 3 + 4 * 2, dx)
+    _assert_match(2 * 2 - 6 * 3, dy)
+
+
+def test_value_and_grad_first_order():
+    def square(x):
+        return x * x
+
+    @parse_and_compile
+    def f(x):
+        return value_and_grad(square)(x)
+
+    v, g = f(10)
+    assert v == 100, v
+    _assert_match(20, g)
+
+
+def test_value_grad_two_args():
+    def func(x, y):
+        return 2 * x * y + 2 * x * x - 3 * y * y
+
+    @parse_and_compile
+    def f(x, y):
+        return value_and_grad(func, "y")(x, y)
+
+    @parse_and_compile
+    def g(x, y):
+        return value_and_grad(func, "x")(x, y)
+
+    @parse_and_compile
+    def h(x, y):
+        return value_and_grad(func)(x, y)
+
+    func_1_2 = -6
+    assert func_1_2 == func(1, 2)
+
+    value_f, grad_f = f(1, 2)
+    assert value_f == func_1_2
+    _assert_match(-10, grad_f)
+
+    value_g, grad_g = g(1, 2)
+    assert value_g == func_1_2
+    _assert_match(8, grad_g)
+
+    v, (dx, dy) = h(2, 3)
+    assert v == 12 + 8 - 27
+    _assert_match(2 * 3 + 4 * 2, dx)
+    _assert_match(2 * 2 - 6 * 3, dy)
+
+
+def test_rng():
+    @parse_and_compile
+    def f():
+        rstate = random_initialize(12345678)
+        r0, v0 = random_uint32(rstate, (2, 2))
+        return v0
+
+    print(f())
+
+
 def test_while():
-    @_compile
+    @parse_and_compile
+    def f(n):
+        ret = 0
+        i = 0
+        while i < n + 1:
+            ret = ret + i
+            i = i + 1
+        return ret
+
+    assert f(0) == 0
+    assert f(1) == 1
+    assert f(2) == 3
+    assert f(3) == 6
+
+
+def test_for_range():
+    @parse_and_compile
     def f(n):
         ret = 0
         for i in range(n + 1):
@@ -27,7 +151,7 @@ def test_while():
 
 
 def test_recursion():
-    @_compile
+    @parse_and_compile
     def factorial(n):
         return 1 if n < 2 else n * factorial(n - 1)
 
@@ -42,11 +166,11 @@ def test_recursion():
         assert factorial(x) == y, factorial(x)
 
 
-def test_closure_call():
+def test_function_call():
     def _pgcd(a, b):
         return a if not b else _pgcd(b, a % b)
 
-    @_compile
+    @parse_and_compile
     def pgcd(a, b):
         return _pgcd(b, a) if a < b else _pgcd(a, b)
 
@@ -54,8 +178,20 @@ def test_closure_call():
     assert pgcd(625, 250) == 125, pgcd(625, 250)
 
 
-def test_from_parse_with_if():
-    @_compile
+def test_inner_closure():
+    @parse_and_compile
+    def pgcd(a, b):
+        def _pgcd(a, b):
+            return a if not b else _pgcd(b, a % b)
+
+        return _pgcd(b, a) if a < b else _pgcd(a, b)
+
+    assert pgcd(12, 32) == 4, pgcd(12, 32)
+    assert pgcd(625, 250) == 125, pgcd(625, 250)
+
+
+def test_if():
+    @parse_and_compile
     def f(x):
         if x < 0:
             return x * x
@@ -67,8 +203,8 @@ def test_from_parse_with_if():
     assert f(2) == 8, f(2)
 
 
-def test_from_parse():
-    @_compile
+def test_simple():
+    @parse_and_compile
     def f(x):
         return 2 * x + 1
 

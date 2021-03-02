@@ -211,7 +211,38 @@ def python_universe_getitem(c, universe, handle):
     return f"{universe}.get({handle})"
 
 
-def user_switch(cond, if_true, if_false):
+def op_grad(f, *required_args):
+    """Implement operation grad using finite difference."""
+    from myia.debug.finite_diff import GradTester
+    import inspect
+
+    argnames = inspect.getfullargspec(f).args
+
+    def gradient(*args):
+        gt = GradTester(f, None, args, argnames)
+        ret = gt.compute_finite_diff()
+        out = []
+        for i in range(len(args)):
+            argname = argnames[i]
+            if not required_args or argname in required_args:
+                k = f"d{f.__name__}/d{argname}"
+                out.append(ret[k])
+        return out[0] if len(out) == 1 else out
+
+    return gradient
+
+
+def op_value_and_grad(f, *required_args):
+    """Implement operation value_and_grad."""
+    gradient = op_grad(f, *required_args)
+
+    def v_and_g(*args):
+        return f(*args), gradient(*args)
+
+    return v_and_g
+
+
+def op_user_switch(cond, if_true, if_false):
     """Implementation for operation `user_switch`."""
     return if_true if cond else if_false
 
@@ -335,10 +366,12 @@ OPERATION_MAP = {
 }
 FUNCTION_MAP = {
     range: op_range,
+    operations.grad: op_grad,
+    operations.value_and_grad: op_value_and_grad,
     operations.myia_next: generate_caller("__myia_next__"),
     operations.myia_iter: generate_caller("__myia_iter__"),
     operations.myia_hasnext: generate_caller("__myia_hasnext__"),
-    operations.user_switch: user_switch,
+    operations.user_switch: op_user_switch,
 }
 
 
@@ -349,6 +382,7 @@ def convert_operation(c, node, op, *inputs):
         name = inputs[1].value
         resolved = namespace[name]
         code = None
+
         if resolved in OPERATION_MAP:
             # Resolve as Python's operator module function.
             code = f"operator.{OPERATION_MAP[resolved].__name__}"
@@ -365,11 +399,30 @@ def convert_operation(c, node, op, *inputs):
             symbol_name = resolved.__name__
             c.register_global(symbol_name, resolved)
             code = symbol_name
-        if code:
-            # Register code as a ConstantString, so that
-            # node name will be directly replaced with that code.
-            c.force_node_constant(node, ConstantString(code))
-            return None
+        elif isinstance(resolved, Operation):
+            # Use operation's python implementation if available.
+            impl = resolved.defaults().get("python_implementation", None)
+            if impl is not None:
+                symbol_name = f"operation_{resolved.name}"
+                c.register_global(symbol_name, impl)
+                code = symbol_name
+        elif isinstance(resolved, ModuleType):
+            # Module imported, probably to call an external function
+            # (e.g. `torch.argmax`)
+            module_name = resolved.__name__
+            c.register_global(module_name, resolved)
+            code = module_name
+
+        if code is None:
+            raise NotImplementedError(
+                f"Unable to resolve: {resolved}, inputs: {' '.join(str(inp) for inp in inputs)}"
+            )
+
+        # Register code as a ConstantString, so that
+        # node name will be directly replaced with that code.
+        c.force_node_constant(node, ConstantString(code))
+        return None
+
     raise NotImplementedError(
         f"Unsupported operation {op} {' '.join(str(inp) for inp in inputs)}"
     )
@@ -576,7 +629,12 @@ class PythonConstantConverter(_PythonConverter):
         # (e.g. for inputs of operations.resolve apply nodes).
         from myia.utils.misc import Namespace
 
-        if isinstance(v, (str, Namespace, Operation)):
+        if isinstance(v, str):
+            # Return a ConstantString so that given string will be inlined.
+            # Given string is wrapped inside 2 double quotes.
+            assert '"' not in v, v
+            return ConstantString(f'"{v}"')
+        if isinstance(v, (Namespace, Operation)):
             return None
         raise NotImplementedError(
             f"No default conversion for value {v}, type {type(v)}"
