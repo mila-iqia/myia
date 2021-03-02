@@ -89,7 +89,8 @@ def parse(func):
     for flag in inner_flags:
         del graph.flags[flag]
 
-    graph.name = name
+    if name is not None:
+        graph.name = name
     _parse_cache[func] = graph
     return graph
 

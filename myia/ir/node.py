@@ -53,6 +53,10 @@ class Graph:
 
         return Apply(self, *edges)
 
+    def __str__(self):
+        if self.name is not None:
+            return self.name
+        return "<unamed_graph>"
 
 class Node:
     __slots__ = ('abstract', 'location', 'info')
@@ -140,6 +144,9 @@ class Parameter(Node):
     def is_parameter(self):
         return True
 
+    def __str__(self):
+        return self.name
+
 
 class Constant(Node):
     __slots__ = ('value',)
@@ -152,3 +159,7 @@ class Constant(Node):
 
     def is_constant_graph(self):
         return self.is_constant(Graph)
+
+
+    def __str__(self):
+        return str(self.value)
