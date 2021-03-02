@@ -942,7 +942,19 @@ class FunctionCompiler(_Compiler):
                 output.append(f"{prefix} {op_code}")
         # Output may be empty, for e.g. if function just returns a parameter.
         if not output:
-            output.append(f"return {self.ref(graph.output)}")
+            # I don't know why, but there may be functions that
+            # return a value not even reachable from function code
+            # (thus, self.ref() might not find node).
+            # In such case, let s just put an exception raising in code.
+            # If such function is called, then code will fail.
+            try:
+                output_name = self.ref(graph.output)
+            except KeyError:
+                output.append(
+                    f'raise RuntimeError("Unreachable: {type(graph.output).__name__} {graph.output}")'
+                )
+            else:
+                output.append(f"return {output_name}")
 
         constants_code = []
         closures_code = []
@@ -1024,12 +1036,8 @@ class PythonCompiler(_Compiler):
                 self.graph_to_name[g] = "main"
             else:
                 self.graph_to_name[g] = self.get_label(g)
-        # Compile main function.
-        self.fn_name_to_code["main"] = self.convert_func(graph)
-        # Compile all root graphs called via main function.
+        # Graph name to function code
         for g, g_name in self.graph_to_name.items():
-            if g_name == "main" or g_name not in self.graphs_used:
-                continue
             self.fn_name_to_code[g_name] = self.convert_func(g)
         # Compilation.
         pre_code = [
@@ -1099,7 +1107,8 @@ class PythonCompiler(_Compiler):
 
     def ref(self, node):
         """Return a name (string) associated to given node."""
-        assert node.is_constant_graph() and node.value.parent is None
+        if not (node.is_constant_graph() and node.value.parent is None):
+            raise KeyError(f"Expected a root graph, got {node}")
         self.graphs_used.add(self.graph_to_name[node.value])
         return self.graph_to_name[node.value]
 
