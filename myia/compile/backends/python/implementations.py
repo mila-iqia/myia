@@ -663,8 +663,3 @@ def max_pool2d_grad(x, ws, stride, pad, ceil_mode, gz):
         + tuple(slice(pad[i], img_shp[i] - pad[i]) for i in range(nd))
     ]
     return gx
-
-
-def user_switch(cond, if_true, if_false):
-    """Implementation for operation `user_switch`."""
-    return if_true if cond else if_false

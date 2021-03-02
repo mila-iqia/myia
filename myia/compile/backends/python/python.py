@@ -6,12 +6,11 @@ import operator
 import re
 import sys
 from collections import Counter
-from types import ModuleType
+from types import FunctionType, ModuleType
 
 from myia import operations
 from myia.abstract import to_abstract
 from myia.compile.backends import Backend, Converter
-from myia.compile.backends.python import implementations as IMPL
 from myia.compile.transform import convert_grad, get_prim_graph
 from myia.debug.label import NodeLabeler
 from myia.graph_utils import toposort
@@ -19,6 +18,20 @@ from myia.ir import Graph, manage
 from myia.lib import ANYTHING, AbstractArray, AbstractHandle, AbstractTuple
 from myia.operations import Operation, Primitive, primitives as P
 from myia.xtype import Tuple, type_to_np_dtype
+
+
+class ConstantString:
+    """Helper class to represent a string to be treated as a constant.
+
+    Constant strings will be inlined and replace node names in final code.
+    """
+
+    def __init__(self, value):
+        """Initialize."""
+        self.value = value
+
+    def __str__(self):
+        return self.value
 
 
 def python_array_map(c, fn, *arrays):
@@ -198,6 +211,28 @@ def python_universe_getitem(c, universe, handle):
     return f"{universe}.get({handle})"
 
 
+def user_switch(cond, if_true, if_false):
+    """Implementation for operation `user_switch`."""
+    return if_true if cond else if_false
+
+
+def op_range(start, stop=None, step=None):
+    """Implementation for operation range."""
+    from myia.operations.op_range import range_
+
+    return range_(start, stop, step)
+
+
+def generate_caller(name):
+    """Generate an object method caller."""
+
+    def caller(obj, *args, **kwargs):
+        return getattr(obj, name)(*args, **kwargs)
+
+    caller.__name__ = f"fn_{name}"
+    return caller
+
+
 SIMPLE_MAP = {
     P.argmax: f"IMPL.argmax(%s, %s)",
     P.array_max: "np.array(np.max(%s, %s))",
@@ -298,21 +333,43 @@ OPERATION_MAP = {
     operations.getitem: operator.getitem,
     operations.bool: operator.truth,
 }
-IMPL_OPERATION_MAP = {
-    operations.user_switch: IMPL.user_switch,
+FUNCTION_MAP = {
+    range: op_range,
+    operations.myia_next: generate_caller("__myia_next__"),
+    operations.myia_iter: generate_caller("__myia_iter__"),
+    operations.myia_hasnext: generate_caller("__myia_hasnext__"),
+    operations.user_switch: user_switch,
 }
 
 
-def convert_operation(c, op, *inputs):
+def convert_operation(c, node, op, *inputs):
     """Convert an operation apply node to a Python code."""
     if op.value is operations.resolve:
         namespace = inputs[0].value
         name = inputs[1].value
         resolved = namespace[name]
+        code = None
         if resolved in OPERATION_MAP:
-            return f"operator.{OPERATION_MAP[resolved].__name__}"
-        if resolved in IMPL_OPERATION_MAP:
-            return f"IMPL.{IMPL_OPERATION_MAP[resolved].__name__}"
+            # Resolve as Python's operator module function.
+            code = f"operator.{OPERATION_MAP[resolved].__name__}"
+        elif resolved in FUNCTION_MAP:
+            # Resolve as a specific function.
+            # Function will be available as global symbol in compiled function.
+            fn = FUNCTION_MAP[resolved]
+            symbol_name = fn.__name__
+            c.register_global(symbol_name, fn)
+            code = symbol_name
+        elif isinstance(resolved, FunctionType):
+            # Resolved is a function.
+            # Function will be available as global symbol in compiled function.
+            symbol_name = resolved.__name__
+            c.register_global(symbol_name, resolved)
+            code = symbol_name
+        if code:
+            # Register code as a ConstantString, so that
+            # node name will be directly replaced with that code.
+            c.force_node_constant(node, ConstantString(code))
+            return None
     raise NotImplementedError(
         f"Unsupported operation {op} {' '.join(str(inp) for inp in inputs)}"
     )
@@ -619,6 +676,13 @@ class _Compiler:
         """Convert a value to a Python constant."""
         raise NotImplementedError()
 
+    def register_global(self, name, value):
+        """Register a symbol with given name to given value.
+
+        Symbol will be available as a global symbol in compiled function.
+        """
+        raise NotImplementedError()
+
 
 class FunctionCompiler(_Compiler):
     """Compiler for a single graph. Compile it to code for a Python function."""
@@ -630,6 +694,8 @@ class FunctionCompiler(_Compiler):
         self.node_to_name = {}
         self.const_name_to_value = {}
         self.closure_name_to_code = {}
+        # Associate closure graph to closure name.
+        self.closure_to_name = {}
 
     def local_ref(self, node):
         """Return name for a node inside this function."""
@@ -637,7 +703,11 @@ class FunctionCompiler(_Compiler):
 
     def has_node(self, node):
         """Return True if given node has already an associated name."""
-        return node in self.node_to_name or self.parent.has_node(node)
+        return (
+            (node.is_constant_graph() and node.value in self.closure_to_name)
+            or node in self.node_to_name
+            or self.parent.has_node(node)
+        )
 
     def has_constant(self, name):
         """Return True if a constant with given name is already registered."""
@@ -661,6 +731,8 @@ class FunctionCompiler(_Compiler):
         Either the node name, or a constant value (as a string)
         if node is a constant that can be inlined.
         """
+        if node.is_constant_graph() and node.value in self.closure_to_name:
+            return self.closure_to_name[node.value]
         if node in self.node_to_name:
             name = self.node_to_name[node]
             if name in self.const_name_to_value and self._is_inline_const(
@@ -672,7 +744,9 @@ class FunctionCompiler(_Compiler):
 
     def _is_inline_const(self, const_value):
         """Return True if given value can be inlined."""
-        return isinstance(const_value, (bool, int, float, type(None)))
+        return isinstance(
+            const_value, (bool, int, float, type(None), ConstantString)
+        )
 
     def get_graph_cache(self):
         """Return graph cache (for graph compilation caching)."""
@@ -681,6 +755,17 @@ class FunctionCompiler(_Compiler):
     def make_const(self, v, t):
         """Convert a value to a Python constant."""
         return self.parent.make_const(v, t)
+
+    def register_global(self, name, value):
+        """Register global symbol."""
+        self.parent.register_global(name, value)
+
+    def force_node_constant(self, node, constant):
+        """Associate a constant value to a node.
+
+        Node name will be inlined using given constant in compiled code.
+        """
+        self.const_name_to_value[self.ref(node)] = constant
 
     def on_constant(self, node):
         """Generate code for a constant node."""
@@ -714,34 +799,38 @@ class FunctionCompiler(_Compiler):
 
         # Convert operation call to an inline code, if possible.
         if node.inputs[0].is_constant(Operation):
-            return convert_operation(self, *node.inputs)
+            return convert_operation(self, node, *node.inputs)
 
         # Otherwise generate a raw call.
         return f"{self.ref(node.inputs[0])}({', '.join(self.ref(n) for n in node.inputs[1:])})"
 
     def _add_node(self, node):
         """Associate a name to a node. Return true if a new name was generated."""
-        if not self.has_node(node) and not (
-            node.is_constant_graph() and node.value.parent is None
-        ):
+        if self.has_node(node):
+            # Node already registered.
+            return False
+
+        if node.is_constant_graph() and node.value.parent is None:
             # Const graphs without parent are already registered in
             # root PythonCompiler object, hence available from self.ref(node).
-            self.node_to_name[node] = self.get_label(node)
+            return False
 
-            # If added node is an inlinable constant node, let's register
-            # it right now, as we may need to use and inline this node
-            # before we meet the node definition itself.
-            # E.g. A closure may use a constant defined after closure code
-            # in parent function.
-            if node.is_constant() and self._is_inline_const(node.value):
-                self.on_constant(node)
+        self.node_to_name[node] = self.get_label(node)
 
-            return True
-        return False
+        # If added node is an inlinable constant node, let's register
+        # it right now, as we may need to use and inline this node
+        # before we meet the node definition itself.
+        # E.g. A closure may use a constant defined after closure code
+        # in parent function.
+        if node.is_constant() and self._is_inline_const(node.value):
+            self.on_constant(node)
+
+        return True
 
     def on_function(self, graph, node):
         """Convert a graph to a function and register it as a closure (constant value)."""
         if not self.has_constant(self.ref(node)):
+            self.closure_to_name[graph] = self.ref(node)
             self.closure_name_to_code[self.ref(node)] = FunctionCompiler(
                 graph, self
             ).compile()
@@ -756,11 +845,14 @@ class FunctionCompiler(_Compiler):
         # Register parameters.
         param_names = []
         for p in graph.parameters:
-            self._add_node(p)
+            # A parameter should always be a local variable.
+            self.node_to_name[p] = self.get_label(p)
             param_names.append(self.local_ref(p))
         seq = []
         # Register nodes.
-        for node in toposort(graph.output, NodeVisitor(), in_graph(graph)):
+        for node in toposort(
+            graph.output, NodeVisitor(), in_graph(graph), allow_cycles=True
+        ):
             if self._add_node(node):
                 seq.append(node)
         output = []
@@ -830,6 +922,8 @@ class PythonCompiler(_Compiler):
             relation_symbols={"copy": "", "opt": ""}
         )
         self.name_counter = Counter()
+        self.globals = {}
+        self.graphs_used = set()
 
     def is_valid_python_name(self, text):
         """Return True if text is a valid Python name."""
@@ -872,8 +966,12 @@ class PythonCompiler(_Compiler):
                 self.graph_to_name[g] = "main"
             else:
                 self.graph_to_name[g] = self.get_label(g)
-        # Graph name to function code
+        # Compile main function.
+        self.fn_name_to_code["main"] = self.convert_func(graph)
+        # Compile all root graphs called via main function.
         for g, g_name in self.graph_to_name.items():
+            if g_name == "main" or g_name not in self.graphs_used:
+                continue
             self.fn_name_to_code[g_name] = self.convert_func(g)
         # Compilation.
         pre_code = [
@@ -884,6 +982,9 @@ class PythonCompiler(_Compiler):
             "from myia.lib import TaggedValue",
             "from myia.utils.universe import HandleInstance",
             "import myia.compile.backends.python.implementations as IMPL",
+        ]
+        dynamic_imports = [
+            f"# Dynamic external import: {name}" for name in self.globals
         ]
         other_functions = []
         main_body = None
@@ -897,7 +998,12 @@ class PythonCompiler(_Compiler):
                 other_functions.append(fn_signature)
                 other_functions.append(fn_body)
         final_structure = (
-            pre_code + other_functions + [main_signature, main_body]
+            pre_code
+            + ([""] if pre_code else [])
+            + dynamic_imports
+            + ([""] if dynamic_imports else [])
+            + other_functions
+            + [main_signature, main_body]
         )
         final_code = nested_list_to_code_string(final_structure)
 
@@ -911,6 +1017,9 @@ class PythonCompiler(_Compiler):
         # reference: https://stackoverflow.com/a/19850183
         compiled = compile(final_code, "", "exec")
         module = ModuleType("mod")
+        # Add required global variables into module.
+        for name, value in self.globals.items():
+            module.__dict__[name] = value
         exec(compiled, module.__dict__)
         return getattr(module, "main")
 
@@ -933,11 +1042,22 @@ class PythonCompiler(_Compiler):
     def ref(self, node):
         """Return a name (string) associated to given node."""
         assert node.is_constant_graph() and node.value.parent is None
+        self.graphs_used.add(self.graph_to_name[node.value])
         return self.graph_to_name[node.value]
 
     def get_graph_cache(self):
         """Return graph cache (for graph compilation caching)."""
         return self._prim_graph_cache
+
+    def register_global(self, name, value):
+        """Register global symbol for compiled code."""
+        if name in self.globals:
+            registered_value = self.globals[name]
+            if registered_value != value:
+                raise ValueError(
+                    f"Registered global name ({name}) twice with different values: {registered_value} then {value}"
+                )
+        self.globals[name] = value
 
     def convert_func(self, graph):
         """Convert a graph to Python function code."""
