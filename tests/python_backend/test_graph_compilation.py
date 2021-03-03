@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from myia.compile.backends.python.python import compile_graph
 from myia.ir import manage
 from myia.ir.utils import print_graph
@@ -134,6 +136,30 @@ def test_while():
     assert f(1) == 1
     assert f(2) == 3
     assert f(3) == 6
+
+
+def test_iter_object():
+    @dataclass
+    class HalfIterator:
+        value: int
+
+        def __myia_iter__(self):
+            return self
+
+        def __myia_hasnext__(self):
+            return self.value > 0
+
+        def __myia_next__(self):
+            return self.value, HalfIterator(self.value // 2)
+
+    @parse_and_compile
+    def f(v):
+        ret = 0
+        for x in HalfIterator(v):
+            ret = ret + x
+        return ret
+
+    print(f(10))
 
 
 def test_for_range():
