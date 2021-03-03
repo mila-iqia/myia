@@ -8,6 +8,8 @@ import sys
 from collections import Counter
 from types import FunctionType, ModuleType
 
+from ovld import ovld
+
 from myia import operations
 from myia.abstract import to_abstract
 from myia.compile.backends import Backend, Converter
@@ -247,21 +249,34 @@ def op_user_switch(cond, if_true, if_false):
     return if_true if cond else if_false
 
 
-def op_range(start, stop=None, step=None):
-    """Implementation for operation range."""
-    from myia.operations.op_range import range_
-
-    return range_(start, stop, step)
+@ovld  # noqa: F811
+def myia_iter(obj: object):
+    return obj.__myia_iter__()
 
 
-def generate_caller(name):
-    """Generate an object method caller."""
+@ovld  # noqa: F811
+def myia_iter(obj: range):
+    return obj
 
-    def caller(obj, *args, **kwargs):
-        return getattr(obj, name)(*args, **kwargs)
 
-    caller.__name__ = f"fn_{name}"
-    return caller
+@ovld  # noqa: F811
+def myia_hasnext(obj: object):
+    return obj.__myia_hasnext__()
+
+
+@ovld  # noqa: F811
+def myia_hasnext(obj: range):
+    return obj.start < obj.stop
+
+
+@ovld  # noqa: F811
+def myia_next(obj: object):
+    return obj.__myia_next__()
+
+
+@ovld  # noqa: F811
+def myia_next(obj: range):
+    return obj.start, range(obj.start + obj.step, obj.stop, obj.step)
 
 
 SIMPLE_MAP = {
@@ -365,12 +380,12 @@ OPERATION_MAP = {
     operations.bool: operator.truth,
 }
 FUNCTION_MAP = {
-    range: op_range,
+    range: range,
     operations.grad: op_grad,
     operations.value_and_grad: op_value_and_grad,
-    operations.myia_next: generate_caller("__myia_next__"),
-    operations.myia_iter: generate_caller("__myia_iter__"),
-    operations.myia_hasnext: generate_caller("__myia_hasnext__"),
+    operations.myia_next: myia_next,
+    operations.myia_iter: myia_iter,
+    operations.myia_hasnext: myia_hasnext,
     operations.user_switch: op_user_switch,
 }
 
