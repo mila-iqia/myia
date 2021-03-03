@@ -411,7 +411,12 @@ def convert_operation(c, node, op, *inputs):
         elif callable(resolved):
             # Resolved is a callable.
             # Callable will be available as global symbol in compiled function.
-            code = c.register_global(resolved.__name__, resolved)
+            symbol_name = (
+                resolved.__name__
+                if getattr(resolved, "__name__", "")
+                else f"callable_{type(resolved).__name__}"
+            )
+            code = c.register_global(symbol_name, resolved)
 
         if code is None:
             raise NotImplementedError(
