@@ -49,7 +49,7 @@ class Graph:
         edges = [
             Edge(p, i if isinstance(i, Node) else self.constant(i)) for p, i in enumerate(inputs)
         ]
-        edges.append(Edge(FN, fn))
+        edges.append(Edge(FN, fn if isinstance(fn, Node) else self.constant(fn)))
 
         return Apply(self, *edges)
 
@@ -124,11 +124,15 @@ class Apply(Node):
         self.edges[label] = e
 
     @property
+    def fn(self):
+        return self.edges[FN].node
+
+    @property
     def inputs(self):
         i = 0
         res = []
         while i in self.edges:
-            res.append(self.edges[i])
+            res.append(self.edges[i].node)
             i += 1
         return res
 
