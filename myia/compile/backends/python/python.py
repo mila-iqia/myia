@@ -1082,12 +1082,9 @@ class PythonCompiler(_Compiler):
         # Compile code string to a Python executable function
         # reference: https://stackoverflow.com/a/19850183
         compiled = compile(final_code, "", "exec")
-        module = ModuleType("mod")
-        # Add required global variables into module.
-        for name, value in self.globals.items():
-            module.__dict__[name] = value
-        exec(compiled, module.__dict__)
-        return getattr(module, "main")
+        assert "main" not in self.globals
+        exec(compiled, self.globals)
+        return self.globals["main"]
 
     def has_node(self, node):
         """Return True if given node has already an associated name."""
@@ -1147,7 +1144,6 @@ class PythonBackend(Backend):
             debug = sys.stdout if debug is True else debug
             assert hasattr(debug, "write")
 
-        self.compiler = PythonCompiler()
         self.to_backend_value = PythonInputConverter()
         self.from_backend_value = PythonOutputConverter()
         self.debug = debug
@@ -1163,7 +1159,10 @@ class PythonBackend(Backend):
         # Remove symbolic key instances.
         graph = convert_grad(graph)
         # Then compile the graph.
-        return self.compiler.run(graph, self)
+        # Create a PythonCompiler object each time we want to compile,
+        # to avoid sharing states through different compilations
+        # (e.g. for "PythonCompiler.globals" member).
+        return PythonCompiler().run(graph, self)
 
     def supports_prim_group(self, prim_group):
         """Return True if given primitive group is supported."""
