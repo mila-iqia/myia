@@ -159,7 +159,7 @@ def test_iter_object():
             ret = ret + x
         return ret
 
-    print(f(10))
+    assert f(10) == 18, f(10)
 
 
 def test_for_range():
