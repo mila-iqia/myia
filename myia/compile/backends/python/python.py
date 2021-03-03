@@ -6,7 +6,7 @@ import operator
 import re
 import sys
 from collections import Counter
-from types import FunctionType, ModuleType
+from types import ModuleType
 
 from ovld import ovld
 
@@ -375,7 +375,6 @@ OPERATION_MAP = {
     operations.bool: operator.truth,
 }
 FUNCTION_MAP = {
-    range: range,
     operations.grad: op_grad,
     operations.value_and_grad: op_value_and_grad,
     operations.myia_next: myia_next,
@@ -400,10 +399,6 @@ def convert_operation(c, node, op, *inputs):
             # Function will be available as global symbol in compiled function.
             fn = FUNCTION_MAP[resolved]
             code = c.register_global(fn.__name__, fn)
-        elif isinstance(resolved, FunctionType):
-            # Resolved is a function.
-            # Function will be available as global symbol in compiled function.
-            code = c.register_global(resolved.__name__, resolved)
         elif isinstance(resolved, Operation):
             # Use operation's python implementation if available.
             impl = resolved.defaults().get("python_implementation", None)
@@ -412,6 +407,10 @@ def convert_operation(c, node, op, *inputs):
         elif isinstance(resolved, ModuleType):
             # Module imported, probably to call an external function
             # (e.g. `torch.argmax`)
+            code = c.register_global(resolved.__name__, resolved)
+        elif callable(resolved):
+            # Resolved is a callable.
+            # Callable will be available as global symbol in compiled function.
             code = c.register_global(resolved.__name__, resolved)
 
         if code is None:

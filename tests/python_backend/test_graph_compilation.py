@@ -227,3 +227,11 @@ def test_two_external_functions_with_same_name():
         return f1(x) + f2(x)
 
     assert g(5) == 25, g(5)
+
+
+def test_cast():
+    @parse_and_compile
+    def f(x):
+        return float(x) + 1.5
+
+    assert f(2) == 3.5, f(2)
