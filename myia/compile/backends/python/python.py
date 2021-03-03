@@ -390,28 +390,20 @@ def convert_operation(c, node, op, *inputs):
             # Resolve as a specific function.
             # Function will be available as global symbol in compiled function.
             fn = FUNCTION_MAP[resolved]
-            symbol_name = fn.__name__
-            c.register_global(symbol_name, fn)
-            code = symbol_name
+            code = c.register_global(fn.__name__, fn)
         elif isinstance(resolved, FunctionType):
             # Resolved is a function.
             # Function will be available as global symbol in compiled function.
-            symbol_name = resolved.__name__
-            c.register_global(symbol_name, resolved)
-            code = symbol_name
+            code = c.register_global(resolved.__name__, resolved)
         elif isinstance(resolved, Operation):
             # Use operation's python implementation if available.
             impl = resolved.defaults().get("python_implementation", None)
             if impl is not None:
-                symbol_name = f"operation_{resolved.name}"
-                c.register_global(symbol_name, impl)
-                code = symbol_name
+                code = c.register_global(f"operation_{resolved.name}", impl)
         elif isinstance(resolved, ModuleType):
             # Module imported, probably to call an external function
             # (e.g. `torch.argmax`)
-            module_name = resolved.__name__
-            c.register_global(module_name, resolved)
-            code = module_name
+            code = c.register_global(resolved.__name__, resolved)
 
         if code is None:
             raise NotImplementedError(
@@ -738,6 +730,9 @@ class _Compiler:
         """Register a symbol with given name to given value.
 
         Symbol will be available as a global symbol in compiled function.
+
+        Must return name used to register value
+        (either given name, or another if necessary).
         """
         raise NotImplementedError()
 
@@ -816,7 +811,7 @@ class FunctionCompiler(_Compiler):
 
     def register_global(self, name, value):
         """Register global symbol."""
-        self.parent.register_global(name, value)
+        return self.parent.register_global(name, value)
 
     def force_node_constant(self, node, constant):
         """Associate a constant value to a node.
@@ -992,6 +987,7 @@ class PythonCompiler(_Compiler):
             relation_symbols={"copy": "", "opt": ""}
         )
         self.name_counter = Counter()
+        self.global_counter = Counter()
         self.globals = {}
         self.graphs_used = set()
 
@@ -1114,14 +1110,18 @@ class PythonCompiler(_Compiler):
         return self._prim_graph_cache
 
     def register_global(self, name, value):
-        """Register global symbol for compiled code."""
-        if name in self.globals:
-            registered_value = self.globals[name]
-            if registered_value != value:
-                raise ValueError(
-                    f"Registered global name ({name}) twice with different values: {registered_value} then {value}"
-                )
+        """Register global symbol for compiled code.
+
+        :param name: name to register
+        :param value: value to register
+        :return: name used to register value. May be different
+            from given name if given name was already used.
+        """
+        self.global_counter.update([name])
+        count = self.global_counter[name]
+        name = name if count == 1 else f"{name}_v{count}"
         self.globals[name] = value
+        return name
 
     def convert_func(self, graph):
         """Convert a graph to Python function code."""

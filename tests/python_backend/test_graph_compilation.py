@@ -210,3 +210,20 @@ def test_simple():
 
     assert f(0) == 1, f(0)
     assert f(-2) == -3, f(0)
+
+
+def test_two_external_functions_with_same_name():
+    def f1(x):
+        return 2 * x
+
+    def f2(x):
+        return 3 * x
+
+    f1.__name__ = "f"
+    f2.__name__ = "f"
+
+    @parse_and_compile
+    def g(x):
+        return f1(x) + f2(x)
+
+    assert g(5) == 25, g(5)
