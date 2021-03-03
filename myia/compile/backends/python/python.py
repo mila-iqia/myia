@@ -244,11 +244,6 @@ def op_value_and_grad(f, *required_args):
     return v_and_g
 
 
-def op_user_switch(cond, if_true, if_false):
-    """Implementation for operation `user_switch`."""
-    return if_true if cond else if_false
-
-
 @ovld  # noqa: F811
 def myia_iter(obj: object):
     return obj.__myia_iter__()
@@ -386,7 +381,6 @@ FUNCTION_MAP = {
     operations.myia_next: myia_next,
     operations.myia_iter: myia_iter,
     operations.myia_hasnext: myia_hasnext,
-    operations.user_switch: op_user_switch,
 }
 
 

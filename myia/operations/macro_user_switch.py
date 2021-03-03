@@ -20,6 +20,11 @@ from ..xtype import Bool
 from . import primitives as P
 
 
+def pyimpl_user_switch(condref, tbref, fbref):
+    """Implement `user_switch`."""
+    return tbref if condref else fbref
+
+
 class _CastRemapper(CloneRemapper):
     def __init__(
         self,
@@ -304,5 +309,5 @@ __operation_defaults__ = {
     "name": "user_switch",
     "registered_name": "user_switch",
     "mapping": user_switch,
-    "python_implementation": None,
+    "python_implementation": pyimpl_user_switch,
 }
