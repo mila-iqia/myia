@@ -5,6 +5,7 @@ import textwrap
 from typing import NamedTuple
 
 from .ir import Node, Apply, Constant, Graph, Parameter
+from .ir.node import SEQ
 from .utils import ClosureNamespace, ModuleNamespace
 
 
@@ -98,6 +99,7 @@ def parse(func):
 class Block:
     def __init__(self, parent, name, location=None, flags={}):
         self.parent = parent
+        self.preds = set()
 
         if self.parent:
             pgraph = self.parent.graph
@@ -109,34 +111,35 @@ class Block:
         self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
 
-        self.inloop = False
-
         self.last_apply = None
-        self.variables = {}
-
-        self.possible_phis = set()
-        self.phi_nodes = []
-
-    def mature(self):
-        for p in self.graph.parameters:
-            if p in self.phi_nodes:
-                self.set_phi_arguments(p)
-        self.matured = True
+        self.var_seq = 0
+        self.variables_read = {}
+        self.variables_written = {}
 
     def write(self, varnum, node):
-        self.variables.setdefault(varnum, []).append(node)
+        st = self.graph.apply('store', varnum, node, self.var_seq)
+        self.var_seq += 1
+        self.variables_written.setdefault(varnum, []).append(st)
+        return st
 
-    def read(self, varnum, *, _globals=True):
-        if varnum in self.variables:
-            node = self.variables[varnum][-1]
-            return node
+    def read(self, varnum):
+        ld = self.graph.apply("load", varnum, self.var_seq)
+        self.var_seq += 1
+        self.variables_read.setdefault(varnum, []).append(ld)
+        return ld
 
-        assert False, "node not trivial"
-                
+    def apply(self, *inputs):
+        return self.graph.apply(*inputs)
+
+    def link_seq(self, node):
+        node.add_edge(SEQ, self.last_apply)
+        self.last_apply = node
+        return node
 
     def returns(self, value):
         assert self.graph.return_ is None
         self.graph.output = value
+        self.link_seq(self.graph.return_)
 
 
 class Parser:
@@ -192,8 +195,7 @@ class Parser:
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
 
-        main_block, _finalize = self._create_function(None, function_def)
-        _finalize()
+        main_block = self._create_function(None, function_def)
 
         # Check for no return
         # This does a dfs and finds graphs with None for return_
@@ -204,16 +206,6 @@ class Parser:
         function_block = self.new_block(parent=block,
                                         name=node.name,
                                         location=self.make_location(node))
-        function_block.mature()
-        graph = function_block.graph
-        function_block.write(node.name, Constant(graph))
-
-        def _finalize():
-            return self._finalize_function(node, function_block)
-
-        return function_block, _finalize
-
-    def _finalize_function(self, node, function_block):
         args = node.args.args
         nondefaults = [None] * (len(args) - len(node.args.kw_defaults))
         defaults = nondefaults + node.args.defaults
@@ -239,41 +231,41 @@ class Parser:
                 defaults_names.append(arg.arg)
                 defaults_list.append(dflt_node)
 
-            if node.args.vararg:
-                arg = node.args.vararg
-                vararg_node = Parameter(function_block.graph, name=arg.arg,
-                                        location=self.make_location(arg))
-                function_block.graph.parameters.append(vararg_node)
-                function_block.write(arg.arg, vararg_node)
-            else:
-                vararg_node = None
+        if node.args.vararg:
+            arg = node.args.vararg
+            vararg_node = Parameter(function_block.graph, name=arg.arg,
+                                    location=self.make_location(arg))
+            function_block.graph.parameters.append(vararg_node)
+            function_block.write(arg.arg, vararg_node)
+        else:
+            vararg_node = None
 
-            if node.args.kwarg:
-                arg = node.args.kwarg
-                kwarg_node = Parameter(function_block.graph, name=arg.arg,
-                                       location=self.make_location(arg))
-                function_block.graph.parameters.append(kwarg_node)
-                function_block.write(arg.arg, kwarg_node)
-            else:
-                kwarg_node = None
+        if node.args.kwarg:
+            arg = node.args.kwarg
+            kwarg_node = Parameter(function_block.graph, name=arg.arg,
+                                   location=self.make_location(arg))
+            function_block.graph.parameters.append(kwarg_node)
+            function_block.write(arg.arg, kwarg_node)
+        else:
+            kwarg_node = None
 
-            self.process_statements(function_block, node.body)
+        self.process_statements(function_block, node.body)
 
-            if function_block.graph.return_ is None:
-                raise MyiaSyntaxError(
-                    "Function doesn't return a value", self.make_location(node)
-                )
+        if function_block.graph.return_ is None:
+            raise MyiaSyntaxError(
+                "Function doesn't return a value", self.make_location(node)
+            )
 
-            function_block.graph.vararg = vararg_node and vararg_node.name
-            function_block.graph.kwarg = kwarg_node and kwarg_node.name
-            function_block.graph.defaults = dict(zip(defaults_name,
-                                                     defaults_list))
-            function_block.graph.kwonly = len(node.args.kwonlyargs)
+        function_block.graph.vararg = vararg_node and vararg_node.name
+        function_block.graph.kwarg = kwarg_node and kwarg_node.name
+        function_block.graph.defaults = dict(zip(defaults_name,
+                                                 defaults_list))
+        function_block.graph.kwonly = len(node.args.kwonlyargs)
 
-            if node.returns:
-                function_block.graph.return_.add_annotation(self._eval_ast_node(node.returns))
+        if node.returns:
+            function_block.graph.return_.add_annotation(self._eval_ast_node(node.returns))
 
-            return function_block
+        return function_block
 
     def process_node(self, block, node):
         method_name = f"process_{node.__class__.__name__}"
@@ -286,14 +278,55 @@ class Parser:
                 self.make_location(node)
             )
 
+    # expressions (returns a value)
+
+    def process_Name(self, block, node):
+        assert isinstance(node.ctx, ast.Load)
+        return block.read(node.id)
+
+    def process_BinOp(self, block, node):
+        return block.apply(ast_map[type(node.op)],
+                           self.process_node(block, node.left),
+                           self.process_node(block, node.right))
+
+    def process_Num(self, block, node):
+        return Constant(node.n)
+
+    def process_Str(self, block, node):
+        return Constant(node.s)
+
+    def process_Constant(self, block, node):
+        return Constant(node.value)
+
+    # statements (returns a block)
+
     def process_statements(self, starting_block, nodes):
         block = starting_block
         for node in nodes:
             block = self.process_node(block, node)
         return block
 
-    def process_Name(self, block, node):
-        return block.read(node.id)
+    def _assign(self, block, targ, val):
+        if isinstance(targ, ast.Name):
+            # x = val
+            st = block.write(targ.id, val)
+            block.link_seq(st)
+
+        elif isinstance(targ, ast.Tuple):
+            # x, y = val
+            for i, elt in enumerate(targ.elts):
+                nn = block.apply("getitem", node, i)
+                self._assign(block, elt, nn)
+
+        else:
+            raise NotImplementedError(targ)
+
+    def process_Assign(self, block, node):
+        val = self.process_node(block, node.value)
+        for targ in node.targets:
+            self._assign(block, targ, val)
+
+        return block
 
     def process_Pass(self, block, node):
         return block
