@@ -636,9 +636,7 @@ class PythonConstantConverter(_PythonConverter):
 
         if isinstance(v, str):
             # Return a ConstantString so that given string will be inlined.
-            # Given string is wrapped inside 2 double quotes.
-            assert '"' not in v, v
-            return ConstantString(f'"{v}"')
+            return ConstantString(repr(v))
         if isinstance(v, (Namespace, Operation)):
             return None
         raise NotImplementedError(
