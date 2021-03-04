@@ -171,6 +171,8 @@ class Parser:
         return Block(parent, name, location, dict(**self.recflags, **flags))
 
     def make_location(self, node):
+        if node is None:
+            return None
         if isinstance(node, (list, tuple)):
             if len(node) == 0:
                 return None
@@ -267,6 +269,17 @@ class Parser:
 
         return function_block
 
+    def make_condition_blocks(self, block, tn, fn):
+        tb = self.new_block(block, "if_true", self.make_location(tn))
+        tb.preds.add(block)
+
+        fb = self.new_block(block, "if_false", self.make_location(fn))
+        fb.preds.add(block)
+
+        return tb, fb
+
+    # expressions (returns a value)
+
     def process_node(self, block, node):
         method_name = f"process_{node.__class__.__name__}"
         method = getattr(self, method_name, None)
@@ -278,8 +291,6 @@ class Parser:
                 self.make_location(node)
             )
 
-    # expressions (returns a value)
-
     def process_Name(self, block, node):
         assert isinstance(node.ctx, ast.Load)
         return block.read(node.id)
@@ -289,11 +300,43 @@ class Parser:
                            self.process_node(block, node.left),
                            self.process_node(block, node.right))
 
-    def process_Num(self, block, node):
-        return Constant(node.n)
+    def _fold_bool(self, block, values, mode):
+        first, *rest = values
+        test = self.process_node(block, first)
+        if rest:
+            if mode == "and":
+                tb, fb = self.make_condition_blocks(block, rest, None)
+                fb.returns(Constant(False))
+                tb.returns(self._fold_bool(tb, rest, mode))
+            else:
+                tb, fb = self.make_condition_blocks(block, None, rest)
+                tb.returns(Constant(True))
+                fb.returns(self._fold_bool(fb, rest, mode))
+            switch = block.apply("switch", test, tb.graph, fb.graph)
+            return block.apply(switch)
+        else:
+             return test
 
-    def process_Str(self, block, node):
-        return Constant(node.s)
+    def process_BoolOp(self, block, node):
+        if isinstance(node.op, ast.And):
+            return self._fold_bool(block, node.values, "and")
+        elif isinstance(node.op, ast.Or):
+            return self._fold_bool(block, node.values, "or")
+        else:
+            raise AssertionError(f"Unknown BoolOp: {node.op}")
+
+    def process_IfExp(self, block, node):
+        cond = self.process_node(block, node.test)
+        tb, fb = self.make_condition_blocks(block, node.body, node.orelse)
+
+        tn = self.process_node(tb, node.body)
+        fn = self.process_node(fb, node.orelse)
+
+        tb.returns(tn)
+        fb.returns(fn)
+
+        switch = block.apply("user_switch", cond, tb.graph, fb.graph)
+        return block.apply(switch)
 
     def process_Constant(self, block, node):
         return Constant(node.value)
