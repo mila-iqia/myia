@@ -35,6 +35,9 @@ combine_as_imports = true
 
 [tool.coverage.report]
 exclude_lines = [
+    "def __hrepr__",
+    "def __hrepr_short__",
+    "def __hrepr_resources__",
     "AssertionError",
     "NotImplementedError",
     "untested",
