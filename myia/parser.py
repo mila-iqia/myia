@@ -325,6 +325,26 @@ class Parser:
         else:
             raise AssertionError(f"Unknown BoolOp: {node.op}")
 
+    def process_Compare(self, block, node):
+        if len(node.ops) == 1:
+            left = self.process_node(block, node.left)
+            right = self.process_node(block, node.comparators[0])
+            return block.apply(ast_map[type(node.ops[0])], left, right)
+        else:
+            cur = node.left
+            rest = node.comparators
+            ops = node.ops
+            values = []
+            while ops:
+                # TODO: fix up source locations
+                values.append(ast.Compare(ops=[ops[0]], left=cur, comparators=[rest[0]]))
+                cur, rest = rest[0], rest[1:]
+                ops = ops[1:]
+            return self._fold_bool(block, values, "and")
+
+    def process_Constant(self, block, node):
+        return Constant(node.value)
+
     def process_IfExp(self, block, node):
         cond = self.process_node(block, node.test)
         tb, fb = self.make_condition_blocks(block, node.body, node.orelse)
@@ -338,8 +358,9 @@ class Parser:
         switch = block.apply("user_switch", cond, tb.graph, fb.graph)
         return block.apply(switch)
 
-    def process_Constant(self, block, node):
-        return Constant(node.value)
+    def process_UnaryOp(self, block, node):
+        val = self.process_node(block, node.operand)
+        return block.apply(ast_map[type(node.op)], val)
 
     # statements (returns a block)
 

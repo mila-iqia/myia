@@ -106,3 +106,38 @@ graph if_true() {
   return True
 }
 """
+
+
+def test_compare():
+    def f(x):
+        return 0 < x < 42
+
+    assert str_graph(parse(f)) == """graph f(%x) {
+  %_apply0 = load(x, 1)
+  %_apply1 = lt(0, %_apply0)
+  %_apply2 = switch(%_apply1, @if_true, @if_false)
+  %_apply3 = %_apply2()
+  return %_apply3
+}
+
+graph if_false() {
+  return False
+}
+
+graph if_true() {
+  %_apply4 = load(x, 0)
+  %_apply5 = lt(%_apply4, 42)
+  return %_apply5
+}
+"""
+
+def test_unary():
+    def f(x):
+        return -x
+
+    assert str_graph(parse(f)) == """graph f(%x) {
+  %_apply0 = load(x, 1)
+  %_apply1 = neg(%_apply0)
+  return %_apply1
+}
+"""
