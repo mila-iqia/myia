@@ -107,8 +107,19 @@ graph if_true() {
 }
 """
 
-
 def test_compare():
+    def f(x):
+        return x > 0
+
+    assert str_graph(parse(f)) == """graph f(%x) {
+  %_apply0 = load(x, 1)
+  %_apply1 = gt(%_apply0, 0)
+  return %_apply1
+}
+"""
+
+
+def test_compare2():
     def f(x):
         return 0 < x < 42
 
@@ -139,5 +150,123 @@ def test_unary():
   %_apply0 = load(x, 1)
   %_apply1 = neg(%_apply0)
   return %_apply1
+}
+"""
+
+
+def test_if():
+    def f(b, x, y):
+        if b:
+            return x
+        else:
+            return y
+
+    assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
+  %_apply0 = load(b, 3)
+  %_apply1 = user_switch(%_apply0, @if_true, @if_false)
+  %_apply2 = %_apply1()
+  return %_apply2
+}
+
+graph if_false() {
+  %_apply3 = load(y, 0)
+  return %_apply3
+}
+
+graph if_true() {
+  %_apply4 = load(x, 0)
+  return %_apply4
+}
+"""
+
+def test_if2():
+    def f(b, x, y):
+        if b:
+            return x
+        return y
+
+    assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
+  %_apply0 = load(b, 3)
+  %_apply1 = user_switch(%_apply0, @if_true, @if_false)
+  %_apply2 = %_apply1()
+  return %_apply2
+}
+
+graph if_false() {
+  %_apply3 = @if_after()
+  return %_apply3
+}
+
+graph if_after() {
+  %_apply4 = load(y, 0)
+  return %_apply4
+}
+
+graph if_true() {
+  %_apply5 = load(x, 0)
+  return %_apply5
+}
+"""
+
+
+def test_while():
+    def f(b, x, y):
+        while b:
+            return x
+        return y
+
+    assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
+  %_apply0 = @while_header()
+  return %_apply0
+}
+
+graph while_header() {
+  %_apply1 = load(b, 0)
+  %_apply2 = user_switch(%_apply1, @while_body, @while_after)
+  %_apply3 = %_apply2()
+  return %_apply3
+}
+
+graph while_after() {
+  %_apply4 = load(y, 0)
+  return %_apply4
+}
+
+graph while_body() {
+  %_apply5 = load(x, 0)
+  return %_apply5
+}
+"""
+
+
+def test_while2():
+    def f(x):
+        while x:
+            x = x - 1
+        return x
+
+    assert str_graph(parse(f)) == """graph f(%x) {
+  %_apply0 = @while_header()
+  return %_apply0
+}
+
+graph while_header() {
+  %_apply1 = load(x, 0)
+  %_apply2 = user_switch(%_apply1, @while_body, @while_after)
+  %_apply3 = %_apply2()
+  return %_apply3
+}
+
+graph while_after() {
+  %_apply4 = load(x, 0)
+  return %_apply4
+}
+
+graph while_body() {
+  %_apply5 = load(x, 0)
+  %_apply6 = sub(%_apply5, 1)
+  %_apply7 = store(x, %_apply6, 1)
+  %_apply8 = @while_header()
+  return %_apply8
 }
 """

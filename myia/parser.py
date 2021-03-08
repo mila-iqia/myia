@@ -99,7 +99,11 @@ def parse(func):
 class Block:
     def __init__(self, parent, name, location=None, flags={}):
         self.parent = parent
+        if self.parent:
+            self.parent.children.add(self)
+        self.children = set()
         self.preds = set()
+        self.jump_tag = None
 
         if self.parent:
             pgraph = self.parent.graph
@@ -135,6 +139,18 @@ class Block:
         node.add_edge(SEQ, self.last_apply)
         self.last_apply = node
         return node
+
+    def cond(self, cond, true, false):
+        assert self.graph.return_ is None
+        switch = self.apply("user_switch", cond, true.graph, false.graph)
+        self.returns(self.apply(switch))
+
+    def jump(self, target, *args):
+        assert self.graph.return_ is None
+        jump = self.apply(target.graph, *args)
+        self.jump_tag = (target, jump)
+        target.preds.add(self)
+        self.returns(jump)
 
     def returns(self, value):
         assert self.graph.return_ is None
@@ -392,9 +408,47 @@ class Parser:
 
         return block
 
+    def process_If(self, block, node):
+        cond = self.process_node(block, node.test)
+        true_block, false_block = self.make_condition_blocks(block, node.body, node.orelse)
+
+        # TODO: figure out how to add a location here
+        # (we would need the list of nodes that follow the if)
+        after_block = self.new_block(block, "if_after", None)
+
+        true_end = self.process_statements(true_block, node.body)
+        if not true_end.graph.return_:
+            true_end.jump(after_block)
+
+        false_end = self.process_statements(false_block, node.orelse)
+        if not false_end.graph.return_:
+            false_end.jump(after_block)
+
+        block.cond(cond, true_block, false_block)
+        return after_block
+
     def process_Pass(self, block, node):
         return block
 
     def process_Return(self, block, node):
         block.returns(self.process_node(block, node.value))
         return block
+
+    def process_While(self, block, node):
+        header_block = self.new_block(block, "while_header", self.make_location(node.test))
+        body_block = self.new_block(block, "while_body", self.make_location(node.body))
+        # TODO: Same as If we need the list of nodes that follow
+        # for the location
+        after_block = self.new_block(block, "while_after", None)
+
+        body_block.preds.add(header_block)
+        after_block.preds.add(header_block)
+        block.jump(header_block)
+        cond = self.process_node(header_block, node.test)
+        header_block.cond(cond, body_block, after_block)
+
+        after_body = self.process_statements(body_block, node.body)
+        if not after_body.graph.return_:
+            after_body.jump(header_block)
+
+        return after_block
