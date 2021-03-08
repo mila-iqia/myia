@@ -69,7 +69,14 @@ def str_graph(g, allow_cycles=False, recursive=True):
                     raise ValueError("cycle in sequence edges")
             seen_nodes.add(node)
             applies.append(node)
-            for edge in node.edges.values():
+
+            edges = list(node.edges.values())
+            seq = node.edges.get(SEQ, None)
+            if seq is not None:
+                # This ensures seq will be processed first
+                edges.remove(seq)
+                edges.insert(0, seq)
+            for edge in edges:
                 if edge.node is not None:
                     if (edge.node.is_apply() and
                             edge.node.graph is g):
