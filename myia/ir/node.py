@@ -37,8 +37,8 @@ class Graph:
     def set_flags(self, **flags):
         self.flags.update(flags)
 
-    def add_parameter(self):
-        p = Parameter(self)
+    def add_parameter(self, name):
+        p = Parameter(self, name)
         self.parameters.append(p)
         return p
 
