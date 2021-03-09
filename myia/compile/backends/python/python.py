@@ -299,7 +299,7 @@ def myia_next(obj: tuple):
 
 
 SIMPLE_MAP = {
-    P.argmax: f"IMPL.argmax(%s, %s)",
+    P.argmax: "IMPL.argmax(%s, %s)",
     P.array_max: "np.array(np.max(%s, %s))",
     P.array_reduce: "IMPL.array_reduce(%s, %s, %s)",
     P.array_to_scalar: "%s.item()",
@@ -310,8 +310,8 @@ SIMPLE_MAP = {
     P.casttag: "%s.cast(%s)",
     P.concat: "np.concatenate(%s, axis=%s)",
     P.conv2d: "IMPL.conv2d(%s, %s, %s, %s, %s, %s)",
-    P.conv2d_weight_grad: f"IMPL.conv2d_weight_grad(%s, %s, %s, %s, %s, %s, %s)",
-    P.conv_transpose2d: f"IMPL.conv_transpose2d(%s, %s, %s, %s, %s, %s, %s)",
+    P.conv2d_weight_grad: "IMPL.conv2d_weight_grad(%s, %s, %s, %s, %s, %s, %s)",
+    P.conv_transpose2d: "IMPL.conv_transpose2d(%s, %s, %s, %s, %s, %s, %s)",
     P.distribute: "np.broadcast_to(%s, %s)",
     P.dot: "np.dot(%s, %s)",
     P.env_getitem: "%s.get(%s, %s)",
@@ -349,7 +349,7 @@ SIMPLE_MAP = {
     P.scalar_uadd: "%s",
     P.scalar_usub: "-%s",
     P.scatter: "IMPL.scatter(%s, %s, %s, %s)",
-    P.scatter_add: f"IMPL.scatter_add(%s, %s, %s, %s)",
+    P.scatter_add: "IMPL.scatter_add(%s, %s, %s, %s)",
     P.take: "np.take(%s, %s, axis=0)",
     P.transpose: "np.transpose(%s, %s)",
     P.tuple_getitem: "%s[%s]",
@@ -409,6 +409,28 @@ FUNCTION_MAP = {
     operations.myia_hasnext: myia_hasnext,
     operations.make_dict: op_make_dict,
 }
+APPLY_MAP = {
+    "operator.add": "{} + {}",
+    "operator.sub": "{} - {}",
+    "operator.mul": "{} * {}",
+    "operator.mod": "{} % {}",
+    "operator.pow": "{} ** {}",
+    "operator.eq": "{} == {}",
+    "operator.ne": "{} != {}",
+    "operator.lt": "{} < {}",
+    "operator.gt": "{} > {}",
+    "operator.le": "{} <= {}",
+    "operator.ge": "{} >= {}",
+    "operator.pos": "+{}",
+    "operator.neg": "-{}",
+    "operator.not_": "not {}",
+    "operator.and_": "{} & {}",
+    "operator.or_": "{} | {}",
+    "operator.invert": "~{}",
+    "operator.rshift": "{} >> {}",
+    "operator.lshift": "{} << {}",
+    "operator.getitem": "{}[{}]",
+}
 
 
 def convert_operation(c, node, op, *inputs):
@@ -463,6 +485,16 @@ def convert_operation(c, node, op, *inputs):
     raise NotImplementedError(
         f"Unsupported operation {op} {' '.join(str(inp) for inp in inputs)}"
     )
+
+
+def optimize_apply_call(fn_name, *arg_names):
+    """Generate an apply call from given apply name and arg names.
+
+    If possible, replace an apply call with an inlined code.
+    """
+    if fn_name in APPLY_MAP:
+        return APPLY_MAP[fn_name].format(*arg_names)
+    return f"{fn_name}({', '.join(arg_names)})"
 
 
 class PythonMapper:
@@ -903,7 +935,10 @@ class FunctionCompiler(_Compiler):
             return convert_operation(self, node, *node.inputs)
 
         # Otherwise generate a raw call.
-        return f"{self.ref(node.inputs[0])}({', '.join(self.ref(n) for n in node.inputs[1:])})"
+        # return f"{self.ref(node.inputs[0])}({', '.join(self.ref(n) for n in node.inputs[1:])})"
+        return optimize_apply_call(
+            self.ref(node.inputs[0]), *[self.ref(n) for n in node.inputs[1:]]
+        )
 
     def _add_node(self, node):
         """Associate a name to a node. Return true if a new name was generated."""
