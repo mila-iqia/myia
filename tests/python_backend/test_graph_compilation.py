@@ -286,7 +286,7 @@ def test_grad_with_dout():
     _assert_match(dy * -3, h(x, y))
 
 
-def test_for_on_tuple():
+def test_for_loop_on_tuple():
     @parse_and_compile
     def f(t):
         ret = 0
@@ -296,3 +296,58 @@ def test_for_on_tuple():
 
     t = (1, 2, 3)
     assert f(t) == 6
+
+
+def test_operators():
+    @parse_and_compile
+    def f(a, b):
+        return (
+            a + b,
+            a - b,
+            a * b,
+            a % b,
+            a ** b,
+            a == b,
+            a != b,
+            a < b,
+            a > b,
+            a <= b,
+            a >= b,
+            +a,
+            -a,
+            not a,
+            a & b,
+            a | b,
+            b << a,
+            b >> a,
+            ~a,
+            a and b,
+            a or b,
+        )
+
+    a = 2
+    b = 3
+    results = (
+        5,
+        -1,
+        6,
+        2,
+        8,
+        False,
+        True,
+        True,
+        False,
+        True,
+        False,
+        2,
+        -2,
+        False,
+        2,
+        3,
+        12,
+        0,
+        ~2,
+        3,
+        True,
+    )
+    assert f(a, b) == results, (f(a, b), results)
