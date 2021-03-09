@@ -5,6 +5,19 @@ from ..lib import MyiaTypeError, macro
 from . import primitives as P
 
 
+def pyimpl_apply(fn, *varargs):
+    """Implementation for macro apply."""
+    args = []
+    kwargs = {}
+    for vararg in varargs:
+        if isinstance(vararg, dict):
+            kwargs.update(vararg)
+        else:
+            assert isinstance(vararg, tuple)
+            args.extend(vararg)
+    return fn(*args, **kwargs)
+
+
 @macro
 async def apply(info, fnref, *grouprefs):
     """Expand a varargs and keyword args call."""
@@ -31,5 +44,5 @@ __operation_defaults__ = {
     "name": "apply",
     "registered_name": "apply",
     "mapping": apply,
-    "python_implementation": None,
+    "python_implementation": pyimpl_apply,
 }

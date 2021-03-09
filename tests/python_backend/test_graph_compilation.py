@@ -261,3 +261,38 @@ def test_cast():
         return float(x) + 1.5
 
     assert f(2) == 3.5, f(2)
+
+
+def test_grad_with_dout():
+    """Test grad with dout."""
+
+    def f(x, y):
+        a = x ** 3
+        b = y ** 4
+        return a * b
+
+    @parse_and_compile
+    def g(x, y):
+        return grad(f, "x")(x, y, dout=2)
+
+    @parse_and_compile
+    def h(x, y):
+        return grad(f, "y")(x, y, dout=-3)
+
+    x, y = 2.0, 3.0
+    dx = 3 * (x ** 2) * (y ** 4)
+    dy = 4 * (y ** 3) * (x ** 3)
+    _assert_match(dx * 2, g(x, y))
+    _assert_match(dy * -3, h(x, y))
+
+
+def test_for_on_tuple():
+    @parse_and_compile
+    def f(t):
+        ret = 0
+        for x in t:
+            ret = ret + x
+        return ret
+
+    t = (1, 2, 3)
+    assert f(t) == 6

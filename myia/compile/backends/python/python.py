@@ -19,7 +19,7 @@ from myia.graph_utils import toposort
 from myia.ir import Graph, manage
 from myia.lib import ANYTHING, AbstractArray, AbstractHandle, AbstractTuple
 from myia.operations import Operation, Primitive, primitives as P
-from myia.xtype import Tuple, type_to_np_dtype
+from myia.xtype import Dict, Tuple, type_to_np_dtype
 
 
 class ConstantString:
@@ -220,7 +220,7 @@ def op_grad(f, *required_args):
 
     argnames = inspect.getfullargspec(f).args
 
-    def gradient(*args):
+    def gradient(*args, dout=1):
         gt = GradTester(f, None, args, argnames)
         ret = gt.compute_finite_diff()
         out = []
@@ -228,7 +228,8 @@ def op_grad(f, *required_args):
             argname = argnames[i]
             if not required_args or argname in required_args:
                 k = f"d{f.__name__}/d{argname}"
-                out.append(ret[k])
+                dx = ret[k]
+                out.append(dx * type(dx)(dout))
         return out[0] if len(out) == 1 else out
 
     return gradient
@@ -238,10 +239,18 @@ def op_value_and_grad(f, *required_args):
     """Implement operation value_and_grad."""
     gradient = op_grad(f, *required_args)
 
-    def v_and_g(*args):
-        return f(*args), gradient(*args)
+    def v_and_g(*args, dout=1):
+        return f(*args), gradient(*args, dout=dout)
 
     return v_and_g
+
+
+def op_make_dict(dct: dict, *values):
+    """Implement operation make_dict.
+
+    dct must be a dict with keys to map to given values.
+    """
+    return {key: val for key, val in zip(dct.keys(), values)}
 
 
 @ovld  # noqa: F811
@@ -251,6 +260,11 @@ def myia_iter(obj: object):
 
 @ovld  # noqa: F811
 def myia_iter(obj: range):
+    return obj
+
+
+@ovld  # noqa: F811
+def myia_iter(obj: tuple):
     return obj
 
 
@@ -265,6 +279,11 @@ def myia_hasnext(obj: range):
 
 
 @ovld  # noqa: F811
+def myia_hasnext(obj: tuple):
+    return bool(obj)
+
+
+@ovld  # noqa: F811
 def myia_next(obj: object):
     return obj.__myia_next__()
 
@@ -272,6 +291,11 @@ def myia_next(obj: object):
 @ovld  # noqa: F811
 def myia_next(obj: range):
     return obj.start, range(obj.start + obj.step, obj.stop, obj.step)
+
+
+@ovld  # noqa: F811
+def myia_next(obj: tuple):
+    return obj[0], obj[1:]
 
 
 SIMPLE_MAP = {
@@ -380,6 +404,7 @@ FUNCTION_MAP = {
     operations.myia_next: myia_next,
     operations.myia_iter: myia_iter,
     operations.myia_hasnext: myia_hasnext,
+    operations.make_dict: op_make_dict,
 }
 
 
@@ -391,7 +416,11 @@ def convert_operation(c, node, op, *inputs):
         resolved = namespace[name]
         code = None
 
-        if resolved in OPERATION_MAP:
+        if resolved is operations.make_tuple:
+            # Return an empty string, to get
+            # `(*tuple_vals)` instead of `operation_make_tuple(*tuple_vals)`
+            code = ""
+        elif resolved in OPERATION_MAP:
             # Resolve as Python's operator module function.
             code = f"operator.{OPERATION_MAP[resolved].__name__}"
         elif resolved in FUNCTION_MAP:
@@ -614,13 +643,18 @@ class PythonConstantConverter(_PythonConverter):
     def convert_type(self, v, t):
         """Return type name as a string."""
         if isinstance(t.element, AbstractHandle):
-            return "HandleInstance"
+            return ConstantString("HandleInstance")
         else:
             myia_type = t.element.xtype()
             if myia_type is Tuple:
-                return "tuple"
+                return ConstantString("tuple")
+            elif myia_type is Dict:
+                # We may need to remember dict definition keys,
+                # e.g. for operation make_dict. So, let's return a dict
+                # with keys associated to None.
+                return repr({key: None for key in v.entries})
             else:
-                return f"np.{type_to_np_dtype(myia_type)}"
+                return ConstantString(f"np.{type_to_np_dtype(myia_type)}")
 
     def convert_handle(self, v, t):
         """Convert a Handle."""
@@ -1128,6 +1162,9 @@ class PythonCompiler(_Compiler):
         :return: name used to register value. May be different
             from given name if given name was already used.
         """
+        # If name is already associated to given value, then nothing to do.
+        if name in self.globals and self.globals[name] is value:
+            return name
         self.global_counter.update([name])
         count = self.global_counter[name]
         name = name if count == 1 else f"{name}_v{count}"
