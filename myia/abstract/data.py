@@ -15,7 +15,12 @@ _id = count(1)
 #############
 
 
+class Cachable:
+    pass
+
+
 ABSENT = Named("ABSENT")
+ANYTHING = Named("ANYTHING")
 
 
 class Tracks:
@@ -25,10 +30,7 @@ class Tracks:
     def register_track(cls, track_name, track_handler):
         @property
         def prop(self):
-            if track_name in self._tracks:
-                return self._tracks[track_name].value
-            else:
-                return ABSENT
+            return self.get_track(track_name).value
 
         setattr(cls, track_name, prop)
         cls.track_handlers[track_name] = track_handler
@@ -44,6 +46,8 @@ class Tracks:
         )
 
     def get_track(self, name):
+        if name not in self._tracks:
+            self._tracks[name] = self.track_handlers[name].default()
         return self._tracks[name]
 
     def items(self):
@@ -74,6 +78,10 @@ class Tracks:
 
 
 class Track:
+    @classmethod
+    def default(cls):
+        return cls(ABSENT)
+
     def __init__(self, value):
         self.value = value
 
@@ -85,7 +93,9 @@ class Track:
 
 
 class ValueTrack(Track):
-    pass
+    @classmethod
+    def default(cls):
+        return cls(ANYTHING)
 
 
 class InterfaceTrack(Track):
@@ -101,7 +111,7 @@ Tracks.register_track("interface", InterfaceTrack)
 #################
 
 
-class AbstractValue(Interned, PossiblyRecursive):
+class AbstractValue(Interned, PossiblyRecursive, Cachable):
     """Base class for all abstract values.
 
     Attributes:
@@ -207,6 +217,10 @@ class AbstractUnion(AbstractValue):
         super().__init__(tracks)
         self.options = list(options)  # Possibilities(options)
 
+    def __eqkey__(self):
+        v = AbstractValue.__eqkey__(self)
+        return AttrEK(self, (v, "options"))
+
     def __hrepr_short__(self, H, hrepr):
         return H.instance["myia-abstract-union"](
             type="*U",
@@ -233,7 +247,11 @@ class AbstractUnion(AbstractValue):
 ####################
 
 
-class Opaque:
+class Generic(Cachable):
+    pass
+
+
+class Opaque(Generic):
     def __init__(self, rank):
         self.rank = rank
 
@@ -263,7 +281,7 @@ class Opaque:
     __str__ = __repr__ = pstr
 
 
-class Placeholder:
+class Placeholder(Generic):
     def __init__(self):
         self.id = next(_id)
 
