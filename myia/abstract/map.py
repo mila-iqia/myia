@@ -5,9 +5,9 @@ from ovld import ovld
 from ..utils.intern import intern
 from . import data
 
-#########
-# Check #
-#########
+#############
+# Predicate #
+#############
 
 
 @ovld.dispatch(initial_state=lambda: {"cache": {}, "prop": None})
@@ -20,7 +20,7 @@ def abstract_predicate(self, x, **kwargs):
             if hasattr(x, prop):
                 return getattr(x, prop) is x
             elif __call__(x, **kwargs):
-                if isinstance(x, data.AbstractValue):
+                if isinstance(x, data.Cachable):
                     setattr(x, prop, x)
                 return True
             else:
@@ -138,11 +138,11 @@ def abstract_map(self, x, **kwargs):
     __call__ = self.resolve(x)
 
     def proceed():
-        if isinstance(x, data.AbstractValue) and x in cache:
+        if isinstance(x, data.Cachable) and x in cache:
             return cache[x]
         result = __call__(x, **kwargs)
         if not isinstance(result, GeneratorType):
-            if isinstance(x, data.AbstractValue):
+            if isinstance(x, data.Cachable):
                 cache[x] = result
             return result
         cls = result.send(None)
@@ -208,3 +208,104 @@ def abstract_map(self, x: data.AbstractUnion, **kwargs):
 @ovld  # noqa: F811
 def abstract_map(self, x: object, **kwargs):
     return x
+
+
+########
+# Map2 #
+########
+
+
+class MapError(Exception):
+    def __init__(self, x, y, reason):
+        super().__init__(reason)
+        self.x = x
+        self.y = y
+        self.reason = reason
+
+
+@ovld.dispatch(
+    initial_state=lambda: {"cache": {}},
+    postprocess=_intern,
+)
+def abstract_map2(self, x, y, **kwargs):
+    """Combine two abstract values."""
+    __call__ = self.resolve(x, y)
+
+    cache = self.cache
+    cachable = isinstance(x, data.Cachable) and isinstance(y, data.Cachable)
+
+    if cachable and (x, y) in cache:
+        return cache[x, y]
+
+    result = __call__(x, y, **kwargs)
+    if not isinstance(result, GeneratorType):
+        if cachable:
+            cache[x, y] = result
+        return result
+
+    cls = result.send(None)
+    assert cls is not None
+    inst = cls.empty()
+    constructor = _make_constructor(inst)
+    cache[x, y] = inst
+
+    try:
+        result.send(constructor)
+    except StopIteration as e:
+        if inst is not None:
+            assert e.value is inst
+        return e.value
+    else:
+        raise AssertionError(
+            "Generators in abstract_map2 must yield once, then return."
+        )
+
+
+@ovld  # noqa: F811
+def abstract_map2(self, x: data.Tracks, y: data.Tracks, **kwargs):
+    tracks = {**x._tracks, **y._tracks}
+    return data.Tracks(
+        {
+            k: self(x.get_track(k), y.get_track(k), **kwargs)
+            for k in tracks.keys()
+        }
+    )
+
+
+@ovld  # noqa: F811
+def abstract_map2(self, x: data.AbstractAtom, y: data.AbstractAtom, **kwargs):
+    assert type(x) is type(y)
+    return type(x)(tracks=self(x.tracks, y.tracks, **kwargs))
+
+
+@ovld  # noqa: F811
+def abstract_map2(
+    self, x: data.AbstractStructure, y: data.AbstractStructure, **kwargs
+):
+    assert type(x) is type(y)
+    if len(x.elements) != len(y.elements):
+        raise MapError(x, y, reason="Structures have different lengths")
+
+    return (yield type(x))(
+        [self(xe, ye, **kwargs) for xe, ye in zip(x.elements, y.elements)],
+        tracks=self(x.tracks, y.tracks, **kwargs),
+    )
+
+
+@ovld  # noqa: F811
+def abstract_map2(self, x: data.AbstractUnion, y: data.AbstractUnion, **kwargs):
+    # TODO: this should be more like merging sets
+
+    assert type(x) is type(y)
+    if len(x.options) != len(y.options):
+        raise MapError(x, y, reason="Unions have different lengths")
+
+    return (yield type(x))(
+        [self(xe, ye, **kwargs) for xe, ye in zip(x.options, y.options)],
+        tracks=self(x.tracks, y.tracks, **kwargs),
+    )
+
+
+@ovld  # noqa: F811
+def abstract_map2(self, x: object, y: object, **kwargs):
+    raise MapError(x, y, reason="Cannot merge objects")

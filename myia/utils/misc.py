@@ -58,7 +58,7 @@ class Named:
             name: The name of this object.
 
         """
-        self.name = name
+        self.name = self.__name__ = name
 
     def __repr__(self):
         """Return the object's name."""

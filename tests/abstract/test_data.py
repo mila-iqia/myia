@@ -1,5 +1,5 @@
 from myia.abstract import data
-from myia.abstract.data import ABSENT
+from myia.abstract.data import ABSENT, ANYTHING
 from myia.utils.intern import intern
 
 
@@ -17,10 +17,8 @@ def test_tracks():
 
 def test_empty_tracks():
     tr = data.Tracks()
-    assert tr.value is ABSENT
+    assert tr.value is ANYTHING
     assert tr.interface is ABSENT
-    assert set(tr.values()) == set()
-    assert dict(tr.items()) == {}
 
 
 def test_AbstractAtom():
@@ -33,14 +31,15 @@ def test_AbstractAtom():
     assert s1.t.value == 1
     assert s1.t.interface is int
 
-    assert s2.t.value is ABSENT
+    assert s2.t.value is ANYTHING
     assert s2.t.interface is int
 
 
 def makerec():
     i = data.AbstractAtom({"interface": int})
     rec = data.AbstractStructure.empty()
-    un = data.AbstractUnion([i, rec], tracks={})
+    un = data.AbstractUnion.empty()
+    un.commit([i, rec], tracks={})
     rec.commit([un, un], tracks={"interface": tuple})
     return intern(rec)
 

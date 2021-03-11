@@ -1,6 +1,18 @@
+from ovld import ovld
+
 from myia.abstract import data
-from myia.abstract.map import abstract_all, abstract_any, abstract_map
+from myia.abstract.map import (
+    abstract_all,
+    abstract_any,
+    abstract_map,
+    abstract_map2,
+    MapError,
+)
 from myia.utils.intern import intern
+
+import pytest
+
+from ..common import one_test_per_assert, A, Un
 
 
 @abstract_any.variant
@@ -104,15 +116,47 @@ def test_props():
     assert absolutify(tu1000) is tu1000
 
 
+@abstract_map2.variant
+def add(self, x: data.ValueTrack, y: data.ValueTrack):
+    return data.ValueTrack(x.value + y.value)
+
+
+@ovld
+def add(self, x: data.InterfaceTrack, y: data.InterfaceTrack, **kwargs):
+    assert x.value == y.value
+    return x
+
+
+@one_test_per_assert
+def test_map2():
+    assert add(A(1), A(7)) is A(8)
+    assert add(A(1, 2, 10), A(7, 0, 21)) is A(8, 2, 31)
+    assert add(Un(1, 2, 10), Un(7, 0, 21)) is Un(8, 2, 31)
+
+
+def test_map2_bad():
+    with pytest.raises(MapError):
+        add(A(1), A(9, 3))
+
+    with pytest.raises(MapError):
+        add(A(1, 2), A(1, 2, 3))
+
+    with pytest.raises(MapError):
+        add(Un(1, 2), Un(3, 4, 5))
+
+
 def makerec(value):
     i = data.AbstractAtom({"value": value, "interface": int})
     rec = data.AbstractStructure.empty()
-    un = data.AbstractUnion([i, rec], tracks={})
+    un = data.AbstractUnion.empty()
+    un.commit([i, rec], tracks={})
     rec.commit([un, un], tracks={"interface": tuple})
     return intern(rec)
 
 
+@one_test_per_assert
 def test_rec():
     assert absolutify(makerec(-3)) is makerec(3)
     assert absolutify_noprop(makerec(-3)) is makerec(3)
     assert increment_value(makerec(-3)) is makerec(-2)
+    assert add(makerec(-1), makerec(4)) is makerec(3)
