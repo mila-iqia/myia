@@ -53,6 +53,20 @@ def test_seq():
 }
 """
 
+
+def test_seq2():
+    def f(x):
+        return x + x
+
+    assert str_graph(parse(f)) == """graph f(%x) {
+  %_apply0 = load(x, 1)
+  %_apply1 = load(x, 2)
+  %_apply2 = add(%_apply0, %_apply1)
+  return %_apply2
+}
+"""
+
+
 def test_ifexp():
     def f(x, y, b):
         return x if b else y
