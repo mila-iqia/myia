@@ -133,7 +133,9 @@ class Block:
         return ld
 
     def apply(self, *inputs):
-        return self.graph.apply(*inputs)
+        res = self.graph.apply(*inputs)
+        self.link_seq(res)
+        return res
 
     def link_seq(self, node):
         node.add_edge(SEQ, self.last_apply)

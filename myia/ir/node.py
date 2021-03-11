@@ -164,6 +164,5 @@ class Constant(Node):
     def is_constant_graph(self):
         return self.is_constant(Graph)
 
-
     def __str__(self):
         return str(self.value)

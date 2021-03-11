@@ -70,19 +70,18 @@ def str_graph(g, allow_cycles=False, recursive=True):
             seen_nodes.add(node)
             applies.append(node)
 
-            edges = list(node.edges.values())
+            nodes = [e.node for e in node.edges.values()]
             seq = node.edges.get(SEQ, None)
             if seq is not None:
                 # This ensures seq will be processed first
-                edges.remove(seq)
-                edges.insert(0, seq)
-            for edge in edges:
-                if edge.node is not None:
-                    if (edge.node.is_apply() and
-                            edge.node.graph is g):
-                        todo.append(edge.node)
-                    elif recursive and edge.node.is_constant_graph():
-                        todo_graphs.append(edge.node.value)
+                nodes = [seq.node] + [n for n in nodes if n is not seq.node]
+            for node in nodes:
+                if node is not None:
+                    if (node.is_apply() and
+                            node.graph is g):
+                        todo.append(node)
+                    elif recursive and node.is_constant_graph():
+                        todo_graphs.append(node.value)
 
         for node in reversed(applies):
             if (node.graph is not None and node.graph is not g) or node is g.return_:
