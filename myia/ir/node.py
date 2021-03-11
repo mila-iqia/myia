@@ -93,6 +93,9 @@ class Edge:
         self.label = label
         self.node = node
 
+    def __str__(self):
+        return f"Edge({self.label}, {self.node})"
+
 
 def edgemap(edges):
     res = {}
@@ -135,6 +138,9 @@ class Apply(Node):
             res.append(self.edges[i].node)
             i += 1
         return res
+
+    def __str__(self):
+        return f"{self.fn}({self.inputs})"
 
 
 class Parameter(Node):
