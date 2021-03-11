@@ -133,3 +133,22 @@ def unify(x, y, U=None):
     U = U or Unificator()
     res = _unify(x, y, U=U)
     return reify(res, unif=U.canon), U
+
+
+#########
+# merge #
+#########
+
+
+@_unify.variant
+def _merge(self, x: data.AbstractUnion, y: data.AbstractUnion, *, U):
+    assert type(x) is type(y)
+    return (yield type(x))(
+        [*x.options, *y.options], tracks=self(x.tracks, y.tracks, U=U)
+    )
+
+
+def merge(x, y, U=None):
+    U = U or Unificator()
+    res = _merge(x, y, U=U)
+    return reify(res, unif=U.canon), U
