@@ -1,18 +1,17 @@
+import pytest
 from ovld import ovld
 
 from myia.abstract import data
 from myia.abstract.map import (
+    MapError,
     abstract_all,
     abstract_any,
     abstract_map,
     abstract_map2,
-    MapError,
 )
 from myia.utils.intern import intern
 
-import pytest
-
-from ..common import one_test_per_assert, A, Un
+from ..common import A, Un, one_test_per_assert
 
 
 @abstract_any.variant

@@ -4,11 +4,12 @@ from myia.abstract.utils import (
     Unificator,
     canonical,
     is_concrete,
+    merge,
     uncanonical,
     unify,
 )
 
-from ..common import A, one_test_per_assert
+from ..common import A, Un, one_test_per_assert
 
 o0 = data.Opaque(0)
 o1 = data.Opaque(1)
@@ -85,6 +86,10 @@ def test_unify():
 
     assert _utest(A(o0, o0), A(6, o0), A(6, 6))
 
+    # Unions
+    assert _utest(Un(o0), Un(6), Un(6))
+    assert _utest(Un(o0, o0), Un(6, o0), Un(6, 6))
+
     # Variables remain
     assert _utest(o0, o1)
 
@@ -94,6 +99,8 @@ def test_cannot_unify():
     assert not _utest(A(1), A(2))
     assert not _utest(A(o0, 3), A(7, o0))
     assert not _utest(A(o0, o1, o2, 9), A(7, o0, o1, o2))
+    assert not _utest(Un(1), Un(2))
+    assert not _utest(Un(1), Un(1, 2))
 
 
 def test_unify_recursive():
@@ -108,3 +115,24 @@ def test_unify_recursive():
     assert a.elements[1] is b
     assert b.elements[0] is A(8)
     assert b.elements[1] is a
+
+
+def _mtest(a, b, expected=True, mappings={}):
+    try:
+        c, U = merge(a, b)
+    except MapError:
+        return False
+    if expected is not True:
+        assert c == expected
+    for entry, canon in mappings.items():
+        print(entry, canon, U.canon[entry])
+        assert U.canon[entry] == canon
+    return True
+
+
+@one_test_per_assert
+def test_merge():
+    assert _mtest(o0, A(1), A(1), {o0: A(1)})
+    assert _mtest(Un(1), Un(2), Un(1, 2))
+    assert _mtest(Un(o0), Un(6), Un(o0, 6))
+    assert _mtest(Un(1), Un(1, 2), Un(1, 1, 2))
