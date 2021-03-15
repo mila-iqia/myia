@@ -69,7 +69,7 @@ _parse_cache = {}
 
 def parse(func):
     if func in _parse_cache:
-        return _parse_cache[key]
+        return _parse_cache[func]
 
     flags = dict(getattr(func, "_myia_flags", {}))
 
@@ -97,45 +97,33 @@ def parse(func):
 
 
 class Block:
-    def __init__(self, parent, name, location=None, flags={}):
-        self.parent = parent
-        if self.parent:
-            self.parent.children.add(self)
-        self.children = set()
-        self.preds = set()
-        self.jump_tag = None
+    def __init__(self, function, name, parent_graph, location=None, flags={}):
+        self.function = function
 
-        if self.parent:
-            pgraph = self.parent.graph
-        else:
-            pgraph = None
-        self.graph = Graph(pgraph)
+        self.graph = Graph(parent_graph)
         self.graph.name = name
         self.graph.location = location
         self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
 
+        self.preds = set()
+        self.jump_tag = None
         self.last_apply = None
-        self.var_seq = 0
-        self.variables_read = {}
-        self.variables_written = {}
-
-    def write(self, varnum, node):
-        st = self.graph.apply('store', varnum, node, self.var_seq)
-        self.var_seq += 1
-        self.variables_written.setdefault(varnum, []).append(st)
-        return st
-
-    def read(self, varnum):
-        ld = self.graph.apply("load", varnum, self.var_seq)
-        self.var_seq += 1
-        self.variables_read.setdefault(varnum, []).append(ld)
-        return ld
 
     def apply(self, *inputs):
         res = self.graph.apply(*inputs)
         self.link_seq(res)
         return res
+
+    def read(self, varnum):
+        ld = self.apply("load", varnum)
+        self.function.read(varnum, ld)
+        return ld
+
+    def write(self, varnum, node):
+        st = self.apply('store', varnum, node)
+        self.function.write(varnum, st)
+        return st
 
     def link_seq(self, node):
         node.add_edge(SEQ, self.last_apply)
@@ -158,6 +146,44 @@ class Block:
         assert self.graph.return_ is None
         self.graph.output = value
         self.link_seq(self.graph.return_)
+
+
+class Function:
+    def __init__(self, parent, name, location=None, flags={}):
+        if parent is not None:
+            parent_function = parent.function
+            parent_graph = parent.graph
+        else:
+            parent_function = None
+            parent_graph = None
+        self.parent = parent_function
+        self.flags = flags
+        self.children = set()
+        if self.parent is not None:
+            self.parent.children.add(self)
+
+        self.initial_block = Block(self, name, parent_graph,
+                                   location, flags)
+        self.blocks = [self.initial_block]
+
+        self.variables_read = {}
+        self.variables_written = {}
+
+        self.variables_nonlocal = set()
+        self.variables_global = set()
+        self.variables_local = set()
+
+    def new_block(self, name, parent, location=None):
+        block = Block(self, name, parent.graph, location,
+                      self.flags)
+        self.blocks.append(block)
+        return block
+
+    def write(self, varnum, st):
+        self.variables_written.setdefault(varnum, []).append(st)
+
+    def read(self, varnum, ld):
+        self.variables_read.setdefault(varnum, []).append(ld)
 
 
 class Parser:
@@ -184,9 +210,6 @@ class Parser:
         # We currently act as if "from __future__ import annotations" is
         # in effect, which means that we only need to care about globals.
         return eval(text, self.function.__globals__)
-
-    def new_block(self, parent, name, location, flags={}):
-        return Block(parent, name, location, dict(**self.recflags, **flags))
 
     def make_location(self, node):
         if node is None:
@@ -223,9 +246,12 @@ class Parser:
         return main_block.graph
 
     def _create_function(self, block, node):
-        function_block = self.new_block(parent=block,
-                                        name=node.name,
-                                        location=self.make_location(node))
+        function = Function(parent=block,
+                            name=node.name,
+                            location=self.make_location(node),
+                            flags=self.recflags)
+        function_block = function.initial_block
+
         args = node.args.args
         nondefaults = [None] * (len(args) - len(node.args.kw_defaults))
         defaults = nondefaults + node.args.defaults
@@ -247,7 +273,14 @@ class Parser:
             function_block.graph.parameters.append(param_node)
             function_block.write(arg.arg, param_node)
             if dflt:
-                dflt_node = self.process_node(function_block, dflt)
+                # TODO If there are no parents (the initial function),
+                # then evaluate in the global env
+                if block is None:
+                    raise MyiaSyntaxError("default value on the entry function")
+                # XXX: This might not work correctly with our framework,
+                # but we need to evaluate the default arguments in the parent
+                # context for proper name resolution.
+                dflt_node = self.process_node(block, dflt)
                 defaults_names.append(arg.arg)
                 defaults_list.append(dflt_node)
 
@@ -288,10 +321,10 @@ class Parser:
         return function_block
 
     def make_condition_blocks(self, block, tn, fn):
-        tb = self.new_block(block, "if_true", self.make_location(tn))
+        tb = block.function.new_block("if_true", block, self.make_location(tn))
         tb.preds.add(block)
 
-        fb = self.new_block(block, "if_false", self.make_location(fn))
+        fb = block.function.new_block("if_false", block, self.make_location(fn))
         fb.preds.add(block)
 
         return tb, fb
@@ -392,7 +425,6 @@ class Parser:
         if isinstance(targ, ast.Name):
             # x = val
             st = block.write(targ.id, val)
-            block.link_seq(st)
 
         elif isinstance(targ, ast.Tuple):
             # x, y = val
@@ -416,7 +448,7 @@ class Parser:
 
         # TODO: figure out how to add a location here
         # (we would need the list of nodes that follow the if)
-        after_block = self.new_block(block, "if_after", None)
+        after_block = block.function.new_block("if_after", block, None)
 
         true_end = self.process_statements(true_block, node.body)
         if not true_end.graph.return_:
@@ -429,6 +461,14 @@ class Parser:
         block.cond(cond, true_block, false_block)
         return after_block
 
+    def process_Global(self, block, node):
+        block.function.variables_global.update(node.names)
+        return block
+
+    def process_Nonlocal(self, block, node):
+        block.function.variables_nonlocal.update(node.names)
+        return block
+
     def process_Pass(self, block, node):
         return block
 
@@ -437,11 +477,13 @@ class Parser:
         return block
 
     def process_While(self, block, node):
-        header_block = self.new_block(block, "while_header", self.make_location(node.test))
-        body_block = self.new_block(block, "while_body", self.make_location(node.body))
+        header_block = block.function.new_block("while_header", block,
+                                                self.make_location(node.test))
+        body_block = block.function.new_block("while_body", block,
+                                              self.make_location(node.body))
         # TODO: Same as If we need the list of nodes that follow
         # for the location
-        after_block = self.new_block(block, "while_after", None)
+        after_block = block.function.new_block("while_after", block, None)
 
         body_block.preds.add(header_block)
         after_block.preds.add(header_block)

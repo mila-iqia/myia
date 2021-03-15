@@ -9,8 +9,9 @@ def test_simple():
         return x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = load(x, 1)
-  return %_apply0
+  %_apply0 = store(x, %x)
+  %_apply1 = load(x)
+  return %_apply1
 }
 """
 
@@ -21,8 +22,25 @@ def test_closure():
         return x
 
     assert str_graph(parse(f)) == """graph f() {
-  %_apply0 = load(x, 0)
+  %_apply0 = load(x)
   return %_apply0
+}
+"""
+
+
+def test_nonlocal():
+    x = 1
+    def f():
+        nonlocal x
+        x = x + 1
+        return x
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = load(x)
+  %_apply1 = add(%_apply0, 1)
+  %_apply2 = store(x, %_apply1)
+  %_apply3 = load(x)
+  return %_apply3
 }
 """
 
@@ -30,12 +48,13 @@ def test_closure():
 def test_add():
     def f(x, y):
         return x + y
-
     assert str_graph(parse(f)) == """graph f(%x, %y) {
-  %_apply0 = load(x, 2)
-  %_apply1 = load(y, 3)
-  %_apply2 = add(%_apply0, %_apply1)
-  return %_apply2
+  %_apply0 = store(x, %x)
+  %_apply1 = store(y, %y)
+  %_apply2 = load(x)
+  %_apply3 = load(y)
+  %_apply4 = add(%_apply2, %_apply3)
+  return %_apply4
 }
 """
 
@@ -46,9 +65,10 @@ def test_seq():
         return 0
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = load(x, 1)
-  %_apply1 = add(%_apply0, 1)
-  %_apply2 = store(x, %_apply1, 2)
+  %_apply0 = store(x, %x)
+  %_apply1 = load(x)
+  %_apply2 = add(%_apply1, 1)
+  %_apply3 = store(x, %_apply2)
   return 0
 }
 """
@@ -59,10 +79,11 @@ def test_seq2():
         return x + x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = load(x, 1)
-  %_apply1 = load(x, 2)
-  %_apply2 = add(%_apply0, %_apply1)
-  return %_apply2
+  %_apply0 = store(x, %x)
+  %_apply1 = load(x)
+  %_apply2 = load(x)
+  %_apply3 = add(%_apply1, %_apply2)
+  return %_apply3
 }
 """
 
@@ -72,20 +93,23 @@ def test_ifexp():
         return x if b else y
 
     assert str_graph(parse(f)) == """graph f(%x, %y, %b) {
-  %_apply0 = load(b, 3)
-  %_apply1 = user_switch(%_apply0, @if_true, @if_false)
-  %_apply2 = %_apply1()
-  return %_apply2
+  %_apply0 = store(x, %x)
+  %_apply1 = store(y, %y)
+  %_apply2 = store(b, %b)
+  %_apply3 = load(b)
+  %_apply4 = user_switch(%_apply3, @if_true, @if_false)
+  %_apply5 = %_apply4()
+  return %_apply5
 }
 
 graph if_false() {
-  %_apply3 = load(y, 0)
-  return %_apply3
+  %_apply6 = load(y)
+  return %_apply6
 }
 
 graph if_true() {
-  %_apply4 = load(x, 0)
-  return %_apply4
+  %_apply7 = load(x)
+  return %_apply7
 }
 """
 
@@ -94,12 +118,15 @@ def test_boolop():
         return a and b or c
 
     assert str_graph(parse(f)) == """graph f(%a, %b, %c) {
-  %_apply0 = load(a, 3)
-  %_apply1 = switch(%_apply0, @if_true, @if_false)
-  %_apply2 = %_apply1()
-  %_apply3 = switch(%_apply2, @if_true, @if_false)
-  %_apply4 = %_apply3()
-  return %_apply4
+  %_apply0 = store(a, %a)
+  %_apply1 = store(b, %b)
+  %_apply2 = store(c, %c)
+  %_apply3 = load(a)
+  %_apply4 = switch(%_apply3, @if_true, @if_false)
+  %_apply5 = %_apply4()
+  %_apply6 = switch(%_apply5, @if_true, @if_false)
+  %_apply7 = %_apply6()
+  return %_apply7
 }
 
 graph if_false() {
@@ -107,13 +134,13 @@ graph if_false() {
 }
 
 graph if_true() {
-  %_apply5 = load(b, 0)
-  return %_apply5
+  %_apply8 = load(b)
+  return %_apply8
 }
 
 graph if_false() {
-  %_apply6 = load(c, 0)
-  return %_apply6
+  %_apply9 = load(c)
+  return %_apply9
 }
 
 graph if_true() {
@@ -126,9 +153,10 @@ def test_compare():
         return x > 0
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = load(x, 1)
-  %_apply1 = gt(%_apply0, 0)
-  return %_apply1
+  %_apply0 = store(x, %x)
+  %_apply1 = load(x)
+  %_apply2 = gt(%_apply1, 0)
+  return %_apply2
 }
 """
 
@@ -138,11 +166,12 @@ def test_compare2():
         return 0 < x < 42
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = load(x, 1)
-  %_apply1 = lt(0, %_apply0)
-  %_apply2 = switch(%_apply1, @if_true, @if_false)
-  %_apply3 = %_apply2()
-  return %_apply3
+  %_apply0 = store(x, %x)
+  %_apply1 = load(x)
+  %_apply2 = lt(0, %_apply1)
+  %_apply3 = switch(%_apply2, @if_true, @if_false)
+  %_apply4 = %_apply3()
+  return %_apply4
 }
 
 graph if_false() {
@@ -150,9 +179,9 @@ graph if_false() {
 }
 
 graph if_true() {
-  %_apply4 = load(x, 0)
-  %_apply5 = lt(%_apply4, 42)
-  return %_apply5
+  %_apply5 = load(x)
+  %_apply6 = lt(%_apply5, 42)
+  return %_apply6
 }
 """
 
@@ -161,9 +190,10 @@ def test_unary():
         return -x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = load(x, 1)
-  %_apply1 = neg(%_apply0)
-  return %_apply1
+  %_apply0 = store(x, %x)
+  %_apply1 = load(x)
+  %_apply2 = neg(%_apply1)
+  return %_apply2
 }
 """
 
@@ -176,20 +206,23 @@ def test_if():
             return y
 
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = load(b, 3)
-  %_apply1 = user_switch(%_apply0, @if_true, @if_false)
-  %_apply2 = %_apply1()
-  return %_apply2
+  %_apply0 = store(b, %b)
+  %_apply1 = store(x, %x)
+  %_apply2 = store(y, %y)
+  %_apply3 = load(b)
+  %_apply4 = user_switch(%_apply3, @if_true, @if_false)
+  %_apply5 = %_apply4()
+  return %_apply5
 }
 
 graph if_false() {
-  %_apply3 = load(y, 0)
-  return %_apply3
+  %_apply6 = load(y)
+  return %_apply6
 }
 
 graph if_true() {
-  %_apply4 = load(x, 0)
-  return %_apply4
+  %_apply7 = load(x)
+  return %_apply7
 }
 """
 
@@ -200,25 +233,28 @@ def test_if2():
         return y
 
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = load(b, 3)
-  %_apply1 = user_switch(%_apply0, @if_true, @if_false)
-  %_apply2 = %_apply1()
-  return %_apply2
+  %_apply0 = store(b, %b)
+  %_apply1 = store(x, %x)
+  %_apply2 = store(y, %y)
+  %_apply3 = load(b)
+  %_apply4 = user_switch(%_apply3, @if_true, @if_false)
+  %_apply5 = %_apply4()
+  return %_apply5
 }
 
 graph if_false() {
-  %_apply3 = @if_after()
-  return %_apply3
+  %_apply6 = @if_after()
+  return %_apply6
 }
 
 graph if_after() {
-  %_apply4 = load(y, 0)
-  return %_apply4
+  %_apply7 = load(y)
+  return %_apply7
 }
 
 graph if_true() {
-  %_apply5 = load(x, 0)
-  return %_apply5
+  %_apply8 = load(x)
+  return %_apply8
 }
 """
 
@@ -230,25 +266,28 @@ def test_while():
         return y
 
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = @while_header()
-  return %_apply0
-}
-
-graph while_header() {
-  %_apply1 = load(b, 0)
-  %_apply2 = user_switch(%_apply1, @while_body, @while_after)
-  %_apply3 = %_apply2()
+  %_apply0 = store(b, %b)
+  %_apply1 = store(x, %x)
+  %_apply2 = store(y, %y)
+  %_apply3 = @while_header()
   return %_apply3
 }
 
+graph while_header() {
+  %_apply4 = load(b)
+  %_apply5 = user_switch(%_apply4, @while_body, @while_after)
+  %_apply6 = %_apply5()
+  return %_apply6
+}
+
 graph while_after() {
-  %_apply4 = load(y, 0)
-  return %_apply4
+  %_apply7 = load(y)
+  return %_apply7
 }
 
 graph while_body() {
-  %_apply5 = load(x, 0)
-  return %_apply5
+  %_apply8 = load(x)
+  return %_apply8
 }
 """
 
@@ -260,27 +299,28 @@ def test_while2():
         return x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = @while_header()
-  return %_apply0
+  %_apply0 = store(x, %x)
+  %_apply1 = @while_header()
+  return %_apply1
 }
 
 graph while_header() {
-  %_apply1 = load(x, 0)
-  %_apply2 = user_switch(%_apply1, @while_body, @while_after)
-  %_apply3 = %_apply2()
-  return %_apply3
-}
-
-graph while_after() {
-  %_apply4 = load(x, 0)
+  %_apply2 = load(x)
+  %_apply3 = user_switch(%_apply2, @while_body, @while_after)
+  %_apply4 = %_apply3()
   return %_apply4
 }
 
+graph while_after() {
+  %_apply5 = load(x)
+  return %_apply5
+}
+
 graph while_body() {
-  %_apply5 = load(x, 0)
-  %_apply6 = sub(%_apply5, 1)
-  %_apply7 = store(x, %_apply6, 1)
-  %_apply8 = @while_header()
-  return %_apply8
+  %_apply6 = load(x)
+  %_apply7 = sub(%_apply6, 1)
+  %_apply8 = store(x, %_apply7)
+  %_apply9 = @while_header()
+  return %_apply9
 }
 """
