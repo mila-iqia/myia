@@ -110,19 +110,32 @@ class Block:
         self.jump_tag = None
         self.last_apply = None
 
+        self.variables_written = {}
+        self.variables_read = {}
+
+        self.variables_phi = []
+        self.possible_phis = set()
+
     def apply(self, *inputs):
         res = self.graph.apply(*inputs)
         self.link_seq(res)
         return res
 
     def read(self, varnum):
-        ld = self.apply("load", varnum)
-        self.function.read(varnum, ld)
+        st = self.variables_written.get(varnum, [None])[-1]
+        ld = self.apply("load", varnum, st)
+        self.variables_read.setdefault(varnum, []).append(ld)
+        if not varnum in self.function.variables_local:
+            self.function.variables_free.add(varnum)
+        elif not varnum in self.variables_written:
+            self.possible_phis.add(varnum)
         return ld
 
     def write(self, varnum, node):
         st = self.apply('store', varnum, node)
-        self.function.write(varnum, st)
+        self.variables_written.setdefault(varnum, []).append(st)
+        self.function.variables_local.add(varnum)
+        self.function.variables_first_write.setdefault(varnum, st)
         return st
 
     def link_seq(self, node):
@@ -166,24 +179,20 @@ class Function:
                                    location, flags)
         self.blocks = [self.initial_block]
 
-        self.variables_read = {}
-        self.variables_written = {}
+        self.variables_free = set()
+        self.variables_root = set()
 
-        self.variables_nonlocal = set()
         self.variables_global = set()
         self.variables_local = set()
+
+        self.variables_nonlocal = set()
+        self.variables_first_write = dict()
 
     def new_block(self, name, parent, location=None):
         block = Block(self, name, parent.graph, location,
                       self.flags)
         self.blocks.append(block)
         return block
-
-    def write(self, varnum, st):
-        self.variables_written.setdefault(varnum, []).append(st)
-
-    def read(self, varnum, ld):
-        self.variables_read.setdefault(varnum, []).append(ld)
 
 
 class Parser:
@@ -240,10 +249,139 @@ class Parser:
 
         main_block = self._create_function(None, function_def)
 
+        # Order from parents to children
+        functions = self.all_functions(main_block.function)
+        self.analyze(functions)
+        self.resolve(functions)
+
         # Check for no return
         # This does a dfs and finds graphs with None for return_
 
         return main_block.graph
+
+    def all_functions(self, main_function):
+        functions = [main_function]
+        todo = list(main_function.children)
+        while todo:
+            fn = todo.pop()
+            functions.append(fn)
+            todo.extend(fn.children)
+        return functions
+
+    def analyze(self, functions):
+        for function in reversed(functions):
+            # remove from locals what was marked as not a local
+            function.variables_local -= function.variables_nonlocal
+            function.variables_local -= function.variables_global
+
+            function.variables_free -= function.variables_global
+            function.variables_free.update(function.variables_nonlocal)
+
+            for err in function.variables_free.intersection(
+                function.variables_local
+            ):
+                # If this intersection is non-empty it means
+                # that we reference the variables it contains
+                # before we assign to them
+                raise UnboundLocalError(f"local variable '{err}' is referenced before assignment")
+
+            for child in function.children:
+                # variables_free is the sum of all free variables
+                # including children
+                function.variables_free.update(
+                    child.variables_free - function.variables_local
+                )
+                # variables_root is the set of closure variables defined here
+                function.variables_root.update(
+                    function.variables_local.intersection(child.variables_free)
+                )
+
+            for block in function.blocks:
+                # build the phi namespace
+                if len(block.possible_phis) > 0:
+                    preds_written = set()
+                    for pred in block.preds:
+                        preds_written.update(pred.variables_written)
+
+                    # To be a phi it must be written in the preds,
+                    # be a local variable and not be a root
+                    block.variables_phi = list(block.possible_phis.intersection(preds_written).intersection(function.variables_local) - function.variables_root)
+
+    def resolve_read(self, repl, ld, function, local_namespace):
+        var = ld.edges[0].node.value
+        st = ld.edges[1].node
+        if var in function.variables_root or function.variables_free:
+            if var not in local_namespace:
+                repl[ld] = ld.graph.apply("resolve", self.global_namespace, var)
+            else:
+                repl[ld] = ld.graph.apply("universe_getitem", local_namespace[var])
+        elif var in function.variables_global:
+            repl[ld] = ld.graph.apply("resolve", self.global_namespace, var)
+        elif var in function.variables_local:
+            # st will the the constant None otherwise
+            if st.is_apply():
+                repl[ld] = st.edges[1].node
+            else:
+                repl[ld] = local_namespace[var]
+        else:
+            raise AssertionError(f"unclassified variable '{var}'")
+
+    def resolve_write(self, repl, st, function, local_namespace):
+        var = st.edges[0].node.value
+        value = st.edges[1].node
+        if var in function.variables_root or function.variables_free:
+            repl[st] = st.graph.apply("universe_setitem", local_namespace[var], value)
+        elif var in function.variables_global:
+            raise UnimplementedError("attempt to write to a global variable")
+        elif var in function.variables_local:
+            # This should only affect seq edges
+            repl[st] = st.edges[SEQ].node
+        else:
+            raise AssertionError(f"unclassified variable '{var}'")
+
+    def resolve(self, functions):
+        namespace = {}
+        for function in functions:
+
+            errs = function.variables_nonlocal - namespace.keys()
+            for err in errs:
+                raise SyntaxError(f"no binding for variable '{err}' found")
+
+            for var in function.variables_root:
+                st = function.variables_first_write[var]
+                namespace[var] = st.graph.apply(
+                    "make_handle",
+                    st.graph.apply("typeof", st.edges[1]),
+                )
+
+            for block in function.blocks:
+                repl = {}
+                local_namespace = namespace.copy()
+
+                # add phi inputs
+                for phi in block.variables_phi:
+                    arg = Parameter(block.graph, name="phi")
+                    block.graph.parameters.append(arg)
+                    local_namespace[var] = arg
+
+                # resolve all variable reads
+                for var, items in block.variables_read.items():
+                    for item in items:
+                        self.resolve_read(repl, item, function, local_namespace)
+
+                # resolve write that need to stay
+                for var, items in block.variables_written.items():
+                    for item in items:
+                        self.resolve_write(repl, item, function, local_namespace)
+
+                # The jump is always at the end so we can do this last
+                if block.jump_tag:
+                    target, jump = block.jump_tag
+                    for phi in target.variables_phi:
+                        value = block.variables_written[phi][-1].edges[1].node
+                        jump.append_input(value)
+
+                block.graph.replace(repl)
 
     def _create_function(self, block, node):
         function = Function(parent=block,

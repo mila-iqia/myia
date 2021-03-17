@@ -9,20 +9,18 @@ def test_simple():
         return x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = store(x, %x)
-  %_apply1 = load(x)
-  return %_apply1
+  return %x
 }
 """
 
 
-def test_closure():
+def test_free():
     x = 1
     def f():
         return x
 
     assert str_graph(parse(f)) == """graph f() {
-  %_apply0 = load(x)
+  %_apply0 = resolve(:tests.test_parser, x)
   return %_apply0
 }
 """
@@ -32,7 +30,22 @@ def test_global():
     x = 1
     def f():
         global x
-        x = x + 1
+        return x
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = resolve(:tests.test_parser, x)
+  return %_apply0
+}
+"""
+
+
+def Xtest_nonlocal():
+    def f():
+        x = 1
+        def g():
+            nonlocal x
+            x = x + 1
+        g()
         return x
 
     assert str_graph(parse(f)) == """graph f() {
@@ -49,12 +62,8 @@ def test_add():
     def f(x, y):
         return x + y
     assert str_graph(parse(f)) == """graph f(%x, %y) {
-  %_apply0 = store(x, %x)
-  %_apply1 = store(y, %y)
-  %_apply2 = load(x)
-  %_apply3 = load(y)
-  %_apply4 = add(%_apply2, %_apply3)
-  return %_apply4
+  %_apply0 = add(%x, %y)
+  return %_apply0
 }
 """
 
@@ -65,10 +74,7 @@ def test_seq():
         return 0
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = store(x, %x)
-  %_apply1 = load(x)
-  %_apply2 = add(%_apply1, 1)
-  %_apply3 = store(x, %_apply2)
+  %_apply0 = add(%x, 1)
   return 0
 }
 """
@@ -79,11 +85,8 @@ def test_seq2():
         return x + x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = store(x, %x)
-  %_apply1 = load(x)
-  %_apply2 = load(x)
-  %_apply3 = add(%_apply1, %_apply2)
-  return %_apply3
+  %_apply0 = add(%x, %x)
+  return %_apply0
 }
 """
 
@@ -153,10 +156,8 @@ def test_compare():
         return x > 0
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = store(x, %x)
-  %_apply1 = load(x)
-  %_apply2 = gt(%_apply1, 0)
-  return %_apply2
+  %_apply0 = gt(%x, 0)
+  return %_apply0
 }
 """
 
@@ -190,10 +191,8 @@ def test_unary():
         return -x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = store(x, %x)
-  %_apply1 = load(x)
-  %_apply2 = neg(%_apply1)
-  return %_apply2
+  %_apply0 = neg(%x)
+  return %_apply0
 }
 """
 
