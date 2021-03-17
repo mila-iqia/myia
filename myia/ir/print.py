@@ -67,11 +67,14 @@ def str_graph(g, allow_cycles=False, recursive=True):
                     continue
                 else:
                     raise ValueError("cycle in sequence edges")
+            # This can happen due to replaces
+            if not node.is_apply():
+                continue
             seen_nodes.add(node)
             applies.append(node)
 
             seq = node.edges.get(SEQ, None)
-            if seq.node is not None:
+            if seq and seq.node is not None:
                 todo.append(seq.node)
             if recursive:
                 nodes = [e.node for e in node.edges.values()]

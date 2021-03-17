@@ -53,6 +53,20 @@ class Graph:
 
         return Apply(self, *edges)
 
+    def replace(self, mapping):
+        todo = [self.return_]
+        seen = set()
+        while todo:
+            node = todo.pop()
+            if node in seen:
+                continue
+            seen.add(node)
+            for edge in node.edges.values():
+                if edge.node in mapping:
+                    edge.node = mapping[edge.node]
+                if edge.node.is_apply():
+                    todo.append(edge.node)
+
     def __str__(self):
         if self.name is not None:
             return self.name
@@ -121,10 +135,16 @@ class Apply(Node):
         else:
             return True
 
-    def add_edge(self, label, value):
+    def add_edge(self, label, node):
         assert label not in self.edges
-        e = Edge(label, value)
+        e = Edge(label, node)
         self.edges[label] = e
+
+    def append_input(self, node):
+        i = 0
+        while i in self.edges:
+            i += 1
+        self.add_edge(i, node)
 
     @property
     def fn(self):
