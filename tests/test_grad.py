@@ -828,7 +828,7 @@ def test_first_order(backend):
     def f(x):
         return grad(square)(x)
 
-    return f(10) == 20
+    assert f(10) == 20
 
 
 @bt()

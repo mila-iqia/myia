@@ -8,6 +8,8 @@ import sys
 from collections import Counter
 from types import ModuleType
 
+from ovld import ovld
+
 from myia import operations
 from myia.abstract import to_abstract
 from myia.compile.backends import Backend, Converter
@@ -17,7 +19,21 @@ from myia.graph_utils import toposort
 from myia.ir import Graph, manage
 from myia.lib import ANYTHING, AbstractArray, AbstractHandle, AbstractTuple
 from myia.operations import Operation, Primitive, primitives as P
-from myia.xtype import Tuple, type_to_np_dtype
+from myia.xtype import Dict, Tuple, type_to_np_dtype
+
+
+class ConstantString:
+    """Helper class to represent a string to be treated as a constant.
+
+    Constant strings will be inlined and replace node names in final code.
+    """
+
+    def __init__(self, value):
+        """Initialize."""
+        self.value = value
+
+    def __str__(self):
+        return self.value
 
 
 def python_array_map(c, fn, *arrays):
@@ -197,8 +213,93 @@ def python_universe_getitem(c, universe, handle):
     return f"{universe}.get({handle})"
 
 
+def op_grad(f, *required_args):
+    """Implement operation grad using finite difference."""
+    from myia.debug.finite_diff import GradTester
+    import inspect
+
+    argnames = inspect.getfullargspec(f).args
+
+    def gradient(*args, dout=1):
+        gt = GradTester(f, None, args, argnames)
+        ret = gt.compute_finite_diff()
+        out = []
+        for i in range(len(args)):
+            argname = argnames[i]
+            if not required_args or argname in required_args:
+                k = f"d{f.__name__}/d{argname}"
+                dx = ret[k]
+                out.append(dx * type(dx)(dout))
+        return out[0] if len(out) == 1 else out
+
+    return gradient
+
+
+def op_value_and_grad(f, *required_args):
+    """Implement operation value_and_grad."""
+    gradient = op_grad(f, *required_args)
+
+    def v_and_g(*args, dout=1):
+        return f(*args), gradient(*args, dout=dout)
+
+    return v_and_g
+
+
+def op_make_dict(dct: dict, *values):
+    """Implement operation make_dict.
+
+    dct must be a dict with keys to map to given values.
+    """
+    return {key: val for key, val in zip(dct.keys(), values)}
+
+
+@ovld  # noqa: F811
+def myia_iter(obj: object):
+    return obj.__myia_iter__()
+
+
+@ovld  # noqa: F811
+def myia_iter(obj: range):
+    return obj
+
+
+@ovld  # noqa: F811
+def myia_iter(obj: tuple):
+    return obj
+
+
+@ovld  # noqa: F811
+def myia_hasnext(obj: object):
+    return obj.__myia_hasnext__()
+
+
+@ovld  # noqa: F811
+def myia_hasnext(obj: range):
+    return obj.start < obj.stop
+
+
+@ovld  # noqa: F811
+def myia_hasnext(obj: tuple):
+    return bool(obj)
+
+
+@ovld  # noqa: F811
+def myia_next(obj: object):
+    return obj.__myia_next__()
+
+
+@ovld  # noqa: F811
+def myia_next(obj: range):
+    return obj.start, range(obj.start + obj.step, obj.stop, obj.step)
+
+
+@ovld  # noqa: F811
+def myia_next(obj: tuple):
+    return obj[0], obj[1:]
+
+
 SIMPLE_MAP = {
-    P.argmax: f"IMPL.argmax(%s, %s)",
+    P.argmax: "IMPL.argmax(%s, %s)",
     P.array_max: "np.array(np.max(%s, %s))",
     P.array_reduce: "IMPL.array_reduce(%s, %s, %s)",
     P.array_to_scalar: "%s.item()",
@@ -209,8 +310,8 @@ SIMPLE_MAP = {
     P.casttag: "%s.cast(%s)",
     P.concat: "np.concatenate(%s, axis=%s)",
     P.conv2d: "IMPL.conv2d(%s, %s, %s, %s, %s, %s)",
-    P.conv2d_weight_grad: f"IMPL.conv2d_weight_grad(%s, %s, %s, %s, %s, %s, %s)",
-    P.conv_transpose2d: f"IMPL.conv_transpose2d(%s, %s, %s, %s, %s, %s, %s)",
+    P.conv2d_weight_grad: "IMPL.conv2d_weight_grad(%s, %s, %s, %s, %s, %s, %s)",
+    P.conv_transpose2d: "IMPL.conv_transpose2d(%s, %s, %s, %s, %s, %s, %s)",
     P.distribute: "np.broadcast_to(%s, %s)",
     P.dot: "np.dot(%s, %s)",
     P.env_getitem: "%s.get(%s, %s)",
@@ -248,7 +349,7 @@ SIMPLE_MAP = {
     P.scalar_uadd: "%s",
     P.scalar_usub: "-%s",
     P.scatter: "IMPL.scatter(%s, %s, %s, %s)",
-    P.scatter_add: f"IMPL.scatter_add(%s, %s, %s, %s)",
+    P.scatter_add: "IMPL.scatter_add(%s, %s, %s, %s)",
     P.take: "np.take(%s, %s, axis=0)",
     P.transpose: "np.transpose(%s, %s)",
     P.tuple_getitem: "%s[%s]",
@@ -282,7 +383,7 @@ OPERATION_MAP = {
     operations.sub: operator.sub,
     operations.mul: operator.mul,
     operations.mod: operator.mod,
-    operations.pow: operator.mod,
+    operations.pow: operator.pow,
     operations.eq: operator.eq,
     operations.ne: operator.ne,
     operations.lt: operator.lt,
@@ -293,21 +394,107 @@ OPERATION_MAP = {
     operations.neg: operator.neg,
     operations.not_: operator.not_,
     operations.and_: operator.and_,
+    operations.rshift: operator.rshift,
+    operations.lshift: operator.lshift,
+    operations.invert: operator.invert,
     operations.or_: operator.or_,
     operations.getitem: operator.getitem,
     operations.bool: operator.truth,
 }
+FUNCTION_MAP = {
+    operations.grad: op_grad,
+    operations.value_and_grad: op_value_and_grad,
+    operations.myia_next: myia_next,
+    operations.myia_iter: myia_iter,
+    operations.myia_hasnext: myia_hasnext,
+    operations.make_dict: op_make_dict,
+}
+APPLY_MAP = {
+    "operator.add": "{} + {}",
+    "operator.sub": "{} - {}",
+    "operator.mul": "{} * {}",
+    "operator.mod": "{} % {}",
+    "operator.pow": "{} ** {}",
+    "operator.eq": "{} == {}",
+    "operator.ne": "{} != {}",
+    "operator.lt": "{} < {}",
+    "operator.gt": "{} > {}",
+    "operator.le": "{} <= {}",
+    "operator.ge": "{} >= {}",
+    "operator.pos": "+{}",
+    "operator.neg": "-{}",
+    "operator.not_": "not {}",
+    "operator.and_": "{} & {}",
+    "operator.or_": "{} | {}",
+    "operator.invert": "~{}",
+    "operator.rshift": "{} >> {}",
+    "operator.lshift": "{} << {}",
+    "operator.getitem": "{}[{}]",
+}
 
 
-def convert_operation(c, op, *inputs):
+def convert_operation(c, node, op, *inputs):
     """Convert an operation apply node to a Python code."""
     if op.value is operations.resolve:
         namespace = inputs[0].value
         name = inputs[1].value
         resolved = namespace[name]
-        if resolved in OPERATION_MAP:
-            return f"operator.{OPERATION_MAP[resolved].__name__}"
-    raise NotImplementedError(f"Unsupported operation {op}")
+        code = None
+
+        if resolved is operations.make_tuple:
+            # Return an empty string, to get
+            # `(*tuple_vals)` instead of `operation_make_tuple(*tuple_vals)`
+            code = ""
+        elif resolved in OPERATION_MAP:
+            # Resolve as Python's operator module function.
+            code = f"operator.{OPERATION_MAP[resolved].__name__}"
+        elif resolved in FUNCTION_MAP:
+            # Resolve as a specific function.
+            # Function will be available as global symbol in compiled function.
+            fn = FUNCTION_MAP[resolved]
+            code = c.register_global(fn.__name__, fn)
+        elif isinstance(resolved, Operation):
+            # Use operation's python implementation if available.
+            impl = resolved.defaults().get("python_implementation", None)
+            if impl is not None:
+                code = c.register_global(f"operation_{resolved.name}", impl)
+        elif isinstance(resolved, ModuleType):
+            # Module imported, probably to call an external function
+            # (e.g. `torch.argmax`)
+            code = c.register_global(resolved.__name__, resolved)
+        elif callable(resolved):
+            # Resolved is a callable.
+            # Callable will be available as global symbol in compiled function.
+            symbol_name = (
+                resolved.__name__
+                if getattr(resolved, "__name__", "")
+                else f"callable_{type(resolved).__name__}"
+            )
+            code = c.register_global(symbol_name, resolved)
+
+        if code is None:
+            raise NotImplementedError(
+                f"Unable to resolve: {resolved}, inputs: {' '.join(str(inp) for inp in inputs)}"
+            )
+
+        # Register code as a ConstantString, so that
+        # node name will be directly replaced with that code.
+        c.force_node_constant(node, ConstantString(code))
+        return None
+
+    raise NotImplementedError(
+        f"Unsupported operation {op} {' '.join(str(inp) for inp in inputs)}"
+    )
+
+
+def optimize_apply_call(fn_name, *arg_names):
+    """Generate an apply call from given apply name and arg names.
+
+    If possible, replace an apply call with an inlined code.
+    """
+    if fn_name in APPLY_MAP:
+        return APPLY_MAP[fn_name].format(*arg_names)
+    return f"{fn_name}({', '.join(arg_names)})"
 
 
 class PythonMapper:
@@ -491,13 +678,18 @@ class PythonConstantConverter(_PythonConverter):
     def convert_type(self, v, t):
         """Return type name as a string."""
         if isinstance(t.element, AbstractHandle):
-            return "HandleInstance"
+            return ConstantString("HandleInstance")
         else:
             myia_type = t.element.xtype()
             if myia_type is Tuple:
-                return "tuple"
+                return ConstantString("tuple")
+            elif myia_type is Dict:
+                # We may need to remember dict definition keys,
+                # e.g. for operation make_dict. So, let's return a dict
+                # with keys associated to None.
+                return repr({key: None for key in v.entries})
             else:
-                return f"np.{type_to_np_dtype(myia_type)}"
+                return ConstantString(f"np.{type_to_np_dtype(myia_type)}")
 
     def convert_handle(self, v, t):
         """Convert a Handle."""
@@ -511,7 +703,10 @@ class PythonConstantConverter(_PythonConverter):
         # (e.g. for inputs of operations.resolve apply nodes).
         from myia.utils.misc import Namespace
 
-        if isinstance(v, (str, Namespace, Operation)):
+        if isinstance(v, str):
+            # Return a ConstantString so that given string will be inlined.
+            return ConstantString(repr(v))
+        if isinstance(v, (Namespace, Operation)):
             return None
         raise NotImplementedError(
             f"No default conversion for value {v}, type {type(v)}"
@@ -611,6 +806,16 @@ class _Compiler:
         """Convert a value to a Python constant."""
         raise NotImplementedError()
 
+    def register_global(self, name, value):
+        """Register a symbol with given name to given value.
+
+        Symbol will be available as a global symbol in compiled function.
+
+        Must return name used to register value
+        (either given name, or another if necessary).
+        """
+        raise NotImplementedError()
+
 
 class FunctionCompiler(_Compiler):
     """Compiler for a single graph. Compile it to code for a Python function."""
@@ -622,6 +827,8 @@ class FunctionCompiler(_Compiler):
         self.node_to_name = {}
         self.const_name_to_value = {}
         self.closure_name_to_code = {}
+        # Associate closure graph to closure name.
+        self.closure_to_name = {}
 
     def local_ref(self, node):
         """Return name for a node inside this function."""
@@ -629,7 +836,11 @@ class FunctionCompiler(_Compiler):
 
     def has_node(self, node):
         """Return True if given node has already an associated name."""
-        return node in self.node_to_name or self.parent.has_node(node)
+        return (
+            (node.is_constant_graph() and node.value in self.closure_to_name)
+            or node in self.node_to_name
+            or self.parent.has_node(node)
+        )
 
     def has_constant(self, name):
         """Return True if a constant with given name is already registered."""
@@ -653,6 +864,8 @@ class FunctionCompiler(_Compiler):
         Either the node name, or a constant value (as a string)
         if node is a constant that can be inlined.
         """
+        if node.is_constant_graph() and node.value in self.closure_to_name:
+            return self.closure_to_name[node.value]
         if node in self.node_to_name:
             name = self.node_to_name[node]
             if name in self.const_name_to_value and self._is_inline_const(
@@ -664,7 +877,9 @@ class FunctionCompiler(_Compiler):
 
     def _is_inline_const(self, const_value):
         """Return True if given value can be inlined."""
-        return isinstance(const_value, (bool, int, float, type(None)))
+        return isinstance(
+            const_value, (bool, int, float, type(None), ConstantString)
+        )
 
     def get_graph_cache(self):
         """Return graph cache (for graph compilation caching)."""
@@ -673,6 +888,17 @@ class FunctionCompiler(_Compiler):
     def make_const(self, v, t):
         """Convert a value to a Python constant."""
         return self.parent.make_const(v, t)
+
+    def register_global(self, name, value):
+        """Register global symbol."""
+        return self.parent.register_global(name, value)
+
+    def force_node_constant(self, node, constant):
+        """Associate a constant value to a node.
+
+        Node name will be inlined using given constant in compiled code.
+        """
+        self.const_name_to_value[self.ref(node)] = constant
 
     def on_constant(self, node):
         """Generate code for a constant node."""
@@ -706,34 +932,41 @@ class FunctionCompiler(_Compiler):
 
         # Convert operation call to an inline code, if possible.
         if node.inputs[0].is_constant(Operation):
-            return convert_operation(self, *node.inputs)
+            return convert_operation(self, node, *node.inputs)
 
         # Otherwise generate a raw call.
-        return f"{self.ref(node.inputs[0])}({', '.join(self.ref(n) for n in node.inputs[1:])})"
+        # return f"{self.ref(node.inputs[0])}({', '.join(self.ref(n) for n in node.inputs[1:])})"
+        return optimize_apply_call(
+            self.ref(node.inputs[0]), *[self.ref(n) for n in node.inputs[1:]]
+        )
 
     def _add_node(self, node):
         """Associate a name to a node. Return true if a new name was generated."""
-        if not self.has_node(node) and not (
-            node.is_constant_graph() and node.value.parent is None
-        ):
+        if self.has_node(node):
+            # Node already registered.
+            return False
+
+        if node.is_constant_graph() and node.value.parent is None:
             # Const graphs without parent are already registered in
             # root PythonCompiler object, hence available from self.ref(node).
-            self.node_to_name[node] = self.get_label(node)
+            return False
 
-            # If added node is an inlinable constant node, let's register
-            # it right now, as we may need to use and inline this node
-            # before we meet the node definition itself.
-            # E.g. A closure may use a constant defined after closure code
-            # in parent function.
-            if node.is_constant() and self._is_inline_const(node.value):
-                self.on_constant(node)
+        self.node_to_name[node] = self.get_label(node)
 
-            return True
-        return False
+        # If added node is an inlinable constant node, let's register
+        # it right now, as we may need to use and inline this node
+        # before we meet the node definition itself.
+        # E.g. A closure may use a constant defined after closure code
+        # in parent function.
+        if node.is_constant() and self._is_inline_const(node.value):
+            self.on_constant(node)
+
+        return True
 
     def on_function(self, graph, node):
         """Convert a graph to a function and register it as a closure (constant value)."""
         if not self.has_constant(self.ref(node)):
+            self.closure_to_name[graph] = self.ref(node)
             self.closure_name_to_code[self.ref(node)] = FunctionCompiler(
                 graph, self
             ).compile()
@@ -748,11 +981,14 @@ class FunctionCompiler(_Compiler):
         # Register parameters.
         param_names = []
         for p in graph.parameters:
-            self._add_node(p)
+            # A parameter should always be a local variable.
+            self.node_to_name[p] = self.get_label(p)
             param_names.append(self.local_ref(p))
         seq = []
         # Register nodes.
-        for node in toposort(graph.output, NodeVisitor(), in_graph(graph)):
+        for node in toposort(
+            graph.output, NodeVisitor(), in_graph(graph), allow_cycles=True
+        ):
             if self._add_node(node):
                 seq.append(node)
         output = []
@@ -784,7 +1020,19 @@ class FunctionCompiler(_Compiler):
                 output.append(f"{prefix} {op_code}")
         # Output may be empty, for e.g. if function just returns a parameter.
         if not output:
-            output.append(f"return {self.ref(graph.output)}")
+            # I don't know why, but there may be functions that
+            # return a value not even reachable from function code
+            # (thus, self.ref() might not find node).
+            # In such case, let s just put an exception raising in code.
+            # If such function is called, then code will fail.
+            try:
+                output_name = self.ref(graph.output)
+            except KeyError:
+                output.append(
+                    f'raise RuntimeError("Unreachable: {type(graph.output).__name__} {graph.output}")'
+                )
+            else:
+                output.append(f"return {output_name}")
 
         constants_code = []
         closures_code = []
@@ -822,6 +1070,9 @@ class PythonCompiler(_Compiler):
             relation_symbols={"copy": "", "opt": ""}
         )
         self.name_counter = Counter()
+        self.global_counter = Counter()
+        self.globals = {}
+        self.graphs_used = set()
 
     def is_valid_python_name(self, text):
         """Return True if text is a valid Python name."""
@@ -877,6 +1128,9 @@ class PythonCompiler(_Compiler):
             "from myia.utils.universe import HandleInstance",
             "import myia.compile.backends.python.implementations as IMPL",
         ]
+        dynamic_imports = [
+            f"# Dynamic external import: {name}" for name in self.globals
+        ]
         other_functions = []
         main_body = None
         main_signature = None
@@ -889,7 +1143,12 @@ class PythonCompiler(_Compiler):
                 other_functions.append(fn_signature)
                 other_functions.append(fn_body)
         final_structure = (
-            pre_code + other_functions + [main_signature, main_body]
+            pre_code
+            + ([""] if pre_code else [])
+            + dynamic_imports
+            + ([""] if dynamic_imports else [])
+            + other_functions
+            + [main_signature, main_body]
         )
         final_code = nested_list_to_code_string(final_structure)
 
@@ -902,9 +1161,9 @@ class PythonCompiler(_Compiler):
         # Compile code string to a Python executable function
         # reference: https://stackoverflow.com/a/19850183
         compiled = compile(final_code, "", "exec")
-        module = ModuleType("mod")
-        exec(compiled, module.__dict__)
-        return getattr(module, "main")
+        assert "main" not in self.globals
+        exec(compiled, self.globals)
+        return self.globals["main"]
 
     def has_node(self, node):
         """Return True if given node has already an associated name."""
@@ -924,12 +1183,31 @@ class PythonCompiler(_Compiler):
 
     def ref(self, node):
         """Return a name (string) associated to given node."""
-        assert node.is_constant_graph() and node.value.parent is None
+        if not (node.is_constant_graph() and node.value.parent is None):
+            raise KeyError(f"Expected a root graph, got {node}")
+        self.graphs_used.add(self.graph_to_name[node.value])
         return self.graph_to_name[node.value]
 
     def get_graph_cache(self):
         """Return graph cache (for graph compilation caching)."""
         return self._prim_graph_cache
+
+    def register_global(self, name, value):
+        """Register global symbol for compiled code.
+
+        :param name: name to register
+        :param value: value to register
+        :return: name used to register value. May be different
+            from given name if given name was already used.
+        """
+        # If name is already associated to given value, then nothing to do.
+        if name in self.globals and self.globals[name] is value:
+            return name
+        self.global_counter.update([name])
+        count = self.global_counter[name]
+        name = name if count == 1 else f"{name}_v{count}"
+        self.globals[name] = value
+        return name
 
     def convert_func(self, graph):
         """Convert a graph to Python function code."""
@@ -952,7 +1230,6 @@ class PythonBackend(Backend):
             debug = sys.stdout if debug is True else debug
             assert hasattr(debug, "write")
 
-        self.compiler = PythonCompiler()
         self.to_backend_value = PythonInputConverter()
         self.from_backend_value = PythonOutputConverter()
         self.debug = debug
@@ -968,7 +1245,10 @@ class PythonBackend(Backend):
         # Remove symbolic key instances.
         graph = convert_grad(graph)
         # Then compile the graph.
-        return self.compiler.run(graph, self)
+        # Create a PythonCompiler object each time we want to compile,
+        # to avoid sharing states through different compilations
+        # (e.g. for "PythonCompiler.globals" member).
+        return PythonCompiler().run(graph, self)
 
     def supports_prim_group(self, prim_group):
         """Return True if given primitive group is supported."""
