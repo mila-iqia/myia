@@ -53,7 +53,7 @@ class Graph:
 
         return Apply(self, *edges)
 
-    def replace(self, mapping):
+    def replace(self, mapping, mapping_seq={}):
         todo = [self.return_]
         seen = set()
         while todo:
@@ -62,9 +62,11 @@ class Graph:
                 continue
             seen.add(node)
             for edge in node.edges.values():
-                if edge.node in mapping:
+                if edge.label is SEQ and edge.node in mapping_seq:
+                    edge.node = mapping_seq[edge.node]
+                elif edge.node in mapping:
                     edge.node = mapping[edge.node]
-                if edge.node.is_apply():
+                if edge.node and edge.node.is_apply():
                     todo.append(edge.node)
 
     def __str__(self):

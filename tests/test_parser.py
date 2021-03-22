@@ -96,22 +96,20 @@ def test_ifexp():
         return x if b else y
 
     assert str_graph(parse(f)) == """graph f(%x, %y, %b) {
-  %_apply0 = store(x, %x)
-  %_apply1 = store(y, %y)
-  %_apply2 = store(b, %b)
-  %_apply3 = load(b)
-  %_apply4 = user_switch(%_apply3, @if_true, @if_false)
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = universe_setitem(%_apply3, %y)
+  %_apply4 = user_switch(%b, @if_true, @if_false)
   %_apply5 = %_apply4()
   return %_apply5
 }
 
 graph if_false() {
-  %_apply6 = load(y)
+  %_apply6 = universe_getitem(%_apply3)
   return %_apply6
 }
 
 graph if_true() {
-  %_apply7 = load(x)
+  %_apply7 = universe_getitem(%_apply1)
   return %_apply7
 }
 """
@@ -121,11 +119,9 @@ def test_boolop():
         return a and b or c
 
     assert str_graph(parse(f)) == """graph f(%a, %b, %c) {
-  %_apply0 = store(a, %a)
-  %_apply1 = store(b, %b)
-  %_apply2 = store(c, %c)
-  %_apply3 = load(a)
-  %_apply4 = switch(%_apply3, @if_true, @if_false)
+  %_apply0 = universe_setitem(%_apply1, %b)
+  %_apply2 = universe_setitem(%_apply3, %c)
+  %_apply4 = switch(%a, @if_true, @if_false)
   %_apply5 = %_apply4()
   %_apply6 = switch(%_apply5, @if_true, @if_false)
   %_apply7 = %_apply6()
@@ -137,12 +133,12 @@ graph if_false() {
 }
 
 graph if_true() {
-  %_apply8 = load(b)
+  %_apply8 = universe_getitem(%_apply1)
   return %_apply8
 }
 
 graph if_false() {
-  %_apply9 = load(c)
+  %_apply9 = universe_getitem(%_apply3)
   return %_apply9
 }
 
@@ -167,12 +163,12 @@ def test_compare2():
         return 0 < x < 42
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = store(x, %x)
-  %_apply1 = load(x)
-  %_apply2 = lt(0, %_apply1)
-  %_apply3 = switch(%_apply2, @if_true, @if_false)
-  %_apply4 = %_apply3()
-  return %_apply4
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = universe_getitem(%_apply1)
+  %_apply3 = lt(0, %_apply2)
+  %_apply4 = switch(%_apply3, @if_true, @if_false)
+  %_apply5 = %_apply4()
+  return %_apply5
 }
 
 graph if_false() {
@@ -180,9 +176,9 @@ graph if_false() {
 }
 
 graph if_true() {
-  %_apply5 = load(x)
-  %_apply6 = lt(%_apply5, 42)
-  return %_apply6
+  %_apply6 = universe_getitem(%_apply1)
+  %_apply7 = lt(%_apply6, 42)
+  return %_apply7
 }
 """
 
@@ -205,22 +201,20 @@ def test_if():
             return y
 
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = store(b, %b)
-  %_apply1 = store(x, %x)
-  %_apply2 = store(y, %y)
-  %_apply3 = load(b)
-  %_apply4 = user_switch(%_apply3, @if_true, @if_false)
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = universe_setitem(%_apply3, %y)
+  %_apply4 = user_switch(%b, @if_true, @if_false)
   %_apply5 = %_apply4()
   return %_apply5
 }
 
 graph if_false() {
-  %_apply6 = load(y)
+  %_apply6 = universe_getitem(%_apply3)
   return %_apply6
 }
 
 graph if_true() {
-  %_apply7 = load(x)
+  %_apply7 = universe_getitem(%_apply1)
   return %_apply7
 }
 """
@@ -232,11 +226,9 @@ def test_if2():
         return y
 
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = store(b, %b)
-  %_apply1 = store(x, %x)
-  %_apply2 = store(y, %y)
-  %_apply3 = load(b)
-  %_apply4 = user_switch(%_apply3, @if_true, @if_false)
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = universe_setitem(%_apply3, %y)
+  %_apply4 = user_switch(%b, @if_true, @if_false)
   %_apply5 = %_apply4()
   return %_apply5
 }
@@ -247,12 +239,12 @@ graph if_false() {
 }
 
 graph if_after() {
-  %_apply7 = load(y)
+  %_apply7 = universe_getitem(%_apply3)
   return %_apply7
 }
 
 graph if_true() {
-  %_apply8 = load(x)
+  %_apply8 = universe_getitem(%_apply1)
   return %_apply8
 }
 """
@@ -265,28 +257,28 @@ def test_while():
         return y
 
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = store(b, %b)
-  %_apply1 = store(x, %x)
-  %_apply2 = store(y, %y)
-  %_apply3 = @while_header()
-  return %_apply3
-}
-
-graph while_header() {
-  %_apply4 = load(b)
-  %_apply5 = user_switch(%_apply4, @while_body, @while_after)
-  %_apply6 = %_apply5()
+  %_apply0 = universe_setitem(%_apply1, %b)
+  %_apply2 = universe_setitem(%_apply3, %x)
+  %_apply4 = universe_setitem(%_apply5, %y)
+  %_apply6 = @while_header()
   return %_apply6
 }
 
+graph while_header() {
+  %_apply7 = universe_getitem(%_apply1)
+  %_apply8 = user_switch(%_apply7, @while_body, @while_after)
+  %_apply9 = %_apply8()
+  return %_apply9
+}
+
 graph while_after() {
-  %_apply7 = load(y)
-  return %_apply7
+  %_apply10 = universe_getitem(%_apply5)
+  return %_apply10
 }
 
 graph while_body() {
-  %_apply8 = load(x)
-  return %_apply8
+  %_apply11 = universe_getitem(%_apply3)
+  return %_apply11
 }
 """
 
@@ -298,28 +290,28 @@ def test_while2():
         return x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = store(x, %x)
-  %_apply1 = @while_header()
-  return %_apply1
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = @while_header()
+  return %_apply2
 }
 
 graph while_header() {
-  %_apply2 = load(x)
-  %_apply3 = user_switch(%_apply2, @while_body, @while_after)
-  %_apply4 = %_apply3()
-  return %_apply4
-}
-
-graph while_after() {
-  %_apply5 = load(x)
+  %_apply3 = universe_getitem(%_apply1)
+  %_apply4 = user_switch(%_apply3, @while_body, @while_after)
+  %_apply5 = %_apply4()
   return %_apply5
 }
 
+graph while_after() {
+  %_apply6 = universe_getitem(%_apply1)
+  return %_apply6
+}
+
 graph while_body() {
-  %_apply6 = load(x)
-  %_apply7 = sub(%_apply6, 1)
-  %_apply8 = store(x, %_apply7)
-  %_apply9 = @while_header()
-  return %_apply9
+  %_apply7 = universe_getitem(%_apply1)
+  %_apply8 = sub(%_apply7, 1)
+  %_apply9 = universe_setitem(%_apply1, %_apply8)
+  %_apply10 = @while_header()
+  return %_apply10
 }
 """

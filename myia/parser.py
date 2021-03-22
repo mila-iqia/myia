@@ -106,15 +106,12 @@ class Block:
         self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
 
-        self.preds = set()
         self.jump_tag = None
         self.last_apply = None
+        self.used = True
 
         self.variables_written = {}
         self.variables_read = {}
-
-        self.variables_phi = []
-        self.possible_phis = set()
 
     def apply(self, *inputs):
         res = self.graph.apply(*inputs)
@@ -127,8 +124,6 @@ class Block:
         self.variables_read.setdefault(varnum, []).append(ld)
         if not varnum in self.function.variables_local:
             self.function.variables_free.add(varnum)
-        elif not varnum in self.variables_written:
-            self.possible_phis.add(varnum)
         return ld
 
     def write(self, varnum, node):
@@ -152,7 +147,6 @@ class Block:
         assert self.graph.return_ is None
         jump = self.apply(target.graph, *args)
         self.jump_tag = (target, jump)
-        target.preds.add(self)
         self.returns(jump)
 
     def returns(self, value):
@@ -181,6 +175,7 @@ class Function:
 
         self.variables_free = set()
         self.variables_root = set()
+        self.variables_local_closure = set()
 
         self.variables_global = set()
         self.variables_local = set()
@@ -297,45 +292,49 @@ class Parser:
                 )
 
             for block in function.blocks:
-                # build the phi namespace
-                if len(block.possible_phis) > 0:
-                    preds_written = set()
-                    for pred in block.preds:
-                        preds_written.update(pred.variables_written)
+                if block is function.initial_block or block.used is False:
+                    continue
+                for var, reads in block.variables_read.items():
+                    if reads[0].edges[1].node.is_constant():
+                        function.variables_local_closure.add(var)
 
-                    # To be a phi it must be written in the preds,
-                    # be a local variable and not be a root
-                    block.variables_phi = list(block.possible_phis.intersection(preds_written).intersection(function.variables_local) - function.variables_root)
-
-    def resolve_read(self, repl, ld, function, local_namespace):
+    def resolve_read(self, repl, repl_seq, ld, function, local_namespace):
         var = ld.edges[0].node.value
         st = ld.edges[1].node
-        if var in function.variables_root or function.variables_free:
+        if var in (function.variables_root | function.variables_free |
+                   function.variables_local_closure):
             if var not in local_namespace:
-                repl[ld] = ld.graph.apply("resolve", self.global_namespace, var)
+                n = ld.graph.apply("resolve", self.global_namespace, var)
             else:
-                repl[ld] = ld.graph.apply("universe_getitem", local_namespace[var])
+                n = ld.graph.apply("universe_getitem", local_namespace[var])
+            n.edges[SEQ] = ld.edges[SEQ]
+            repl[ld] = n
         elif var in function.variables_global:
-            repl[ld] = ld.graph.apply("resolve", self.global_namespace, var)
+            n = ld.graph.apply("resolve", self.global_namespace, var)
+            n.edges[SEQ] = ld.edges[SEQ]
+            repl[ld] = n
         elif var in function.variables_local:
-            # st will the the constant None otherwise
             if st.is_apply():
                 repl[ld] = st.edges[1].node
             else:
+                # st can be none if it wasn't written to in the block namespace
                 repl[ld] = local_namespace[var]
+            repl_seq[ld] = ld.edges[SEQ].node
         else:
             raise AssertionError(f"unclassified variable '{var}'")
 
-    def resolve_write(self, repl, st, function, local_namespace):
+    def resolve_write(self, repl, repl_seq, st, function, local_namespace):
         var = st.edges[0].node.value
         value = st.edges[1].node
-        if var in function.variables_root or function.variables_free:
-            repl[st] = st.graph.apply("universe_setitem", local_namespace[var], value)
+        if var in (function.variables_root | function.variables_free |
+                   function.variables_local_closure):
+            n = st.graph.apply("universe_setitem", local_namespace[var], value)
+            n.edges[SEQ] = st.edges[SEQ]
+            repl[st] = n
         elif var in function.variables_global:
             raise UnimplementedError("attempt to write to a global variable")
         elif var in function.variables_local:
-            # This should only affect seq edges
-            repl[st] = st.edges[SEQ].node
+            repl_seq[st] = st.edges[SEQ].node
         else:
             raise AssertionError(f"unclassified variable '{var}'")
 
@@ -354,34 +353,50 @@ class Parser:
                     st.graph.apply("typeof", st.edges[1]),
                 )
 
-            for block in function.blocks:
-                repl = {}
-                local_namespace = namespace.copy()
+            local_namespace = namespace.copy()
+            for var in function.variables_local_closure:
+                st = function.variables_first_write[var]
+                local_namespace[var] = st.graph.apply(
+                    "make_handle",
+                    st.graph.apply("typeof", st.edges[1])
+                )
 
-                # add phi inputs
-                for phi in block.variables_phi:
-                    arg = Parameter(block.graph, name="phi")
-                    block.graph.parameters.append(arg)
-                    local_namespace[var] = arg
+            for block in function.blocks:
+                if not block.used:
+                    continue
+                repl = {}
+                repl_seq = {}
 
                 # resolve all variable reads
                 for var, items in block.variables_read.items():
                     for item in items:
-                        self.resolve_read(repl, item, function, local_namespace)
+                        self.resolve_read(
+                            repl, repl_seq, item, function, local_namespace)
 
                 # resolve write that need to stay
                 for var, items in block.variables_written.items():
                     for item in items:
-                        self.resolve_write(repl, item, function, local_namespace)
+                        self.resolve_write(
+                            repl, repl_seq, item, function, local_namespace)
 
-                # The jump is always at the end so we can do this last
-                if block.jump_tag:
-                    target, jump = block.jump_tag
-                    for phi in target.variables_phi:
-                        value = block.variables_written[phi][-1].edges[1].node
-                        jump.append_input(value)
+                # make sure to "bake in" top level chain replacements
+                # replacements inside the subgraphs are handled by replace
+                for k in list(repl_seq):
+                    n = repl_seq[k]
+                    while n in repl_seq or n in repl:
+                        if n in repl_seq:
+                            n = repl_seq[n]
+                        else:
+                            n = repl[n]
+                    repl_seq[k] = n
 
-                block.graph.replace(repl)
+                for k in list(repl):
+                    n = repl[k]
+                    while n in repl:
+                        n = repl[n]
+                    repl[k] = n
+
+                block.graph.replace(repl, repl_seq)
 
     def _create_function(self, block, node):
         function = Function(parent=block,
@@ -460,11 +475,7 @@ class Parser:
 
     def make_condition_blocks(self, block, tn, fn):
         tb = block.function.new_block("if_true", block, self.make_location(tn))
-        tb.preds.add(block)
-
         fb = block.function.new_block("if_false", block, self.make_location(fn))
-        fb.preds.add(block)
-
         return tb, fb
 
     # expressions (returns a value)
@@ -587,13 +598,16 @@ class Parser:
         # TODO: figure out how to add a location here
         # (we would need the list of nodes that follow the if)
         after_block = block.function.new_block("if_after", block, None)
+        after_block.used = False
 
         true_end = self.process_statements(true_block, node.body)
         if not true_end.graph.return_:
+            after_block.used = True
             true_end.jump(after_block)
 
         false_end = self.process_statements(false_block, node.orelse)
         if not false_end.graph.return_:
+            after_block.used = True
             false_end.jump(after_block)
 
         block.cond(cond, true_block, false_block)
@@ -625,14 +639,12 @@ class Parser:
     def process_While(self, block, node):
         header_block = block.function.new_block("while_header", block,
                                                 self.make_location(node.test))
-        body_block = block.function.new_block("while_body", block,
+        body_block = block.function.new_block("while_body", header_block,
                                               self.make_location(node.body))
         # TODO: Same as If we need the list of nodes that follow
         # for the location
-        after_block = block.function.new_block("while_after", block, None)
+        after_block = block.function.new_block("while_after", header_block, None)
 
-        body_block.preds.add(header_block)
-        after_block.preds.add(header_block)
         block.jump(header_block)
         cond = self.process_node(header_block, node.test)
         header_block.cond(cond, body_block, after_block)
