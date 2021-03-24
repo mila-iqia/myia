@@ -505,6 +505,7 @@ class Parser:
         first, *rest = values
         test = self.process_node(block, first)
         if rest:
+            test = block.apply(operator.truth, test)
             if mode == "and":
                 tb, fb = self.make_condition_blocks(block, rest, None)
                 fb.returns(Constant(False))
@@ -554,6 +555,7 @@ class Parser:
 
     def process_IfExp(self, block, node):
         cond = self.process_node(block, node.test)
+        cond = block.apply(operator.truth, cond)
         tb, fb = self.make_condition_blocks(block, node.body, node.orelse)
 
         tn = self.process_node(tb, node.body)
@@ -600,6 +602,7 @@ class Parser:
 
     def process_If(self, block, node):
         cond = self.process_node(block, node.test)
+        cond = block.apply(operator.truth, cond)
         true_block, false_block = self.make_condition_blocks(block, node.body, node.orelse)
 
         # TODO: figure out how to add a location here

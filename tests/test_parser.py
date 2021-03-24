@@ -15,7 +15,6 @@ def test_simple():
 
 
 def test_free():
-    x = 1
     def f():
         return x
 
@@ -27,7 +26,6 @@ def test_free():
 
 
 def test_global():
-    x = 1
     def f():
         global x
         return x
@@ -50,7 +48,7 @@ def Xtest_nonlocal():
 
     assert str_graph(parse(f)) == """graph f() {
   %_apply0 = load(x)
-  %_apply1 = add(%_apply0, 1)
+  %_apply1 = <built-in function add>(%_apply0, 1)
   %_apply2 = store(x, %_apply1)
   %_apply3 = load(x)
   return %_apply3
@@ -110,19 +108,20 @@ def test_ifexp():
     assert str_graph(parse(f)) == """graph f(%x, %y, %b) {
   %_apply0 = universe_setitem(%_apply1, %x)
   %_apply2 = universe_setitem(%_apply3, %y)
-  %_apply4 = user_switch(%b, @if_true, @if_false)
-  %_apply5 = %_apply4()
-  return %_apply5
-}
-
-graph if_false() {
-  %_apply6 = universe_getitem(%_apply3)
+  %_apply4 = <built-in function truth>(%b)
+  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
   return %_apply6
 }
 
-graph if_true() {
-  %_apply7 = universe_getitem(%_apply1)
+graph if_false() {
+  %_apply7 = universe_getitem(%_apply3)
   return %_apply7
+}
+
+graph if_true() {
+  %_apply8 = universe_getitem(%_apply1)
+  return %_apply8
 }
 """
 
@@ -133,11 +132,13 @@ def test_boolop():
     assert str_graph(parse(f)) == """graph f(%a, %b, %c) {
   %_apply0 = universe_setitem(%_apply1, %b)
   %_apply2 = universe_setitem(%_apply3, %c)
-  %_apply4 = switch(%a, @if_true, @if_false)
-  %_apply5 = %_apply4()
-  %_apply6 = switch(%_apply5, @if_true, @if_false)
-  %_apply7 = %_apply6()
-  return %_apply7
+  %_apply4 = <built-in function truth>(%a)
+  %_apply5 = switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
+  %_apply7 = <built-in function truth>(%_apply6)
+  %_apply8 = switch(%_apply7, @if_true, @if_false)
+  %_apply9 = %_apply8()
+  return %_apply9
 }
 
 graph if_false() {
@@ -145,13 +146,13 @@ graph if_false() {
 }
 
 graph if_true() {
-  %_apply8 = universe_getitem(%_apply1)
-  return %_apply8
+  %_apply10 = universe_getitem(%_apply1)
+  return %_apply10
 }
 
 graph if_false() {
-  %_apply9 = universe_getitem(%_apply3)
-  return %_apply9
+  %_apply11 = universe_getitem(%_apply3)
+  return %_apply11
 }
 
 graph if_true() {
@@ -178,9 +179,10 @@ def test_compare2():
   %_apply0 = universe_setitem(%_apply1, %x)
   %_apply2 = universe_getitem(%_apply1)
   %_apply3 = <built-in function lt>(0, %_apply2)
-  %_apply4 = switch(%_apply3, @if_true, @if_false)
-  %_apply5 = %_apply4()
-  return %_apply5
+  %_apply4 = <built-in function truth>(%_apply3)
+  %_apply5 = switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
+  return %_apply6
 }
 
 graph if_false() {
@@ -188,9 +190,9 @@ graph if_false() {
 }
 
 graph if_true() {
-  %_apply6 = universe_getitem(%_apply1)
-  %_apply7 = <built-in function lt>(%_apply6, 42)
-  return %_apply7
+  %_apply7 = universe_getitem(%_apply1)
+  %_apply8 = <built-in function lt>(%_apply7, 42)
+  return %_apply8
 }
 """
 
@@ -215,21 +217,23 @@ def test_if():
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
   %_apply0 = universe_setitem(%_apply1, %x)
   %_apply2 = universe_setitem(%_apply3, %y)
-  %_apply4 = user_switch(%b, @if_true, @if_false)
-  %_apply5 = %_apply4()
-  return %_apply5
-}
-
-graph if_false() {
-  %_apply6 = universe_getitem(%_apply3)
+  %_apply4 = <built-in function truth>(%b)
+  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
   return %_apply6
 }
 
-graph if_true() {
-  %_apply7 = universe_getitem(%_apply1)
+graph if_false() {
+  %_apply7 = universe_getitem(%_apply3)
   return %_apply7
 }
+
+graph if_true() {
+  %_apply8 = universe_getitem(%_apply1)
+  return %_apply8
+}
 """
+
 
 def test_if2():
     def f(b, x, y):
@@ -240,24 +244,25 @@ def test_if2():
     assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
   %_apply0 = universe_setitem(%_apply1, %x)
   %_apply2 = universe_setitem(%_apply3, %y)
-  %_apply4 = user_switch(%b, @if_true, @if_false)
-  %_apply5 = %_apply4()
-  return %_apply5
-}
-
-graph if_false() {
-  %_apply6 = @if_after()
+  %_apply4 = <built-in function truth>(%b)
+  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
   return %_apply6
 }
 
-graph if_after() {
-  %_apply7 = universe_getitem(%_apply3)
+graph if_false() {
+  %_apply7 = @if_after()
   return %_apply7
 }
 
-graph if_true() {
-  %_apply8 = universe_getitem(%_apply1)
+graph if_after() {
+  %_apply8 = universe_getitem(%_apply3)
   return %_apply8
+}
+
+graph if_true() {
+  %_apply9 = universe_getitem(%_apply1)
+  return %_apply9
 }
 """
 
