@@ -196,6 +196,33 @@ graph if_true() {
 }
 """
 
+
+def test_lambda():
+    def f():
+        l = lambda x: x
+        return l
+
+    assert str_graph(parse(f)) == """graph f() {
+  return @lambda
+}
+
+graph lambda(%x) {
+  return %x
+}
+"""
+
+
+def test_subscript_index():
+    def f(x, i):
+        return x[i]
+
+    assert str_graph(parse(f)) == """graph f(%x, %i) {
+  %_apply0 = <built-in function getitem>(%x, %i)
+  return %_apply0
+}
+"""
+
+
 def test_unary():
     def f(x):
         return -x

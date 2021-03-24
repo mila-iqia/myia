@@ -399,25 +399,19 @@ class Parser:
 
                 block.graph.replace(repl, repl_seq)
 
-    def _create_function(self, block, node):
-        function = Function(parent=block,
-                            name=node.name,
-                            location=self.make_location(node),
-                            flags=self.recflags)
-        function_block = function.initial_block
+    def _process_args(self, block, function_block, args):
+        pargs = args.args
+        nondefaults = [None] * (len(pargs) - len(args.kw_defaults))
+        defaults = nondefaults + args.defaults
 
-        args = node.args.args
-        nondefaults = [None] * (len(args) - len(node.args.kw_defaults))
-        defaults = nondefaults + node.args.defaults
-
-        kwargs = node.args.kwonlyargs
-        kwnondefaults = [None] * (len(kwargs) - len(node.args.kw_defaults))
-        kwdefaults = kwnondefaults + node.args.kw_defaults
+        kwargs = args.kwonlyargs
+        kwnondefaults = [None] * (len(kwargs) - len(args.kw_defaults))
+        kwdefaults = kwnondefaults + args.kw_defaults
 
         defaults_name = []
         defaults_list = []
 
-        for arg, dflt in zip(args + kwargs, defaults + kwdefaults):
+        for arg, dflt in zip(pargs + kwargs, defaults + kwdefaults):
             param_node = Parameter(function_block.graph, name=arg.arg,
                                    location=self.make_location(arg))
 
@@ -438,8 +432,8 @@ class Parser:
                 defaults_names.append(arg.arg)
                 defaults_list.append(dflt_node)
 
-        if node.args.vararg:
-            arg = node.args.vararg
+        if args.vararg:
+            arg = args.vararg
             vararg_node = Parameter(function_block.graph, name=arg.arg,
                                     location=self.make_location(arg))
             function_block.graph.parameters.append(vararg_node)
@@ -447,8 +441,8 @@ class Parser:
         else:
             vararg_node = None
 
-        if node.args.kwarg:
-            arg = node.args.kwarg
+        if args.kwarg:
+            arg = args.kwarg
             kwarg_node = Parameter(function_block.graph, name=arg.arg,
                                    location=self.make_location(arg))
             function_block.graph.parameters.append(kwarg_node)
@@ -456,18 +450,27 @@ class Parser:
         else:
             kwarg_node = None
 
+        function_block.graph.vararg = vararg_node and vararg_node.name
+        function_block.graph.kwarg = kwarg_node and kwarg_node.name
+        function_block.graph.defaults = dict(zip(defaults_name,
+                                                 defaults_list))
+        function_block.graph.kwonly = len(args.kwonlyargs)
+
+    def _create_function(self, block, node):
+        function = Function(parent=block,
+                            name=node.name,
+                            location=self.make_location(node),
+                            flags=self.recflags)
+        function_block = function.initial_block
+
+        self._process_args(block, function_block, node.args)
+
         self.process_statements(function_block, node.body)
 
         if function_block.graph.return_ is None:
             raise MyiaSyntaxError(
                 "Function doesn't return a value", self.make_location(node)
             )
-
-        function_block.graph.vararg = vararg_node and vararg_node.name
-        function_block.graph.kwarg = kwarg_node and kwarg_node.name
-        function_block.graph.defaults = dict(zip(defaults_name,
-                                                 defaults_list))
-        function_block.graph.kwonly = len(node.args.kwonlyargs)
 
         if node.returns:
             function_block.graph.return_.add_annotation(self._eval_ast_node(node.returns))
@@ -492,9 +495,9 @@ class Parser:
                 self.make_location(node)
             )
 
-    def process_Name(self, block, node):
-        assert isinstance(node.ctx, ast.Load)
-        return block.read(node.id)
+    def process_Attribute(self, block, node):
+        value = self.process_node(block, node.value)
+        return block.apply(operator.getattr, value, Constant(node.attr))
 
     def process_BinOp(self, block, node):
         return block.apply(ast_map[type(node.op)],
@@ -527,6 +530,40 @@ class Parser:
         else:
             raise AssertionError(f"Unknown BoolOp: {node.op}")
 
+    def process_Call(self, block, node):
+        func = self.process_node(block, node.func)
+
+        groups = []
+        current = []
+        for arg in node.args:
+            if isinstance(arg, ast.Starred):
+                groups.append(current)
+                groups.append(self.process_node(block, arg.value))
+                current = []
+            else:
+                current.append(self.process_node(block, arg))
+        if current or not groups:
+            groups.append(current)
+
+        if node.keywords:
+            for k in node.keywords:
+                if k.arg is None:
+                    groups.append(self.process_node(block, k.value))
+                keywords = [k for k in node.keywords if k.arg is not None]
+                groups.append(block.apply("make_dict", *zip((k.arg for k in keywords), (self.process_node(block, k.value) for k in keywords))))
+
+        if len(groups) == 1:
+            (args,) = groups
+            return block.apply(func, *args)
+        else:
+            args = []
+            for group in groups:
+                if isinstance(group, list):
+                    args.append(block.apply("make_tuple", *group))
+                else:
+                    args.append(group)
+            return block.apply("apply", func, *args)
+
     def process_Compare(self, block, node):
         if len(node.ops) == 1:
             left = self.process_node(block, node.left)
@@ -553,6 +590,21 @@ class Parser:
     def process_Constant(self, block, node):
         return Constant(node.value)
 
+    def process_Dict(self, block, node):
+        # we need to process k1, v1, k2, v2, ...
+        # to respect python evaluation order
+        keys = []
+        values = []
+        for k, v in zip(node.keys, node.values):
+            keys.append(self.process_node(block, k))
+            values.append(self.process_node(block, v))
+
+        return block.apply("make_dict", *zip(keys, values))
+
+    def process_ExtSlice(self, block, node):
+        slices = [self.process_node(block, dim) for dim in node.dims]
+        return block.apply("make_tuple", *slices)
+
     def process_IfExp(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
@@ -566,6 +618,59 @@ class Parser:
 
         switch = block.apply("user_switch", cond, tb.graph, fb.graph)
         return block.apply(switch)
+
+    def process_Index(self, block, node):
+        return self.process_node(block, node.value)
+
+    def process_Lambda(self, block, node):
+        function = Function(parent=block,
+                            name="lambda",
+                            location=self.make_location(node),
+                            flags=self.recflags)
+        function_block = function.initial_block
+
+        self._process_args(block, function_block, node.args)
+
+        function_block.returns(self.process_node(function_block, node.body))
+        return Constant(function_block.graph)
+
+    def process_List(self, block, node):
+        elts = [self.process_node(block, e) for e in node.elts]
+        return block.apply("make_list", *elts)
+
+    def process_Name(self, block, node):
+        assert isinstance(node.ctx, ast.Load)
+        return block.read(node.id)
+
+    def process_NameConstant(self, block, node):
+        return Constant(node.value)
+
+    def process_Slice(self, block, node):
+        if node.lower is None:
+            lower = Constant(None)
+        else:
+            lower = self.process_node(block, node.lower)
+        if node.upper is None:
+            upper = Constant(None)
+        else:
+            upper = self.process_node(block, node.upper)
+        if node.step is None:
+            step = Constant(None)
+        else:
+            step = self.process_node(block, node.step)
+        return block.apply("slice", lower, upper, step)
+
+    def process_Subscript(self, block, node):
+        value = self.process_node(block, node.value)
+        slice = self.process_node(block, node.slice)
+        return block.apply(operator.getitem, value, slice)
+
+    def process_Tuple(self, block, node):
+        elts = [self.process_node(block, e) for e in node.elts]
+        if len(elts) == 0:
+            return Constant(())
+        else:
+            return block.apply("make_tuple", *elts)
 
     def process_UnaryOp(self, block, node):
         val = self.process_node(block, node.operand)
