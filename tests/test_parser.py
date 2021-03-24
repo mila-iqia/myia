@@ -62,8 +62,20 @@ def test_add():
     def f(x, y):
         return x + y
     assert str_graph(parse(f)) == """graph f(%x, %y) {
-  %_apply0 = add(%x, %y)
+  %_apply0 = <built-in function add>(%x, %y)
   return %_apply0
+}
+"""
+
+
+def test_not_in():
+    def f(x, y):
+        return x not in y
+
+    assert str_graph(parse(f)) == """graph f(%x, %y) {
+  %_apply0 = <built-in function contains>(%x, %y)
+  %_apply1 = <built-in function not_>(%_apply0)
+  return %_apply1
 }
 """
 
@@ -74,7 +86,7 @@ def test_seq():
         return 0
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = add(%x, 1)
+  %_apply0 = <built-in function add>(%x, 1)
   return 0
 }
 """
@@ -85,7 +97,7 @@ def test_seq2():
         return x + x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = add(%x, %x)
+  %_apply0 = <built-in function add>(%x, %x)
   return %_apply0
 }
 """
@@ -152,7 +164,7 @@ def test_compare():
         return x > 0
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = gt(%x, 0)
+  %_apply0 = <built-in function gt>(%x, 0)
   return %_apply0
 }
 """
@@ -165,7 +177,7 @@ def test_compare2():
     assert str_graph(parse(f)) == """graph f(%x) {
   %_apply0 = universe_setitem(%_apply1, %x)
   %_apply2 = universe_getitem(%_apply1)
-  %_apply3 = lt(0, %_apply2)
+  %_apply3 = <built-in function lt>(0, %_apply2)
   %_apply4 = switch(%_apply3, @if_true, @if_false)
   %_apply5 = %_apply4()
   return %_apply5
@@ -177,7 +189,7 @@ graph if_false() {
 
 graph if_true() {
   %_apply6 = universe_getitem(%_apply1)
-  %_apply7 = lt(%_apply6, 42)
+  %_apply7 = <built-in function lt>(%_apply6, 42)
   return %_apply7
 }
 """
@@ -187,7 +199,7 @@ def test_unary():
         return -x
 
     assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = neg(%x)
+  %_apply0 = <built-in function neg>(%x)
   return %_apply0
 }
 """
@@ -309,7 +321,7 @@ graph while_after() {
 
 graph while_body() {
   %_apply7 = universe_getitem(%_apply1)
-  %_apply8 = sub(%_apply7, 1)
+  %_apply8 = <built-in function sub>(%_apply7, 1)
   %_apply9 = universe_setitem(%_apply1, %_apply8)
   %_apply10 = @while_header()
   return %_apply10

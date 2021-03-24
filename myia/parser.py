@@ -1,5 +1,6 @@
 import ast
 import inspect
+import operator
 
 import textwrap
 from typing import NamedTuple
@@ -34,33 +35,33 @@ class MyiaSyntaxError(Exception):
 
 
 ast_map = {
-    ast.Add: "add",
-    ast.Sub: "sub",
-    ast.Mult: "mul",
-    ast.Div: "truediv",
-    ast.FloorDiv: "floordiv",
-    ast.Mod: "mod",
-    ast.Pow: "pow",
-    ast.MatMult: "matmul",
-    ast.LShift: "lshift",
-    ast.RShift: "rshift",
-    ast.BitAnd: "and_",
-    ast.BitOr: "or_",
-    ast.BitXor: "xor",
-    ast.UAdd: "pos",
-    ast.USub: "neg",
-    ast.Invert: "invert",
-    ast.Not: "not_",
-    ast.Eq: "eq",
-    ast.NotEq: "ne",
-    ast.Lt: "lt",
-    ast.Gt: "gt",
-    ast.LtE: "le",
-    ast.GtE: "ge",
-    ast.Is: "is_",
-    ast.IsNot: "is_not",
-    ast.In: "contains",
-    ast.NotIn: "not_in",
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+    ast.MatMult: operator.matmul,
+    ast.LShift: operator.lshift,
+    ast.RShift: operator.rshift,
+    ast.BitAnd: operator.and_,
+    ast.BitOr: operator.or_,
+    ast.BitXor: operator.xor,
+    ast.UAdd: operator.pos,
+    ast.USub: operator.neg,
+    ast.Invert: operator.invert,
+    ast.Not: operator.not_,
+    ast.Eq: operator.eq,
+    ast.NotEq: operator.ne,
+    ast.Lt: operator.lt,
+    ast.Gt: operator.gt,
+    ast.LtE: operator.le,
+    ast.GtE: operator.ge,
+    ast.Is: operator.is_,
+    ast.IsNot: operator.is_not,
+    ast.In: operator.contains,
+    # ast.NotIn: # Not available in operator, special handling below
 }
 
 
@@ -529,7 +530,13 @@ class Parser:
         if len(node.ops) == 1:
             left = self.process_node(block, node.left)
             right = self.process_node(block, node.comparators[0])
-            return block.apply(ast_map[type(node.ops[0])], left, right)
+            if type(node.ops[0]) is ast.NotIn:
+                # NotIn doesn't have an operator mapping
+                return block.apply(operator.not_,
+                                   block.apply(operator.contains,
+                                               left, right))
+            else:
+                return block.apply(ast_map[type(node.ops[0])], left, right)
         else:
             cur = node.left
             rest = node.comparators
