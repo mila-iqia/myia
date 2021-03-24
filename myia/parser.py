@@ -351,7 +351,7 @@ class Parser:
                 st = function.variables_first_write[var]
                 namespace[var] = st.graph.apply(
                     "make_handle",
-                    st.graph.apply("typeof", st.edges[1]),
+                    st.graph.apply("typeof", st.edges[1].node),
                 )
 
             local_namespace = namespace.copy()
@@ -359,7 +359,7 @@ class Parser:
                 st = function.variables_first_write[var]
                 local_namespace[var] = st.graph.apply(
                     "make_handle",
-                    st.graph.apply("typeof", st.edges[1])
+                    st.graph.apply("typeof", st.edges[1].node)
                 )
 
             for block in function.blocks:
