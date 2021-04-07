@@ -684,24 +684,51 @@ class Parser:
             block = self.process_node(block, node)
         return block
 
-    def _assign(self, block, targ, val):
+    def _assign(self, block, targ, idx, val):
         if isinstance(targ, ast.Name):
             # x = val
+            if idx is not None:
+                val = block.apply(operator.getitem, val, idx)
             st = block.write(targ.id, val)
 
         elif isinstance(targ, ast.Tuple):
             # x, y = val
+            if idx is not None:
+                val = block.apply(operator.getitem, val, idx)
             for i, elt in enumerate(targ.elts):
-                nn = block.apply("getitem", node, i)
-                self._assign(block, elt, nn)
+                self._assign(block, elt, i, val)
+
+        elif isinstance(targ, ast.Starred):
+            if idx is None:
+                raise SyntaxError("starred assignement target must be in a list or tuple")
+            else:
+                raise NotImplementedError("starred assignement")
 
         else:
             raise NotImplementedError(targ)
 
+    def process_Assert(self, block, node):
+        cond = self.process_node(block, node.test)
+        cond = block.apply(operator.truth, cond)
+        msg = self.process_node(block, node.msg) if node.msg else Constant("Assertion failed")
+
+        true_block, false_block = self.make_condition_blocks(block, None, None)
+        block.cond(cond, true_block, false_block)
+        false_block.raises(false_block.apply("exception", msg))
+        return true_block
+
+    def process_AnnAssign(self, block, node):
+        node = self.process_node(block, node.value)
+        node.add_annotation(self._eval_ast_node(node.annotation))
+        self._assign(block, node.target, None, node)
+        return block
+
     def process_Assign(self, block, node):
         val = self.process_node(block, node.value)
         for targ in node.targets:
-            self._assign(block, targ, val)
+            self._assign(block, targ, None, val)
+
+        return block
 
         return block
 

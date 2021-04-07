@@ -234,6 +234,31 @@ def test_unary():
 """
 
 
+def test_assign():
+    def f():
+        x, y = 1, 2
+        return y
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_tuple(1, 2)
+  %_apply1 = <built-in function getitem>(%_apply0, 0)
+  %_apply2 = <built-in function getitem>(%_apply0, 1)
+  return %_apply2
+}
+"""
+
+
+@pytest.mark.xfail
+def test_assign2():
+    def f():
+        x, *y = 1, 2, 3
+        return y
+
+    assert str_graph(parse(f)) == """graph f() {
+}
+"""
+
+
 def test_if():
     def f(b, x, y):
         if b:
