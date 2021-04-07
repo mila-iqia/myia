@@ -174,6 +174,9 @@ class Function:
                                    location, flags)
         self.blocks = [self.initial_block]
 
+        self.break_target = []
+        self.continue_target = []
+
         self.variables_free = set()
         self.variables_root = set()
         self.variables_local_closure = set()
@@ -730,6 +733,21 @@ class Parser:
 
         return block
 
+    def process_Break(self, block, node):
+        if len(block.function.break_target) == 0:
+            raise SyntaxError("'break' outside loop")
+        block.jump(block.function.break_target[-1])
+        return block
+
+    def process_Continue(self, block, node):
+        target = block.function.continue_target
+        if len(target) == 0:
+            raise SyntaxError("'continue' not properly in loop")
+        block.jump(target[0], *target[1])
+        return block
+
+    def process_Expr(self, block, node):
+        self.process_node(block, node.value)
         return block
 
     def process_If(self, block, node):
@@ -783,16 +801,28 @@ class Parser:
                                                 self.make_location(node.test))
         body_block = block.function.new_block("while_body", header_block,
                                               self.make_location(node.body))
+        else_block = block.function.new_block("while_else", header_block,
+                                              self.make_location(node.orelse))
         # TODO: Same as If we need the list of nodes that follow
         # for the location
         after_block = block.function.new_block("while_after", header_block, None)
 
         block.jump(header_block)
         cond = self.process_node(header_block, node.test)
-        header_block.cond(cond, body_block, after_block)
+        header_block.cond(cond, body_block, else_block)
+
+        block.function.break_target.append(after_block)
+        block.function.continue_target.append((header_block, ()))
 
         after_body = self.process_statements(body_block, node.body)
         if not after_body.graph.return_:
             after_body.jump(header_block)
+
+        block.function.break_target.pop(-1)
+        block.function.continue_target.pop(-1)
+
+        after_else = self.process_statements(else_block, node.orelse)
+        if not after_else.graph.return_:
+            after_else.jump(after_block)
 
         return after_block

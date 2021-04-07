@@ -335,19 +335,24 @@ def test_while():
 
 graph while_header() {
   %_apply7 = universe_getitem(%_apply1)
-  %_apply8 = user_switch(%_apply7, @while_body, @while_after)
+  %_apply8 = user_switch(%_apply7, @while_body, @while_else)
   %_apply9 = %_apply8()
   return %_apply9
 }
 
-graph while_after() {
-  %_apply10 = universe_getitem(%_apply5)
+graph while_else() {
+  %_apply10 = @while_after()
   return %_apply10
 }
 
-graph while_body() {
-  %_apply11 = universe_getitem(%_apply3)
+graph while_after() {
+  %_apply11 = universe_getitem(%_apply5)
   return %_apply11
+}
+
+graph while_body() {
+  %_apply12 = universe_getitem(%_apply3)
+  return %_apply12
 }
 """
 
@@ -366,21 +371,26 @@ def test_while2():
 
 graph while_header() {
   %_apply3 = universe_getitem(%_apply1)
-  %_apply4 = user_switch(%_apply3, @while_body, @while_after)
+  %_apply4 = user_switch(%_apply3, @while_body, @while_else)
   %_apply5 = %_apply4()
   return %_apply5
 }
 
-graph while_after() {
-  %_apply6 = universe_getitem(%_apply1)
+graph while_else() {
+  %_apply6 = @while_after()
   return %_apply6
 }
 
-graph while_body() {
+graph while_after() {
   %_apply7 = universe_getitem(%_apply1)
-  %_apply8 = <built-in function sub>(%_apply7, 1)
-  %_apply9 = universe_setitem(%_apply1, %_apply8)
-  %_apply10 = @while_header()
-  return %_apply10
+  return %_apply7
+}
+
+graph while_body() {
+  %_apply8 = universe_getitem(%_apply1)
+  %_apply9 = <built-in function sub>(%_apply8, 1)
+  %_apply10 = universe_setitem(%_apply1, %_apply9)
+  %_apply11 = @while_header()
+  return %_apply11
 }
 """
