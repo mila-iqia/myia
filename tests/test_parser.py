@@ -258,6 +258,43 @@ def test_assign2():
 }
 """
 
+def test_break():
+    def f(a):
+        for b in a:
+            break
+        return 0
+
+    assert  str_graph(parse(f)) == """graph f(%a) {
+  %_apply0 = python_iter(%a)
+  %_apply1 = @for_header(%_apply0)
+  return %_apply1
+}
+
+graph for_header(%it) {
+  %_apply2 = python_hasnext(%it)
+  %_apply3 = user_switch(%_apply2, @for_body, @for_else)
+  %_apply4 = %_apply3()
+  return %_apply4
+}
+
+graph for_else() {
+  %_apply5 = @for_after()
+  return %_apply5
+}
+
+graph for_after() {
+  return 0
+}
+
+graph for_body() {
+  %_apply6 = python_next(%it)
+  %_apply7 = <built-in function getitem>(%_apply6, 0)
+  %_apply8 = <built-in function getitem>(%_apply6, 1)
+  %_apply9 = @for_after()
+  return %_apply9
+}
+"""
+
 
 def test_if():
     def f(b, x, y):
@@ -318,6 +355,100 @@ graph if_true() {
 }
 """
 
+
+def test_for():
+    def f(b):
+        x = 0
+        for a in b:
+            x = x + 1
+        return x
+
+    assert str_graph(parse(f)) == """graph f(%b) {
+  %_apply0 = universe_setitem(%_apply1, 0)
+  %_apply2 = python_iter(%b)
+  %_apply3 = @for_header(%_apply2)
+  return %_apply3
+}
+
+graph for_header(%it) {
+  %_apply4 = python_hasnext(%it)
+  %_apply5 = user_switch(%_apply4, @for_body, @for_else)
+  %_apply6 = %_apply5()
+  return %_apply6
+}
+
+graph for_else() {
+  %_apply7 = @for_after()
+  return %_apply7
+}
+
+graph for_after() {
+  %_apply8 = universe_getitem(%_apply1)
+  return %_apply8
+}
+
+graph for_body() {
+  %_apply9 = python_next(%it)
+  %_apply10 = <built-in function getitem>(%_apply9, 0)
+  %_apply11 = <built-in function getitem>(%_apply9, 1)
+  %_apply12 = universe_getitem(%_apply1)
+  %_apply13 = <built-in function add>(%_apply12, 1)
+  %_apply14 = universe_setitem(%_apply1, %_apply13)
+  %_apply15 = @for_header(%_apply11)
+  return %_apply15
+}
+"""
+
+
+def test_for2():
+    def f(a):
+        x = 0
+        for b, c in a:
+            x = x + 1
+        else:
+            x = x - 1
+        return x
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+  %_apply0 = universe_setitem(%_apply1, 0)
+  %_apply2 = python_iter(%a)
+  %_apply3 = @for_header(%_apply2)
+  return %_apply3
+}
+
+graph for_header(%it) {
+  %_apply4 = python_hasnext(%it)
+  %_apply5 = user_switch(%_apply4, @for_body, @for_else)
+  %_apply6 = %_apply5()
+  return %_apply6
+}
+
+graph for_else() {
+  %_apply7 = universe_getitem(%_apply1)
+  %_apply8 = <built-in function sub>(%_apply7, 1)
+  %_apply9 = universe_setitem(%_apply1, %_apply8)
+  %_apply10 = @for_after()
+  return %_apply10
+}
+
+graph for_after() {
+  %_apply11 = universe_getitem(%_apply1)
+  return %_apply11
+}
+
+graph for_body() {
+  %_apply12 = python_next(%it)
+  %_apply13 = <built-in function getitem>(%_apply12, 0)
+  %_apply14 = <built-in function getitem>(%_apply13, 0)
+  %_apply15 = <built-in function getitem>(%_apply13, 1)
+  %_apply16 = <built-in function getitem>(%_apply12, 1)
+  %_apply17 = universe_getitem(%_apply1)
+  %_apply18 = <built-in function add>(%_apply17, 1)
+  %_apply19 = universe_setitem(%_apply1, %_apply18)
+  %_apply20 = @for_header(%_apply16)
+  return %_apply20
+}
+"""
 
 def test_while():
     def f(b, x, y):

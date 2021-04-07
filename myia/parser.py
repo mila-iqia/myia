@@ -750,6 +750,43 @@ class Parser:
         self.process_node(block, node.value)
         return block
 
+    def process_For(self, block, node):
+        init = block.apply("python_iter", self.process_node(block, node.iter))
+
+        header_block = block.function.new_block("for_header", block, None)
+        it = header_block.graph.add_parameter('it')
+        cond = header_block.apply("python_hasnext", it)
+
+        body_block = block.function.new_block("for_body", header_block,
+                                              self.make_location(node.body))
+        app = body_block.apply("python_next", it)
+        val = body_block.apply(operator.getitem, app, 0)
+        self._assign(body_block, node.target, None, val)
+        it2 = body_block.apply(operator.getitem, app, 1)
+
+        else_block = block.function.new_block("for_else", header_block,
+                                              self.make_location(node.orelse))
+        after_block = block.function.new_block("for_after", block, None)
+
+        block.jump(header_block, init)
+        header_block.cond(cond, body_block, else_block)
+
+        block.function.break_target.append(after_block)
+        block.function.continue_target.append((header_block, (it2,)))
+
+        after_body_block = self.process_statements(body_block, node.body)
+        if not after_body_block.graph.return_:
+            after_body_block.jump(header_block, it2)
+
+        block.function.break_target.pop(-1)
+        block.function.continue_target.pop(-1)
+
+        after_else_block = self.process_statements(else_block, node.orelse)
+        if not after_else_block.graph.return_:
+            after_else_block.jump(after_block)
+
+        return after_block
+
     def process_If(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
