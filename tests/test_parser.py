@@ -37,7 +37,7 @@ def test_global():
 """
 
 
-def Xtest_nonlocal():
+def test_nonlocal():
     def f():
         x = 1
         def g():
@@ -47,11 +47,17 @@ def Xtest_nonlocal():
         return x
 
     assert str_graph(parse(f)) == """graph f() {
-  %_apply0 = load(x)
-  %_apply1 = <built-in function add>(%_apply0, 1)
-  %_apply2 = store(x, %_apply1)
-  %_apply3 = load(x)
+  %_apply0 = universe_setitem(%_apply1, 1)
+  %_apply2 = @g()
+  %_apply3 = universe_getitem(%_apply1)
   return %_apply3
+}
+
+graph g() {
+  %_apply4 = universe_getitem(%_apply1)
+  %_apply5 = <built-in function add>(%_apply4, 1)
+  %_apply6 = universe_setitem(%_apply1, %_apply5)
+  return None
 }
 """
 

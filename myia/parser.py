@@ -823,7 +823,7 @@ class Parser:
 
     def process_Nonlocal(self, block, node):
         for name in node.names:
-            if name in block.function.local_variables:
+            if name in block.function.variables_local:
                 # This is a python error
                 raise SyntaxError(f"name '{name}' is assigned to before nonlocal declaration")
         block.function.variables_nonlocal.update(node.names)
