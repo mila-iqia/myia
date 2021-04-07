@@ -468,12 +468,10 @@ class Parser:
 
         self._process_args(block, function_block, node.args)
 
-        self.process_statements(function_block, node.body)
+        after_block = self.process_statements(function_block, node.body)
 
-        if function_block.graph.return_ is None:
-            raise MyiaSyntaxError(
-                "Function doesn't return a value", self.make_location(node)
-            )
+        if after_block.graph.return_ is None:
+            after_block.returns(Constant(None))
 
         if node.returns:
             function_block.graph.return_.add_annotation(self._eval_ast_node(node.returns))
@@ -786,6 +784,11 @@ class Parser:
             after_else_block.jump(after_block)
 
         return after_block
+
+    def process_FunctionDef(self, block, node):
+        fn_block = self._create_function(block, node)
+        block.write(node.name, fn_block.graph)
+        return block
 
     def process_If(self, block, node):
         cond = self.process_node(block, node.test)
