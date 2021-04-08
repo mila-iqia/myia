@@ -550,8 +550,12 @@ class Parser:
             for k in node.keywords:
                 if k.arg is None:
                     groups.append(self.process_node(block, k.value))
-                keywords = [k for k in node.keywords if k.arg is not None]
-                groups.append(block.apply("make_dict", *zip((k.arg for k in keywords), (self.process_node(block, k.value) for k in keywords))))
+            keywords = [k for k in node.keywords if k.arg is not None]
+            kwlist = list(zip((k.arg for k in keywords), (self.process_node(block, k.value) for k in keywords)))
+            dlist = []
+            for kw in kwlist:
+                dlist.extend(kw)
+            groups.append(block.apply("make_dict", *dlist))
 
         if len(groups) == 1:
             (args,) = groups

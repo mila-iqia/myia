@@ -286,6 +286,143 @@ graph if_true() {
 """
 
 
+def test_call():
+    def f():  # pragma: nocover
+        def g(a):
+            return a
+
+        return g(1)
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = @g(1)
+  return %_apply0
+}
+
+graph g(%a) {
+  return %a
+}
+"""
+
+
+def test_call2():
+    def f():  # pragma: nocover
+        def g(a, b):
+            return a
+
+        return g(1, b=2)
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_dict(b, 2)
+  %_apply1 = make_tuple(1)
+  %_apply2 = apply(@g, %_apply1, %_apply0)
+  return %_apply2
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
+def test_call3():
+    def f():  # pragma: nocover
+        def g(a, b=2):
+            return a
+
+        return g(1)
+
+    # XXX: This is probably wrong
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = @g(1)
+  return %_apply0
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
+def test_call4():
+    def f():  # pragma: nocover
+        def g(a, b=2):
+            return a
+
+        return g(1, 2)
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = @g(1, 2)
+  return %_apply0
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
+def test_call5():
+    def f():  # pragma: nocover
+        def g(a, *b):
+            return a
+
+        return g(1, 2, 3)
+
+    # XXX: This is probably wrong
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = @g(1, 2, 3)
+  return %_apply0
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
+def test_call6():
+    def f():  # pragma: nocover
+        def g(a, **b):
+            return a
+
+        return g(1, b=2, c=3)
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_dict(b, 2, c, 3)
+  %_apply1 = make_tuple(1)
+  %_apply2 = apply(@g, %_apply1, %_apply0)
+  return %_apply2
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
+def test_call_order():
+    def f(a, b, c, d, e, f):  # pragma: nocover
+        def g(*a, **b):
+            return a
+
+        return g(a+b, c+d, c=33, e=e+f)
+
+    assert str_graph(parse(f)) == """graph f(%a, %b, %c, %d, %e, %f) {
+  %_apply0 = <built-in function add>(%a, %b)
+  %_apply1 = <built-in function add>(%c, %d)
+  %_apply2 = <built-in function add>(%e, %f)
+  %_apply3 = make_dict(c, 33, e, %_apply2)
+  %_apply4 = make_tuple(%_apply0, %_apply1)
+  %_apply5 = apply(@g, %_apply4, %_apply3)
+  return %_apply5
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
 def test_ifexp():
     def f(x, y, b):  # pragma: nocover
         return x if b else y
