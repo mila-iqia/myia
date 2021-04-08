@@ -1,6 +1,6 @@
 import pytest
 
-from myia.parser import parse
+from myia.parser import parse, MyiaSyntaxError
 from myia.ir.print import str_graph
 
 
@@ -62,26 +62,12 @@ graph g() {
 """
 
 
-def test_add():
-    def f(x, y):
-        return x + y
-    assert str_graph(parse(f)) == """graph f(%x, %y) {
-  %_apply0 = <built-in function add>(%x, %y)
-  return %_apply0
-}
-"""
+def test_entry_defaults():
+    def f(x=0):  # pragma: nocover
+        return x
 
-
-def test_not_in():
-    def f(x, y):
-        return x not in y
-
-    assert str_graph(parse(f)) == """graph f(%x, %y) {
-  %_apply0 = <built-in function contains>(%x, %y)
-  %_apply1 = <built-in function not_>(%_apply0)
-  return %_apply1
-}
-"""
+    with pytest.raises(MyiaSyntaxError):
+        parse(f)
 
 
 def test_seq():
@@ -193,29 +179,39 @@ def test_getattr():
 """
 
 
-def test_ifexp():
-    def f(x, y, b):
-        return x if b else y
+def test_binop():
+    def f(a, b):  # pragma: nocover
+        return a / b
 
-    assert str_graph(parse(f)) == """graph f(%x, %y, %b) {
-  %_apply0 = universe_setitem(%_apply1, %x)
-  %_apply2 = universe_setitem(%_apply3, %y)
-  %_apply4 = <built-in function truth>(%b)
-  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
-  %_apply6 = %_apply5()
-  return %_apply6
-}
-
-graph if_false() {
-  %_apply7 = universe_getitem(%_apply3)
-  return %_apply7
-}
-
-graph if_true() {
-  %_apply8 = universe_getitem(%_apply1)
-  return %_apply8
+    assert str_graph(parse(f)) == """graph f(%a, %b) {
+  %_apply0 = <built-in function truediv>(%a, %b)
+  return %_apply0
 }
 """
+
+
+def test_binop2():
+    def f(x, y):  # pragma: nocover
+        return x + y
+
+    assert str_graph(parse(f)) == """graph f(%x, %y) {
+  %_apply0 = <built-in function add>(%x, %y)
+  return %_apply0
+}
+"""
+
+
+def test_binop3():
+    def f(x, y):  # pragma: nocover
+        return x not in y
+
+    assert str_graph(parse(f)) == """graph f(%x, %y) {
+  %_apply0 = <built-in function contains>(%x, %y)
+  %_apply1 = <built-in function not_>(%_apply0)
+  return %_apply1
+}
+"""
+
 
 def test_boolop():
     def f(a, b, c):
@@ -284,6 +280,31 @@ graph if_false() {
 graph if_true() {
   %_apply7 = universe_getitem(%_apply1)
   %_apply8 = <built-in function lt>(%_apply7, 42)
+  return %_apply8
+}
+"""
+
+
+def test_ifexp():
+    def f(x, y, b):  # pragma: nocover
+        return x if b else y
+
+    assert str_graph(parse(f)) == """graph f(%x, %y, %b) {
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = universe_setitem(%_apply3, %y)
+  %_apply4 = <built-in function truth>(%b)
+  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
+  return %_apply6
+}
+
+graph if_false() {
+  %_apply7 = universe_getitem(%_apply3)
+  return %_apply7
+}
+
+graph if_true() {
+  %_apply8 = universe_getitem(%_apply1)
   return %_apply8
 }
 """

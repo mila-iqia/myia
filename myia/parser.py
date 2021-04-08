@@ -427,12 +427,12 @@ class Parser:
                 # TODO If there are no parents (the initial function),
                 # then evaluate in the global env
                 if block is None:
-                    raise MyiaSyntaxError("default value on the entry function")
+                    raise MyiaSyntaxError("default value on the entry function", self.make_location(arg))
                 # XXX: This might not work correctly with our framework,
                 # but we need to evaluate the default arguments in the parent
                 # context for proper name resolution.
                 dflt_node = self.process_node(block, dflt)
-                defaults_names.append(arg.arg)
+                defaults_name.append(arg.arg)
                 defaults_list.append(dflt_node)
 
         if args.vararg:
