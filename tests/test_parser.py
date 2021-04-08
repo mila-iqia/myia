@@ -182,6 +182,17 @@ graph g(%a, %b) {
 """
 
 
+def test_getattr():
+    def f(a):
+        return a.b
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+  %_apply0 = <built-in function getattr>(%a, b)
+  return %_apply0
+}
+"""
+
+
 def test_ifexp():
     def f(x, y, b):
         return x if b else y

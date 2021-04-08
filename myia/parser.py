@@ -498,7 +498,7 @@ class Parser:
 
     def process_Attribute(self, block, node):
         value = self.process_node(block, node.value)
-        return block.apply(operator.getattr, value, Constant(node.attr))
+        return block.apply(getattr, value, Constant(node.attr))
 
     def process_BinOp(self, block, node):
         return block.apply(ast_map[type(node.op)],
