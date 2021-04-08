@@ -404,7 +404,7 @@ class Parser:
 
     def _process_args(self, block, function_block, args):
         pargs = args.args
-        nondefaults = [None] * (len(pargs) - len(args.kw_defaults))
+        nondefaults = [None] * (len(pargs) - len(args.defaults))
         defaults = nondefaults + args.defaults
 
         kwargs = args.kwonlyargs

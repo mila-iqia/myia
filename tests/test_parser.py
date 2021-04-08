@@ -106,6 +106,81 @@ def test_seq2():
 }
 """
 
+def test_def():
+    def f():
+        def g(a):
+            return a
+        return g
+
+    assert str_graph(parse(f)) == """graph f() {
+  return @g
+}
+
+graph g(%a) {
+  return %a
+}
+"""
+
+def test_def2():
+    def f():
+        def g(a, *b):
+            return a
+        return g
+
+    assert str_graph(parse(f)) == """graph f() {
+  return @g
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+def test_def3():
+    def f():
+        def g(a, b=1):
+            return b
+        return g
+
+    assert str_graph(parse(f)) == """graph f() {
+  return @g
+}
+
+graph g(%a, %b) {
+  return %b
+}
+"""
+
+def test_def4():
+    def f():
+        def g(a, **b):
+            return a
+        return g
+
+    assert str_graph(parse(f)) == """graph f() {
+  return @g
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+def test_def5():
+    def f():
+        def g(a, *, b):
+            return b
+        return g
+
+    assert str_graph(parse(f)) == """graph f() {
+  return @g
+}
+
+graph g(%a, %b) {
+  return %b
+}
+"""
+
 
 def test_ifexp():
     def f(x, y, b):
