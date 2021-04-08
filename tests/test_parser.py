@@ -5,7 +5,7 @@ from myia.ir.print import str_graph
 
 
 def test_simple():
-    def f(x):
+    def f(x):  # pragma: nocover
         return x
 
     assert str_graph(parse(f)) == """graph f(%x) {
@@ -15,7 +15,7 @@ def test_simple():
 
 
 def test_free():
-    def f():
+    def f():  # pragma: nocover
         return x
 
     assert str_graph(parse(f)) == """graph f() {
@@ -26,7 +26,7 @@ def test_free():
 
 
 def test_global():
-    def f():
+    def f():  # pragma: nocover
         global x
         return x
 
@@ -38,7 +38,7 @@ def test_global():
 
 
 def test_nonlocal():
-    def f():
+    def f():  # pragma: nocover
         x = 1
         def g():
             nonlocal x
@@ -71,7 +71,7 @@ def test_entry_defaults():
 
 
 def test_seq():
-    def f(x):
+    def f(x):  # pragma: nocover
         x = x + 1
         return 0
 
@@ -83,7 +83,7 @@ def test_seq():
 
 
 def test_seq2():
-    def f(x):
+    def f(x):  # pragma: nocover
         return x + x
 
     assert str_graph(parse(f)) == """graph f(%x) {
@@ -93,7 +93,7 @@ def test_seq2():
 """
 
 def test_def():
-    def f():
+    def f():  # pragma: nocover
         def g(a):
             return a
         return g
@@ -108,7 +108,7 @@ graph g(%a) {
 """
 
 def test_def2():
-    def f():
+    def f():  # pragma: nocover
         def g(a, *b):
             return a
         return g
@@ -123,7 +123,7 @@ graph g(%a, %b) {
 """
 
 def test_def3():
-    def f():
+    def f():  # pragma: nocover
         def g(a, b=1):
             return b
         return g
@@ -138,7 +138,7 @@ graph g(%a, %b) {
 """
 
 def test_def4():
-    def f():
+    def f():  # pragma: nocover
         def g(a, **b):
             return a
         return g
@@ -153,7 +153,7 @@ graph g(%a, %b) {
 """
 
 def test_def5():
-    def f():
+    def f():  # pragma: nocover
         def g(a, *, b):
             return b
         return g
@@ -169,7 +169,7 @@ graph g(%a, %b) {
 
 
 def test_getattr():
-    def f(a):
+    def f(a):  # pragma: nocover
         return a.b
 
     assert str_graph(parse(f)) == """graph f(%a) {
@@ -214,7 +214,7 @@ def test_binop3():
 
 
 def test_boolop():
-    def f(a, b, c):
+    def f(a, b, c):  # pragma: nocover
         return a and b or c
 
     assert str_graph(parse(f)) == """graph f(%a, %b, %c) {
@@ -248,8 +248,9 @@ graph if_true() {
 }
 """
 
+
 def test_compare():
-    def f(x):
+    def f(x):  # pragma: nocover
         return x > 0
 
     assert str_graph(parse(f)) == """graph f(%x) {
@@ -260,7 +261,7 @@ def test_compare():
 
 
 def test_compare2():
-    def f(x):
+    def f(x):  # pragma: nocover
         return 0 < x < 42
 
     assert str_graph(parse(f)) == """graph f(%x) {
@@ -311,7 +312,7 @@ graph if_true() {
 
 
 def test_lambda():
-    def f():
+    def f():  # pragma: nocover
         l = lambda x: x
         return l
 
@@ -326,7 +327,7 @@ graph lambda(%x) {
 
 
 def test_subscript_index():
-    def f(x, i):
+    def f(x, i):  # pragma: nocover
         return x[i]
 
     assert str_graph(parse(f)) == """graph f(%x, %i) {
@@ -337,7 +338,7 @@ def test_subscript_index():
 
 
 def test_unary():
-    def f(x):
+    def f(x):  # pragma: nocover
         return -x
 
     assert str_graph(parse(f)) == """graph f(%x) {
@@ -348,7 +349,7 @@ def test_unary():
 
 
 def test_assign():
-    def f():
+    def f():  # pragma: nocover
         x, y = 1, 2
         return y
 
@@ -363,7 +364,7 @@ def test_assign():
 
 @pytest.mark.xfail
 def test_assign2():
-    def f():
+    def f():  # pragma: nocover
         x, *y = 1, 2, 3
         return y
 
@@ -372,7 +373,7 @@ def test_assign2():
 """
 
 def test_break():
-    def f(a):
+    def f(a):  # pragma: nocover
         for b in a:
             break
         return 0
@@ -410,7 +411,7 @@ graph for_body() {
 
 
 def test_if():
-    def f(b, x, y):
+    def f(b, x, y):  # pragma: nocover
         if b:
             return x
         else:
@@ -438,7 +439,7 @@ graph if_true() {
 
 
 def test_if2():
-    def f(b, x, y):
+    def f(b, x, y):  # pragma: nocover
         if b:
             return x
         return y
@@ -470,7 +471,7 @@ graph if_true() {
 
 
 def test_for():
-    def f(b):
+    def f(b):  # pragma: nocover
         x = 0
         for a in b:
             x = x + 1
@@ -514,7 +515,7 @@ graph for_body() {
 
 
 def test_for2():
-    def f(a):
+    def f(a):  # pragma: nocover
         x = 0
         for b, c in a:
             x = x + 1
@@ -564,7 +565,7 @@ graph for_body() {
 """
 
 def test_while():
-    def f(b, x, y):
+    def f(b, x, y):  # pragma: nocover
         while b:
             return x
         return y
@@ -602,7 +603,7 @@ graph while_body() {
 
 
 def test_while2():
-    def f(x):
+    def f(x):  # pragma: nocover
         while x:
             x = x - 1
         return x
