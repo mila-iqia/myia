@@ -598,15 +598,15 @@ class Parser:
     def process_Dict(self, block, node):
         # we need to process k1, v1, k2, v2, ...
         # to respect python evaluation order
-        keys = []
-        values = []
+        dlist = []
         for k, v in zip(node.keys, node.values):
-            keys.append(self.process_node(block, k))
-            values.append(self.process_node(block, v))
+            dlist.append(self.process_node(block, k))
+            dlist.append(self.process_node(block, v))
 
-        return block.apply("make_dict", *zip(keys, values))
+        return block.apply("make_dict", *dlist)
 
     def process_ExtSlice(self, block, node):
+        # This node is removed in 3.9+
         slices = [self.process_node(block, dim) for dim in node.dims]
         return block.apply("make_tuple", *slices)
 

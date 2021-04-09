@@ -249,43 +249,6 @@ graph if_true() {
 """
 
 
-def test_compare():
-    def f(x):  # pragma: nocover
-        return x > 0
-
-    assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = <built-in function gt>(%x, 0)
-  return %_apply0
-}
-"""
-
-
-def test_compare2():
-    def f(x):  # pragma: nocover
-        return 0 < x < 42
-
-    assert str_graph(parse(f)) == """graph f(%x) {
-  %_apply0 = universe_setitem(%_apply1, %x)
-  %_apply2 = universe_getitem(%_apply1)
-  %_apply3 = <built-in function lt>(0, %_apply2)
-  %_apply4 = <built-in function truth>(%_apply3)
-  %_apply5 = switch(%_apply4, @if_true, @if_false)
-  %_apply6 = %_apply5()
-  return %_apply6
-}
-
-graph if_false() {
-  return False
-}
-
-graph if_true() {
-  %_apply7 = universe_getitem(%_apply1)
-  %_apply8 = <built-in function lt>(%_apply7, 42)
-  return %_apply8
-}
-"""
-
-
 def test_call():
     def f():  # pragma: nocover
         def g(a):
@@ -423,6 +386,85 @@ graph g(%a, %b) {
 """
 
 
+def test_compare():
+    def f(x):  # pragma: nocover
+        return x > 0
+
+    assert str_graph(parse(f)) == """graph f(%x) {
+  %_apply0 = <built-in function gt>(%x, 0)
+  return %_apply0
+}
+"""
+
+
+def test_compare2():
+    def f(x):  # pragma: nocover
+        return 0 < x < 42
+
+    assert str_graph(parse(f)) == """graph f(%x) {
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = universe_getitem(%_apply1)
+  %_apply3 = <built-in function lt>(0, %_apply2)
+  %_apply4 = <built-in function truth>(%_apply3)
+  %_apply5 = switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
+  return %_apply6
+}
+
+graph if_false() {
+  return False
+}
+
+graph if_true() {
+  %_apply7 = universe_getitem(%_apply1)
+  %_apply8 = <built-in function lt>(%_apply7, 42)
+  return %_apply8
+}
+"""
+
+
+def test_dict():
+    def f():  # pragma: nocover
+        return {'a': 1}
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_dict(a, 1)
+  return %_apply0
+}
+"""
+
+
+def test_dict2():
+    def f():  # pragma: nocover
+        a = 1
+        b = 2
+        c = 3
+        return {a+b: c-b, a*c: b/c}
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = <built-in function add>(1, 2)
+  %_apply1 = <built-in function sub>(3, 2)
+  %_apply2 = <built-in function mul>(1, 3)
+  %_apply3 = <built-in function truediv>(2, 3)
+  %_apply4 = make_dict(%_apply0, %_apply1, %_apply2, %_apply3)
+  return %_apply4
+}
+"""
+
+
+def test_extslice():
+    def f(a):  # pragma: nocover
+        return a[1:2, 3]
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+  %_apply0 = slice(1, 2, None)
+  %_apply1 = make_tuple(%_apply0, 3)
+  %_apply2 = <built-in function getitem>(%a, %_apply1)
+  return %_apply2
+}
+"""
+
+
 def test_ifexp():
     def f(x, y, b):  # pragma: nocover
         return x if b else y
@@ -448,6 +490,17 @@ graph if_true() {
 """
 
 
+def test_index():
+    def f(a):  # pragma: nocover
+        return a[0]
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+  %_apply0 = <built-in function getitem>(%a, 0)
+  return %_apply0
+}
+"""
+
+
 def test_lambda():
     def f():  # pragma: nocover
         l = lambda x: x
@@ -463,13 +516,50 @@ graph lambda(%x) {
 """
 
 
-def test_subscript_index():
-    def f(x, i):  # pragma: nocover
-        return x[i]
+def test_list():
+    def f(a, b):  # pragma: nocover
+        c = 4
+        return [a+b, c-a, 0, c-b]
 
-    assert str_graph(parse(f)) == """graph f(%x, %i) {
-  %_apply0 = <built-in function getitem>(%x, %i)
-  return %_apply0
+    assert str_graph(parse(f)) == """graph f(%a, %b) {
+  %_apply0 = <built-in function add>(%a, %b)
+  %_apply1 = <built-in function sub>(4, %a)
+  %_apply2 = <built-in function sub>(4, %b)
+  %_apply3 = make_list(%_apply0, %_apply1, 0, %_apply2)
+  return %_apply3
+}
+"""
+
+
+def test_named_constant():
+    def f():  # pragma: nocover
+        return True
+
+    assert str_graph(parse(f)) == """graph f() {
+  return True
+}
+"""
+
+def test_slice():
+    def f(a):  # pragma: nocover
+        return a[1::2, :1]
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+  %_apply0 = slice(1, None, 2)
+  %_apply1 = slice(None, 1, None)
+  %_apply2 = make_tuple(%_apply0, %_apply1)
+  %_apply3 = <built-in function getitem>(%a, %_apply2)
+  return %_apply3
+}
+"""
+
+
+def test_empty_tuple():
+    def f():  # pragma: nocover
+        return ()
+
+    assert str_graph(parse(f)) == """graph f() {
+  return ()
 }
 """
 
