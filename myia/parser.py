@@ -712,6 +712,12 @@ class Parser:
         else:
             raise NotImplementedError(targ)
 
+    def process_AnnAssign(self, block, node):
+        val = self.process_node(block, node.value)
+        val.add_annotation(self._eval_ast_node(node.annotation))
+        self._assign(block, node.target, None, val)
+        return block
+
     def process_Assert(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
@@ -721,12 +727,6 @@ class Parser:
         block.cond(cond, true_block, false_block)
         false_block.raises(false_block.apply("exception", msg))
         return true_block
-
-    def process_AnnAssign(self, block, node):
-        node = self.process_node(block, node.value)
-        node.add_annotation(self._eval_ast_node(node.annotation))
-        self._assign(block, node.target, None, node)
-        return block
 
     def process_Assign(self, block, node):
         val = self.process_node(block, node.value)

@@ -575,6 +575,17 @@ def test_unary():
 """
 
 
+def test_ann_assign():
+    def f():
+        a : int = 1
+        return a
+
+    assert str_graph(parse(f)) == """graph f() {
+  return 1
+}
+"""
+
+
 def test_assign():
     def f():  # pragma: nocover
         x, y = 1, 2

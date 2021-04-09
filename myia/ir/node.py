@@ -94,8 +94,8 @@ class Node:
         return False
 
     def ensure_info(self):
-        if self._info is None:
-            self._info = SimpleNamespace()
+        if self.info is None:
+            self.info = SimpleNamespace()
 
     def add_annotation(self, annotation):
         self.ensure_info()
