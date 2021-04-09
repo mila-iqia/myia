@@ -4,6 +4,59 @@ from myia.parser import parse, MyiaSyntaxError
 from myia.ir.print import str_graph
 
 
+def test_same():
+    def f():  # pragma: nocover
+        return 1
+
+    pf1 = parse(f)
+    assert pf1 is parse(f)
+
+
+def test_flags():
+    def f():  # pragma: nocover
+        def g():
+            return 0
+        return g
+
+    f._myia_flags = {'name': 'f22', 'test_flag': 'inner'}
+
+    assert str_graph(parse(f)) == """graph f22() {
+  return @g
+}
+
+graph g() {
+  return 0
+}
+"""
+
+
+def test_var_error1():
+    def f(a):  # pragma: nocover
+        a = x
+        x = 1
+
+    with pytest.raises(UnboundLocalError):
+        parse(f)
+
+
+def test_var_error2():
+    def f():  # pragma: nocover
+        global x
+        x = 1
+
+    with pytest.raises(NotImplementedError):
+        parse(f)
+
+
+def test_not_supported():
+    def f():  # pragma: nocover
+        async def g():
+            pass
+
+    with pytest.raises(MyiaSyntaxError):
+        parse(f)
+
+
 def test_simple():
     def f(x):  # pragma: nocover
         return x
@@ -151,6 +204,23 @@ graph g(%a, %b) {
   return %a
 }
 """
+
+
+def test_def6():
+    def f():  # pragma: nocover
+        def g(a: int) -> int:
+            return a
+        return g
+
+    assert str_graph(parse(f)) == """graph f() {
+  return @g
+}
+
+graph g(%a) {
+  return %a
+}
+"""
+
 
 def test_def5():
     def f():  # pragma: nocover
@@ -355,6 +425,49 @@ def test_call6():
   %_apply1 = make_tuple(1)
   %_apply2 = apply(@g, %_apply1, %_apply0)
   return %_apply2
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
+def test_call7():
+    def f():  # pragma: nocover
+        def g(a, b):
+            return a
+
+        return g(*(1, 2))
+
+    # XXX: This doesn't seem right
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_tuple(1, 2)
+  %_apply1 = make_tuple()
+  %_apply2 = apply(@g, %_apply1, %_apply0)
+  return %_apply2
+}
+
+graph g(%a, %b) {
+  return %a
+}
+"""
+
+
+def test_call8():
+    def f():  # pragma: nocover
+        def g(*, a, b):
+            return a
+
+        return g(**{'a': 1, 'b': 2})
+
+    # XXX: This doesn't seem right
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_dict(a, 1, b, 2)
+  %_apply1 = make_dict()
+  %_apply2 = make_tuple()
+  %_apply3 = apply(@g, %_apply2, %_apply0, %_apply1)
+  return %_apply3
 }
 
 graph g(%a, %b) {
@@ -576,12 +689,36 @@ def test_unary():
 
 
 def test_ann_assign():
-    def f():
+    def f():  # pragma: nocover
         a : int = 1
         return a
 
     assert str_graph(parse(f)) == """graph f() {
   return 1
+}
+"""
+
+
+def test_assert():
+    def f(a):  # pragma: nocover
+        assert a == 1, "not 1"
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+  %_apply0 = <built-in function eq>(%a, 1)
+  %_apply1 = <built-in function truth>(%_apply0)
+  %_apply2 = user_switch(%_apply1, @if_true, @if_false)
+  %_apply3 = %_apply2()
+  return %_apply3
+}
+
+graph if_false() {
+  %_apply4 = exception(not 1)
+  %_apply5 = raise(%_apply4)
+  return %_apply5
+}
+
+graph if_true() {
+  return None
 }
 """
 
@@ -600,8 +737,62 @@ def test_assign():
 """
 
 
-@pytest.mark.xfail
 def test_assign2():
+    def f():  # pragma: nocover
+        [x, y] = 1, 2
+        return y
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_tuple(1, 2)
+  %_apply1 = <built-in function getitem>(%_apply0, 0)
+  %_apply2 = <built-in function getitem>(%_apply0, 1)
+  return %_apply2
+}
+"""
+
+
+def test_assign3():
+    def f():  # pragma: nocover
+        x, (y, z) = 1, (2, 3)
+        return x, y, z
+
+    assert str_graph(parse(f)) == """graph f() {
+  %_apply0 = make_tuple(2, 3)
+  %_apply1 = make_tuple(1, %_apply0)
+  %_apply2 = <built-in function getitem>(%_apply1, 0)
+  %_apply3 = <built-in function getitem>(%_apply1, 1)
+  %_apply4 = <built-in function getitem>(%_apply3, 0)
+  %_apply5 = <built-in function getitem>(%_apply3, 1)
+  %_apply6 = make_tuple(%_apply2, %_apply4, %_apply5)
+  return %_apply6
+}
+"""
+
+
+@pytest.mark.xfail
+def test_assign4():
+    def f(a):  # pragma: nocover
+        a.b = 1
+        return a
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+}
+"""
+
+
+@pytest.mark.xfail
+def test_assign5():
+    def f(a):  # pragma: nocover
+        a[0] = 1
+        return a
+
+    assert str_graph(parse(f)) == """graph f(%a) {
+}
+"""
+
+
+@pytest.mark.xfail
+def test_assign6():
     def f():  # pragma: nocover
         x, *y = 1, 2, 3
         return y
@@ -610,10 +801,14 @@ def test_assign2():
 }
 """
 
-def test_break():
+
+def test_break_continue():
     def f(a):  # pragma: nocover
         for b in a:
-            break
+            if b < 2:
+                break
+            if b > 4:
+                continue
         return 0
 
     assert  str_graph(parse(f)) == """graph f(%a) {
@@ -641,69 +836,48 @@ graph for_after() {
 graph for_body() {
   %_apply6 = python_next(%it)
   %_apply7 = <built-in function getitem>(%_apply6, 0)
-  %_apply8 = <built-in function getitem>(%_apply6, 1)
-  %_apply9 = @for_after()
-  return %_apply9
-}
-"""
-
-
-def test_if():
-    def f(b, x, y):  # pragma: nocover
-        if b:
-            return x
-        else:
-            return y
-
-    assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = universe_setitem(%_apply1, %x)
-  %_apply2 = universe_setitem(%_apply3, %y)
-  %_apply4 = <built-in function truth>(%b)
-  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
-  %_apply6 = %_apply5()
-  return %_apply6
+  %_apply8 = universe_setitem(%_apply9, %_apply7)
+  %_apply10 = <built-in function getitem>(%_apply6, 1)
+  %_apply11 = universe_getitem(%_apply9)
+  %_apply12 = <built-in function lt>(%_apply11, 2)
+  %_apply13 = <built-in function truth>(%_apply12)
+  %_apply14 = user_switch(%_apply13, @if_true, @if_false)
+  %_apply15 = %_apply14()
+  return %_apply15
 }
 
 graph if_false() {
-  %_apply7 = universe_getitem(%_apply3)
-  return %_apply7
-}
-
-graph if_true() {
-  %_apply8 = universe_getitem(%_apply1)
-  return %_apply8
-}
-"""
-
-
-def test_if2():
-    def f(b, x, y):  # pragma: nocover
-        if b:
-            return x
-        return y
-
-    assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
-  %_apply0 = universe_setitem(%_apply1, %x)
-  %_apply2 = universe_setitem(%_apply3, %y)
-  %_apply4 = <built-in function truth>(%b)
-  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
-  %_apply6 = %_apply5()
-  return %_apply6
-}
-
-graph if_false() {
-  %_apply7 = @if_after()
-  return %_apply7
+  %_apply16 = @if_after()
+  return %_apply16
 }
 
 graph if_after() {
-  %_apply8 = universe_getitem(%_apply3)
-  return %_apply8
+  %_apply17 = universe_getitem(%_apply9)
+  %_apply18 = <built-in function gt>(%_apply17, 4)
+  %_apply19 = <built-in function truth>(%_apply18)
+  %_apply20 = user_switch(%_apply19, @if_true, @if_false)
+  %_apply21 = %_apply20()
+  return %_apply21
+}
+
+graph if_false() {
+  %_apply22 = @if_after()
+  return %_apply22
+}
+
+graph if_after() {
+  %_apply23 = @for_header(%_apply10)
+  return %_apply23
 }
 
 graph if_true() {
-  %_apply9 = universe_getitem(%_apply1)
-  return %_apply9
+  %_apply24 = @for_header(%_apply10)
+  return %_apply24
+}
+
+graph if_true() {
+  %_apply25 = @for_after()
+  return %_apply25
 }
 """
 
@@ -801,6 +975,76 @@ graph for_body() {
   return %_apply20
 }
 """
+
+
+def test_if():
+    def f(b, x, y):  # pragma: nocover
+        if b:
+            return x
+        else:
+            return y
+
+    assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
+  %_apply0 = universe_setitem(%_apply1, %x)
+  %_apply2 = universe_setitem(%_apply3, %y)
+  %_apply4 = <built-in function truth>(%b)
+  %_apply5 = user_switch(%_apply4, @if_true, @if_false)
+  %_apply6 = %_apply5()
+  return %_apply6
+}
+
+graph if_false() {
+  %_apply7 = universe_getitem(%_apply3)
+  return %_apply7
+}
+
+graph if_true() {
+  %_apply8 = universe_getitem(%_apply1)
+  return %_apply8
+}
+"""
+
+
+def test_if2():
+    def f(b, x, y):  # pragma: nocover
+        if b:
+            y = 0
+        return y
+
+    assert str_graph(parse(f)) == """graph f(%b, %x, %y) {
+  %_apply0 = universe_setitem(%_apply1, %y)
+  %_apply2 = <built-in function truth>(%b)
+  %_apply3 = user_switch(%_apply2, @if_true, @if_false)
+  %_apply4 = %_apply3()
+  return %_apply4
+}
+
+graph if_false() {
+  %_apply5 = @if_after()
+  return %_apply5
+}
+
+graph if_after() {
+  %_apply6 = universe_getitem(%_apply1)
+  return %_apply6
+}
+
+graph if_true() {
+  %_apply7 = universe_setitem(%_apply1, 0)
+  %_apply8 = @if_after()
+  return %_apply8
+}
+"""
+
+def test_pass():
+    def f():  # pragma: nocover
+        pass
+
+    assert str_graph(parse(f)) == """graph f() {
+  return None
+}
+"""
+
 
 def test_while():
     def f(b, x, y):  # pragma: nocover

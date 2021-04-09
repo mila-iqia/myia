@@ -150,6 +150,9 @@ class Block:
         self.jump_tag = (target, jump)
         self.returns(jump)
 
+    def raises(self, exc):
+        self.returns(self.apply("raise", exc))
+
     def returns(self, value):
         assert self.graph.return_ is None
         self.graph.output = value
@@ -318,14 +321,11 @@ class Parser:
             n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
         elif var in function.variables_local:
-            if st.is_apply():
-                repl[ld] = st.edges[1].node
-            else:
-                # st can be none if it wasn't written to in the block namespace
-                repl[ld] = local_namespace[var]
+            assert st.is_apply()
+            repl[ld] = st.edges[1].node
             repl_seq[ld] = ld.edges[SEQ].node
         else:
-            raise AssertionError(f"unclassified variable '{var}'")
+            raise AssertionError(f"unclassified variable '{var}'")  # pragma: nocover
 
     def resolve_write(self, repl, repl_seq, st, function, local_namespace):
         var = st.edges[0].node.value
@@ -336,11 +336,11 @@ class Parser:
             n.edges[SEQ] = st.edges[SEQ]
             repl[st] = n
         elif var in function.variables_global:
-            raise UnimplementedError("attempt to write to a global variable")
+            raise NotImplementedError("attempt to write to a global variable")
         elif var in function.variables_local:
             repl_seq[st] = st.edges[SEQ].node
         else:
-            raise AssertionError(f"unclassified variable '{var}'")
+            raise AssertionError(f"unclassified variable '{var}'")  # pragma: nocover
 
     def resolve(self, functions):
         namespace = {}
@@ -348,7 +348,9 @@ class Parser:
 
             errs = function.variables_nonlocal - namespace.keys()
             for err in errs:
-                raise SyntaxError(f"no binding for variable '{err}' found")
+                # This should never show up in practice
+                # since python will error out
+                raise SyntaxError(f"no binding for variable '{err}' found")  # pragma: nocover
 
             for var in function.variables_root:
                 st = function.variables_first_write[var]
@@ -396,7 +398,8 @@ class Parser:
 
                 for k in list(repl):
                     n = repl[k]
-                    while n in repl:
+                    while n in repl:  # pragma: nocover
+                        assert False, "Please report the code that triggered this"
                         n = repl[n]
                     repl[k] = n
 
@@ -529,7 +532,7 @@ class Parser:
         elif isinstance(node.op, ast.Or):
             return self._fold_bool(block, node.values, "or")
         else:
-            raise AssertionError(f"Unknown BoolOp: {node.op}")
+            raise AssertionError(f"Unknown BoolOp: {node.op}")  # pragma: nocover
 
     def process_Call(self, block, node):
         func = self.process_node(block, node.func)
@@ -648,7 +651,8 @@ class Parser:
         return block.read(node.id)
 
     def process_NameConstant(self, block, node):
-        return Constant(node.value)
+        # removed in python 3.8
+        return Constant(node.value)  # pragma: nocover
 
     def process_Slice(self, block, node):
         if node.lower is None:
@@ -696,7 +700,7 @@ class Parser:
                 val = block.apply(operator.getitem, val, idx)
             st = block.write(targ.id, val)
 
-        elif isinstance(targ, ast.Tuple):
+        elif isinstance(targ, (ast.Tuple, ast.List)):
             # x, y = val
             if idx is not None:
                 val = block.apply(operator.getitem, val, idx)
@@ -705,7 +709,8 @@ class Parser:
 
         elif isinstance(targ, ast.Starred):
             if idx is None:
-                raise SyntaxError("starred assignement target must be in a list or tuple")
+                # this should not show up since python will catch it
+                raise SyntaxError("starred assignement target must be in a list or tuple")  # pragma: nocover
             else:
                 raise NotImplementedError("starred assignement")
 
@@ -737,14 +742,17 @@ class Parser:
 
     def process_Break(self, block, node):
         if len(block.function.break_target) == 0:
-            raise SyntaxError("'break' outside loop")
+            # python should catch this
+            raise SyntaxError("'break' outside loop")  # pragma: nocover
         block.jump(block.function.break_target[-1])
         return block
 
     def process_Continue(self, block, node):
         target = block.function.continue_target
         if len(target) == 0:
-            raise SyntaxError("'continue' not properly in loop")
+            # python should catch this
+            raise SyntaxError("'continue' not properly in loop")  # pragma: nocover
+        target = target[-1]
         block.jump(target[0], *target[1])
         return block
 
@@ -821,7 +829,7 @@ class Parser:
         for name in node.names:
             if name in block.function.variables_local:
                 # This is a python error
-                raise SyntaxError(f"name '{name}' is assigned to before global declaration")
+                raise SyntaxError(f"name '{name}' is assigned to before global declaration")  # pragma: nocover
         block.function.variables_global.update(node.names)
         return block
 
@@ -829,7 +837,7 @@ class Parser:
         for name in node.names:
             if name in block.function.variables_local:
                 # This is a python error
-                raise SyntaxError(f"name '{name}' is assigned to before nonlocal declaration")
+                raise SyntaxError(f"name '{name}' is assigned to before nonlocal declaration")  # pragma: nocover
         block.function.variables_nonlocal.update(node.names)
         return block
 
