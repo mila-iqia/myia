@@ -18,7 +18,11 @@ def _print_node(node, buf, nodecache, offset=0):
     assert node.is_apply()
     print(f"{o}%{nodecache.repr(node)} = ", end="", file=buf)
     print(f"{repr_node(node.fn, nodecache)}(", end="", file=buf)
-    print(", ".join(repr_node(a, nodecache) for a in node.inputs), end="", file=buf)
+    print(
+        ", ".join(repr_node(a, nodecache) for a in node.inputs),
+        end="",
+        file=buf,
+    )
     print(")", file=buf, end="")
     if node.abstract is not None:
         print(f" ; type={node.abstract}", file=buf, end="")
@@ -51,7 +55,8 @@ def str_graph(g, allow_cycles=False, recursive=True):
                 f"%{str(p)}{' : ' + str(p.astract) if p.abstract is not None else ''}"
                 for p in g.parameters
             ),
-            file=buf, end="",
+            file=buf,
+            end="",
         )
 
         print(") ", file=buf, end="")
@@ -83,7 +88,9 @@ def str_graph(g, allow_cycles=False, recursive=True):
                         todo_graphs.append(node.value)
 
         for node in reversed(applies):
-            if (node.graph is not None and node.graph is not g) or node is g.return_:
+            if (
+                node.graph is not None and node.graph is not g
+            ) or node is g.return_:
                 continue
             _print_node(node, buf, nodecache, offset=2)
 

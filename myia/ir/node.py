@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 from myia.utils import Named
 
-FN = Named('$fn')
-SEQ = Named('$seq')
+FN = Named("$fn")
+SEQ = Named("$seq")
 
 
 class Graph:
@@ -47,9 +47,12 @@ class Graph:
 
     def apply(self, fn, *inputs):
         edges = [
-            Edge(p, i if isinstance(i, Node) else self.constant(i)) for p, i in enumerate(inputs)
+            Edge(p, i if isinstance(i, Node) else self.constant(i))
+            for p, i in enumerate(inputs)
         ]
-        edges.append(Edge(FN, fn if isinstance(fn, Node) else self.constant(fn)))
+        edges.append(
+            Edge(FN, fn if isinstance(fn, Node) else self.constant(fn))
+        )
 
         return Apply(self, *edges)
 
@@ -74,8 +77,10 @@ class Graph:
             return self.name
         return "<unamed_graph>"
 
+
 class Node:
-    __slots__ = ('abstract', 'location', 'info')
+    __slots__ = ("abstract", "location", "info")
+
     def __init__(self, location=None):
         self.abstract = None
         self.location = location
@@ -103,7 +108,7 @@ class Node:
 
 
 class Edge:
-    __slots__ = ('label', 'node')
+    __slots__ = ("label", "node")
 
     def __init__(self, label, node):
         self.label = label
@@ -121,9 +126,9 @@ def edgemap(edges):
 
     return res
 
-        
+
 class Apply(Node):
-    __slots__ = ('edges', 'graph')
+    __slots__ = ("edges", "graph")
 
     def __init__(self, graph, *edges, location=None):
         super().__init__(location)
@@ -166,7 +171,7 @@ class Apply(Node):
 
 
 class Parameter(Node):
-    __slots__ = ('graph', 'name')
+    __slots__ = ("graph", "name")
 
     def __init__(self, graph, name, location=None):
         super().__init__(location)
@@ -181,7 +186,8 @@ class Parameter(Node):
 
 
 class Constant(Node):
-    __slots__ = ('value',)
+    __slots__ = ("value",)
+
     def __init__(self, value, location=None):
         super().__init__(location)
         self.value = value

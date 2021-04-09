@@ -128,7 +128,7 @@ class Block:
         return ld
 
     def write(self, varnum, node):
-        st = self.apply('store', varnum, node)
+        st = self.apply("store", varnum, node)
         self.variables_written.setdefault(varnum, []).append(st)
         self.function.variables_local.add(varnum)
         self.function.variables_first_write.setdefault(varnum, st)
@@ -173,8 +173,7 @@ class Function:
         if self.parent is not None:
             self.parent.children.add(self)
 
-        self.initial_block = Block(self, name, parent_graph,
-                                   location, flags)
+        self.initial_block = Block(self, name, parent_graph, location, flags)
         self.blocks = [self.initial_block]
 
         self.break_target = []
@@ -191,8 +190,7 @@ class Function:
         self.variables_first_write = dict()
 
     def new_block(self, name, parent, location=None):
-        block = Block(self, name, parent.graph, location,
-                      self.flags)
+        block = Block(self, name, parent.graph, location, self.flags)
         self.blocks.append(block)
         return block
 
@@ -285,7 +283,9 @@ class Parser:
                 # If this intersection is non-empty it means
                 # that we reference the variables it contains
                 # before we assign to them
-                raise UnboundLocalError(f"local variable '{err}' is referenced before assignment")
+                raise UnboundLocalError(
+                    f"local variable '{err}' is referenced before assignment"
+                )
 
             for child in function.children:
                 # variables_free is the sum of all free variables
@@ -308,8 +308,11 @@ class Parser:
     def resolve_read(self, repl, repl_seq, ld, function, local_namespace):
         var = ld.edges[0].node.value
         st = ld.edges[1].node
-        if var in (function.variables_root | function.variables_free |
-                   function.variables_local_closure):
+        if var in (
+            function.variables_root
+            | function.variables_free
+            | function.variables_local_closure
+        ):
             if var not in local_namespace:
                 n = ld.graph.apply("resolve", self.global_namespace, var)
             else:
@@ -325,13 +328,18 @@ class Parser:
             repl[ld] = st.edges[1].node
             repl_seq[ld] = ld.edges[SEQ].node
         else:
-            raise AssertionError(f"unclassified variable '{var}'")  # pragma: nocover
+            raise AssertionError(
+                f"unclassified variable '{var}'"
+            )  # pragma: nocover
 
     def resolve_write(self, repl, repl_seq, st, function, local_namespace):
         var = st.edges[0].node.value
         value = st.edges[1].node
-        if var in (function.variables_root | function.variables_free |
-                   function.variables_local_closure):
+        if var in (
+            function.variables_root
+            | function.variables_free
+            | function.variables_local_closure
+        ):
             n = st.graph.apply("universe_setitem", local_namespace[var], value)
             n.edges[SEQ] = st.edges[SEQ]
             repl[st] = n
@@ -340,7 +348,9 @@ class Parser:
         elif var in function.variables_local:
             repl_seq[st] = st.edges[SEQ].node
         else:
-            raise AssertionError(f"unclassified variable '{var}'")  # pragma: nocover
+            raise AssertionError(
+                f"unclassified variable '{var}'"
+            )  # pragma: nocover
 
     def resolve(self, functions):
         namespace = {}
@@ -350,21 +360,21 @@ class Parser:
             for err in errs:
                 # This should never show up in practice
                 # since python will error out
-                raise SyntaxError(f"no binding for variable '{err}' found")  # pragma: nocover
+                raise SyntaxError(
+                    f"no binding for variable '{err}' found"
+                )  # pragma: nocover
 
             for var in function.variables_root:
                 st = function.variables_first_write[var]
                 namespace[var] = st.graph.apply(
-                    "make_handle",
-                    st.graph.apply("typeof", st.edges[1].node),
+                    "make_handle", st.graph.apply("typeof", st.edges[1].node),
                 )
 
             local_namespace = namespace.copy()
             for var in function.variables_local_closure:
                 st = function.variables_first_write[var]
                 local_namespace[var] = st.graph.apply(
-                    "make_handle",
-                    st.graph.apply("typeof", st.edges[1].node)
+                    "make_handle", st.graph.apply("typeof", st.edges[1].node)
                 )
 
             for block in function.blocks:
@@ -377,13 +387,15 @@ class Parser:
                 for var, items in block.variables_read.items():
                     for item in items:
                         self.resolve_read(
-                            repl, repl_seq, item, function, local_namespace)
+                            repl, repl_seq, item, function, local_namespace
+                        )
 
                 # resolve write that need to stay
                 for var, items in block.variables_written.items():
                     for item in items:
                         self.resolve_write(
-                            repl, repl_seq, item, function, local_namespace)
+                            repl, repl_seq, item, function, local_namespace
+                        )
 
                 # make sure to "bake in" top level chain replacements
                 # replacements inside the subgraphs are handled by replace
@@ -399,7 +411,9 @@ class Parser:
                 for k in list(repl):
                     n = repl[k]
                     while n in repl:  # pragma: nocover
-                        assert False, "Please report the code that triggered this"
+                        assert (
+                            False
+                        ), "Please report the code that triggered this"
                         n = repl[n]
                     repl[k] = n
 
@@ -418,8 +432,11 @@ class Parser:
         defaults_list = []
 
         for arg, dflt in zip(pargs + kwargs, defaults + kwdefaults):
-            param_node = Parameter(function_block.graph, name=arg.arg,
-                                   location=self.make_location(arg))
+            param_node = Parameter(
+                function_block.graph,
+                name=arg.arg,
+                location=self.make_location(arg),
+            )
 
             if arg.annotation:
                 param_node.add_annotation(self._eval_ast_node(arg.annotation))
@@ -430,7 +447,10 @@ class Parser:
                 # TODO If there are no parents (the initial function),
                 # then evaluate in the global env
                 if block is None:
-                    raise MyiaSyntaxError("default value on the entry function", self.make_location(arg))
+                    raise MyiaSyntaxError(
+                        "default value on the entry function",
+                        self.make_location(arg),
+                    )
                 # XXX: This might not work correctly with our framework,
                 # but we need to evaluate the default arguments in the parent
                 # context for proper name resolution.
@@ -440,8 +460,11 @@ class Parser:
 
         if args.vararg:
             arg = args.vararg
-            vararg_node = Parameter(function_block.graph, name=arg.arg,
-                                    location=self.make_location(arg))
+            vararg_node = Parameter(
+                function_block.graph,
+                name=arg.arg,
+                location=self.make_location(arg),
+            )
             function_block.graph.parameters.append(vararg_node)
             function_block.write(arg.arg, vararg_node)
         else:
@@ -449,8 +472,11 @@ class Parser:
 
         if args.kwarg:
             arg = args.kwarg
-            kwarg_node = Parameter(function_block.graph, name=arg.arg,
-                                   location=self.make_location(arg))
+            kwarg_node = Parameter(
+                function_block.graph,
+                name=arg.arg,
+                location=self.make_location(arg),
+            )
             function_block.graph.parameters.append(kwarg_node)
             function_block.write(arg.arg, kwarg_node)
         else:
@@ -458,15 +484,16 @@ class Parser:
 
         function_block.graph.vararg = vararg_node and vararg_node.name
         function_block.graph.kwarg = kwarg_node and kwarg_node.name
-        function_block.graph.defaults = dict(zip(defaults_name,
-                                                 defaults_list))
+        function_block.graph.defaults = dict(zip(defaults_name, defaults_list))
         function_block.graph.kwonly = len(args.kwonlyargs)
 
     def _create_function(self, block, node):
-        function = Function(parent=block,
-                            name=node.name,
-                            location=self.make_location(node),
-                            flags=self.recflags)
+        function = Function(
+            parent=block,
+            name=node.name,
+            location=self.make_location(node),
+            flags=self.recflags,
+        )
         function_block = function.initial_block
 
         self._process_args(block, function_block, node.args)
@@ -477,7 +504,9 @@ class Parser:
             after_block.returns(Constant(None))
 
         if node.returns:
-            function_block.graph.return_.add_annotation(self._eval_ast_node(node.returns))
+            function_block.graph.return_.add_annotation(
+                self._eval_ast_node(node.returns)
+            )
 
         return function_block
 
@@ -496,7 +525,7 @@ class Parser:
         else:
             raise MyiaSyntaxError(
                 f"{node.__class__.__name__} not supported",
-                self.make_location(node)
+                self.make_location(node),
             )
 
     def process_Attribute(self, block, node):
@@ -504,9 +533,11 @@ class Parser:
         return block.apply(getattr, value, Constant(node.attr))
 
     def process_BinOp(self, block, node):
-        return block.apply(ast_map[type(node.op)],
-                           self.process_node(block, node.left),
-                           self.process_node(block, node.right))
+        return block.apply(
+            ast_map[type(node.op)],
+            self.process_node(block, node.left),
+            self.process_node(block, node.right),
+        )
 
     def _fold_bool(self, block, values, mode):
         first, *rest = values
@@ -524,7 +555,7 @@ class Parser:
             switch = block.apply("switch", test, tb.graph, fb.graph)
             return block.apply(switch)
         else:
-             return test
+            return test
 
     def process_BoolOp(self, block, node):
         if isinstance(node.op, ast.And):
@@ -532,7 +563,9 @@ class Parser:
         elif isinstance(node.op, ast.Or):
             return self._fold_bool(block, node.values, "or")
         else:
-            raise AssertionError(f"Unknown BoolOp: {node.op}")  # pragma: nocover
+            raise AssertionError(
+                f"Unknown BoolOp: {node.op}"
+            )  # pragma: nocover
 
     def process_Call(self, block, node):
         func = self.process_node(block, node.func)
@@ -554,7 +587,12 @@ class Parser:
                 if k.arg is None:
                     groups.append(self.process_node(block, k.value))
             keywords = [k for k in node.keywords if k.arg is not None]
-            kwlist = list(zip((k.arg for k in keywords), (self.process_node(block, k.value) for k in keywords)))
+            kwlist = list(
+                zip(
+                    (k.arg for k in keywords),
+                    (self.process_node(block, k.value) for k in keywords),
+                )
+            )
             dlist = []
             for kw in kwlist:
                 dlist.extend(kw)
@@ -578,9 +616,9 @@ class Parser:
             right = self.process_node(block, node.comparators[0])
             if type(node.ops[0]) is ast.NotIn:
                 # NotIn doesn't have an operator mapping
-                return block.apply(operator.not_,
-                                   block.apply(operator.contains,
-                                               left, right))
+                return block.apply(
+                    operator.not_, block.apply(operator.contains, left, right)
+                )
             else:
                 return block.apply(ast_map[type(node.ops[0])], left, right)
         else:
@@ -590,7 +628,9 @@ class Parser:
             values = []
             while ops:
                 # TODO: fix up source locations
-                values.append(ast.Compare(ops=[ops[0]], left=cur, comparators=[rest[0]]))
+                values.append(
+                    ast.Compare(ops=[ops[0]], left=cur, comparators=[rest[0]])
+                )
                 cur, rest = rest[0], rest[1:]
                 ops = ops[1:]
             return self._fold_bool(block, values, "and")
@@ -631,10 +671,12 @@ class Parser:
         return self.process_node(block, node.value)
 
     def process_Lambda(self, block, node):
-        function = Function(parent=block,
-                            name="lambda",
-                            location=self.make_location(node),
-                            flags=self.recflags)
+        function = Function(
+            parent=block,
+            name="lambda",
+            location=self.make_location(node),
+            flags=self.recflags,
+        )
         function_block = function.initial_block
 
         self._process_args(block, function_block, node.args)
@@ -710,7 +752,9 @@ class Parser:
         elif isinstance(targ, ast.Starred):
             if idx is None:
                 # this should not show up since python will catch it
-                raise SyntaxError("starred assignement target must be in a list or tuple")  # pragma: nocover
+                raise SyntaxError(
+                    "starred assignement target must be in a list or tuple"
+                )  # pragma: nocover
             else:
                 raise NotImplementedError("starred assignement")
 
@@ -726,7 +770,11 @@ class Parser:
     def process_Assert(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
-        msg = self.process_node(block, node.msg) if node.msg else Constant("Assertion failed")
+        msg = (
+            self.process_node(block, node.msg)
+            if node.msg
+            else Constant("Assertion failed")
+        )
 
         true_block, false_block = self.make_condition_blocks(block, None, None)
         block.cond(cond, true_block, false_block)
@@ -751,7 +799,9 @@ class Parser:
         target = block.function.continue_target
         if len(target) == 0:
             # python should catch this
-            raise SyntaxError("'continue' not properly in loop")  # pragma: nocover
+            raise SyntaxError(
+                "'continue' not properly in loop"
+            )  # pragma: nocover
         target = target[-1]
         block.jump(target[0], *target[1])
         return block
@@ -764,18 +814,20 @@ class Parser:
         init = block.apply("python_iter", self.process_node(block, node.iter))
 
         header_block = block.function.new_block("for_header", block, None)
-        it = header_block.graph.add_parameter('it')
+        it = header_block.graph.add_parameter("it")
         cond = header_block.apply("python_hasnext", it)
 
-        body_block = block.function.new_block("for_body", header_block,
-                                              self.make_location(node.body))
+        body_block = block.function.new_block(
+            "for_body", header_block, self.make_location(node.body)
+        )
         app = body_block.apply("python_next", it)
         val = body_block.apply(operator.getitem, app, 0)
         self._assign(body_block, node.target, None, val)
         it2 = body_block.apply(operator.getitem, app, 1)
 
-        else_block = block.function.new_block("for_else", header_block,
-                                              self.make_location(node.orelse))
+        else_block = block.function.new_block(
+            "for_else", header_block, self.make_location(node.orelse)
+        )
         after_block = block.function.new_block("for_after", block, None)
 
         block.jump(header_block, init)
@@ -805,7 +857,9 @@ class Parser:
     def process_If(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
-        true_block, false_block = self.make_condition_blocks(block, node.body, node.orelse)
+        true_block, false_block = self.make_condition_blocks(
+            block, node.body, node.orelse
+        )
 
         # TODO: figure out how to add a location here
         # (we would need the list of nodes that follow the if)
@@ -829,7 +883,9 @@ class Parser:
         for name in node.names:
             if name in block.function.variables_local:
                 # This is a python error
-                raise SyntaxError(f"name '{name}' is assigned to before global declaration")  # pragma: nocover
+                raise SyntaxError(
+                    f"name '{name}' is assigned to before global declaration"
+                )  # pragma: nocover
         block.function.variables_global.update(node.names)
         return block
 
@@ -837,7 +893,9 @@ class Parser:
         for name in node.names:
             if name in block.function.variables_local:
                 # This is a python error
-                raise SyntaxError(f"name '{name}' is assigned to before nonlocal declaration")  # pragma: nocover
+                raise SyntaxError(
+                    f"name '{name}' is assigned to before nonlocal declaration"
+                )  # pragma: nocover
         block.function.variables_nonlocal.update(node.names)
         return block
 
@@ -849,15 +907,20 @@ class Parser:
         return block
 
     def process_While(self, block, node):
-        header_block = block.function.new_block("while_header", block,
-                                                self.make_location(node.test))
-        body_block = block.function.new_block("while_body", header_block,
-                                              self.make_location(node.body))
-        else_block = block.function.new_block("while_else", header_block,
-                                              self.make_location(node.orelse))
+        header_block = block.function.new_block(
+            "while_header", block, self.make_location(node.test)
+        )
+        body_block = block.function.new_block(
+            "while_body", header_block, self.make_location(node.body)
+        )
+        else_block = block.function.new_block(
+            "while_else", header_block, self.make_location(node.orelse)
+        )
         # TODO: Same as If we need the list of nodes that follow
         # for the location
-        after_block = block.function.new_block("while_after", header_block, None)
+        after_block = block.function.new_block(
+            "while_after", header_block, None
+        )
 
         block.jump(header_block)
         cond = self.process_node(header_block, node.test)
