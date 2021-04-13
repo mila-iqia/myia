@@ -22,7 +22,7 @@ class Graph:
     @property
     def output(self):
         if not self.return_ or 0 not in self.return_.edges:
-            raise ValueError("Graph has no input")
+            raise ValueError("Graph has no output")
         return self.return_.edges[0].node
 
     @output.setter
