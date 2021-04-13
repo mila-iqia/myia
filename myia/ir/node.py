@@ -75,7 +75,7 @@ class Graph:
     def __str__(self):
         if self.name is not None:
             return self.name
-        return "<unamed_graph>"
+        return "<unnamed_graph>"
 
 
 class Node:
