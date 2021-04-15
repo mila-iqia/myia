@@ -120,8 +120,9 @@ class Block:
         return res
 
     def read(self, varnum):
+        ld = self.apply("load", varnum)
         st = self.variables_written.get(varnum, [None])[-1]
-        ld = self.apply("load", varnum, st)
+        ld.add_edge("prevwrite", st)
         self.variables_read.setdefault(varnum, []).append(ld)
         if not varnum in self.function.variables_local:
             self.function.variables_free.add(varnum)
@@ -302,12 +303,15 @@ class Parser:
                 if block is function.initial_block or block.used is False:
                     continue
                 for var, reads in block.variables_read.items():
-                    if reads[0].edges[1].node.is_constant():
+                    if (
+                        var in function.variables_local
+                        and reads[0].edges["prevwrite"].node is None
+                    ):
                         function.variables_local_closure.add(var)
 
     def resolve_read(self, repl, repl_seq, ld, function, local_namespace):
         var = ld.edges[0].node.value
-        st = ld.edges[1].node
+        st = ld.edges["prevwrite"].node
         if var in (
             function.variables_root
             | function.variables_free

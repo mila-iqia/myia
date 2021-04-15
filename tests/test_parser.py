@@ -1162,6 +1162,91 @@ graph for_body() {
     )
 
 
+def test_for3():
+    def f(n):
+        acc = 0
+        for i in range(n):
+            for j in range(n):
+                acc = acc + j
+        return acc
+
+    assert (
+        str_graph(parse(f))
+        == """graph f(%n) {
+  %_apply0 = typeof(%n)
+  %_apply1 = make_handle(%_apply0)
+  %_apply2 = universe_setitem(%_apply1, %n)
+  %_apply3 = typeof(0)
+  %_apply4 = make_handle(%_apply3)
+  %_apply5 = universe_setitem(%_apply4, 0)
+  %_apply6 = resolve(:tests.test_parser, range)
+  %_apply7 = universe_getitem(%_apply1)
+  %_apply8 = %_apply6(%_apply7)
+  %_apply9 = python_iter(%_apply8)
+  %_apply10 = @for_header(%_apply9)
+  return %_apply10
+}
+
+graph for_header(%it) {
+  %_apply11 = python_hasnext(%it)
+  %_apply12 = user_switch(%_apply11, @for_body, @for_else)
+  %_apply13 = %_apply12()
+  return %_apply13
+}
+
+graph for_else() {
+  %_apply14 = @for_after()
+  return %_apply14
+}
+
+graph for_after() {
+  %_apply15 = universe_getitem(%_apply4)
+  return %_apply15
+}
+
+graph for_body() {
+  %_apply16 = python_next(%it)
+  %_apply17 = <built-in function getitem>(%_apply16, 0)
+  %_apply18 = <built-in function getitem>(%_apply16, 1)
+  %_apply19 = resolve(:tests.test_parser, range)
+  %_apply20 = universe_getitem(%_apply1)
+  %_apply21 = %_apply19(%_apply20)
+  %_apply22 = python_iter(%_apply21)
+  %_apply23 = @for_header(%_apply22)
+  return %_apply23
+}
+
+graph for_header(%it) {
+  %_apply24 = python_hasnext(%it)
+  %_apply25 = user_switch(%_apply24, @for_body, @for_else)
+  %_apply26 = %_apply25()
+  return %_apply26
+}
+
+graph for_else() {
+  %_apply27 = @for_after()
+  return %_apply27
+}
+
+graph for_after() {
+  %_apply28 = @for_header(%_apply18)
+  return %_apply28
+}
+
+graph for_body() {
+  %_apply29 = python_next(%it)
+  %_apply30 = <built-in function getitem>(%_apply29, 0)
+  %_apply31 = <built-in function getitem>(%_apply29, 1)
+  %_apply32 = universe_getitem(%_apply4)
+  %_apply33 = <built-in function add>(%_apply32, %_apply30)
+  %_apply34 = universe_setitem(%_apply4, %_apply33)
+  %_apply35 = @for_header(%_apply31)
+  return %_apply35
+}
+"""
+    )
+
+
 def test_if():
     def f(b, x, y):  # pragma: nocover
         if b:
