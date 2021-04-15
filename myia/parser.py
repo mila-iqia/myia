@@ -367,7 +367,8 @@ class Parser:
             for var in function.variables_root:
                 st = function.variables_first_write[var]
                 namespace[var] = st.graph.apply(
-                    "make_handle", st.graph.apply("typeof", st.edges[1].node),
+                    "make_handle",
+                    st.graph.apply("typeof", st.edges[1].node),
                 )
 
             local_namespace = namespace.copy()

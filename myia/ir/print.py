@@ -87,11 +87,24 @@ def str_graph(g, allow_cycles=False, recursive=True):
                     if node is not None and node.is_constant_graph():
                         todo_graphs.append(node.value)
 
+        def _print_stragglers(n):
+            nodes = [e.node for e in n.edges.values()]
+            for node in nodes:
+                if (
+                    node is not None
+                    and node.is_apply()
+                    and node not in seen_nodes
+                ):
+                    seen_nodes.add(node)
+                    _print_stragglers(node)
+                    _print_node(node, buf, nodecache, offset=2)
+
         for node in reversed(applies):
             if (
                 node.graph is not None and node.graph is not g
             ) or node is g.return_:
                 continue
+            _print_stragglers(node)
             _print_node(node, buf, nodecache, offset=2)
 
         print(f"  return {repr_node(g.output, nodecache)}", file=buf)
