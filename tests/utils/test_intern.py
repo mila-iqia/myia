@@ -5,15 +5,19 @@ from dataclasses import dataclass
 import pytest
 
 from myia.utils.intern import (
+    Atom,
     AttrEK,
     CanonStore,
     IncompleteException,
     Interned,
+    ItemEK,
     PossiblyRecursive,
+    canon_store,
     eq,
     eqrec,
     hash as hsh,
     hashrec,
+    intern,
 )
 
 
@@ -32,6 +36,29 @@ class Thingy(Interned, PossiblyRecursive):
 
     def __eqkey__(self):
         return AttrEK(self, ("value",))
+
+
+class Mixed(Interned, PossiblyRecursive):
+    def __init__(self, value1, value2):
+        self.value1 = value1
+        self.value2 = value2
+
+    def __eqkey__(self):
+        return AttrEK(self, (Atom(self.value1, self.value1), "value2"))
+
+
+class Itemy(Interned, PossiblyRecursive):
+    def __init__(self, **attrs):
+        self.attrs = attrs
+
+    def __getitem__(self, item):
+        return self.attrs[item]
+
+    def __setitem__(self, item, value):
+        self.attrs[item] = value
+
+    def __eqkey__(self):
+        return ItemEK(self, tuple(self.attrs.keys()))
 
 
 def test_interned():
@@ -131,6 +158,36 @@ def test_canonical():
     assert p1 is p2
     assert p1.x is p3.x
     assert p2.x is p3.x
+
+
+def test_canonical2():
+    t1 = Itemy.new(a=1, b=2)
+    t2 = Itemy.new(a=1, b=2)
+    assert t1 is not t2
+    p1 = Point(t1, 1)
+    p2 = Point(t2, 1)
+    p3 = Point(t2, 2)
+    assert p1 is p2
+    assert p1.x is p3.x
+    assert p2.x is p3.x
+
+
+def test_canonical3():
+    a = Mixed(1, {"a": 2})
+    b = Mixed(1, {"a": 2})
+    assert a is b
+
+
+def test_intern():
+    assert intern(None) is None
+
+
+def test_gc():
+    before = len(canon_store)
+    for i in range(2000):
+        Point(i, i)
+    after = len(canon_store)
+    assert after < before + 1000
 
 
 class C:

@@ -40,6 +40,9 @@ class CanonStore:
             return
         weakref.finalize(x, self.to_gc.add, hsh)
 
+    def __len__(self):
+        return sum([len(s) for s in self.hashes.values()])
+
     def gc(self):
         """Garbage-collect unused canonical objects."""
         to_gc = list(self.to_gc)
