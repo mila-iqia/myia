@@ -3,6 +3,7 @@ from myia.abstract.utils import (
     MapError,
     Unificator,
     canonical,
+    fresh_generics,
     is_concrete,
     merge,
     uncanonical,
@@ -36,28 +37,53 @@ def test_is_concrete():
 
 @one_test_per_assert
 def test_canonical():
-    assert canonical(ph1) == o0
-    assert canonical(ph2) == o0
+    assert canonical(ph1, mapping={}) == o0
+    assert canonical(ph2, mapping={}) == o0
 
-    assert canonical(A(ph1, int)) is A(o0, int)
-    assert canonical(A(ph2, int)) is A(o0, int)
-    assert canonical(A(ph1, ph2)) is A(o0, o1)
-    assert canonical(A(ph2, ph1)) is A(o0, o1)
-    assert canonical(A(ph1, ph1)) is A(o0, o0)
+    assert canonical(A(ph1, int), mapping={}) is A(o0, int)
+    assert canonical(A(ph2, int), mapping={}) is A(o0, int)
+    assert canonical(A(ph1, ph2), mapping={}) is A(o0, o1)
+    assert canonical(A(ph2, ph1), mapping={}) is A(o0, o1)
+    assert canonical(A(ph1, ph1), mapping={}) is A(o0, o0)
 
-    assert canonical(A((ph2, ph2), (ph1, ph1))) is A((o0, o0), (o1, o1))
+    assert canonical(A((ph2, ph2), (ph1, ph1)), mapping={}) is A((o0, o0), (o1, o1))
+
+    assert canonical(A(o0, o1), mapping={}) is A(o0, o1)
+    assert canonical(A(o1, o0), mapping={}) is A(o0, o1)
 
 
-def test_uncanonical():
-    assert uncanonical(o0) is not uncanonical(o0)
+def test_fresh_generics():
+    assert fresh_generics(o0, mapping={}) is not fresh_generics(o0, mapping={})
 
     tu1 = A(o0, o0)
-    tu1_unc = uncanonical(tu1)
+    tu1_unc = fresh_generics(tu1, mapping={})
     assert tu1_unc.elements[0] is tu1_unc.elements[1]
 
     tu2 = A(o0, o1)
-    tu2_unc = uncanonical(tu2)
+    tu2_unc = fresh_generics(tu2, mapping={})
     assert tu2_unc.elements[0] is not tu2_unc.elements[1]
+
+
+def test_uncanonical():
+    for x in [
+        ph1,
+        ph2,
+        A(ph1, int),
+        A(ph2, int),
+        A(ph1, ph2),
+        A(ph2, ph1),
+        A(ph1, ph1),
+        A((ph2, ph2), (ph1, ph1)),
+        A(o0, o1),
+        A(o1, o0),
+    ]:
+        mapping = {}
+        canon = canonical(x, mapping=mapping)
+        assert uncanonical(canon, mapping=mapping) is x
+
+        mapping = {}
+        fgn = fresh_generics(x, mapping=mapping)
+        assert uncanonical(fgn, mapping=mapping) is x
 
 
 def _utest(a, b, expected=True, mappings={}):
