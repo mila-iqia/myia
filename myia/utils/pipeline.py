@@ -1,7 +1,6 @@
 """Tools to generate and configure Myia's operation pipeline."""
 
 import inspect
-from itertools import count
 from types import FunctionType
 
 
@@ -21,15 +20,6 @@ def partition_keywords(f, kw):
     bad = {k: v for k, v in kw.items() if k not in valid}
 
     return good, bad
-
-
-def _nameof(step, default):
-    if hasattr(step, "name"):
-        return step.name
-    elif hasattr(step, "__name__"):
-        return step.__name__
-    else:  # pragma: no cover
-        return default
 
 
 class Pipeline:
@@ -86,7 +76,6 @@ class Pipeline:
 
     def _call(self, fn, kwargs):
         """Execute one of the steps on the kwargs."""
-        step_name = _nameof(fn, str(self.steps.index(fn)))
         if not isinstance(fn, FunctionType):
             fn = fn.__call__
         valid_args, rest = partition_keywords(fn, kwargs)
@@ -131,10 +120,9 @@ class LoopPipeline(Pipeline):
     def __call__(self, **kwargs):
         """Execute the function sequence."""
         kwargs = {**self.arguments, **kwargs}
-        counter = count(1)
         changes = True
         while changes:
-            changes = False
+            changes = kwargs[self.changes_field] = False
             for idx, fn in enumerate(self):
                 kwargs = self._call(fn, kwargs)
                 changes = changes or kwargs.get(self.changes_field, False)
