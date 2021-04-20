@@ -5,35 +5,17 @@ from ovld import ovld
 from . import data
 from .map import MapError, abstract_all, abstract_map, abstract_map2
 
-###################
-# no_placeholders #
-###################
-
-
-@abstract_all.variant(
-    initial_state=lambda: {"cache": {}, "prop": None},
-)
-def no_placeholders(self, ph: data.Placeholder, **_):
-    return False
-
 
 #############
 # canonical #
 #############
 
 
-@abstract_map.variant(
-    initial_state=lambda: {
-        "cache": {},
-        "remap": {},
-        "prop": None,
-        "check": no_placeholders,
-    }
-)
-def canonical(self, ph: data.Placeholder):
-    if ph not in self.remap:
-        self.remap[ph] = data.Opaque(len(self.remap))
-    return self.remap[ph]
+@abstract_map.variant
+def canonical(self, gn: data.Generic, *, mapping):
+    if gn not in mapping:
+        mapping[gn] = data.Opaque(len(mapping))
+    return mapping[gn]
 
 
 ###############
@@ -41,14 +23,26 @@ def canonical(self, ph: data.Placeholder):
 ###############
 
 
-@abstract_map.variant(
-    initial_state=lambda: {"cache": {}, "prop": None, "check": None}
-)
-def uncanonical(self, opq: data.Opaque):
-    # Only called once per call to uncanonical per distinct opq, because the
-    # result is cached in self.cache. Each call to uncanonical has its own
-    # cache, however.
-    return data.Placeholder()
+@abstract_map.variant
+def _uncanonical(self, gn: data.Generic, *, invmapping):
+    return invmapping[gn]
+
+
+def uncanonical(x, *, mapping):
+    invmapping = {v: k for k, v in mapping.items()}
+    return _uncanonical(x, invmapping=invmapping)
+
+
+##################
+# fresh_generics #
+##################
+
+
+@abstract_map.variant
+def fresh_generics(self, gn: data.Generic, *, mapping):
+    if gn not in mapping:
+        mapping[gn] = data.Placeholder()
+    return mapping[gn]
 
 
 #########
