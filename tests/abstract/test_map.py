@@ -6,6 +6,7 @@ from myia.abstract.map import (
     MapError,
     abstract_all,
     abstract_any,
+    abstract_collect,
     abstract_map,
     abstract_map2,
 )
@@ -161,3 +162,31 @@ def test_rec():
     assert absolutify_noprop(makerec(-3)) is makerec(3)
     assert increment_value(makerec(-3)) is makerec(-2)
     assert add(makerec(-1), makerec(4)) is makerec(3)
+
+
+@abstract_collect.variant
+def ints(self, x: data.Tracks):
+    if x.interface is int:
+        return {x.value}
+    else:
+        return set()
+
+
+@abstract_collect.variant(
+    initial_state=lambda: {"cache": {}, "prop": "$floats"}
+)
+def floats(self, x: data.Tracks):
+    if x.interface is float:
+        return {x.value}
+    else:
+        return set()
+
+
+@one_test_per_assert
+def test_abstract_collect():
+    assert ints(A(1, 2, (3.5, 4))) == {1, 2, 4}
+    assert ints(A(1)) == {1}
+    assert ints(A(2.4, 8.9)) == set()
+    assert ints(Un(2.4, 7, 8.9)) == {7}
+    assert floats(A(1, 2, (3.5, 4))) == {data.ANYTHING}
+    assert floats(A(2.4, 7, 8.9)) == {data.ANYTHING}

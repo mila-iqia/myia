@@ -1,5 +1,7 @@
 """General functions to process or transform AbstractValues."""
 
+import operator
+from functools import reduce
 from types import GeneratorType
 
 from ovld import ovld
@@ -114,6 +116,75 @@ def abstract_any(self, xs: data.AbstractUnion, **kwargs):  # noqa: F811
 @ovld
 def abstract_any(self, xs: object, **kwargs):  # noqa: F811
     return False
+
+
+########
+# Find #
+########
+
+
+@ovld.dispatch(initial_state=lambda: {"cache": {}, "prop": None})
+def abstract_collect(self, x, **kwargs):
+    """Find all instances."""
+    __call__ = self.resolve(x)
+
+    def proceed():
+        if prop:
+            if hasattr(x, prop):
+                return getattr(x, prop)
+            else:
+                result = __call__(x, **kwargs)
+                if isinstance(x, data.Cachable):
+                    setattr(x, prop, result)
+                return result
+        else:
+            return __call__(x, **kwargs)
+
+    prop = self.prop
+    cache = self.cache
+
+    try:
+        rval = cache.get(x, None)
+    except TypeError:  # pragma: no cover
+        return proceed()
+
+    if rval is None:
+        cache[x] = True
+        cache[x] = proceed()
+        return cache[x]
+    else:
+        return rval
+
+
+@ovld
+def abstract_collect(self, x: data.Tracks, **kwargs):
+    return reduce(operator.or_, [self(v, **kwargs) for v in x.values()])
+
+
+@ovld  # noqa: F811
+def abstract_collect(self, x: data.AbstractAtom, **kwargs):
+    return self(x.tracks, **kwargs)
+
+
+@ovld  # noqa: F811
+def abstract_collect(self, xs: data.AbstractStructure, **kwargs):
+    return self(xs.tracks, **kwargs) | reduce(
+        operator.or_,
+        [self(x, **kwargs) for x in xs.elements],
+    )
+
+
+@ovld  # noqa: F811
+def abstract_collect(self, xs: data.AbstractUnion, **kwargs):
+    return self(xs.tracks, **kwargs) | reduce(
+        operator.or_,
+        [self(x, **kwargs) for x in xs.options],
+    )
+
+
+@ovld  # noqa: F811
+def abstract_collect(self, xs: object, **kwargs):
+    return set()
 
 
 #######
