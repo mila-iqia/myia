@@ -3,6 +3,7 @@ from myia.abstract.utils import (
     MapError,
     canonical,
     fresh_generics,
+    get_generics,
     is_concrete,
     merge,
     uncanonical,
@@ -163,3 +164,9 @@ def test_merge():
     assert _mtest(Un(1), Un(2), Un(1, 2))
     assert _mtest(Un(o0), Un(6), Un(o0, 6))
     assert _mtest(Un(1), Un(1, 2), Un(1, 1, 2))
+
+
+@one_test_per_assert
+def test_get_generics():
+    assert get_generics(A(o0, 1, o1)) == {o0, o1}
+    assert get_generics(A(int, float)) == set()

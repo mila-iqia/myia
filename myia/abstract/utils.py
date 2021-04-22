@@ -5,7 +5,24 @@ from collections import defaultdict
 from ovld import ovld
 
 from . import data
-from .map import MapError, abstract_all, abstract_map, abstract_map2
+from .map import (
+    MapError,
+    abstract_all,
+    abstract_collect,
+    abstract_map,
+    abstract_map2,
+)
+
+################
+# get_generics #
+################
+
+
+@abstract_collect.variant(
+    initial_state=lambda: {"cache": {}, "prop": "$generics"}
+)
+def get_generics(self, gn: data.Generic):
+    return {gn}
 
 #############
 # canonical #
