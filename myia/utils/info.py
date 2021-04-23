@@ -68,6 +68,12 @@ class DebugInfo:
 
     """
 
+    def __new__(cls, *args, **kwargs):
+        if not _debug.get():
+            return None
+        else:
+            return super().__new__(cls)
+
     def __init__(self, obj=None, **kwargs):
         """Construct a DebugInfo object."""
         self.name = None

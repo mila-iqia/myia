@@ -10,7 +10,6 @@ SEQ = Named("$seq")
 class Graph:
     def __init__(self, parent=None):
         self.parent = parent
-        self.name = None
         self.parameters = []
         self.return_ = None
         self.flags = {}
@@ -18,7 +17,6 @@ class Graph:
         self.kwargs = False
         self.defaults = {}
         self.kwonly = 0
-        self.location = None
         self.debug = DebugInfo(obj=self)
 
     @property
@@ -74,19 +72,18 @@ class Graph:
                 if edge.node and edge.node.is_apply():
                     todo.append(edge.node)
 
-    def __str__(self):
-        if self.name is not None:
-            return self.name
-        return "<unnamed_graph>"
+    def add_debug(self, **kwargs):
+        if self.debug is not None:
+            for k, v in kwargs.items():
+                setattr(self.debug, k, v)
 
 
 class Node:
-    __slots__ = ("abstract", "location", "info", "debug", "__weakref__")
+    __slots__ = ("abstract", "annotation", "debug", "__weakref__")
 
-    def __init__(self, location=None):
+    def __init__(self):
         self.abstract = None
-        self.location = location
-        self.info = None
+        self.annotation = None
         self.debug = DebugInfo(obj=self)
 
     def is_apply(self, value=None):
@@ -101,13 +98,13 @@ class Node:
     def is_constant_graph(self):
         return False
 
-    def ensure_info(self):
-        if self.info is None:
-            self.info = SimpleNamespace()
-
     def add_annotation(self, annotation):
-        self.ensure_info()
-        self.info.annotation = annotation
+        self.annotation = annotation
+
+    def add_debug(self, **kwargs):
+        if self.debug is not None:
+            for k, v in kwargs.items():
+                setattr(self.debug, k, v)
 
 
 class Edge:
@@ -133,8 +130,8 @@ def edgemap(edges):
 class Apply(Node):
     __slots__ = ("edges", "graph")
 
-    def __init__(self, graph, *edges, location=None):
-        super().__init__(location)
+    def __init__(self, graph, *edges):
+        super().__init__()
         self.graph = graph
         self.edges = edgemap(edges)
 
@@ -176,10 +173,11 @@ class Apply(Node):
 class Parameter(Node):
     __slots__ = ("graph", "name")
 
-    def __init__(self, graph, name, location=None):
-        super().__init__(location)
-        self.graph = graph
+    def __init__(self, graph, name):
+        super().__init__()
         self.name = name
+        self.add_debug(name=name)
+        self.graph = graph
 
     def is_parameter(self):
         return True
@@ -191,8 +189,8 @@ class Parameter(Node):
 class Constant(Node):
     __slots__ = ("value",)
 
-    def __init__(self, value, location=None):
-        super().__init__(location)
+    def __init__(self, value):
+        super().__init__()
         self.value = value
 
     def is_constant(self, cls=object):
