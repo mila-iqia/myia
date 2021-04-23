@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 from myia.utils import Named
+from myia.utils.info import DebugInfo
 
 FN = Named("$fn")
 SEQ = Named("$seq")
@@ -18,6 +19,7 @@ class Graph:
         self.defaults = {}
         self.kwonly = 0
         self.location = None
+        self.debug = DebugInfo(obj=self)
 
     @property
     def output(self):
@@ -79,12 +81,13 @@ class Graph:
 
 
 class Node:
-    __slots__ = ("abstract", "location", "info")
+    __slots__ = ("abstract", "location", "info", "debug", "__weakref__")
 
     def __init__(self, location=None):
         self.abstract = None
         self.location = location
         self.info = None
+        self.debug = DebugInfo(obj=self)
 
     def is_apply(self, value=None):
         return False

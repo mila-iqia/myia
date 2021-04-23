@@ -1,13 +1,13 @@
 import ast
 import inspect
 import operator
-
 import textwrap
 from typing import NamedTuple
 
-from .ir import Node, Apply, Constant, Graph, Parameter
+from .ir import Apply, Constant, Graph, Node, Parameter
 from .ir.node import SEQ
 from .utils import ClosureNamespace, ModuleNamespace
+from .utils.info import about, debug_inherit, current_info
 
 
 class Location(NamedTuple):
@@ -191,7 +191,8 @@ class Function:
         self.variables_first_write = dict()
 
     def new_block(self, name, parent, location=None):
-        block = Block(self, name, parent.graph, location, self.flags)
+        with about(parent.graph.debug, name):
+            block = Block(self, name, parent.graph, location, self.flags)
         self.blocks.append(block)
         return block
 
@@ -487,8 +488,8 @@ class Parser:
         else:
             kwarg_node = None
 
-        function_block.graph.vararg = vararg_node and vararg_node.name
-        function_block.graph.kwarg = kwarg_node and kwarg_node.name
+        function_block.graph.varargs = vararg_node and vararg_node.name
+        function_block.graph.kwargs = kwarg_node and kwarg_node.name
         function_block.graph.defaults = dict(zip(defaults_name, defaults_list))
         function_block.graph.kwonly = len(args.kwonlyargs)
 
@@ -789,7 +790,8 @@ class Parser:
     def process_Assign(self, block, node):
         val = self.process_node(block, node.value)
         for targ in node.targets:
-            self._assign(block, targ, None, val)
+            with debug_inherit(name=targ.id):
+                self._assign(block, targ, None, val)
 
         return block
 
