@@ -2,6 +2,7 @@ import pytest
 
 from myia.parser import parse, MyiaSyntaxError
 from myia.ir.print import str_graph
+from myia.utils.info import enable_debug
 
 
 def test_same():
@@ -1421,3 +1422,35 @@ graph @while_body() {
 }
 """
     )
+
+
+def test_debug():
+    def f(a, b, c):  # pragma: no cover
+        d = 33
+
+        def g(e, f):
+            h = e + f
+            i = e - f
+            return h - i
+
+        d = d - g(a, b)
+        return c - d
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a, b, c) {
+  #1 = g(a, b)
+  d = <built-in function sub>(33, #1)
+  #2 = <built-in function sub>(c, d)
+  return #2
+}
+
+graph g(e, f.2) {
+  h = <built-in function add>(e, f.2)
+  i = <built-in function sub>(e, f.2)
+  #3 = <built-in function sub>(h, i)
+  return #3
+}
+"""
+        )
