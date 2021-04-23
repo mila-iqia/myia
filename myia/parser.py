@@ -790,8 +790,7 @@ class Parser:
     def process_Assign(self, block, node):
         val = self.process_node(block, node.value)
         for targ in node.targets:
-            with debug_inherit(name=targ.id):
-                self._assign(block, targ, None, val)
+            self._assign(block, targ, None, val)
 
         return block
 

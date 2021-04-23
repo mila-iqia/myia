@@ -1,25 +1,17 @@
 from .node import SEQ
 import io
-
-
-def repr_node(node, nodecache):
-    if node.is_constant_graph():
-        return f"@{str(node.value)}"
-    elif node.is_constant():
-        return str(node.value)
-    elif node.is_apply():
-        return f"%{nodecache.repr(node)}"
-    else:
-        return f"%{str(node)}"
+from ..utils.info import get_debug
+from collections import Counter
+from .node import Constant
 
 
 def _print_node(node, buf, nodecache, offset=0):
     o = " " * offset
     assert node.is_apply()
-    print(f"{o}%{nodecache.repr(node)} = ", end="", file=buf)
-    print(f"{repr_node(node.fn, nodecache)}(", end="", file=buf)
+    print(f"{o}{nodecache(node)} = ", end="", file=buf)
+    print(f"{nodecache(node.fn)}(", end="", file=buf)
     print(
-        ", ".join(repr_node(a, nodecache) for a in node.inputs),
+        ", ".join(nodecache(a) for a in node.inputs),
         end="",
         file=buf,
     )
@@ -30,7 +22,10 @@ def _print_node(node, buf, nodecache, offset=0):
 
 
 def str_graph(g, allow_cycles=False, recursive=True):
-    nodecache = NodeCache()
+    if get_debug():
+        nodecache = Labeller()
+    else:
+        nodecache = NodeCache()
     buf = io.StringIO()
     seen_nodes = set()
     seen_graphs = set()
@@ -49,10 +44,10 @@ def str_graph(g, allow_cycles=False, recursive=True):
             print("", file=buf)
         first = False
 
-        print(f"graph {str(g)}(", file=buf, end="")
+        print(f"graph {nodecache(Constant(g))}(", file=buf, end="")
         print(
             ", ".join(
-                f"%{str(p)}{' : ' + str(p.astract) if p.abstract is not None else ''}"
+                f"{nodecache(p)}{' : ' + str(p.astract) if p.abstract is not None else ''}"
                 for p in g.parameters
             ),
             file=buf,
@@ -107,20 +102,37 @@ def str_graph(g, allow_cycles=False, recursive=True):
             _print_stragglers(node)
             _print_node(node, buf, nodecache, offset=2)
 
-        print(f"  return {repr_node(g.output, nodecache)}", file=buf)
+        print(f"  return {nodecache(g.output)}", file=buf)
         print("}", file=buf)
 
     return buf.getvalue()
 
 
 class NodeCache:
-    def __init__(self, ctr=0):
-        self.ctr = ctr
+    def __init__(self):
         self.cache = {}
+        self.names = Counter()
 
-    def repr(self, node):
+    def __call__(self, node):
         key = id(node)
+        if node.is_constant():
+            key = id(node.value)
         if key not in self.cache:
-            self.cache[key] = f"_apply{self.ctr}"
-            self.ctr += 1
+            if node.is_apply():
+                name = f"%_apply"
+            elif node.is_constant_graph():
+                name = f"@{str(node.value)}"
+            elif node.is_constant():
+                name = str(node.value)
+            else:
+                name = f"%{str(node)}"
+
+            n = self.names[name]
+            self.names[name] += 1
+            if n == 0:
+                if name == '%_apply':
+                    name = '%_apply0'
+            else:
+                name = name + str(n)
+            self.cache[key] = name
         return self.cache[key]

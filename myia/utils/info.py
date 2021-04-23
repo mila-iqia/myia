@@ -33,6 +33,20 @@ class StackVar:
 
 
 _stack = StackVar("_stack")
+_debug = ContextVar("debug", default=False)
+
+
+@contextmanager
+def enable_debug():
+    """Enable debugging for a context."""
+    tok = _debug.set(True)
+    yield
+    _debug.reset(tok)
+
+
+def get_debug():
+    """Return whether debug is enabled or not."""
+    return _debug.get()
 
 
 def current_info():
@@ -126,7 +140,7 @@ def about(parent, relation, **kwargs):
     relation field set to the given relation.
     """
     parent = getattr(parent, "debug", parent)
-    if not isinstance(parent, DebugInfo):
+    if _debug.get() and not isinstance(parent, DebugInfo):
         raise TypeError("about() takes a DebugInfo or an object with debug")
     with debug_inherit(about=parent, relation=relation, **kwargs):
         yield
