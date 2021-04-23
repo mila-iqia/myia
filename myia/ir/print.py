@@ -1,8 +1,8 @@
 from .node import SEQ
 import io
-from ..utils.info import get_debug
+from ..utils.info import get_debug, Labeler
 from collections import Counter
-from .node import Constant
+from .node import Constant, Node
 
 
 def _print_node(node, buf, nodecache, offset=0):
@@ -22,10 +22,7 @@ def _print_node(node, buf, nodecache, offset=0):
 
 
 def str_graph(g, allow_cycles=False, recursive=True):
-    if get_debug():
-        nodecache = Labeller()
-    else:
-        nodecache = NodeCache()
+    nodecache = NodeCache()
     buf = io.StringIO()
     seen_nodes = set()
     seen_graphs = set()
@@ -108,31 +105,27 @@ def str_graph(g, allow_cycles=False, recursive=True):
     return buf.getvalue()
 
 
+def _disambiguator(label, id):
+    return f"{label}.{id}"
+
+
+def _constant_describer(node):
+    if (
+        isinstance(node, Node)
+        and node.is_constant()
+        and not node.is_constant_graph()
+    ):
+        return str(node.value)
+
+
 class NodeCache:
     def __init__(self):
-        self.cache = {}
-        self.names = Counter()
+        self.lbl = Labeler(
+            disambiguator=_disambiguator, object_describer=_constant_describer
+        )
 
     def __call__(self, node):
-        key = id(node)
-        if node.is_constant():
-            key = id(node.value)
-        if key not in self.cache:
-            if node.is_apply():
-                name = f"%_apply"
-            elif node.is_constant_graph():
-                name = f"@{str(node.value)}"
-            elif node.is_constant():
-                name = str(node.value)
-            else:
-                name = f"%{str(node)}"
-
-            n = self.names[name]
-            self.names[name] += 1
-            if n == 0:
-                if name == '%_apply':
-                    name = '%_apply0'
-            else:
-                name = name + str(n)
-            self.cache[key] = name
-        return self.cache[key]
+        if node.is_constant_graph():
+            return self.lbl(node.value)
+        else:
+            return self.lbl(node)

@@ -280,14 +280,18 @@ class Labeler:
             if (lbl := self.object_describer(obj)) is not None:
                 return lbl
             info = obj.debug
-        if info in self.cache:
-            return self.cache[info]
+        key = id(obj)
+        if key in self.cache:
+            return self.cache[key]
 
-        lbl = self.label(info)
+        if info is not None:
+            lbl = self.label(info)
+        else:
+            lbl = self.name_generator(next(self.name_id))
         self.generated_names[lbl] += 1
         n = self.generated_names[lbl]
         if n > 1:
             lbl = self.disambiguator(lbl, n)
 
-        self.cache[info] = lbl
+        self.cache[key] = lbl
         return lbl
