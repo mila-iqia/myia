@@ -7,7 +7,7 @@ from typing import NamedTuple
 from .ir import Apply, Constant, Graph, Node, Parameter
 from .ir.node import SEQ
 from .utils import ClosureNamespace, ModuleNamespace
-from .utils.info import about, debug_inherit, current_info
+from .utils.info import debug_inherit, get_debug
 
 
 class Location(NamedTuple):
@@ -92,18 +92,16 @@ def parse(func):
         del graph.flags[flag]
 
     if name is not None:
-        graph.name = name
+        graph.add_debug(name=name)
     _parse_cache[func] = graph
     return graph
 
 
 class Block:
-    def __init__(self, function, name, parent_graph, location=None, flags={}):
+    def __init__(self, function, parent_graph, flags={}):
         self.function = function
 
         self.graph = Graph(parent_graph)
-        self.graph.name = name
-        self.graph.location = location
         self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
 
@@ -161,7 +159,7 @@ class Block:
 
 
 class Function:
-    def __init__(self, parent, name, location=None, flags={}):
+    def __init__(self, parent, flags={}):
         if parent is not None:
             parent_function = parent.function
             parent_graph = parent.graph
@@ -174,7 +172,7 @@ class Function:
         if self.parent is not None:
             self.parent.children.add(self)
 
-        self.initial_block = Block(self, name, parent_graph, location, flags)
+        self.initial_block = Block(self, parent_graph, flags)
         self.blocks = [self.initial_block]
 
         self.break_target = []
@@ -190,9 +188,8 @@ class Function:
         self.variables_nonlocal = set()
         self.variables_first_write = dict()
 
-    def new_block(self, name, parent, location=None):
-        with about(parent.graph.debug, name):
-            block = Block(self, name, parent.graph, location, self.flags)
+    def new_block(self, parent):
+        block = Block(self, parent.graph, self.flags)
         self.blocks.append(block)
         return block
 
@@ -437,12 +434,15 @@ class Parser:
         defaults_name = []
         defaults_list = []
 
+        # We don't handle this for now.
+        assert args.posonlyargs == []
+
         for arg, dflt in zip(pargs + kwargs, defaults + kwdefaults):
-            param_node = Parameter(
-                function_block.graph,
-                name=arg.arg,
-                location=self.make_location(arg),
-            )
+            with debug_inherit(location=self.make_location(arg)):
+                param_node = Parameter(
+                    function_block.graph,
+                    name=arg.arg
+                )
 
             if arg.annotation:
                 param_node.add_annotation(self._eval_ast_node(arg.annotation))
@@ -466,11 +466,11 @@ class Parser:
 
         if args.vararg:
             arg = args.vararg
-            vararg_node = Parameter(
-                function_block.graph,
-                name=arg.arg,
-                location=self.make_location(arg),
-            )
+            with debug_inherit(location=self.make_location(arg)):
+                vararg_node = Parameter(
+                    function_block.graph,
+                    name=arg.arg
+                )
             function_block.graph.parameters.append(vararg_node)
             function_block.write(arg.arg, vararg_node)
         else:
@@ -478,28 +478,27 @@ class Parser:
 
         if args.kwarg:
             arg = args.kwarg
-            kwarg_node = Parameter(
-                function_block.graph,
-                name=arg.arg,
-                location=self.make_location(arg),
-            )
+            with debug_inherit(location=self.make_location(arg)):
+                kwarg_node = Parameter(
+                    function_block.graph,
+                    name=arg.arg
+                )
             function_block.graph.parameters.append(kwarg_node)
             function_block.write(arg.arg, kwarg_node)
         else:
             kwarg_node = None
 
-        function_block.graph.varargs = vararg_node and vararg_node.name
-        function_block.graph.kwargs = kwarg_node and kwarg_node.name
+        function_block.graph.varargs = vararg_node
+        function_block.graph.kwargs = kwarg_node
         function_block.graph.defaults = dict(zip(defaults_name, defaults_list))
         function_block.graph.kwonly = len(args.kwonlyargs)
 
     def _create_function(self, block, node):
-        function = Function(
-            parent=block,
-            name=node.name,
-            location=self.make_location(node),
-            flags=self.recflags,
-        )
+        with debug_inherit(name=node.name, location=self.make_location(node)):
+            function = Function(
+                parent=block,
+                flags=self.recflags,
+            )
         function_block = function.initial_block
 
         self._process_args(block, function_block, node.args)
@@ -517,8 +516,10 @@ class Parser:
         return function_block
 
     def make_condition_blocks(self, block, tn, fn):
-        tb = block.function.new_block("if_true", block, self.make_location(tn))
-        fb = block.function.new_block("if_false", block, self.make_location(fn))
+        with debug_inherit(name="if_true", location=self.make_location(tn)):
+            tb = block.function.new_block(block)
+        with debug_inherit(name="if_false", location=self.make_location(fn)):
+            fb = block.function.new_block(block)
         return tb, fb
 
     # expressions (returns a value)
@@ -677,12 +678,11 @@ class Parser:
         return self.process_node(block, node.value)
 
     def process_Lambda(self, block, node):
-        function = Function(
-            parent=block,
-            name="lambda",
-            location=self.make_location(node),
-            flags=self.recflags,
-        )
+        with debug_inherit(name="lambda", location=self.make_location(node)):
+            function = Function(
+                parent=block,
+                flags=self.recflags,
+            )
         function_block = function.initial_block
 
         self._process_args(block, function_block, node.args)
@@ -745,7 +745,11 @@ class Parser:
         if isinstance(targ, ast.Name):
             # x = val
             if idx is not None:
-                val = block.apply(operator.getitem, val, idx)
+                with debug_inherit(name=targ.id):
+                    val = block.apply(operator.getitem, val, idx)
+            else:
+                if get_debug():
+                    val.debug.name = targ.id
             st = block.write(targ.id, val)
 
         elif isinstance(targ, (ast.Tuple, ast.List)):
@@ -819,22 +823,30 @@ class Parser:
     def process_For(self, block, node):
         init = block.apply("python_iter", self.process_node(block, node.iter))
 
-        header_block = block.function.new_block("for_header", block, None)
+        with debug_inherit(name="for_header"):
+            header_block = block.function.new_block(block)
         it = header_block.graph.add_parameter("it")
         cond = header_block.apply("python_hasnext", it)
 
-        body_block = block.function.new_block(
-            "for_body", header_block, self.make_location(node.body)
-        )
+        with debug_inherit(
+            name="for_body", location=self.make_location(node.body)
+        ):
+            body_block = block.function.new_block(
+                header_block,
+            )
         app = body_block.apply("python_next", it)
         val = body_block.apply(operator.getitem, app, 0)
         self._assign(body_block, node.target, None, val)
         it2 = body_block.apply(operator.getitem, app, 1)
 
-        else_block = block.function.new_block(
-            "for_else", header_block, self.make_location(node.orelse)
-        )
-        after_block = block.function.new_block("for_after", block, None)
+        with debug_inherit(
+            name="for_else", location=self.make_location(node.orelse)
+        ):
+            else_block = block.function.new_block(
+                header_block,
+            )
+        with debug_inherit(name="for_after"):
+            after_block = block.function.new_block(block)
 
         block.jump(header_block, init)
         header_block.cond(cond, body_block, else_block)
@@ -869,7 +881,8 @@ class Parser:
 
         # TODO: figure out how to add a location here
         # (we would need the list of nodes that follow the if)
-        after_block = block.function.new_block("if_after", block, None)
+        with debug_inherit(name="if_after"):
+            after_block = block.function.new_block(block)
         after_block.used = False
 
         true_end = self.process_statements(true_block, node.body)
@@ -913,20 +926,28 @@ class Parser:
         return block
 
     def process_While(self, block, node):
-        header_block = block.function.new_block(
-            "while_header", block, self.make_location(node.test)
-        )
-        body_block = block.function.new_block(
-            "while_body", header_block, self.make_location(node.body)
-        )
-        else_block = block.function.new_block(
-            "while_else", header_block, self.make_location(node.orelse)
-        )
+        with debug_inherit(
+            name="while_header", location=self.make_location(node.test)
+        ):
+            header_block = block.function.new_block(
+                block,
+            )
+        with debug_inherit(
+            name="while_body", location=self.make_location(node.body)
+        ):
+            body_block = block.function.new_block(
+                header_block,
+            )
+        with debug_inherit(
+            name="while_else", location=self.make_location(node.orelse)
+        ):
+            else_block = block.function.new_block(
+                header_block,
+            )
         # TODO: Same as If we need the list of nodes that follow
         # for the location
-        after_block = block.function.new_block(
-            "while_after", header_block, None
-        )
+        with debug_inherit(name="while_after"):
+            after_block = block.function.new_block(header_block)
 
         block.jump(header_block)
         cond = self.process_node(header_block, node.test)
