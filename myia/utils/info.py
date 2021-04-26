@@ -40,8 +40,10 @@ _debug = ContextVar("debug", default=False)
 def enable_debug():
     """Enable debugging for a context."""
     tok = _debug.set(True)
-    yield
-    _debug.reset(tok)
+    try:
+        yield
+    finally:
+        _debug.reset(tok)
 
 
 def get_debug():

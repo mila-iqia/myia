@@ -348,6 +348,8 @@ class Parser:
         elif var in function.variables_global:
             raise NotImplementedError("attempt to write to a global variable")
         elif var in function.variables_local:
+            if get_debug():
+                st.edges[1].node.debug.name = st.edges[0].node.value
             repl_seq[st] = st.edges[SEQ].node
         else:
             raise AssertionError(
@@ -368,17 +370,16 @@ class Parser:
 
             for var in function.variables_root:
                 st = function.variables_first_write[var]
-                namespace[var] = st.graph.apply(
-                    "make_handle",
-                    st.graph.apply("typeof", st.edges[1].node),
-                )
+                t = st.graph.apply("typeof", st.edges[1].node)
+                with debug_inherit(name=st.edges[0].node.value):
+                    namespace[var] = st.graph.apply("make_handle", t)
 
             local_namespace = namespace.copy()
             for var in function.variables_local_closure:
                 st = function.variables_first_write[var]
-                local_namespace[var] = st.graph.apply(
-                    "make_handle", st.graph.apply("typeof", st.edges[1].node)
-                )
+                t = st.graph.apply("typeof", st.edges[1].node)
+                with debug_inherit(name=st.edges[0].node.value):
+                    local_namespace[var] = st.graph.apply("make_handle", t)
 
             for block in function.blocks:
                 if not block.used:
@@ -438,11 +439,8 @@ class Parser:
         assert args.posonlyargs == []
 
         for arg, dflt in zip(pargs + kwargs, defaults + kwdefaults):
-            with debug_inherit(location=self.make_location(arg)):
-                param_node = Parameter(
-                    function_block.graph,
-                    name=arg.arg
-                )
+            with debug_inherit(name=arg.arg, location=self.make_location(arg)):
+                param_node = Parameter(function_block.graph, name=arg.arg)
 
             if arg.annotation:
                 param_node.add_annotation(self._eval_ast_node(arg.annotation))
@@ -466,11 +464,8 @@ class Parser:
 
         if args.vararg:
             arg = args.vararg
-            with debug_inherit(location=self.make_location(arg)):
-                vararg_node = Parameter(
-                    function_block.graph,
-                    name=arg.arg
-                )
+            with debug_inherit(name=arg.arg, location=self.make_location(arg)):
+                vararg_node = Parameter(function_block.graph, name=arg.arg)
             function_block.graph.parameters.append(vararg_node)
             function_block.write(arg.arg, vararg_node)
         else:
@@ -478,11 +473,8 @@ class Parser:
 
         if args.kwarg:
             arg = args.kwarg
-            with debug_inherit(location=self.make_location(arg)):
-                kwarg_node = Parameter(
-                    function_block.graph,
-                    name=arg.arg
-                )
+            with debug_inherit(name=arg.arg, location=self.make_location(arg)):
+                kwarg_node = Parameter(function_block.graph, name=arg.arg)
             function_block.graph.parameters.append(kwarg_node)
             function_block.write(arg.arg, kwarg_node)
         else:
@@ -745,11 +737,7 @@ class Parser:
         if isinstance(targ, ast.Name):
             # x = val
             if idx is not None:
-                with debug_inherit(name=targ.id):
-                    val = block.apply(operator.getitem, val, idx)
-            else:
-                if get_debug():
-                    val.debug.name = targ.id
+                val = block.apply(operator.getitem, val, idx)
             st = block.write(targ.id, val)
 
         elif isinstance(targ, (ast.Tuple, ast.List)):

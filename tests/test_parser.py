@@ -24,11 +24,11 @@ def test_flags():
 
     assert (
         str_graph(parse(f))
-        == """graph @f22() {
-  return @g
+        == """graph #1() {
+  return #2
 }
 
-graph @g() {
+graph #2() {
   return 0
 }
 """
@@ -66,13 +66,14 @@ def test_simple():
     def f(x):  # pragma: nocover
         return x
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x) {
-  return %x
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  return x
 }
 """
-    )
+        )
 
 
 def test_free():
@@ -81,9 +82,9 @@ def test_free():
 
     assert (
         str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = resolve(:tests.test_parser, x)
-  return %_apply0
+        == """graph #1() {
+  #2 = resolve(:tests.test_parser, x)
+  return #2
 }
 """
     )
@@ -94,14 +95,15 @@ def test_global():
         global x
         return x
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = resolve(:tests.test_parser, x)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = resolve(:tests.test_parser, x)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_nonlocal():
@@ -115,25 +117,26 @@ def test_nonlocal():
         g()
         return x
 
-    assert (
-        str_graph(parse(f), allow_cycles=True)
-        == """graph @f() {
-  %_apply0 = typeof(1)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, 1)
-  %_apply3 = @g()
-  %_apply4 = universe_getitem(%_apply1)
-  return %_apply4
+    with enable_debug():
+        assert (
+            str_graph(parse(f), allow_cycles=True)
+            == """graph f() {
+  #1 = typeof(1)
+  x = make_handle(#1)
+  #2 = universe_setitem(x, 1)
+  #3 = g()
+  #4 = universe_getitem(x)
+  return #4
 }
 
-graph @g() {
-  %_apply5 = universe_getitem(%_apply1)
-  %_apply6 = <built-in function add>(%_apply5, 1)
-  %_apply7 = universe_setitem(%_apply1, %_apply6)
+graph g() {
+  #5 = universe_getitem(x)
+  #6 = <built-in function add>(#5, 1)
+  #7 = universe_setitem(x, #6)
   return None
 }
 """
-    )
+        )
 
 
 def test_entry_defaults():
@@ -149,28 +152,30 @@ def test_seq():
         x = x + 1
         return 0
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x) {
-  %_apply0 = <built-in function add>(%x, 1)
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  x.2 = <built-in function add>(x, 1)
   return 0
 }
 """
-    )
+        )
 
 
 def test_seq2():
     def f(x):  # pragma: nocover
         return x + x
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x) {
-  %_apply0 = <built-in function add>(%x, %x)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  #1 = <built-in function add>(x, x)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_def():
@@ -180,17 +185,18 @@ def test_def():
 
         return g
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  return @g
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  return g
 }
 
-graph @g(%a) {
-  return %a
+graph g(a) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_def2():
@@ -200,17 +206,18 @@ def test_def2():
 
         return g
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  return @g
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  return g
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_def3():
@@ -220,17 +227,18 @@ def test_def3():
 
         return g
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  return @g
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  return g
 }
 
-graph @g(%a, %b) {
-  return %b
+graph g(a, b) {
+  return b
 }
 """
-    )
+        )
 
 
 def test_def4():
@@ -240,17 +248,18 @@ def test_def4():
 
         return g
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  return @g
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  return g
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_def6():
@@ -260,17 +269,18 @@ def test_def6():
 
         return g
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  return @g
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  return g
 }
 
-graph @g(%a) {
-  return %a
+graph g(a) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_def5():
@@ -280,117 +290,123 @@ def test_def5():
 
         return g
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  return @g
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  return g
 }
 
-graph @g(%a, %b) {
-  return %b
+graph g(a, b) {
+  return b
 }
 """
-    )
+        )
 
 
 def test_getattr():
     def f(a):  # pragma: nocover
         return a.b
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
-  %_apply0 = <built-in function getattr>(%a, b)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  #1 = <built-in function getattr>(a, b)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_binop():
     def f(a, b):  # pragma: nocover
         return a / b
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a, %b) {
-  %_apply0 = <built-in function truediv>(%a, %b)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a, b) {
+  #1 = <built-in function truediv>(a, b)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_binop2():
     def f(x, y):  # pragma: nocover
         return x + y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x, %y) {
-  %_apply0 = <built-in function add>(%x, %y)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x, y) {
+  #1 = <built-in function add>(x, y)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_binop3():
     def f(x, y):  # pragma: nocover
         return x not in y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x, %y) {
-  %_apply0 = <built-in function contains>(%x, %y)
-  %_apply1 = <built-in function not_>(%_apply0)
-  return %_apply1
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x, y) {
+  #1 = <built-in function contains>(x, y)
+  #2 = <built-in function not_>(#1)
+  return #2
 }
 """
-    )
+        )
 
 
 def test_boolop():
     def f(a, b, c):  # pragma: nocover
         return a and b or c
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a, %b, %c) {
-  %_apply0 = typeof(%b)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %b)
-  %_apply3 = typeof(%c)
-  %_apply4 = make_handle(%_apply3)
-  %_apply5 = universe_setitem(%_apply4, %c)
-  %_apply6 = <built-in function truth>(%a)
-  %_apply7 = switch(%_apply6, @if_true, @if_false)
-  %_apply8 = %_apply7()
-  %_apply9 = <built-in function truth>(%_apply8)
-  %_apply10 = switch(%_apply9, @if_true1, @if_false1)
-  %_apply11 = %_apply10()
-  return %_apply11
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a, b, c) {
+  #1 = typeof(b)
+  b.2 = make_handle(#1)
+  #2 = universe_setitem(b.2, b)
+  #3 = typeof(c)
+  c.2 = make_handle(#3)
+  #4 = universe_setitem(c.2, c)
+  #5 = <built-in function truth>(a)
+  #6 = switch(#5, if_true, if_false)
+  #7 = #6()
+  #8 = <built-in function truth>(#7)
+  #9 = switch(#8, if_true.2, if_false.2)
+  #10 = #9()
+  return #10
 }
 
-graph @if_false() {
+graph if_false() {
   return False
 }
 
-graph @if_true() {
-  %_apply12 = universe_getitem(%_apply1)
-  return %_apply12
+graph if_true() {
+  #11 = universe_getitem(b.2)
+  return #11
 }
 
-graph @if_false1() {
-  %_apply13 = universe_getitem(%_apply4)
-  return %_apply13
+graph if_false.2() {
+  #12 = universe_getitem(c.2)
+  return #12
 }
 
-graph @if_true1() {
+graph if_true.2() {
   return True
 }
 """
-    )
+        )
 
 
 def test_call():
@@ -400,18 +416,19 @@ def test_call():
 
         return g(1)
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = @g(1)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = g(1)
+  return #1
 }
 
-graph @g(%a) {
-  return %a
+graph g(a) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call2():
@@ -421,20 +438,21 @@ def test_call2():
 
         return g(1, b=2)
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_dict(b, 2)
-  %_apply1 = make_tuple(1)
-  %_apply2 = apply(@g, %_apply1, %_apply0)
-  return %_apply2
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = make_dict(b, 2)
+  #2 = make_tuple(1)
+  #3 = apply(g, #2, #1)
+  return #3
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call3():
@@ -444,19 +462,19 @@ def test_call3():
 
         return g(1)
 
-    # XXX: This is probably wrong
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = @g(1)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = g(1)
+  return #1
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call4():
@@ -466,18 +484,19 @@ def test_call4():
 
         return g(1, 2)
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = @g(1, 2)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = g(1, 2)
+  return #1
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call5():
@@ -487,19 +506,19 @@ def test_call5():
 
         return g(1, 2, 3)
 
-    # XXX: This is probably wrong
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = @g(1, 2, 3)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = g(1, 2, 3)
+  return #1
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call6():
@@ -509,20 +528,21 @@ def test_call6():
 
         return g(1, b=2, c=3)
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_dict(b, 2, c, 3)
-  %_apply1 = make_tuple(1)
-  %_apply2 = apply(@g, %_apply1, %_apply0)
-  return %_apply2
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = make_dict(b, 2, c, 3)
+  #2 = make_tuple(1)
+  #3 = apply(g, #2, #1)
+  return #3
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call7():
@@ -532,21 +552,21 @@ def test_call7():
 
         return g(*(1, 2))
 
-    # XXX: This doesn't seem right
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_tuple(1, 2)
-  %_apply1 = make_tuple()
-  %_apply2 = apply(@g, %_apply1, %_apply0)
-  return %_apply2
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = make_tuple(1, 2)
+  #2 = make_tuple()
+  #3 = apply(g, #2, #1)
+  return #3
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call8():
@@ -556,22 +576,22 @@ def test_call8():
 
         return g(**{"a": 1, "b": 2})
 
-    # XXX: This doesn't seem right
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_dict(a, 1, b, 2)
-  %_apply1 = make_dict()
-  %_apply2 = make_tuple()
-  %_apply3 = apply(@g, %_apply2, %_apply0, %_apply1)
-  return %_apply3
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = make_dict(a, 1, b, 2)
+  #2 = make_dict()
+  #3 = make_tuple()
+  #4 = apply(g, #3, #1, #2)
+  return #4
 }
 
-graph @g(%a, %b) {
-  return %a
+graph g(a, b) {
+  return a
 }
 """
-    )
+        )
 
 
 def test_call_order():
@@ -581,68 +601,71 @@ def test_call_order():
 
         return g(a + b, c + d, c=33, e=e + f)
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a, %b, %c, %d, %e, %f) {
-  %_apply0 = <built-in function add>(%a, %b)
-  %_apply1 = <built-in function add>(%c, %d)
-  %_apply2 = <built-in function add>(%e, %f)
-  %_apply3 = make_dict(c, 33, e, %_apply2)
-  %_apply4 = make_tuple(%_apply0, %_apply1)
-  %_apply5 = apply(@g, %_apply4, %_apply3)
-  return %_apply5
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a, b, c, d, e, f.2) {
+  #1 = <built-in function add>(a, b)
+  #2 = <built-in function add>(c, d)
+  #3 = <built-in function add>(e, f.2)
+  #4 = make_dict(c, 33, e, #3)
+  #5 = make_tuple(#1, #2)
+  #6 = apply(g, #5, #4)
+  return #6
 }
 
-graph @g(%a1, %b1) {
-  return %a1
+graph g(a.2, b.2) {
+  return a.2
 }
 """
-    )
+        )
 
 
 def test_compare():
     def f(x):  # pragma: nocover
         return x > 0
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x) {
-  %_apply0 = <built-in function gt>(%x, 0)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  #1 = <built-in function gt>(x, 0)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_compare2():
     def f(x):  # pragma: nocover
         return 0 < x < 42
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x) {
-  %_apply0 = typeof(%x)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %x)
-  %_apply3 = universe_getitem(%_apply1)
-  %_apply4 = <built-in function lt>(0, %_apply3)
-  %_apply5 = <built-in function truth>(%_apply4)
-  %_apply6 = switch(%_apply5, @if_true, @if_false)
-  %_apply7 = %_apply6()
-  return %_apply7
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  #1 = typeof(x)
+  x.2 = make_handle(#1)
+  #2 = universe_setitem(x.2, x)
+  #3 = universe_getitem(x.2)
+  #4 = <built-in function lt>(0, #3)
+  #5 = <built-in function truth>(#4)
+  #6 = switch(#5, if_true, if_false)
+  #7 = #6()
+  return #7
 }
 
-graph @if_false() {
+graph if_false() {
   return False
 }
 
-graph @if_true() {
-  %_apply8 = universe_getitem(%_apply1)
-  %_apply9 = <built-in function lt>(%_apply8, 42)
-  return %_apply9
+graph if_true() {
+  #8 = universe_getitem(x.2)
+  #9 = <built-in function lt>(#8, 42)
+  return #9
 }
 """
-    )
+        )
 
 
 def test_dict():
@@ -651,9 +674,9 @@ def test_dict():
 
     assert (
         str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_dict(a, 1)
-  return %_apply0
+        == """graph #1() {
+  #2 = make_dict(a, 1)
+  return #2
 }
 """
     )
@@ -666,80 +689,84 @@ def test_dict2():
         c = 3
         return {a + b: c - b, a * c: b / c}
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = <built-in function add>(1, 2)
-  %_apply1 = <built-in function sub>(3, 2)
-  %_apply2 = <built-in function mul>(1, 3)
-  %_apply3 = <built-in function truediv>(2, 3)
-  %_apply4 = make_dict(%_apply0, %_apply1, %_apply2, %_apply3)
-  return %_apply4
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = <built-in function add>(1, 2)
+  #2 = <built-in function sub>(3, 2)
+  #3 = <built-in function mul>(1, 3)
+  #4 = <built-in function truediv>(2, 3)
+  #5 = make_dict(#1, #2, #3, #4)
+  return #5
 }
 """
-    )
+        )
 
 
 def test_extslice():
     def f(a):  # pragma: nocover
         return a[1:2, 3]
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
-  %_apply0 = slice(1, 2, None)
-  %_apply1 = make_tuple(%_apply0, 3)
-  %_apply2 = <built-in function getitem>(%a, %_apply1)
-  return %_apply2
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  #1 = slice(1, 2, None)
+  #2 = make_tuple(#1, 3)
+  #3 = <built-in function getitem>(a, #2)
+  return #3
 }
 """
-    )
+        )
 
 
 def test_ifexp():
     def f(x, y, b):  # pragma: nocover
         return x if b else y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x, %y, %b) {
-  %_apply0 = typeof(%x)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %x)
-  %_apply3 = typeof(%y)
-  %_apply4 = make_handle(%_apply3)
-  %_apply5 = universe_setitem(%_apply4, %y)
-  %_apply6 = <built-in function truth>(%b)
-  %_apply7 = user_switch(%_apply6, @if_true, @if_false)
-  %_apply8 = %_apply7()
-  return %_apply8
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x, y, b) {
+  #1 = typeof(x)
+  x.2 = make_handle(#1)
+  #2 = universe_setitem(x.2, x)
+  #3 = typeof(y)
+  y.2 = make_handle(#3)
+  #4 = universe_setitem(y.2, y)
+  #5 = <built-in function truth>(b)
+  #6 = user_switch(#5, if_true, if_false)
+  #7 = #6()
+  return #7
 }
 
-graph @if_false() {
-  %_apply9 = universe_getitem(%_apply4)
-  return %_apply9
+graph if_false() {
+  #8 = universe_getitem(y.2)
+  return #8
 }
 
-graph @if_true() {
-  %_apply10 = universe_getitem(%_apply1)
-  return %_apply10
+graph if_true() {
+  #9 = universe_getitem(x.2)
+  return #9
 }
 """
-    )
+        )
 
 
 def test_index():
     def f(a):  # pragma: nocover
         return a[0]
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
-  %_apply0 = <built-in function getitem>(%a, 0)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  #1 = <built-in function getitem>(a, 0)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_lambda():
@@ -747,17 +774,18 @@ def test_lambda():
         l = lambda x: x
         return l
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  return @lambda
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  return lambda
 }
 
-graph @lambda(%x) {
-  return %x
+graph lambda(x) {
+  return x
 }
 """
-    )
+        )
 
 
 def test_list():
@@ -765,17 +793,18 @@ def test_list():
         c = 4
         return [a + b, c - a, 0, c - b]
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a, %b) {
-  %_apply0 = <built-in function add>(%a, %b)
-  %_apply1 = <built-in function sub>(4, %a)
-  %_apply2 = <built-in function sub>(4, %b)
-  %_apply3 = make_list(%_apply0, %_apply1, 0, %_apply2)
-  return %_apply3
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a, b) {
+  #1 = <built-in function add>(a, b)
+  #2 = <built-in function sub>(4, a)
+  #3 = <built-in function sub>(4, b)
+  #4 = make_list(#1, #2, 0, #3)
+  return #4
 }
 """
-    )
+        )
 
 
 def test_named_constant():
@@ -784,7 +813,7 @@ def test_named_constant():
 
     assert (
         str_graph(parse(f))
-        == """graph @f() {
+        == """graph #1() {
   return True
 }
 """
@@ -795,17 +824,18 @@ def test_slice():
     def f(a):  # pragma: nocover
         return a[1::2, :1]
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
-  %_apply0 = slice(1, None, 2)
-  %_apply1 = slice(None, 1, None)
-  %_apply2 = make_tuple(%_apply0, %_apply1)
-  %_apply3 = <built-in function getitem>(%a, %_apply2)
-  return %_apply3
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  #1 = slice(1, None, 2)
+  #2 = slice(None, 1, None)
+  #3 = make_tuple(#1, #2)
+  #4 = <built-in function getitem>(a, #3)
+  return #4
 }
 """
-    )
+        )
 
 
 def test_empty_tuple():
@@ -814,7 +844,7 @@ def test_empty_tuple():
 
     assert (
         str_graph(parse(f))
-        == """graph @f() {
+        == """graph #1() {
   return ()
 }
 """
@@ -825,14 +855,15 @@ def test_unary():
     def f(x):  # pragma: nocover
         return -x
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x) {
-  %_apply0 = <built-in function neg>(%x)
-  return %_apply0
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  #1 = <built-in function neg>(x)
+  return #1
 }
 """
-    )
+        )
 
 
 def test_ann_assign():
@@ -842,7 +873,7 @@ def test_ann_assign():
 
     assert (
         str_graph(parse(f))
-        == """graph @f() {
+        == """graph #1() {
   return 1
 }
 """
@@ -853,27 +884,28 @@ def test_assert():
     def f(a):  # pragma: nocover
         assert a == 1, "not 1"
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
-  %_apply0 = <built-in function eq>(%a, 1)
-  %_apply1 = <built-in function truth>(%_apply0)
-  %_apply2 = user_switch(%_apply1, @if_true, @if_false)
-  %_apply3 = %_apply2()
-  return %_apply3
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  #1 = <built-in function eq>(a, 1)
+  #2 = <built-in function truth>(#1)
+  #3 = user_switch(#2, if_true, if_false)
+  #4 = #3()
+  return #4
 }
 
-graph @if_false() {
-  %_apply4 = exception(not 1)
-  %_apply5 = raise(%_apply4)
-  return %_apply5
+graph if_false() {
+  #5 = exception(not 1)
+  #6 = raise(#5)
+  return #6
 }
 
-graph @if_true() {
+graph if_true() {
   return None
 }
 """
-    )
+        )
 
 
 def test_assign():
@@ -881,16 +913,17 @@ def test_assign():
         x, y = 1, 2
         return y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_tuple(1, 2)
-  %_apply1 = <built-in function getitem>(%_apply0, 0)
-  %_apply2 = <built-in function getitem>(%_apply0, 1)
-  return %_apply2
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = make_tuple(1, 2)
+  x = <built-in function getitem>(#1, 0)
+  y = <built-in function getitem>(#1, 1)
+  return y
 }
 """
-    )
+        )
 
 
 def test_assign2():
@@ -898,16 +931,17 @@ def test_assign2():
         [x, y] = 1, 2
         return y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_tuple(1, 2)
-  %_apply1 = <built-in function getitem>(%_apply0, 0)
-  %_apply2 = <built-in function getitem>(%_apply0, 1)
-  return %_apply2
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = make_tuple(1, 2)
+  x = <built-in function getitem>(#1, 0)
+  y = <built-in function getitem>(#1, 1)
+  return y
 }
 """
-    )
+        )
 
 
 def test_assign3():
@@ -915,20 +949,21 @@ def test_assign3():
         x, (y, z) = 1, (2, 3)
         return x, y, z
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
-  %_apply0 = make_tuple(2, 3)
-  %_apply1 = make_tuple(1, %_apply0)
-  %_apply2 = <built-in function getitem>(%_apply1, 0)
-  %_apply3 = <built-in function getitem>(%_apply1, 1)
-  %_apply4 = <built-in function getitem>(%_apply3, 0)
-  %_apply5 = <built-in function getitem>(%_apply3, 1)
-  %_apply6 = make_tuple(%_apply2, %_apply4, %_apply5)
-  return %_apply6
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = make_tuple(2, 3)
+  #2 = make_tuple(1, #1)
+  x = <built-in function getitem>(#2, 0)
+  #3 = <built-in function getitem>(#2, 1)
+  y = <built-in function getitem>(#3, 0)
+  z = <built-in function getitem>(#3, 1)
+  #4 = make_tuple(x, y, z)
+  return #4
 }
 """
-    )
+        )
 
 
 @pytest.mark.xfail
@@ -937,12 +972,13 @@ def test_assign4():
         a.b = 1
         return a
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
 }
 """
-    )
+        )
 
 
 @pytest.mark.xfail
@@ -951,12 +987,13 @@ def test_assign5():
         a[0] = 1
         return a
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
 }
 """
-    )
+        )
 
 
 @pytest.mark.xfail
@@ -965,12 +1002,13 @@ def test_assign6():
         x, *y = 1, 2, 3
         return y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f() {
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
 }
 """
-    )
+        )
 
 
 def test_break_continue():
@@ -982,80 +1020,81 @@ def test_break_continue():
                 continue
         return 0
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
-  %_apply0 = python_iter(%a)
-  %_apply1 = @for_header(%_apply0)
-  return %_apply1
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  #1 = python_iter(a)
+  #2 = for_header(#1)
+  return #2
 }
 
-graph @for_header(%it) {
-  %_apply2 = python_hasnext(%it)
-  %_apply3 = user_switch(%_apply2, @for_body, @for_else)
-  %_apply4 = %_apply3()
-  return %_apply4
+graph for_header(it) {
+  #3 = python_hasnext(it)
+  #4 = user_switch(#3, for_body, for_else)
+  #5 = #4()
+  return #5
 }
 
-graph @for_else() {
-  %_apply5 = @for_after()
-  return %_apply5
+graph for_else() {
+  #6 = for_after()
+  return #6
 }
 
-graph @for_after() {
+graph for_after() {
   return 0
 }
 
-graph @for_body() {
-  %_apply6 = python_next(%it)
-  %_apply7 = <built-in function getitem>(%_apply6, 0)
-  %_apply8 = typeof(%_apply7)
-  %_apply9 = make_handle(%_apply8)
-  %_apply10 = universe_setitem(%_apply9, %_apply7)
-  %_apply11 = <built-in function getitem>(%_apply6, 1)
-  %_apply12 = universe_getitem(%_apply9)
-  %_apply13 = <built-in function lt>(%_apply12, 2)
-  %_apply14 = <built-in function truth>(%_apply13)
-  %_apply15 = user_switch(%_apply14, @if_true, @if_false)
-  %_apply16 = %_apply15()
-  return %_apply16
+graph for_body() {
+  #7 = python_next(it)
+  #8 = <built-in function getitem>(#7, 0)
+  #9 = typeof(#8)
+  b = make_handle(#9)
+  #10 = universe_setitem(b, #8)
+  #11 = <built-in function getitem>(#7, 1)
+  #12 = universe_getitem(b)
+  #13 = <built-in function lt>(#12, 2)
+  #14 = <built-in function truth>(#13)
+  #15 = user_switch(#14, if_true, if_false)
+  #16 = #15()
+  return #16
 }
 
-graph @if_false() {
-  %_apply17 = @if_after()
-  return %_apply17
+graph if_false() {
+  #17 = if_after()
+  return #17
 }
 
-graph @if_after() {
-  %_apply18 = universe_getitem(%_apply9)
-  %_apply19 = <built-in function gt>(%_apply18, 4)
-  %_apply20 = <built-in function truth>(%_apply19)
-  %_apply21 = user_switch(%_apply20, @if_true1, @if_false1)
-  %_apply22 = %_apply21()
-  return %_apply22
+graph if_after() {
+  #18 = universe_getitem(b)
+  #19 = <built-in function gt>(#18, 4)
+  #20 = <built-in function truth>(#19)
+  #21 = user_switch(#20, if_true.2, if_false.2)
+  #22 = #21()
+  return #22
 }
 
-graph @if_false1() {
-  %_apply23 = @if_after1()
-  return %_apply23
+graph if_false.2() {
+  #23 = if_after.2()
+  return #23
 }
 
-graph @if_after1() {
-  %_apply24 = @for_header(%_apply11)
-  return %_apply24
+graph if_after.2() {
+  #24 = for_header(#11)
+  return #24
 }
 
-graph @if_true1() {
-  %_apply25 = @for_header(%_apply11)
-  return %_apply25
+graph if_true.2() {
+  #25 = for_header(#11)
+  return #25
 }
 
-graph @if_true() {
-  %_apply26 = @for_after()
-  return %_apply26
+graph if_true() {
+  #26 = for_after()
+  return #26
 }
 """
-    )
+        )
 
 
 def test_for():
@@ -1065,46 +1104,47 @@ def test_for():
             x = x + 1
         return x
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%b) {
-  %_apply0 = typeof(0)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, 0)
-  %_apply3 = python_iter(%b)
-  %_apply4 = @for_header(%_apply3)
-  return %_apply4
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b) {
+  #1 = typeof(0)
+  x = make_handle(#1)
+  #2 = universe_setitem(x, 0)
+  #3 = python_iter(b)
+  #4 = for_header(#3)
+  return #4
 }
 
-graph @for_header(%it) {
-  %_apply5 = python_hasnext(%it)
-  %_apply6 = user_switch(%_apply5, @for_body, @for_else)
-  %_apply7 = %_apply6()
-  return %_apply7
+graph for_header(it) {
+  #5 = python_hasnext(it)
+  #6 = user_switch(#5, for_body, for_else)
+  #7 = #6()
+  return #7
 }
 
-graph @for_else() {
-  %_apply8 = @for_after()
-  return %_apply8
+graph for_else() {
+  #8 = for_after()
+  return #8
 }
 
-graph @for_after() {
-  %_apply9 = universe_getitem(%_apply1)
-  return %_apply9
+graph for_after() {
+  #9 = universe_getitem(x)
+  return #9
 }
 
-graph @for_body() {
-  %_apply10 = python_next(%it)
-  %_apply11 = <built-in function getitem>(%_apply10, 0)
-  %_apply12 = <built-in function getitem>(%_apply10, 1)
-  %_apply13 = universe_getitem(%_apply1)
-  %_apply14 = <built-in function add>(%_apply13, 1)
-  %_apply15 = universe_setitem(%_apply1, %_apply14)
-  %_apply16 = @for_header(%_apply12)
-  return %_apply16
+graph for_body() {
+  #10 = python_next(it)
+  a = <built-in function getitem>(#10, 0)
+  #11 = <built-in function getitem>(#10, 1)
+  #12 = universe_getitem(x)
+  #13 = <built-in function add>(#12, 1)
+  #14 = universe_setitem(x, #13)
+  #15 = for_header(#11)
+  return #15
 }
 """
-    )
+        )
 
 
 def test_for2():
@@ -1116,51 +1156,52 @@ def test_for2():
             x = x - 1
         return x
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%a) {
-  %_apply0 = typeof(0)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, 0)
-  %_apply3 = python_iter(%a)
-  %_apply4 = @for_header(%_apply3)
-  return %_apply4
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  #1 = typeof(0)
+  x = make_handle(#1)
+  #2 = universe_setitem(x, 0)
+  #3 = python_iter(a)
+  #4 = for_header(#3)
+  return #4
 }
 
-graph @for_header(%it) {
-  %_apply5 = python_hasnext(%it)
-  %_apply6 = user_switch(%_apply5, @for_body, @for_else)
-  %_apply7 = %_apply6()
-  return %_apply7
+graph for_header(it) {
+  #5 = python_hasnext(it)
+  #6 = user_switch(#5, for_body, for_else)
+  #7 = #6()
+  return #7
 }
 
-graph @for_else() {
-  %_apply8 = universe_getitem(%_apply1)
-  %_apply9 = <built-in function sub>(%_apply8, 1)
-  %_apply10 = universe_setitem(%_apply1, %_apply9)
-  %_apply11 = @for_after()
-  return %_apply11
+graph for_else() {
+  #8 = universe_getitem(x)
+  #9 = <built-in function sub>(#8, 1)
+  #10 = universe_setitem(x, #9)
+  #11 = for_after()
+  return #11
 }
 
-graph @for_after() {
-  %_apply12 = universe_getitem(%_apply1)
-  return %_apply12
+graph for_after() {
+  #12 = universe_getitem(x)
+  return #12
 }
 
-graph @for_body() {
-  %_apply13 = python_next(%it)
-  %_apply14 = <built-in function getitem>(%_apply13, 0)
-  %_apply15 = <built-in function getitem>(%_apply14, 0)
-  %_apply16 = <built-in function getitem>(%_apply14, 1)
-  %_apply17 = <built-in function getitem>(%_apply13, 1)
-  %_apply18 = universe_getitem(%_apply1)
-  %_apply19 = <built-in function add>(%_apply18, 1)
-  %_apply20 = universe_setitem(%_apply1, %_apply19)
-  %_apply21 = @for_header(%_apply17)
-  return %_apply21
+graph for_body() {
+  #13 = python_next(it)
+  #14 = <built-in function getitem>(#13, 0)
+  b = <built-in function getitem>(#14, 0)
+  c = <built-in function getitem>(#14, 1)
+  #15 = <built-in function getitem>(#13, 1)
+  #16 = universe_getitem(x)
+  #17 = <built-in function add>(#16, 1)
+  #18 = universe_setitem(x, #17)
+  #19 = for_header(#15)
+  return #19
 }
 """
-    )
+        )
 
 
 def test_for3():
@@ -1171,81 +1212,82 @@ def test_for3():
                 acc = acc + j
         return acc
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%n) {
-  %_apply0 = typeof(%n)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %n)
-  %_apply3 = typeof(0)
-  %_apply4 = make_handle(%_apply3)
-  %_apply5 = universe_setitem(%_apply4, 0)
-  %_apply6 = resolve(:tests.test_parser, range)
-  %_apply7 = universe_getitem(%_apply1)
-  %_apply8 = %_apply6(%_apply7)
-  %_apply9 = python_iter(%_apply8)
-  %_apply10 = @for_header(%_apply9)
-  return %_apply10
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(n) {
+  #1 = typeof(n)
+  n.2 = make_handle(#1)
+  #2 = universe_setitem(n.2, n)
+  #3 = typeof(0)
+  acc = make_handle(#3)
+  #4 = universe_setitem(acc, 0)
+  #5 = resolve(:tests.test_parser, range)
+  #6 = universe_getitem(n.2)
+  #7 = #5(#6)
+  #8 = python_iter(#7)
+  #9 = for_header(#8)
+  return #9
 }
 
-graph @for_header(%it) {
-  %_apply11 = python_hasnext(%it)
-  %_apply12 = user_switch(%_apply11, @for_body, @for_else)
-  %_apply13 = %_apply12()
-  return %_apply13
+graph for_header(it) {
+  #10 = python_hasnext(it)
+  #11 = user_switch(#10, for_body, for_else)
+  #12 = #11()
+  return #12
 }
 
-graph @for_else() {
-  %_apply14 = @for_after()
-  return %_apply14
+graph for_else() {
+  #13 = for_after()
+  return #13
 }
 
-graph @for_after() {
-  %_apply15 = universe_getitem(%_apply4)
-  return %_apply15
+graph for_after() {
+  #14 = universe_getitem(acc)
+  return #14
 }
 
-graph @for_body() {
-  %_apply16 = python_next(%it)
-  %_apply17 = <built-in function getitem>(%_apply16, 0)
-  %_apply18 = <built-in function getitem>(%_apply16, 1)
-  %_apply19 = resolve(:tests.test_parser, range)
-  %_apply20 = universe_getitem(%_apply1)
-  %_apply21 = %_apply19(%_apply20)
-  %_apply22 = python_iter(%_apply21)
-  %_apply23 = @for_header1(%_apply22)
-  return %_apply23
+graph for_body() {
+  #15 = python_next(it)
+  i = <built-in function getitem>(#15, 0)
+  #16 = <built-in function getitem>(#15, 1)
+  #17 = resolve(:tests.test_parser, range)
+  #18 = universe_getitem(n.2)
+  #19 = #17(#18)
+  #20 = python_iter(#19)
+  #21 = for_header.2(#20)
+  return #21
 }
 
-graph @for_header1(%it1) {
-  %_apply24 = python_hasnext(%it1)
-  %_apply25 = user_switch(%_apply24, @for_body1, @for_else1)
-  %_apply26 = %_apply25()
-  return %_apply26
+graph for_header.2(it.2) {
+  #22 = python_hasnext(it.2)
+  #23 = user_switch(#22, for_body.2, for_else.2)
+  #24 = #23()
+  return #24
 }
 
-graph @for_else1() {
-  %_apply27 = @for_after1()
-  return %_apply27
+graph for_else.2() {
+  #25 = for_after.2()
+  return #25
 }
 
-graph @for_after1() {
-  %_apply28 = @for_header(%_apply18)
-  return %_apply28
+graph for_after.2() {
+  #26 = for_header(#16)
+  return #26
 }
 
-graph @for_body1() {
-  %_apply29 = python_next(%it1)
-  %_apply30 = <built-in function getitem>(%_apply29, 0)
-  %_apply31 = <built-in function getitem>(%_apply29, 1)
-  %_apply32 = universe_getitem(%_apply4)
-  %_apply33 = <built-in function add>(%_apply32, %_apply30)
-  %_apply34 = universe_setitem(%_apply4, %_apply33)
-  %_apply35 = @for_header1(%_apply31)
-  return %_apply35
+graph for_body.2() {
+  #27 = python_next(it.2)
+  j = <built-in function getitem>(#27, 0)
+  #28 = <built-in function getitem>(#27, 1)
+  #29 = universe_getitem(acc)
+  #30 = <built-in function add>(#29, j)
+  #31 = universe_setitem(acc, #30)
+  #32 = for_header.2(#28)
+  return #32
 }
 """
-    )
+        )
 
 
 def test_if():
@@ -1255,32 +1297,33 @@ def test_if():
         else:
             return y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%b, %x, %y) {
-  %_apply0 = typeof(%x)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %x)
-  %_apply3 = typeof(%y)
-  %_apply4 = make_handle(%_apply3)
-  %_apply5 = universe_setitem(%_apply4, %y)
-  %_apply6 = <built-in function truth>(%b)
-  %_apply7 = user_switch(%_apply6, @if_true, @if_false)
-  %_apply8 = %_apply7()
-  return %_apply8
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b, x, y) {
+  #1 = typeof(x)
+  x.2 = make_handle(#1)
+  #2 = universe_setitem(x.2, x)
+  #3 = typeof(y)
+  y.2 = make_handle(#3)
+  #4 = universe_setitem(y.2, y)
+  #5 = <built-in function truth>(b)
+  #6 = user_switch(#5, if_true, if_false)
+  #7 = #6()
+  return #7
 }
 
-graph @if_false() {
-  %_apply9 = universe_getitem(%_apply4)
-  return %_apply9
+graph if_false() {
+  #8 = universe_getitem(y.2)
+  return #8
 }
 
-graph @if_true() {
-  %_apply10 = universe_getitem(%_apply1)
-  return %_apply10
+graph if_true() {
+  #9 = universe_getitem(x.2)
+  return #9
 }
 """
-    )
+        )
 
 
 def test_if2():
@@ -1289,35 +1332,36 @@ def test_if2():
             y = 0
         return y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%b, %x, %y) {
-  %_apply0 = typeof(%y)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %y)
-  %_apply3 = <built-in function truth>(%b)
-  %_apply4 = user_switch(%_apply3, @if_true, @if_false)
-  %_apply5 = %_apply4()
-  return %_apply5
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b, x, y) {
+  #1 = typeof(y)
+  y.2 = make_handle(#1)
+  #2 = universe_setitem(y.2, y)
+  #3 = <built-in function truth>(b)
+  #4 = user_switch(#3, if_true, if_false)
+  #5 = #4()
+  return #5
 }
 
-graph @if_false() {
-  %_apply6 = @if_after()
-  return %_apply6
+graph if_false() {
+  #6 = if_after()
+  return #6
 }
 
-graph @if_after() {
-  %_apply7 = universe_getitem(%_apply1)
-  return %_apply7
+graph if_after() {
+  #7 = universe_getitem(y.2)
+  return #7
 }
 
-graph @if_true() {
-  %_apply8 = universe_setitem(%_apply1, 0)
-  %_apply9 = @if_after()
-  return %_apply9
+graph if_true() {
+  #8 = universe_setitem(y.2, 0)
+  #9 = if_after()
+  return #9
 }
 """
-    )
+        )
 
 
 def test_pass():
@@ -1326,7 +1370,7 @@ def test_pass():
 
     assert (
         str_graph(parse(f))
-        == """graph @f() {
+        == """graph #1() {
   return None
 }
 """
@@ -1339,45 +1383,46 @@ def test_while():
             return x
         return y
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%b, %x, %y) {
-  %_apply0 = typeof(%b)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %b)
-  %_apply3 = typeof(%x)
-  %_apply4 = make_handle(%_apply3)
-  %_apply5 = universe_setitem(%_apply4, %x)
-  %_apply6 = typeof(%y)
-  %_apply7 = make_handle(%_apply6)
-  %_apply8 = universe_setitem(%_apply7, %y)
-  %_apply9 = @while_header()
-  return %_apply9
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b, x, y) {
+  #1 = typeof(b)
+  b.2 = make_handle(#1)
+  #2 = universe_setitem(b.2, b)
+  #3 = typeof(x)
+  x.2 = make_handle(#3)
+  #4 = universe_setitem(x.2, x)
+  #5 = typeof(y)
+  y.2 = make_handle(#5)
+  #6 = universe_setitem(y.2, y)
+  #7 = while_header()
+  return #7
 }
 
-graph @while_header() {
-  %_apply10 = universe_getitem(%_apply1)
-  %_apply11 = user_switch(%_apply10, @while_body, @while_else)
-  %_apply12 = %_apply11()
-  return %_apply12
+graph while_header() {
+  #8 = universe_getitem(b.2)
+  #9 = user_switch(#8, while_body, while_else)
+  #10 = #9()
+  return #10
 }
 
-graph @while_else() {
-  %_apply13 = @while_after()
-  return %_apply13
+graph while_else() {
+  #11 = while_after()
+  return #11
 }
 
-graph @while_after() {
-  %_apply14 = universe_getitem(%_apply7)
-  return %_apply14
+graph while_after() {
+  #12 = universe_getitem(y.2)
+  return #12
 }
 
-graph @while_body() {
-  %_apply15 = universe_getitem(%_apply4)
-  return %_apply15
+graph while_body() {
+  #13 = universe_getitem(x.2)
+  return #13
 }
 """
-    )
+        )
 
 
 def test_while2():
@@ -1386,71 +1431,40 @@ def test_while2():
             x = x - 1
         return x
 
-    assert (
-        str_graph(parse(f))
-        == """graph @f(%x) {
-  %_apply0 = typeof(%x)
-  %_apply1 = make_handle(%_apply0)
-  %_apply2 = universe_setitem(%_apply1, %x)
-  %_apply3 = @while_header()
-  return %_apply3
-}
-
-graph @while_header() {
-  %_apply4 = universe_getitem(%_apply1)
-  %_apply5 = user_switch(%_apply4, @while_body, @while_else)
-  %_apply6 = %_apply5()
-  return %_apply6
-}
-
-graph @while_else() {
-  %_apply7 = @while_after()
-  return %_apply7
-}
-
-graph @while_after() {
-  %_apply8 = universe_getitem(%_apply1)
-  return %_apply8
-}
-
-graph @while_body() {
-  %_apply9 = universe_getitem(%_apply1)
-  %_apply10 = <built-in function sub>(%_apply9, 1)
-  %_apply11 = universe_setitem(%_apply1, %_apply10)
-  %_apply12 = @while_header()
-  return %_apply12
-}
-"""
-    )
-
-
-def test_debug():
-    def f(a, b, c):  # pragma: no cover
-        d = 33
-
-        def g(e, f):
-            h = e + f
-            i = e - f
-            return h - i
-
-        d = d - g(a, b)
-        return c - d
-
     with enable_debug():
         assert (
             str_graph(parse(f))
-            == """graph f(a, b, c) {
-  #1 = g(a, b)
-  d = <built-in function sub>(33, #1)
-  #2 = <built-in function sub>(c, d)
-  return #2
+            == """graph f(x) {
+  #1 = typeof(x)
+  x.2 = make_handle(#1)
+  #2 = universe_setitem(x.2, x)
+  #3 = while_header()
+  return #3
 }
 
-graph g(e, f.2) {
-  h = <built-in function add>(e, f.2)
-  i = <built-in function sub>(e, f.2)
-  #3 = <built-in function sub>(h, i)
-  return #3
+graph while_header() {
+  #4 = universe_getitem(x.2)
+  #5 = user_switch(#4, while_body, while_else)
+  #6 = #5()
+  return #6
+}
+
+graph while_else() {
+  #7 = while_after()
+  return #7
+}
+
+graph while_after() {
+  #8 = universe_getitem(x.2)
+  return #8
+}
+
+graph while_body() {
+  #9 = universe_getitem(x.2)
+  #10 = <built-in function sub>(#9, 1)
+  #11 = universe_setitem(x.2, #10)
+  #12 = while_header()
+  return #12
 }
 """
         )
