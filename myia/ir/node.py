@@ -114,9 +114,6 @@ class Edge:
         self.label = label
         self.node = node
 
-    def __str__(self):
-        return f"Edge({self.label}, {self.node})"
-
 
 def edgemap(edges):
     res = {}
@@ -147,12 +144,6 @@ class Apply(Node):
         e = Edge(label, node)
         self.edges[label] = e
 
-    def append_input(self, node):
-        i = 0
-        while i in self.edges:
-            i += 1
-        self.add_edge(i, node)
-
     @property
     def fn(self):
         return self.edges[FN].node
@@ -164,10 +155,7 @@ class Apply(Node):
         while i in self.edges:
             res.append(self.edges[i].node)
             i += 1
-        return res
-
-    def __str__(self):
-        return f"{self.fn}({self.inputs})"
+        return tuple(res)
 
 
 class Parameter(Node):
@@ -182,9 +170,6 @@ class Parameter(Node):
     def is_parameter(self):
         return True
 
-    def __str__(self):
-        return self.name
-
 
 class Constant(Node):
     __slots__ = ("value",)
@@ -198,6 +183,3 @@ class Constant(Node):
 
     def is_constant_graph(self):
         return self.is_constant(Graph)
-
-    def __str__(self):
-        return str(self.value)
