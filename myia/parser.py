@@ -1,3 +1,5 @@
+"""Parser module to transform python code into myia IR."""
+
 import ast
 import inspect
 import operator
@@ -12,6 +14,7 @@ from .utils.info import debug_inherit, get_debug
 
 class Location(NamedTuple):
     """A location in source code.
+
     Attributes:
         filename: The filename.
         line: The line number.
@@ -69,6 +72,11 @@ _parse_cache = {}
 
 
 def parse(func):
+    """Parse a python function and return the myia graph.
+
+    This takes a python function object and will extract and parse its
+    source code.
+    """
     if func in _parse_cache:
         return _parse_cache[func]
 
@@ -98,6 +106,8 @@ def parse(func):
 
 
 class Block:
+    """This is used to represent a basic block in a python function."""
+
     def __init__(self, function, parent_graph, flags={}):
         self.function = function
 
@@ -113,11 +123,18 @@ class Block:
         self.variables_read = {}
 
     def apply(self, *inputs):
+        """Create an apply and link it in the sequence chain."""
         res = self.graph.apply(*inputs)
         self.link_seq(res)
         return res
 
     def read(self, varnum):
+        """Add a read operation of the specified name.
+
+        This will return a placeholder 'load' operation that will be
+        resolved later when we have more information about where the
+        variable is read from.
+        """
         ld = self.apply("load", varnum)
         st = self.variables_written.get(varnum, [None])[-1]
         ld.add_edge("prevwrite", st)
@@ -127,38 +144,49 @@ class Block:
         return ld
 
     def write(self, varnum, node):
+        """Add a write operation of the specified value to the specified name.
+
+        This will add a placeholder 'store' operation in the sequence
+        chain that will be resolved later.
+        """
         st = self.apply("store", varnum, node)
         self.variables_written.setdefault(varnum, []).append(st)
         self.function.variables_local.add(varnum)
         self.function.variables_first_write.setdefault(varnum, st)
-        return st
 
     def link_seq(self, node):
+        """Append a node in the sequence chain."""
         node.add_edge(SEQ, self.last_apply)
         self.last_apply = node
         return node
 
     def cond(self, cond, true, false):
+        """End the block with a conditional jump to one of two blocks."""
         assert self.graph.return_ is None
         switch = self.apply("user_switch", cond, true.graph, false.graph)
         self.returns(self.apply(switch))
 
     def jump(self, target, *args):
+        """End the block in a jump to another block, with optional arguments."""
         assert self.graph.return_ is None
         jump = self.apply(target.graph, *args)
         self.jump_tag = (target, jump)
         self.returns(jump)
 
     def raises(self, exc):
+        """End the block with an exception."""
         self.returns(self.apply("raise", exc))
 
     def returns(self, value):
+        """End the block with an arbitrary expression."""
         assert self.graph.return_ is None
         self.graph.output = value
         self.link_seq(self.graph.return_)
 
 
 class Function:
+    """Represents a python fucntion, mostly for namespace purposes."""
+
     def __init__(self, parent, flags={}):
         if parent is not None:
             parent_function = parent.function
@@ -189,12 +217,19 @@ class Function:
         self.variables_first_write = dict()
 
     def new_block(self, parent):
+        """Create a new block in this function.
+
+        The parent must be a block in which all the closed over
+        variables are defined in either it or its parents.
+        """
         block = Block(self, parent.graph, self.flags)
         self.blocks.append(block)
         return block
 
 
 class Parser:
+    """Utility class for the parsing state, use `parse` instead."""
+
     def __init__(self, function, recflags):
         self.function = function
         self.recflags = recflags
@@ -220,6 +255,7 @@ class Parser:
         return eval(text, self.function.__globals__)
 
     def make_location(self, node):
+        """Make a `Location` for a node or list of nodes."""
         if node is None:
             return None
         if isinstance(node, (list, tuple)):
@@ -242,6 +278,7 @@ class Parser:
             return None
 
     def parse(self):
+        """Perform the parsing of the top-level function and subfunctions."""
         tree = ast.parse(self.src, filename=self.filename)
         function_def = tree.body[0]
         assert isinstance(function_def, ast.FunctionDef)
@@ -259,6 +296,7 @@ class Parser:
         return main_block.graph
 
     def all_functions(self, main_function):
+        """Return a list of all the subfunctions in a function in preorder."""
         functions = [main_function]
         todo = list(main_function.children)
         while todo:
@@ -268,6 +306,13 @@ class Parser:
         return functions
 
     def analyze(self, functions):
+        """Analyze the functions to prepare for load/store resolution.
+
+        This will traverse all the blocks in all the functions and
+        collect information about variables definitions and closures.
+        This will modify the Block and Function objects to store that
+        information.
+        """
         for function in reversed(functions):
             # remove from locals what was marked as not a local
             function.variables_local -= function.variables_nonlocal
@@ -308,6 +353,7 @@ class Parser:
                         function.variables_local_closure.add(var)
 
     def resolve_read(self, repl, repl_seq, ld, function, local_namespace):
+        """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
         st = ld.edges["prevwrite"].node
         if var in (
@@ -335,6 +381,7 @@ class Parser:
             )  # pragma: nocover
 
     def resolve_write(self, repl, repl_seq, st, function, local_namespace):
+        """Resolve a 'store' operation with pre-collected information."""
         var = st.edges[0].node.value
         value = st.edges[1].node
         if var in (
@@ -357,6 +404,11 @@ class Parser:
             )  # pragma: nocover
 
     def resolve(self, functions):
+        """Resolve all the 'load' and 'store' operations.
+
+        This assumes that `Parser.analyze` has been called first and
+        will use the information it collects.
+        """
         namespace = {}
         for function in functions:
 
@@ -424,6 +476,10 @@ class Parser:
                 block.graph.replace(repl, repl_seq)
 
     def _process_args(self, block, function_block, args):
+        """Process argument definition.
+
+        This can be used for any argument list.
+        """
         pargs = args.args
         nondefaults = [None] * (len(pargs) - len(args.defaults))
         defaults = nondefaults + args.defaults
@@ -443,7 +499,7 @@ class Parser:
                 param_node = Parameter(function_block.graph, name=arg.arg)
 
             if arg.annotation:
-                param_node.add_annotation(self._eval_ast_node(arg.annotation))
+                param_node.annotation = self._eval_ast_node(arg.annotation)
 
             function_block.graph.parameters.append(param_node)
             function_block.write(arg.arg, param_node)
@@ -501,13 +557,14 @@ class Parser:
             after_block.returns(Constant(None))
 
         if node.returns:
-            function_block.graph.return_.add_annotation(
-                self._eval_ast_node(node.returns)
+            function_block.graph.return_.annotation = self._eval_ast_node(
+                node.returns
             )
 
         return function_block
 
     def make_condition_blocks(self, block, tn, fn):
+        """Make true/false branch blocks."""
         with debug_inherit(name="if_true", location=self.make_location(tn)):
             tb = block.function.new_block(block)
         with debug_inherit(name="if_false", location=self.make_location(fn)):
@@ -517,7 +574,8 @@ class Parser:
     # expressions (returns a value)
 
     def process_node(self, block, node):
-        method_name = f"process_{node.__class__.__name__}"
+        """Process an AST node in the current block."""
+        method_name = f"_process_{node.__class__.__name__}"
         method = getattr(self, method_name, None)
         if method:
             return method(block, node)
@@ -527,11 +585,11 @@ class Parser:
                 self.make_location(node),
             )
 
-    def process_Attribute(self, block, node):
+    def _process_Attribute(self, block, node):
         value = self.process_node(block, node.value)
         return block.apply(getattr, value, Constant(node.attr))
 
-    def process_BinOp(self, block, node):
+    def _process_BinOp(self, block, node):
         return block.apply(
             ast_map[type(node.op)],
             self.process_node(block, node.left),
@@ -556,7 +614,7 @@ class Parser:
         else:
             return test
 
-    def process_BoolOp(self, block, node):
+    def _process_BoolOp(self, block, node):
         if isinstance(node.op, ast.And):
             return self._fold_bool(block, node.values, "and")
         elif isinstance(node.op, ast.Or):
@@ -566,7 +624,7 @@ class Parser:
                 f"Unknown BoolOp: {node.op}"
             )  # pragma: nocover
 
-    def process_Call(self, block, node):
+    def _process_Call(self, block, node):
         func = self.process_node(block, node.func)
 
         groups = []
@@ -609,7 +667,7 @@ class Parser:
                     args.append(group)
             return block.apply("apply", func, *args)
 
-    def process_Compare(self, block, node):
+    def _process_Compare(self, block, node):
         if len(node.ops) == 1:
             left = self.process_node(block, node.left)
             right = self.process_node(block, node.comparators[0])
@@ -634,10 +692,10 @@ class Parser:
                 ops = ops[1:]
             return self._fold_bool(block, values, "and")
 
-    def process_Constant(self, block, node):
+    def _process_Constant(self, block, node):
         return Constant(node.value)
 
-    def process_Dict(self, block, node):
+    def _process_Dict(self, block, node):
         # we need to process k1, v1, k2, v2, ...
         # to respect python evaluation order
         dlist = []
@@ -647,12 +705,12 @@ class Parser:
 
         return block.apply("make_dict", *dlist)
 
-    def process_ExtSlice(self, block, node):
+    def _process_ExtSlice(self, block, node):
         # This node is removed in 3.9+
         slices = [self.process_node(block, dim) for dim in node.dims]
         return block.apply("make_tuple", *slices)
 
-    def process_IfExp(self, block, node):
+    def _process_IfExp(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
         tb, fb = self.make_condition_blocks(block, node.body, node.orelse)
@@ -666,10 +724,10 @@ class Parser:
         switch = block.apply("user_switch", cond, tb.graph, fb.graph)
         return block.apply(switch)
 
-    def process_Index(self, block, node):
+    def _process_Index(self, block, node):
         return self.process_node(block, node.value)
 
-    def process_Lambda(self, block, node):
+    def _process_Lambda(self, block, node):
         with debug_inherit(name="lambda", location=self.make_location(node)):
             function = Function(
                 parent=block,
@@ -682,19 +740,19 @@ class Parser:
         function_block.returns(self.process_node(function_block, node.body))
         return Constant(function_block.graph)
 
-    def process_List(self, block, node):
+    def _process_List(self, block, node):
         elts = [self.process_node(block, e) for e in node.elts]
         return block.apply("make_list", *elts)
 
-    def process_Name(self, block, node):
+    def _process_Name(self, block, node):
         assert isinstance(node.ctx, ast.Load)
         return block.read(node.id)
 
-    def process_NameConstant(self, block, node):
+    def _process_NameConstant(self, block, node):
         # removed in python 3.8
         return Constant(node.value)  # pragma: nocover
 
-    def process_Slice(self, block, node):
+    def _process_Slice(self, block, node):
         if node.lower is None:
             lower = Constant(None)
         else:
@@ -709,25 +767,30 @@ class Parser:
             step = self.process_node(block, node.step)
         return block.apply("slice", lower, upper, step)
 
-    def process_Subscript(self, block, node):
+    def _process_Subscript(self, block, node):
         value = self.process_node(block, node.value)
         slice = self.process_node(block, node.slice)
         return block.apply(operator.getitem, value, slice)
 
-    def process_Tuple(self, block, node):
+    def _process_Tuple(self, block, node):
         elts = [self.process_node(block, e) for e in node.elts]
         if len(elts) == 0:
             return Constant(())
         else:
             return block.apply("make_tuple", *elts)
 
-    def process_UnaryOp(self, block, node):
+    def _process_UnaryOp(self, block, node):
         val = self.process_node(block, node.operand)
         return block.apply(ast_map[type(node.op)], val)
 
     # statements (returns a block)
 
     def process_statements(self, starting_block, nodes):
+        """Process a list of statements.
+
+        This will return the active block at the end of the list which
+        may be different from the `starting_block`.
+        """
         block = starting_block
         for node in nodes:
             block = self.process_node(block, node)
@@ -759,13 +822,13 @@ class Parser:
         else:
             raise NotImplementedError(targ)
 
-    def process_AnnAssign(self, block, node):
+    def _process_AnnAssign(self, block, node):
         val = self.process_node(block, node.value)
-        val.add_annotation(self._eval_ast_node(node.annotation))
+        val.annotation = self._eval_ast_node(node.annotation)
         self._assign(block, node.target, None, val)
         return block
 
-    def process_Assert(self, block, node):
+    def _process_Assert(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
         msg = (
@@ -779,21 +842,21 @@ class Parser:
         false_block.raises(false_block.apply("exception", msg))
         return true_block
 
-    def process_Assign(self, block, node):
+    def _process_Assign(self, block, node):
         val = self.process_node(block, node.value)
         for targ in node.targets:
             self._assign(block, targ, None, val)
 
         return block
 
-    def process_Break(self, block, node):
+    def _process_Break(self, block, node):
         if len(block.function.break_target) == 0:
             # python should catch this
             raise SyntaxError("'break' outside loop")  # pragma: nocover
         block.jump(block.function.break_target[-1])
         return block
 
-    def process_Continue(self, block, node):
+    def _process_Continue(self, block, node):
         target = block.function.continue_target
         if len(target) == 0:
             # python should catch this
@@ -804,11 +867,11 @@ class Parser:
         block.jump(target[0], *target[1])
         return block
 
-    def process_Expr(self, block, node):
+    def _process_Expr(self, block, node):
         self.process_node(block, node.value)
         return block
 
-    def process_For(self, block, node):
+    def _process_For(self, block, node):
         init = block.apply("python_iter", self.process_node(block, node.iter))
 
         with debug_inherit(name="for_header"):
@@ -855,12 +918,12 @@ class Parser:
 
         return after_block
 
-    def process_FunctionDef(self, block, node):
+    def _process_FunctionDef(self, block, node):
         fn_block = self._create_function(block, node)
         block.write(node.name, fn_block.graph)
         return block
 
-    def process_If(self, block, node):
+    def _process_If(self, block, node):
         cond = self.process_node(block, node.test)
         cond = block.apply(operator.truth, cond)
         true_block, false_block = self.make_condition_blocks(
@@ -886,7 +949,7 @@ class Parser:
         block.cond(cond, true_block, false_block)
         return after_block
 
-    def process_Global(self, block, node):
+    def _process_Global(self, block, node):
         for name in node.names:
             if name in block.function.variables_local:
                 # This is a python error
@@ -896,7 +959,7 @@ class Parser:
         block.function.variables_global.update(node.names)
         return block
 
-    def process_Nonlocal(self, block, node):
+    def _process_Nonlocal(self, block, node):
         for name in node.names:
             if name in block.function.variables_local:
                 # This is a python error
@@ -906,14 +969,14 @@ class Parser:
         block.function.variables_nonlocal.update(node.names)
         return block
 
-    def process_Pass(self, block, node):
+    def _process_Pass(self, block, node):
         return block
 
-    def process_Return(self, block, node):
+    def _process_Return(self, block, node):
         block.returns(self.process_node(block, node.value))
         return block
 
-    def process_While(self, block, node):
+    def _process_While(self, block, node):
         with debug_inherit(
             name="while_header", location=self.make_location(node.test)
         ):

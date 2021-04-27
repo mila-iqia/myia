@@ -71,13 +71,13 @@ class DebugInfo:
     """
 
     def __new__(cls, *args, **kwargs):
+        """Checks if debug is enabled."""
         if not _debug.get():
             return None
         else:
             return super().__new__(cls)
 
     def __init__(self, obj=None, **kwargs):
-        """Construct a DebugInfo object."""
         self.name = None
         self.about = None
         self.relation = None

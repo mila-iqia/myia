@@ -1,3 +1,5 @@
+"""Utilities to print a textual representation of graphs."""
+
 import io
 
 from ..utils.info import Labeler
@@ -21,7 +23,14 @@ def _print_node(node, buf, nodecache, offset=0):
 
 
 def str_graph(g, allow_cycles=False, recursive=True):
-    nodecache = NodeCache()
+    """Return a textual representation of a graph.
+
+    Arguments:
+       g: The graph to print
+       allow_cycles: Useful for debugging broken graphs that contain cycles
+       recursive: Also print subgraphs.
+    """
+    nodecache = _NodeCache()
     buf = io.StringIO()
     seen_nodes = set()
     seen_graphs = set()
@@ -117,7 +126,9 @@ def _constant_describer(node):
         return str(node.value)
 
 
-class NodeCache:
+class _NodeCache:
+    """Adapter for the Labeller to deal with Constant graphs."""
+
     def __init__(self):
         self.lbl = Labeler(
             disambiguator=_disambiguator, object_describer=_constant_describer
