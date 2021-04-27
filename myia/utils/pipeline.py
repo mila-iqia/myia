@@ -37,7 +37,6 @@ class Pipeline:
     """
 
     def __init__(self, *steps, arguments={}, name="pipeline"):
-        """Initialize a Pipeline."""
         self.steps = steps
         self.arguments = arguments
         self.name = name
@@ -113,7 +112,6 @@ class LoopPipeline(Pipeline):
     def __init__(
         self, *steps, arguments={}, name="pipeline", changes_field="changes"
     ):
-        """Initialize a LoopPipeline."""
         super().__init__(*steps, arguments=arguments, name=name)
         self.changes_field = changes_field
 
