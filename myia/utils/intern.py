@@ -10,7 +10,6 @@ class CanonStore:
     """Store of canonical objects."""
 
     def __init__(self, hashfn, eqfn):
-        """Initialize a CanonStore."""
         self.hashes = defaultdict(weakref.WeakSet)
         self.to_gc = set()
         self.hashfn = hashfn
@@ -69,7 +68,6 @@ class EqKey:
     """Base class for Atom/Elements."""
 
     def __init__(self, obj):
-        """Initialize an EqKey."""
         t = type(obj)
         if t in (int, bool):
             t = float
@@ -97,7 +95,6 @@ class ItemEK(ElementsBase):
     """Object indexed using getitem."""
 
     def __init__(self, obj, keys):
-        """Initialize an ItemEK."""
         super().__init__(obj)
         self.keys = tuple(keys)
         self.values = tuple(
@@ -117,7 +114,6 @@ class AttrEK(ElementsBase):
     """Object indexed using getattr."""
 
     def __init__(self, obj, keys):
-        """Initialize an AttrEK."""
         super().__init__(obj)
         self.keys = tuple(keys)
         self.values = tuple(
