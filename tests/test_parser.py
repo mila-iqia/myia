@@ -37,8 +37,8 @@ graph #2() {
 
 def test_var_error1():
     def f(a):  # pragma: nocover
-        a = x
-        x = 1
+        a = x  # noqa: F841
+        x = 1  # noqa: F841
 
     with pytest.raises(UnboundLocalError):
         parse(f)
@@ -771,8 +771,8 @@ def test_index():
 
 def test_lambda():
     def f():  # pragma: nocover
-        l = lambda x: x
-        return l
+        lm = lambda x: x  # noqa: E731
+        return lm
 
     with enable_debug():
         assert (
@@ -910,7 +910,7 @@ graph if_true() {
 
 def test_assign():
     def f():  # pragma: nocover
-        x, y = 1, 2
+        x, y = 1, 2  # noqa: F841
         return y
 
     with enable_debug():
@@ -928,7 +928,7 @@ def test_assign():
 
 def test_assign2():
     def f():  # pragma: nocover
-        [x, y] = 1, 2
+        [x, y] = 1, 2  # noqa: F841
         return y
 
     with enable_debug():
@@ -999,7 +999,7 @@ def test_assign5():
 @pytest.mark.xfail
 def test_assign6():
     def f():  # pragma: nocover
-        x, *y = 1, 2, 3
+        x, *y = 1, 2, 3  # noqa: F841
         return y
 
     with enable_debug():

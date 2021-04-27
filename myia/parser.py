@@ -4,7 +4,7 @@ import operator
 import textwrap
 from typing import NamedTuple
 
-from .ir import Apply, Constant, Graph, Node, Parameter
+from .ir import Constant, Graph, Parameter
 from .ir.node import SEQ
 from .utils import ClosureNamespace, ModuleNamespace
 from .utils.info import debug_inherit, get_debug
@@ -122,7 +122,7 @@ class Block:
         st = self.variables_written.get(varnum, [None])[-1]
         ld.add_edge("prevwrite", st)
         self.variables_read.setdefault(varnum, []).append(ld)
-        if not varnum in self.function.variables_local:
+        if varnum not in self.function.variables_local:
             self.function.variables_free.add(varnum)
         return ld
 
@@ -738,7 +738,7 @@ class Parser:
             # x = val
             if idx is not None:
                 val = block.apply(operator.getitem, val, idx)
-            st = block.write(targ.id, val)
+            block.write(targ.id, val)
 
         elif isinstance(targ, (ast.Tuple, ast.List)):
             # x, y = val

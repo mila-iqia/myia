@@ -1,7 +1,6 @@
 from .node import SEQ
 import io
-from ..utils.info import get_debug, Labeler
-from collections import Counter
+from ..utils.info import Labeler
 from .node import Constant, Node
 
 

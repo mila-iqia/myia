@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 from myia.utils import Named
 from myia.utils.info import DebugInfo
 
