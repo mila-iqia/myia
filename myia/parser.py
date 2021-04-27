@@ -17,8 +17,10 @@ class Location(NamedTuple):
 
     Attributes:
         filename: The filename.
-        line: The line number.
-        column: The column number.
+        line: The initial line number.
+        column: The initial column number.
+        line_end: The final line number
+        column_end: The final column number
     """
 
     filename: str
