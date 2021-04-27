@@ -15,6 +15,7 @@ ovld = "^0.2.7"
 black = "^20.8b1"
 isort = "^5.7.0"
 flake8 = "^3.8.4"
+pydocstyle = "^6.0.0"
 pytest = "^6.2.2"
 pytest-cov = "^2.11.1"
 

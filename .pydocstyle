@@ -1,0 +1,4 @@
+[pydocstyle]
+ignore-decorators = ovld
+add-ignore = D104,D105,D107,D202
+convention = google
