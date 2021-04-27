@@ -1,1 +1,1 @@
-from .node import Graph, Node, Apply, Constant, Parameter
+from .node import Apply, Constant, Graph, Node, Parameter

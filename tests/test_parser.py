@@ -1,7 +1,7 @@
 import pytest
 
-from myia.parser import parse, MyiaSyntaxError
 from myia.ir.print import str_graph
+from myia.parser import MyiaSyntaxError, parse
 from myia.utils.info import enable_debug
 
 

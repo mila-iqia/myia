@@ -1,7 +1,7 @@
-from .node import SEQ
 import io
+
 from ..utils.info import Labeler
-from .node import Constant, Node
+from .node import SEQ, Constant, Node
 
 
 def _print_node(node, buf, nodecache, offset=0):
