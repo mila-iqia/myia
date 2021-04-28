@@ -30,7 +30,6 @@
 import copy
 import gc
 import pickle
-import sys
 import unittest
 import weakref
 
@@ -320,9 +319,6 @@ class TestOrderedset(unittest.TestCase):
     def test_ordering(self):
         oset1 = OrderedSet(self.lst)
         oset2 = OrderedSet(self.lst)
-
-        if sys.version_info < (3, 0):
-            self.assertFalse(oset1 <= None)
 
         self.assertLessEqual(oset2, oset1)
         self.assertLessEqual(oset2, set(oset1))

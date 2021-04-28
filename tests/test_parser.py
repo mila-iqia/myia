@@ -6,7 +6,7 @@ from myia.utils.info import enable_debug
 
 
 def test_same():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         return 1
 
     pf1 = parse(f)
@@ -14,7 +14,7 @@ def test_same():
 
 
 def test_flags():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g():
             return 0
 
@@ -36,7 +36,7 @@ graph #2() {
 
 
 def test_var_error1():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         a = x  # noqa: F841
         x = 1  # noqa: F841
 
@@ -45,7 +45,7 @@ def test_var_error1():
 
 
 def test_var_error2():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         global x
         x = 1
 
@@ -54,7 +54,7 @@ def test_var_error2():
 
 
 def test_not_supported():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         async def g():
             pass
 
@@ -63,7 +63,7 @@ def test_not_supported():
 
 
 def test_simple():
-    def f(x):  # pragma: nocover
+    def f(x):  # pragma: no cover
         return x
 
     with enable_debug():
@@ -77,7 +77,7 @@ def test_simple():
 
 
 def test_free():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         return x
 
     assert (
@@ -91,7 +91,7 @@ def test_free():
 
 
 def test_global():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         global x
         return x
 
@@ -107,7 +107,7 @@ def test_global():
 
 
 def test_nonlocal():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         x = 1
 
         def g():
@@ -140,7 +140,7 @@ graph g() {
 
 
 def test_entry_defaults():
-    def f(x=0):  # pragma: nocover
+    def f(x=0):  # pragma: no cover
         return x
 
     with pytest.raises(MyiaSyntaxError):
@@ -148,7 +148,7 @@ def test_entry_defaults():
 
 
 def test_seq():
-    def f(x):  # pragma: nocover
+    def f(x):  # pragma: no cover
         x = x + 1
         return 0
 
@@ -164,7 +164,7 @@ def test_seq():
 
 
 def test_seq2():
-    def f(x):  # pragma: nocover
+    def f(x):  # pragma: no cover
         return x + x
 
     with enable_debug():
@@ -179,7 +179,7 @@ def test_seq2():
 
 
 def test_def():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a):
             return a
 
@@ -200,7 +200,7 @@ graph g(a) {
 
 
 def test_def2():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, *b):
             return a
 
@@ -221,7 +221,7 @@ graph g(a, b) {
 
 
 def test_def3():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, b=1):
             return b
 
@@ -242,7 +242,7 @@ graph g(a, b) {
 
 
 def test_def4():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, **b):
             return a
 
@@ -263,7 +263,7 @@ graph g(a, b) {
 
 
 def test_def6():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a: int) -> int:
             return a
 
@@ -284,7 +284,7 @@ graph g(a) {
 
 
 def test_def5():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, *, b):
             return b
 
@@ -305,7 +305,7 @@ graph g(a, b) {
 
 
 def test_getattr():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         return a.b
 
     with enable_debug():
@@ -320,7 +320,7 @@ def test_getattr():
 
 
 def test_binop():
-    def f(a, b):  # pragma: nocover
+    def f(a, b):  # pragma: no cover
         return a / b
 
     with enable_debug():
@@ -335,7 +335,7 @@ def test_binop():
 
 
 def test_binop2():
-    def f(x, y):  # pragma: nocover
+    def f(x, y):  # pragma: no cover
         return x + y
 
     with enable_debug():
@@ -350,7 +350,7 @@ def test_binop2():
 
 
 def test_binop3():
-    def f(x, y):  # pragma: nocover
+    def f(x, y):  # pragma: no cover
         return x not in y
 
     with enable_debug():
@@ -366,7 +366,7 @@ def test_binop3():
 
 
 def test_boolop():
-    def f(a, b, c):  # pragma: nocover
+    def f(a, b, c):  # pragma: no cover
         return a and b or c
 
     with enable_debug():
@@ -410,7 +410,7 @@ graph if_true:f.2() {
 
 
 def test_call():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a):
             return a
 
@@ -432,7 +432,7 @@ graph g(a) {
 
 
 def test_call2():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, b):
             return a
 
@@ -456,7 +456,7 @@ graph g(a, b) {
 
 
 def test_call3():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, b=2):
             return a
 
@@ -478,7 +478,7 @@ graph g(a, b) {
 
 
 def test_call4():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, b=2):
             return a
 
@@ -500,7 +500,7 @@ graph g(a, b) {
 
 
 def test_call5():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, *b):
             return a
 
@@ -522,7 +522,7 @@ graph g(a, b) {
 
 
 def test_call6():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, **b):
             return a
 
@@ -546,7 +546,7 @@ graph g(a, b) {
 
 
 def test_call7():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(a, b):
             return a
 
@@ -570,7 +570,7 @@ graph g(a, b) {
 
 
 def test_call8():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         def g(*, a, b):
             return a
 
@@ -595,7 +595,7 @@ graph g(a, b) {
 
 
 def test_call_order():
-    def f(a, b, c, d, e, f):  # pragma: nocover
+    def f(a, b, c, d, e, f):  # pragma: no cover
         def g(*a, **b):
             return a
 
@@ -622,7 +622,7 @@ graph g(a.2, b.2) {
 
 
 def test_compare():
-    def f(x):  # pragma: nocover
+    def f(x):  # pragma: no cover
         return x > 0
 
     with enable_debug():
@@ -637,7 +637,7 @@ def test_compare():
 
 
 def test_compare2():
-    def f(x):  # pragma: nocover
+    def f(x):  # pragma: no cover
         return 0 < x < 42
 
     with enable_debug():
@@ -669,7 +669,7 @@ graph if_true:f() {
 
 
 def test_dict():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         return {"a": 1}
 
     assert (
@@ -683,7 +683,7 @@ def test_dict():
 
 
 def test_dict2():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         a = 1
         b = 2
         c = 3
@@ -705,7 +705,7 @@ def test_dict2():
 
 
 def test_extslice():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         return a[1:2, 3]
 
     with enable_debug():
@@ -722,7 +722,7 @@ def test_extslice():
 
 
 def test_ifexp():
-    def f(x, y, b):  # pragma: nocover
+    def f(x, y, b):  # pragma: no cover
         return x if b else y
 
     with enable_debug():
@@ -755,7 +755,7 @@ graph if_true:f() {
 
 
 def test_index():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         return a[0]
 
     with enable_debug():
@@ -770,7 +770,7 @@ def test_index():
 
 
 def test_lambda():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         lm = lambda x: x  # noqa: E731
         return lm
 
@@ -789,7 +789,7 @@ graph lambda(x) {
 
 
 def test_list():
-    def f(a, b):  # pragma: nocover
+    def f(a, b):  # pragma: no cover
         c = 4
         return [a + b, c - a, 0, c - b]
 
@@ -808,7 +808,7 @@ def test_list():
 
 
 def test_named_constant():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         return True
 
     assert (
@@ -821,7 +821,7 @@ def test_named_constant():
 
 
 def test_slice():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         return a[1::2, :1]
 
     with enable_debug():
@@ -839,7 +839,7 @@ def test_slice():
 
 
 def test_empty_tuple():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         return ()
 
     assert (
@@ -852,7 +852,7 @@ def test_empty_tuple():
 
 
 def test_unary():
-    def f(x):  # pragma: nocover
+    def f(x):  # pragma: no cover
         return -x
 
     with enable_debug():
@@ -867,7 +867,7 @@ def test_unary():
 
 
 def test_ann_assign():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         a: int = 1
         return a
 
@@ -881,7 +881,7 @@ def test_ann_assign():
 
 
 def test_assert():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         assert a == 1, "not 1"
 
     with enable_debug():
@@ -909,7 +909,7 @@ graph if_true:f() {
 
 
 def test_assign():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         x, y = 1, 2  # noqa: F841
         return y
 
@@ -927,7 +927,7 @@ def test_assign():
 
 
 def test_assign2():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         [x, y] = 1, 2  # noqa: F841
         return y
 
@@ -945,7 +945,7 @@ def test_assign2():
 
 
 def test_assign3():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         x, (y, z) = 1, (2, 3)
         return x, y, z
 
@@ -968,7 +968,7 @@ def test_assign3():
 
 @pytest.mark.xfail
 def test_assign4():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         a.b = 1
         return a
 
@@ -983,7 +983,7 @@ def test_assign4():
 
 @pytest.mark.xfail
 def test_assign5():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         a[0] = 1
         return a
 
@@ -998,7 +998,7 @@ def test_assign5():
 
 @pytest.mark.xfail
 def test_assign6():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         x, *y = 1, 2, 3  # noqa: F841
         return y
 
@@ -1012,7 +1012,7 @@ def test_assign6():
 
 
 def test_break_continue():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         for b in a:
             if b < 2:
                 break
@@ -1098,7 +1098,7 @@ graph if_true:for_body() {
 
 
 def test_for():
-    def f(b):  # pragma: nocover
+    def f(b):  # pragma: no cover
         x = 0
         for a in b:
             x = x + 1
@@ -1148,7 +1148,7 @@ graph for_body() {
 
 
 def test_for2():
-    def f(a):  # pragma: nocover
+    def f(a):  # pragma: no cover
         x = 0
         for b, c in a:
             x = x + 1
@@ -1205,7 +1205,7 @@ graph for_body() {
 
 
 def test_for3():
-    def f(n):
+    def f(n):  # pragma: no cover
         acc = 0
         for i in range(n):
             for j in range(n):
@@ -1291,7 +1291,7 @@ graph for_body.2() {
 
 
 def test_if():
-    def f(b, x, y):  # pragma: nocover
+    def f(b, x, y):  # pragma: no cover
         if b:
             return x
         else:
@@ -1327,7 +1327,7 @@ graph if_true:f() {
 
 
 def test_if2():
-    def f(b, x, y):  # pragma: nocover
+    def f(b, x, y):  # pragma: no cover
         if b:
             y = 0
         return y
@@ -1365,7 +1365,7 @@ graph if_true:f() {
 
 
 def test_pass():
-    def f():  # pragma: nocover
+    def f():  # pragma: no cover
         pass
 
     assert (
@@ -1378,7 +1378,7 @@ def test_pass():
 
 
 def test_while():
-    def f(b, x, y):  # pragma: nocover
+    def f(b, x, y):  # pragma: no cover
         while b:
             return x
         return y
@@ -1426,7 +1426,7 @@ graph while_body() {
 
 
 def test_while2():
-    def f(x):  # pragma: nocover
+    def f(x):  # pragma: no cover
         while x:
             x = x - 1
         return x

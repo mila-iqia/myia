@@ -380,7 +380,7 @@ class Parser:
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"
-            )  # pragma: nocover
+            )  # pragma: no cover
 
     def resolve_write(self, repl, repl_seq, st, function, local_namespace):
         """Resolve a 'store' operation with pre-collected information."""
@@ -403,7 +403,7 @@ class Parser:
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"
-            )  # pragma: nocover
+            )  # pragma: no cover
 
     def resolve(self, functions):
         """Resolve all the 'load' and 'store' operations.
@@ -420,7 +420,7 @@ class Parser:
                 # since python will error out
                 raise SyntaxError(
                     f"no binding for variable '{err}' found"
-                )  # pragma: nocover
+                )  # pragma: no cover
 
             for var in function.variables_root:
                 st = function.variables_first_write[var]
@@ -468,7 +468,7 @@ class Parser:
 
                 for k in list(repl):
                     n = repl[k]
-                    while n in repl:  # pragma: nocover
+                    while n in repl:  # pragma: no cover
                         assert (
                             False
                         ), "Please report the code that triggered this"
@@ -628,7 +628,7 @@ class Parser:
         else:
             raise AssertionError(
                 f"Unknown BoolOp: {node.op}"
-            )  # pragma: nocover
+            )  # pragma: no cover
 
     def _process_Call(self, block, node):
         func = self.process_node(block, node.func)
@@ -756,7 +756,7 @@ class Parser:
 
     def _process_NameConstant(self, block, node):
         # removed in python 3.8
-        return Constant(node.value)  # pragma: nocover
+        return Constant(node.value)  # pragma: no cover
 
     def _process_Slice(self, block, node):
         if node.lower is None:
@@ -821,7 +821,7 @@ class Parser:
                 # this should not show up since python will catch it
                 raise SyntaxError(
                     "starred assignement target must be in a list or tuple"
-                )  # pragma: nocover
+                )  # pragma: no cover
             else:
                 raise NotImplementedError("starred assignement")
 
@@ -858,7 +858,7 @@ class Parser:
     def _process_Break(self, block, node):
         if len(block.function.break_target) == 0:
             # python should catch this
-            raise SyntaxError("'break' outside loop")  # pragma: nocover
+            raise SyntaxError("'break' outside loop")  # pragma: no cover
         block.jump(block.function.break_target[-1])
         return block
 
@@ -868,7 +868,7 @@ class Parser:
             # python should catch this
             raise SyntaxError(
                 "'continue' not properly in loop"
-            )  # pragma: nocover
+            )  # pragma: no cover
         target = target[-1]
         block.jump(target[0], *target[1])
         return block
@@ -961,7 +961,7 @@ class Parser:
                 # This is a python error
                 raise SyntaxError(
                     f"name '{name}' is assigned to before global declaration"
-                )  # pragma: nocover
+                )  # pragma: no cover
         block.function.variables_global.update(node.names)
         return block
 
@@ -971,7 +971,7 @@ class Parser:
                 # This is a python error
                 raise SyntaxError(
                     f"name '{name}' is assigned to before nonlocal declaration"
-                )  # pragma: nocover
+                )  # pragma: no cover
         block.function.variables_nonlocal.update(node.names)
         return block
 
