@@ -380,29 +380,29 @@ def test_boolop():
   c.2 = make_handle(#3)
   #4 = universe_setitem(c.2, c)
   #5 = <built-in function truth>(a)
-  #6 = switch(#5, if_true, if_false)
+  #6 = switch(#5, if_true:f, if_false:f)
   #7 = #6()
   #8 = <built-in function truth>(#7)
-  #9 = switch(#8, if_true.2, if_false.2)
+  #9 = switch(#8, if_true:f.2, if_false:f.2)
   #10 = #9()
   return #10
 }
 
-graph if_false() {
+graph if_false:f() {
   return False
 }
 
-graph if_true() {
+graph if_true:f() {
   #11 = universe_getitem(b.2)
   return #11
 }
 
-graph if_false.2() {
+graph if_false:f.2() {
   #12 = universe_getitem(c.2)
   return #12
 }
 
-graph if_true.2() {
+graph if_true:f.2() {
   return True
 }
 """
@@ -650,16 +650,16 @@ def test_compare2():
   #3 = universe_getitem(x.2)
   #4 = <built-in function lt>(0, #3)
   #5 = <built-in function truth>(#4)
-  #6 = switch(#5, if_true, if_false)
+  #6 = switch(#5, if_true:f, if_false:f)
   #7 = #6()
   return #7
 }
 
-graph if_false() {
+graph if_false:f() {
   return False
 }
 
-graph if_true() {
+graph if_true:f() {
   #8 = universe_getitem(x.2)
   #9 = <built-in function lt>(#8, 42)
   return #9
@@ -736,17 +736,17 @@ def test_ifexp():
   y.2 = make_handle(#3)
   #4 = universe_setitem(y.2, y)
   #5 = <built-in function truth>(b)
-  #6 = user_switch(#5, if_true, if_false)
+  #6 = user_switch(#5, if_true:f, if_false:f)
   #7 = #6()
   return #7
 }
 
-graph if_false() {
+graph if_false:f() {
   #8 = universe_getitem(y.2)
   return #8
 }
 
-graph if_true() {
+graph if_true:f() {
   #9 = universe_getitem(x.2)
   return #9
 }
@@ -890,18 +890,18 @@ def test_assert():
             == """graph f(a) {
   #1 = <built-in function eq>(a, 1)
   #2 = <built-in function truth>(#1)
-  #3 = user_switch(#2, if_true, if_false)
+  #3 = user_switch(#2, if_true:f, if_false:f)
   #4 = #3()
   return #4
 }
 
-graph if_false() {
+graph if_false:f() {
   #5 = exception(not 1)
   #6 = raise(#5)
   return #6
 }
 
-graph if_true() {
+graph if_true:f() {
   return None
 }
 """
@@ -1055,12 +1055,12 @@ graph for_body() {
   #12 = universe_getitem(b)
   #13 = <built-in function lt>(#12, 2)
   #14 = <built-in function truth>(#13)
-  #15 = user_switch(#14, if_true, if_false)
+  #15 = user_switch(#14, if_true:for_body, if_false:for_body)
   #16 = #15()
   return #16
 }
 
-graph if_false() {
+graph if_false:for_body() {
   #17 = if_after()
   return #17
 }
@@ -1069,12 +1069,12 @@ graph if_after() {
   #18 = universe_getitem(b)
   #19 = <built-in function gt>(#18, 4)
   #20 = <built-in function truth>(#19)
-  #21 = user_switch(#20, if_true.2, if_false.2)
+  #21 = user_switch(#20, if_true:if_after, if_false:if_after)
   #22 = #21()
   return #22
 }
 
-graph if_false.2() {
+graph if_false:if_after() {
   #23 = if_after.2()
   return #23
 }
@@ -1084,12 +1084,12 @@ graph if_after.2() {
   return #24
 }
 
-graph if_true.2() {
+graph if_true:if_after() {
   #25 = for_header(#11)
   return #25
 }
 
-graph if_true() {
+graph if_true:for_body() {
   #26 = for_after()
   return #26
 }
@@ -1308,17 +1308,17 @@ def test_if():
   y.2 = make_handle(#3)
   #4 = universe_setitem(y.2, y)
   #5 = <built-in function truth>(b)
-  #6 = user_switch(#5, if_true, if_false)
+  #6 = user_switch(#5, if_true:f, if_false:f)
   #7 = #6()
   return #7
 }
 
-graph if_false() {
+graph if_false:f() {
   #8 = universe_getitem(y.2)
   return #8
 }
 
-graph if_true() {
+graph if_true:f() {
   #9 = universe_getitem(x.2)
   return #9
 }
@@ -1340,12 +1340,12 @@ def test_if2():
   y.2 = make_handle(#1)
   #2 = universe_setitem(y.2, y)
   #3 = <built-in function truth>(b)
-  #4 = user_switch(#3, if_true, if_false)
+  #4 = user_switch(#3, if_true:f, if_false:f)
   #5 = #4()
   return #5
 }
 
-graph if_false() {
+graph if_false:f() {
   #6 = if_after()
   return #6
 }
@@ -1355,7 +1355,7 @@ graph if_after() {
   return #7
 }
 
-graph if_true() {
+graph if_true:f() {
   #8 = universe_setitem(y.2, 0)
   #9 = if_after()
   return #9

@@ -9,7 +9,7 @@ from typing import NamedTuple
 from .ir import Constant, Graph, Parameter
 from .ir.node import SEQ
 from .utils import ClosureNamespace, ModuleNamespace
-from .utils.info import debug_inherit, get_debug
+from .utils.info import about, debug_inherit, get_debug
 
 
 class Location(NamedTuple):
@@ -567,9 +567,13 @@ class Parser:
 
     def make_condition_blocks(self, block, tn, fn):
         """Make true/false branch blocks."""
-        with debug_inherit(name="if_true", location=self.make_location(tn)):
+        with about(
+            block.graph, relation="if_true", location=self.make_location(tn)
+        ):
             tb = block.function.new_block(block)
-        with debug_inherit(name="if_false", location=self.make_location(fn)):
+        with about(
+            block.graph, relation="if_false", location=self.make_location(fn)
+        ):
             fb = block.function.new_block(block)
         return tb, fb
 
