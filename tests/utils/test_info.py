@@ -189,3 +189,10 @@ def test_labeler_object_describer():
 
     lbl = Labeler(object_describer=descr)
     assert lbl(x1) == "12"
+
+
+def test_labeler_debuginfo():
+    di = DebugInfo(None, name="DI")
+
+    lbl = Labeler()
+    assert lbl(di) == "DI"
