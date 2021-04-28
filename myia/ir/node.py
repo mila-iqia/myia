@@ -1,7 +1,7 @@
 """Graph representation."""
 
 from myia.utils import Named
-from myia.utils.info import DebugInfo
+from myia.utils.info import make_debug
 
 FN = Named("$fn")
 SEQ = Named("$seq")
@@ -22,7 +22,7 @@ class Graph:
         self.kwargs = False
         self.defaults = {}
         self.kwonly = 0
-        self.debug = DebugInfo(obj=self)
+        self.debug = make_debug(obj=self)
 
     @property
     def output(self):
@@ -125,7 +125,7 @@ class Node:
     def __init__(self):
         self.abstract = None
         self.annotation = None
-        self.debug = DebugInfo(obj=self)
+        self.debug = make_debug(obj=self)
 
     def is_apply(self, value=None):
         """Check if this node is an `Apply` node.

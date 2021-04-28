@@ -70,13 +70,6 @@ class DebugInfo:
 
     """
 
-    def __new__(cls, *args, **kwargs):
-        """Checks if debug is enabled."""
-        if not _debug.get():
-            return None
-        else:
-            return super().__new__(cls)
-
     def __init__(self, obj=None, **kwargs):
         self.name = None
         self.about = None
@@ -120,6 +113,14 @@ class DebugInfo:
             rval.append((curr, curr.relation))
             curr = curr.about
         return rval
+
+
+def make_debug(obj=None, **kwargs):
+    """Returns either None or a DebugInfo, if in debug mode or not."""
+    if not _debug.get():
+        return None
+    else:
+        return DebugInfo(obj, **kwargs)
 
 
 @contextmanager
