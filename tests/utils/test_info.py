@@ -9,6 +9,7 @@ from myia.utils.info import (
     about,
     attach_debug_info,
     debug_inherit,
+    enable_debug,
 )
 
 
@@ -68,9 +69,10 @@ def test_about():
     o = Ob()
     info = DebugInfo(o, a=1, b=2)
 
-    with pytest.raises(TypeError):
-        with about(o, "shape"):
-            pass
+    with enable_debug():
+        with pytest.raises(TypeError):
+            with about(o, "shape"):
+                pass
 
     with about(info, "shape"):
         o2 = Ob()
@@ -141,7 +143,6 @@ def test_labeler(manyinfo):
     m = manyinfo
     lbl = Labeler()
     assert lbl(m.x1) == "toyota"
-    assert lbl(m.x1.debug) == "toyota"
     assert lbl(m.x2) == "apple:toyota"
     assert lbl(m.x2c) == "apple:toyota//2"
     assert lbl(m.x2b) == "apple:toyota//3"
@@ -176,7 +177,6 @@ def test_labeler_nonames():
 
     lbl = Labeler()
     assert lbl(x1) == "#1"
-    assert lbl(x1.debug) == "#1"
     assert lbl(x2) == "assassin:#1"
     assert lbl(x3) == "#2"
 
