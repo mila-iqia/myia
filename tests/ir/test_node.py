@@ -89,6 +89,21 @@ def test_constant():
 
 def test_graph_replace():
     g = Graph()
+    p = g.add_parameter("p")
+    a = g.apply("add", p, 0)
+    a2 = g.apply("add", p, a)
+    a2.add_edge(SEQ, a)
+    a3 = g.apply("op", a2, a)
+    a3.add_edge(SEQ, a2)
+    g.output = a3
+
+    r = {a: p}
+    r_s = {a: None}
+    g.replace(r, r_s)
+
+    assert g.output.edges[SEQ].node.edges[SEQ].node is None
+    assert g.output.edges[1].node is p
+    assert g.output.edges[0].node.edges[1].node is p
 
 
 def test_graph_add_debug():
