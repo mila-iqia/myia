@@ -202,7 +202,7 @@ class Apply(Node):
     def is_apply(self, value=None):
         """See `Node.is_apply`."""
         if value is not None:
-            fn = self.edges[FN]
+            fn = self.edges[FN].node
             return fn.is_constant() and fn.value is value
         else:
             return True
