@@ -754,10 +754,6 @@ class Parser:
         assert isinstance(node.ctx, ast.Load)
         return block.read(node.id)
 
-    def _process_NameConstant(self, block, node):
-        # removed in python 3.8
-        return Constant(node.value)  # pragma: no cover
-
     def _process_Slice(self, block, node):
         if node.lower is None:
             lower = Constant(None)
