@@ -52,7 +52,7 @@ def str_graph(g, allow_cycles=False, recursive=True):
         print(f"graph {nodecache(Constant(g))}(", file=buf, end="")
         print(
             ", ".join(
-                f"{nodecache(p)}{' : ' + str(p.astract) if p.abstract is not None else ''}"
+                f"{nodecache(p)}{': ' + str(p.abstract) if p.abstract is not None else ''}"
                 for p in g.parameters
             ),
             file=buf,
@@ -100,12 +100,11 @@ def str_graph(g, allow_cycles=False, recursive=True):
                     _print_node(node, buf, nodecache, offset=2)
 
         for node in reversed(applies):
-            if (
-                node.graph is not None and node.graph is not g
-            ) or node is g.return_:
+            if node.graph is not None and node.graph is not g:
                 continue
             _print_stragglers(node)
-            _print_node(node, buf, nodecache, offset=2)
+            if node is not g.return_:
+                _print_node(node, buf, nodecache, offset=2)
 
         print(f"  return {nodecache(g.output)}", file=buf)
         print("}", file=buf)
