@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 from .ir import Constant, Graph, Parameter
 from .ir.node import SEQ
-from .utils import ClosureNamespace, ModuleNamespace
+from .utils import ModuleNamespace
 from .utils.info import about, debug_inherit, get_debug
 
 
@@ -242,15 +242,12 @@ class Parser:
         self.line_offset -= 1
         self.filename = inspect.getfile(function)
         self.global_namespace = ModuleNamespace(function.__module__)
-        self.closure_namespace = ClosureNamespace(function)
         self.finalizers = {}
 
     def _eval_ast_node(self, node):
         text = ast.get_source_segment(self.src, node)
         # XXX: This needs the locals at the point of the annotation
-        # to match "old" python behaviour.  The closure_namespace doesn't
-        # have what we need since python doesn't keep a closure for
-        # annotations.
+        # to match "old" python behaviour.
 
         # We currently act as if "from __future__ import annotations" is
         # in effect, which means that we only need to care about globals.
