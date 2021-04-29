@@ -33,6 +33,22 @@ class StackVar:
 
 
 _stack = StackVar("_stack")
+_debug = ContextVar("debug", default=False)
+
+
+@contextmanager
+def enable_debug():
+    """Enable debugging for a context."""
+    tok = _debug.set(True)
+    try:
+        yield
+    finally:
+        _debug.reset(tok)
+
+
+def get_debug():
+    """Return whether debug is enabled or not."""
+    return _debug.get()
 
 
 def current_info():
@@ -55,7 +71,6 @@ class DebugInfo:
     """
 
     def __init__(self, obj=None, **kwargs):
-        """Construct a DebugInfo object."""
         self.name = None
         self.about = None
         self.relation = None
@@ -100,6 +115,14 @@ class DebugInfo:
         return rval
 
 
+def make_debug(obj=None, **kwargs):
+    """Returns either None or a DebugInfo, if in debug mode or not."""
+    if not _debug.get():
+        return None
+    else:
+        return DebugInfo(obj, **kwargs)
+
+
 @contextmanager
 def debug_inherit(**kwargs):
     """Context manager to automatically set attributes on DebugInfo.
@@ -126,7 +149,7 @@ def about(parent, relation, **kwargs):
     relation field set to the given relation.
     """
     parent = getattr(parent, "debug", parent)
-    if not isinstance(parent, DebugInfo):
+    if _debug.get() and not isinstance(parent, DebugInfo):
         raise TypeError("about() takes a DebugInfo or an object with debug")
     with debug_inherit(about=parent, relation=relation, **kwargs):
         yield
@@ -260,14 +283,18 @@ class Labeler:
             if (lbl := self.object_describer(obj)) is not None:
                 return lbl
             info = obj.debug
-        if info in self.cache:
-            return self.cache[info]
+        key = id(obj)
+        if key in self.cache:
+            return self.cache[key]
 
-        lbl = self.label(info)
+        if info is not None:
+            lbl = self.label(info)
+        else:
+            lbl = self.name_generator(next(self.name_id))
         self.generated_names[lbl] += 1
         n = self.generated_names[lbl]
         if n > 1:
             lbl = self.disambiguator(lbl, n)
 
-        self.cache[info] = lbl
+        self.cache[key] = lbl
         return lbl

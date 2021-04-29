@@ -11,3 +11,4 @@ myia_debug/
 docs/_build/
 docs/source/
 /.idea
+/.envrc

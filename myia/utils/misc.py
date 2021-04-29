@@ -1,13 +1,14 @@
 """Miscellaneous utilities."""
 
-# import builtins
+import builtins
+
 # import functools
 # from collections import deque
 # from typing import Any, Dict, List, TypeVar
 
 # import numpy as np
 
-# builtins_d = vars(builtins)
+builtins_d = vars(builtins)
 
 
 # T1 = TypeVar("T1")
@@ -283,76 +284,52 @@ ABSENT = Named("ABSENT")
 #         return f'NS({", ".join(args)})'
 
 
-# class Namespace:
-#     """Namespace in which to resolve variables."""
+class Namespace:
+    """Namespace in which to resolve variables."""
 
-#     def __init__(self, label, *dicts):
-#         """Initialize a namespace.
+    def __init__(self, label, *dicts):
+        """Initialize a namespace.
 
-#         Arguments:
-#             label: The namespace's name.
-#             dicts: A list of dictionaries containing the namespace's data,
-#                 which are consulted sequentially.
+        Arguments:
+            label: The namespace's name.
+            dicts: A list of dictionaries containing the namespace's data,
+                which are consulted sequentially.
 
-#         """
-#         self.label = label
-#         self.dicts = dicts
+        """
+        self.label = label
+        self.dicts = dicts
 
-#     def __contains__(self, name):
-#         for d in self.dicts:
-#             if name in d:
-#                 return True
-#         else:
-#             return False
+    def __contains__(self, name):
+        for d in self.dicts:
+            if name in d:
+                return True
+        else:
+            return False
 
-#     def __getitem__(self, name):
-#         for d in self.dicts:
-#             if name in d:
-#                 return d[name]
-#         else:
-#             raise NameError(name)
+    def __getitem__(self, name):
+        for d in self.dicts:
+            if name in d:
+                return d[name]
+        else:
+            raise NameError(name)
 
-#     def __repr__(self):
-#         return f":{self.label}"  # pragma: no cover
-
-
-# class ModuleNamespace(Namespace):
-#     """Namespace that represents a Python module."""
-
-#     def __init__(self, name):
-#         """Initialize a ModuleNamespace.
-
-#         Arguments:
-#             name: Qualified name for the module. Must be possible
-#                 to `__import__` it.
-
-#         """
-#         mod = vars(__import__(name, fromlist=["_"]))
-#         super().__init__(name, mod, builtins_d)
+    def __repr__(self):
+        return f":{self.label}"  # pragma: no cover
 
 
-# class ClosureNamespace(Namespace):
-#     """Namespace that represents a function's closure."""
+class ModuleNamespace(Namespace):
+    """Namespace that represents a Python module."""
 
-#     def __init__(self, fn):
-#         """Initialize a ClosureNamespace.
+    def __init__(self, name):
+        """Initialize a ModuleNamespace.
 
-#         Arguments:
-#             fn: The function.
+        Arguments:
+            name: Qualified name for the module. Must be possible
+                to `__import__` it.
 
-#         """
-#         lbl = f"{fn.__module__}..<{fn.__name__}>"
-#         names = fn.__code__.co_freevars
-#         cells = fn.__closure__
-#         ns = dict(zip(names, cells or ()))
-#         super().__init__(lbl, ns)
-
-#     def __getitem__(self, name):
-#         (d,) = self.dicts
-#         try:
-#             return d[name].cell_contents
-#         except ValueError:
-#             raise UnboundLocalError(name)
+        """
+        mod = vars(__import__(name, fromlist=["_"]))
+        super().__init__(name, mod, builtins_d)
 
 
 # def is_dataclass_type(cls):
@@ -592,4 +569,5 @@ ABSENT = Named("ABSENT")
 __all__ = [
     "ABSENT",
     "Named",
+    "ModuleNamespace",
 ]
