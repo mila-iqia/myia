@@ -332,30 +332,6 @@ class ModuleNamespace(Namespace):
         super().__init__(name, mod, builtins_d)
 
 
-class ClosureNamespace(Namespace):
-    """Namespace that represents a function's closure."""
-
-    def __init__(self, fn):
-        """Initialize a ClosureNamespace.
-
-        Arguments:
-            fn: The function.
-
-        """
-        lbl = f"{fn.__module__}..<{fn.__name__}>"
-        names = fn.__code__.co_freevars
-        cells = fn.__closure__
-        ns = dict(zip(names, cells or ()))
-        super().__init__(lbl, ns)
-
-    def __getitem__(self, name):
-        (d,) = self.dicts
-        try:
-            return d[name].cell_contents
-        except ValueError:
-            raise UnboundLocalError(name)
-
-
 # def is_dataclass_type(cls):
 #     """Returns whether cls is a dataclass."""
 #     return isinstance(cls, type) and hasattr(cls, "__dataclass_fields__")
@@ -593,6 +569,5 @@ class ClosureNamespace(Namespace):
 __all__ = [
     "ABSENT",
     "Named",
-    "ClosureNamespace",
     "ModuleNamespace",
 ]
