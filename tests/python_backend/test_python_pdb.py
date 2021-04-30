@@ -5,12 +5,13 @@ To deal with it, code with PDB is executed in a separate process. This seems
 enough to make coverage work again.
 """
 import io
-import operator
 import multiprocessing
+import operator
 import os
-from myia.utils.info import enable_debug
-from myia.parser import parse
+
 from myia.compile.backends.python.python import compile_graph
+from myia.parser import parse
+from myia.utils.info import enable_debug
 
 
 def parse_and_compile(function):
@@ -34,7 +35,9 @@ def run_pdb(return_cell, *args):
         return y + z + x
 
     fn, output = parse_and_compile(f)
-    assert output == """# Dynamic external import: operator
+    assert (
+        output
+        == """# Dynamic external import: operator
 
 def f(a, b, c, d):
   x = a ** b
@@ -44,6 +47,7 @@ def f(a, b, c, d):
   _apply2 = y + z
   return _apply2 + x
 """
+    )
 
     wd = os.getcwd()
     # Change working directory to use local .pdbrc

@@ -1,49 +1,42 @@
 """Global implementations useful for compiled modules."""
 from collections import Counter
-from types import FunctionType
 
 from ovld import ovld
 
 
-@ovld  # noqa: F811
+@ovld
 def myia_iter(obj: range):
     return obj
 
 
-@ovld  # noqa: F811
-def myia_iter(obj: tuple):
+@ovld
+def myia_iter(obj: tuple):  # noqa: F811
     return obj
 
 
-@ovld  # noqa: F811
+@ovld
 def myia_hasnext(obj: range):
     return obj.start < obj.stop
 
 
-@ovld  # noqa: F811
-def myia_hasnext(obj: tuple):
+@ovld
+def myia_hasnext(obj: tuple):  # noqa: F811
     return bool(obj)
 
 
-@ovld  # noqa: F811
+@ovld
 def myia_next(obj: range):
     return obj.start, range(obj.start + obj.step, obj.stop, obj.step)
 
 
-@ovld  # noqa: F811
-def myia_next(obj: tuple):
+@ovld
+def myia_next(obj: tuple):  # noqa: F811
     return obj[0], obj[1:]
 
 
-@ovld  # noqa: F811
 def typeof(obj: object):
+    """Implementation for apply `typeof`."""
     return type(obj)
-
-
-@ovld  # noqa: F811
-def typeof(obj: FunctionType):
-    # If object is a function, we return it as it is.
-    return obj
 
 
 class MakeHandle:
@@ -54,10 +47,7 @@ class MakeHandle:
         self.counter = Counter()
 
     def __call__(self, object_type):
-        # If object type is a function, make sure
-        # to always generate the same handle.
-        if isinstance(object_type, FunctionType):
-            return f"function_{id(object_type)}"
+        """Generate an handle for given object type."""
         name = object_type.__name__
         self.counter.update([name])
         count = self.counter[name]

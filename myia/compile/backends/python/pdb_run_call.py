@@ -1,11 +1,16 @@
+"""Helper class to support `pdb` option for Python backend."""
+
+
 class PdbRunCall:
     """Helper class to run code with PDB.
+
     We want PDB to be able to display code using `list .` command, so
     we need to save code into a file and import it as a valid module later.
     """
 
     def __init__(self, code, name, symbols):
         """Initialize.
+
         :param code: code to compile
         :param name: name of function to run
         :param external_symbols: external symbols needed to execute the code.

@@ -1,8 +1,6 @@
 import io
-
-import pytest
-import operator
 import math
+import operator
 
 from myia.compile.backends.python.python import compile_graph
 from myia.ir.print import str_graph
@@ -478,7 +476,8 @@ def test_no_debug():
 
     fn, output = parse_and_compile(f, debug=False)
 
-    assert output == ("""# Dynamic external import: typeof
+    assert output == (
+        """# Dynamic external import: typeof
 # Dynamic external import: make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
@@ -556,7 +555,8 @@ def _graph1(_parameter1):
 
   _apply37 = _graph4 if _apply17 else _graph3
   return _apply37()
-""")
+"""
+    )
 
     # TODO There is currently a bug with universe_getitem called with an unreachable key.
     # Thus, compiled code can't currently run.
@@ -577,13 +577,15 @@ def test_constants():
         i = {}
         j = {"a": "1", True: 2}
         k = dict()
-        l = dict(a=1, b=2)
-        m = operator.add
-        n = math.sin
-        return a, b, c, d, e, g, h, i, j, k, l, m, n
+        m = dict(a=1, b=2)
+        n = operator.add
+        p = math.sin
+        return a, b, c, d, e, g, h, i, j, k, m, n, p
 
     fn, output = parse_and_compile(f)
-    assert output == """# Dynamic external import: operator
+    assert (
+        output
+        == """# Dynamic external import: operator
 # Dynamic external import: math
 
 def f():
@@ -598,9 +600,10 @@ def f():
   k = dict()
   _apply3 = {'a': 1, 'b': 2}
   _apply4 = ()
-  l = dict(*_apply4, **_apply3)
-  m = operator.add
-  n = math.sin
-  return (3, b, c, True, 'a string', g, h, i, j, k, l, m, n)
+  m = dict(*_apply4, **_apply3)
+  n = operator.add
+  p = math.sin
+  return (3, b, c, True, 'a string', g, h, i, j, k, m, n, p)
 """
+    )
     assert fn()[4] == "a string"

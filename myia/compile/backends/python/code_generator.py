@@ -1,15 +1,24 @@
+"""Code generator used to generate compiled code."""
+
 import builtins
 import operator
 from collections import Counter
 
 from myia.compile.backends.python.directed_graph import DirectedGraph
-from myia.compile.backends.python.implementations import MakeHandle, myia_hasnext, myia_iter, myia_next, typeof, \
-    Universe
+from myia.compile.backends.python.implementations import (
+    MakeHandle,
+    Universe,
+    myia_hasnext,
+    myia_iter,
+    myia_next,
+    typeof,
+)
 from myia.ir import Node
 from myia.utils.info import Labeler
 
 
-def default_str(c, format_string, nodes):
+def default_formatter(c, format_string, nodes):
+    """Generate code using given format string and input nodes."""
     return format_string.format(*[c.label(node) for node in nodes])
 
 
@@ -29,16 +38,26 @@ def str_make_list(c, *inputs):
 
 
 def str_make_dict(c, *inputs):
+    """Formatter for apply `make_dict`."""
     assert not len(inputs) % 2
     pairs = [c.rvalue(inp) for inp in inputs]
-    return '{' + ', '.join('{}: {}'.format(pairs[2 * i], pairs[2 * i + 1]) for i in range(len(pairs) // 2)) + '}'
+    return (
+        "{"
+        + ", ".join(
+            "{}: {}".format(pairs[2 * i], pairs[2 * i + 1])
+            for i in range(len(pairs) // 2)
+        )
+        + "}"
+    )
 
 
 def str_apply(c, fn, args, kwargs):
+    """Formatter for apply `apply`, which seems to represent a call with args and kwargs."""
     return f"{c.label(fn)}(*{c.rvalue(args)}, **{c.rvalue(kwargs)})"
 
 
 def str_getattr(c, *params):
+    """Formatter for apply getattr."""
     assert len(params) in (2, 3)
     if len(params) == 2:
         obj, symb = params
@@ -88,7 +107,13 @@ COMPLEX_MAP = {
 
 
 class NodeLabeler:
+    """Node labeler used in Python backend.
+
+    Combine a Labeler (from myia.utils.info) and a node cache to generate default names when necessary.
+    """
+
     def __init__(self):
+        """Initialize."""
         self.cache = {}
         self.default_name_counter = Counter()
         self.lbl = Labeler(
@@ -99,7 +124,9 @@ class NodeLabeler:
         )
 
     def __call__(self, node):
+        """Generate label for given node."""
         if isinstance(node, Node) and node.is_constant_graph():
+            # Use labeler for graph in constant node.
             return self.lbl(node.value)
         else:
             # Use labeler for anything else.
@@ -180,7 +207,9 @@ class CodeGenerator:
         fn = node.fn
         if fn.is_constant():
             if fn.value in SIMPLE_MAP:
-                return default_str(self, SIMPLE_MAP[fn.value], node.inputs)
+                return default_formatter(
+                    self, SIMPLE_MAP[fn.value], node.inputs
+                )
             elif fn.value in COMPLEX_MAP:
                 return COMPLEX_MAP[fn.value](self, *node.inputs)
             elif fn.value in self.module_implementations:
@@ -228,7 +257,7 @@ class CodeGenerator:
         :return: a nested list with two values:
             [function header code: str, function body code: list]
         """
-        graph = directed.data  # type: Graph
+        graph = directed.data
         header = f"def {self.label(graph)}({', '.join(self.label(p) for p in graph.parameters)}):"
         code = []
 

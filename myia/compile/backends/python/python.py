@@ -142,6 +142,8 @@ class GraphToModule(_GraphConverter):
 
 
 class PythonBackend:
+    """Python backend main class."""
+
     def __init__(self, debug=False, pdb=False):
         """Initialize.
 
