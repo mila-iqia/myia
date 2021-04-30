@@ -54,27 +54,27 @@ def abstract_all(self, x: data.Tracks, **kwargs):
     return all(self(v, **kwargs) for v in x.values())
 
 
-@ovld  # noqa: F811
-def abstract_all(self, x: data.AbstractAtom, **kwargs):
+@ovld
+def abstract_all(self, x: data.AbstractAtom, **kwargs):  # noqa: F811
     return self(x.tracks, **kwargs)
 
 
-@ovld  # noqa: F811
-def abstract_all(self, xs: data.AbstractStructure, **kwargs):
+@ovld
+def abstract_all(self, xs: data.AbstractStructure, **kwargs):  # noqa: F811
     return self(xs.tracks, **kwargs) and all(
         self(x, **kwargs) for x in xs.elements
     )
 
 
-@ovld  # noqa: F811
-def abstract_all(self, xs: data.AbstractUnion, **kwargs):
+@ovld
+def abstract_all(self, xs: data.AbstractUnion, **kwargs):  # noqa: F811
     return self(xs.tracks, **kwargs) and all(
         self(x, **kwargs) for x in xs.options
     )
 
 
-@ovld  # noqa: F811
-def abstract_all(self, xs: object, **kwargs):
+@ovld
+def abstract_all(self, xs: object, **kwargs):  # noqa: F811
     return True
 
 
@@ -88,27 +88,27 @@ def abstract_any(self, x: data.Tracks, **kwargs):
     return any(self(v, **kwargs) for v in x.values())
 
 
-@ovld  # noqa: F811
-def abstract_any(self, x: data.AbstractAtom, **kwargs):
+@ovld
+def abstract_any(self, x: data.AbstractAtom, **kwargs):  # noqa: F811
     return self(x.tracks, **kwargs)
 
 
-@ovld  # noqa: F811
-def abstract_any(self, xs: data.AbstractStructure, **kwargs):
+@ovld
+def abstract_any(self, xs: data.AbstractStructure, **kwargs):  # noqa: F811
     return self(xs.tracks, **kwargs) or any(
         self(x, **kwargs) for x in xs.elements
     )
 
 
-@ovld  # noqa: F811
-def abstract_any(self, xs: data.AbstractUnion, **kwargs):
+@ovld
+def abstract_any(self, xs: data.AbstractUnion, **kwargs):  # noqa: F811
     return self(xs.tracks, **kwargs) or any(
         self(x, **kwargs) for x in xs.options
     )
 
 
-@ovld  # noqa: F811
-def abstract_any(self, xs: object, **kwargs):
+@ovld
+def abstract_any(self, xs: object, **kwargs):  # noqa: F811
     return False
 
 
@@ -181,32 +181,32 @@ def abstract_map(self, x, **kwargs):
         return proceed()
 
 
-@ovld  # noqa: F811
-def abstract_map(self, d: data.Tracks, **kwargs):
+@ovld
+def abstract_map(self, d: data.Tracks, **kwargs):  # noqa: F811
     return data.Tracks({k: self(v, **kwargs) for k, v in d.items()})
 
 
-@ovld  # noqa: F811
-def abstract_map(self, x: data.AbstractAtom, **kwargs):
+@ovld
+def abstract_map(self, x: data.AbstractAtom, **kwargs):  # noqa: F811
     return type(x)(self(x.tracks, **kwargs))
 
 
-@ovld  # noqa: F811
-def abstract_map(self, x: data.AbstractStructure, **kwargs):
+@ovld
+def abstract_map(self, x: data.AbstractStructure, **kwargs):  # noqa: F811
     return (yield type(x))(
         [self(elem, **kwargs) for elem in x.elements], self(x.tracks, **kwargs)
     )
 
 
-@ovld  # noqa: F811
-def abstract_map(self, x: data.AbstractUnion, **kwargs):
+@ovld
+def abstract_map(self, x: data.AbstractUnion, **kwargs):  # noqa: F811
     return (yield type(x))(
         [self(opt, **kwargs) for opt in x.options], self(x.tracks, **kwargs)
     )
 
 
-@ovld  # noqa: F811
-def abstract_map(self, x: object, **kwargs):
+@ovld
+def abstract_map(self, x: object, **kwargs):  # noqa: F811
     return x
 
 
@@ -261,8 +261,8 @@ def abstract_map2(self, x, y, **kwargs):
         )
 
 
-@ovld  # noqa: F811
-def abstract_map2(self, x: data.Tracks, y: data.Tracks, **kwargs):
+@ovld
+def abstract_map2(self, x: data.Tracks, y: data.Tracks, **kwargs):  # noqa: F811
     tracks = {**x._tracks, **y._tracks}
     return data.Tracks(
         {
@@ -272,14 +272,16 @@ def abstract_map2(self, x: data.Tracks, y: data.Tracks, **kwargs):
     )
 
 
-@ovld  # noqa: F811
-def abstract_map2(self, x: data.AbstractAtom, y: data.AbstractAtom, **kwargs):
+@ovld
+def abstract_map2(  # noqa: F811
+    self, x: data.AbstractAtom, y: data.AbstractAtom, **kwargs
+):
     assert type(x) is type(y)
     return type(x)(tracks=self(x.tracks, y.tracks, **kwargs))
 
 
-@ovld  # noqa: F811
-def abstract_map2(
+@ovld
+def abstract_map2(  # noqa: F811
     self, x: data.AbstractStructure, y: data.AbstractStructure, **kwargs
 ):
     assert type(x) is type(y)
@@ -292,8 +294,10 @@ def abstract_map2(
     )
 
 
-@ovld  # noqa: F811
-def abstract_map2(self, x: data.AbstractUnion, y: data.AbstractUnion, **kwargs):
+@ovld
+def abstract_map2(  # noqa: F811
+    self, x: data.AbstractUnion, y: data.AbstractUnion, **kwargs
+):
     # TODO: this should be more like merging sets
 
     assert type(x) is type(y)
@@ -306,6 +310,6 @@ def abstract_map2(self, x: data.AbstractUnion, y: data.AbstractUnion, **kwargs):
     )
 
 
-@ovld  # noqa: F811
-def abstract_map2(self, x: object, y: object, **kwargs):
+@ovld
+def abstract_map2(self, x: object, y: object, **kwargs):  # noqa: F811
     raise MapError(x, y, reason="Cannot merge objects")
