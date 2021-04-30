@@ -43,7 +43,6 @@ class MakeHandle:
     """Helper class for apply `make_handle`."""
 
     def __init__(self):
-        """Initialize."""
         self.counter = Counter()
 
     def __call__(self, object_type):
@@ -58,7 +57,6 @@ class Universe:
     """Helper class for Universe."""
 
     def __init__(self):
-        """Initialize."""
         self.universe = {}
 
     def setitem(self, key, value):

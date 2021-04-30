@@ -8,8 +8,6 @@ from myia.utils.info import enable_debug
 def parse_and_compile(function):
     with enable_debug():
         graph = parse(function)
-    # from myia.ir.print import str_graph
-    # print(str_graph(graph))
     return compile_graph(graph, debug=True)
 
 

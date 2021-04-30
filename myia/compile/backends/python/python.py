@@ -108,7 +108,6 @@ class GraphToModule(_GraphConverter):
     """
 
     def __init__(self):
-        """Initialize."""
         self.todo_graphs = []
 
     def has_directed(self, node):

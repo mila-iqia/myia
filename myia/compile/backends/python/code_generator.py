@@ -110,7 +110,6 @@ class NodeLabeler:
     """
 
     def __init__(self):
-        """Initialize."""
         self.cache = {}
         self.default_name_counter = Counter()
         self.lbl = Labeler(
@@ -163,7 +162,6 @@ class CodeGenerator:
     """Helper class to convert graph and nodes to code string."""
 
     def __init__(self):
-        """Initialize."""
         universe = Universe()
         self.inline_nodes = {}
         self.lbl = NodeLabeler()
