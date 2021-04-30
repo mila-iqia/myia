@@ -41,11 +41,11 @@ def run_pdb(return_cell, *args):
 
 def f(a, b, c, d):
   x = a ** b
-  _apply1 = operator.mul
-  y = _apply1(x, c)
+  _1 = operator.mul
+  y = _1(x, c)
   z = x / d
-  _apply2 = y + z
-  return _apply2 + x
+  _2 = y + z
+  return _2 + x
 """
     )
 

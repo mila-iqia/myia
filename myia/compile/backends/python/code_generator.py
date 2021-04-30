@@ -134,7 +134,7 @@ class NodeLabeler:
 
     @classmethod
     def _name_generator(cls, identifier):
-        return f"_apply{identifier}"
+        return f"_{identifier}"
 
     @classmethod
     def _disambiguator(cls, label, id):
@@ -147,15 +147,6 @@ class NodeLabeler:
             and not node.is_constant_graph()
         ):
             return str(node.value)
-
-        if node.debug:
-            return None
-
-        if node not in self.cache:
-            name = f"_{type(node).__name__.lower()}"
-            self.default_name_counter.update([name])
-            self.cache[node] = f"{name}{self.default_name_counter[name]}"
-        return self.cache[node]
 
 
 class CodeGenerator:

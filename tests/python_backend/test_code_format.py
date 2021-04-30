@@ -41,13 +41,13 @@ def test_operations():
         == """def f(x, y):
   a = x + y
   b = x - y
-  _apply1 = 2 * x
-  _apply2 = 3 * a
-  _apply3 = _apply1 + _apply2
-  _apply4 = 5 * b
-  c = _apply3 - _apply4
-  _apply5 = c + b
-  return _apply5 + y
+  _1 = 2 * x
+  _2 = 3 * a
+  _3 = _1 + _2
+  _4 = 5 * b
+  c = _3 - _4
+  _5 = c + b
+  return _5 + y
 """
     )
     assert f(1, 2) == fn(1, 2)
@@ -155,13 +155,13 @@ def test_ifexp():
 # Dynamic external import: universe_getitem
 
 def f(x, y, b):
-  _apply1 = typeof(x)
-  _apply2 = typeof(y)
-  _x_2 = make_handle(_apply1)
-  _y_2 = make_handle(_apply2)
-  _apply3 = universe_setitem(_x_2, x)
-  _apply4 = universe_setitem(_y_2, y)
-  _apply5 = bool(b)
+  _1 = typeof(x)
+  _2 = typeof(y)
+  _x_2 = make_handle(_1)
+  _y_2 = make_handle(_2)
+  _3 = universe_setitem(_x_2, x)
+  _4 = universe_setitem(_y_2, y)
+  _5 = bool(b)
 
   def if_false_f():
     return universe_getitem(_y_2)
@@ -169,8 +169,8 @@ def f(x, y, b):
   def if_true_f():
     return universe_getitem(_x_2)
 
-  _apply6 = if_true_f if _apply5 else if_false_f
-  return _apply6()
+  _6 = if_true_f if _5 else if_false_f
+  return _6()
 """
     )
     assert f(2, 3, 0) == fn(2, 3, 0) == 3
@@ -190,13 +190,13 @@ def test_boolop():
 # Dynamic external import: universe_getitem
 
 def f(a, b, c):
-  _apply1 = typeof(b)
-  _apply2 = typeof(c)
-  _b_2 = make_handle(_apply1)
-  _c_2 = make_handle(_apply2)
-  _apply3 = universe_setitem(_b_2, b)
-  _apply4 = universe_setitem(_c_2, c)
-  _apply5 = bool(a)
+  _1 = typeof(b)
+  _2 = typeof(c)
+  _b_2 = make_handle(_1)
+  _c_2 = make_handle(_2)
+  _3 = universe_setitem(_b_2, b)
+  _4 = universe_setitem(_c_2, c)
+  _5 = bool(a)
 
   def if_false_f():
     return False
@@ -204,9 +204,9 @@ def f(a, b, c):
   def if_true_f():
     return universe_getitem(_b_2)
 
-  _apply6 = if_true_f if _apply5 else if_false_f
-  _apply7 = _apply6()
-  _apply8 = bool(_apply7)
+  _6 = if_true_f if _5 else if_false_f
+  _7 = _6()
+  _8 = bool(_7)
 
   def _if_false_f_2():
     return universe_getitem(_c_2)
@@ -214,8 +214,8 @@ def f(a, b, c):
   def _if_true_f_2():
     return True
 
-  _apply9 = _if_true_f_2 if _apply8 else _if_false_f_2
-  return _apply9()
+  _9 = _if_true_f_2 if _8 else _if_false_f_2
+  return _9()
 """
     )
     assert f(1, 2, 3) == 2 and fn(1, 2, 3) is True
@@ -235,22 +235,22 @@ def test_compare2():
 # Dynamic external import: universe_getitem
 
 def f(x):
-  _apply1 = typeof(x)
-  _x_2 = make_handle(_apply1)
-  _apply2 = universe_setitem(_x_2, x)
-  _apply3 = universe_getitem(_x_2)
-  _apply4 = 0 < _apply3
-  _apply5 = bool(_apply4)
+  _1 = typeof(x)
+  _x_2 = make_handle(_1)
+  _2 = universe_setitem(_x_2, x)
+  _3 = universe_getitem(_x_2)
+  _4 = 0 < _3
+  _5 = bool(_4)
 
   def if_false_f():
     return False
 
   def if_true_f():
-    _apply6 = universe_getitem(_x_2)
-    return _apply6 < 42
+    _6 = universe_getitem(_x_2)
+    return _6 < 42
 
-  _apply7 = if_true_f if _apply5 else if_false_f
-  return _apply7()
+  _7 = if_true_f if _5 else if_false_f
+  return _7()
 """
     )
     assert f(1) is fn(1) is True
@@ -275,13 +275,13 @@ def test_if():
 # Dynamic external import: universe_getitem
 
 def f(b, x, y):
-  _apply1 = typeof(x)
-  _apply2 = typeof(y)
-  _x_2 = make_handle(_apply1)
-  _y_2 = make_handle(_apply2)
-  _apply3 = universe_setitem(_x_2, x)
-  _apply4 = universe_setitem(_y_2, y)
-  _apply5 = bool(b)
+  _1 = typeof(x)
+  _2 = typeof(y)
+  _x_2 = make_handle(_1)
+  _y_2 = make_handle(_2)
+  _3 = universe_setitem(_x_2, x)
+  _4 = universe_setitem(_y_2, y)
+  _5 = bool(b)
 
   def if_false_f():
     return universe_getitem(_y_2)
@@ -289,8 +289,8 @@ def f(b, x, y):
   def if_true_f():
     return universe_getitem(_x_2)
 
-  _apply6 = if_true_f if _apply5 else if_false_f
-  return _apply6()
+  _6 = if_true_f if _5 else if_false_f
+  return _6()
 """
     )
     assert f(0, 1, 2) == fn(0, 1, 2) == 2
@@ -312,17 +312,17 @@ def test_if2():
 # Dynamic external import: universe_getitem
 
 def f(b, x, y):
-  _apply1 = typeof(x)
-  _apply2 = typeof(y)
-  _x_2 = make_handle(_apply1)
-  _y_2 = make_handle(_apply2)
-  _apply3 = universe_setitem(_x_2, x)
-  _apply4 = universe_setitem(_y_2, y)
+  _1 = typeof(x)
+  _2 = typeof(y)
+  _x_2 = make_handle(_1)
+  _y_2 = make_handle(_2)
+  _3 = universe_setitem(_x_2, x)
+  _4 = universe_setitem(_y_2, y)
 
   def if_after():
     return universe_getitem(_y_2)
 
-  _apply5 = bool(b)
+  _5 = bool(b)
 
   def if_false_f():
     return if_after()
@@ -330,8 +330,8 @@ def f(b, x, y):
   def if_true_f():
     return universe_getitem(_x_2)
 
-  _apply6 = if_true_f if _apply5 else if_false_f
-  return _apply6()
+  _6 = if_true_f if _5 else if_false_f
+  return _6()
 """
     )
     assert f(0, 1, 2) == fn(0, 1, 2) == 2
@@ -353,21 +353,21 @@ def test_while():
 # Dynamic external import: universe_getitem
 
 def f(b, x, y):
-  _apply1 = typeof(b)
-  _apply2 = typeof(x)
-  _b_2 = make_handle(_apply1)
-  _apply3 = typeof(y)
-  _x_2 = make_handle(_apply2)
-  _apply4 = universe_setitem(_b_2, b)
-  _y_2 = make_handle(_apply3)
-  _apply5 = universe_setitem(_x_2, x)
-  _apply6 = universe_setitem(_y_2, y)
+  _1 = typeof(b)
+  _2 = typeof(x)
+  _b_2 = make_handle(_1)
+  _3 = typeof(y)
+  _x_2 = make_handle(_2)
+  _4 = universe_setitem(_b_2, b)
+  _y_2 = make_handle(_3)
+  _5 = universe_setitem(_x_2, x)
+  _6 = universe_setitem(_y_2, y)
 
   def while_header():
     def while_after():
       return universe_getitem(_y_2)
 
-    _apply7 = universe_getitem(_b_2)
+    _7 = universe_getitem(_b_2)
 
     def while_else():
       return while_after()
@@ -375,8 +375,8 @@ def f(b, x, y):
     def while_body():
       return universe_getitem(_x_2)
 
-    _apply8 = while_body if _apply7 else while_else
-    return _apply8()
+    _8 = while_body if _7 else while_else
+    return _8()
 
   return while_header()
 """
@@ -400,27 +400,27 @@ def test_while2():
 # Dynamic external import: universe_getitem
 
 def f(x):
-  _apply1 = typeof(x)
-  _x_2 = make_handle(_apply1)
-  _apply2 = universe_setitem(_x_2, x)
+  _1 = typeof(x)
+  _x_2 = make_handle(_1)
+  _2 = universe_setitem(_x_2, x)
 
   def while_header():
     def while_after():
       return universe_getitem(_x_2)
 
-    _apply3 = universe_getitem(_x_2)
+    _3 = universe_getitem(_x_2)
 
     def while_else():
       return while_after()
 
     def while_body():
-      _apply4 = universe_getitem(_x_2)
-      _apply5 = _apply4 - 1
-      _apply6 = universe_setitem(_x_2, _apply5)
+      _4 = universe_getitem(_x_2)
+      _5 = _4 - 1
+      _6 = universe_setitem(_x_2, _5)
       return while_header()
 
-    _apply7 = while_body if _apply3 else while_else
-    return _apply7()
+    _7 = while_body if _3 else while_else
+    return _7()
 
   return while_header()
 """
@@ -439,25 +439,25 @@ def test_recursion():
 # Dynamic external import: factorial
 
 def factorial(n):
-  _apply1 = typeof(n)
-  _n_2 = make_handle(_apply1)
-  _apply2 = universe_setitem(_n_2, n)
-  _apply3 = universe_getitem(_n_2)
-  _apply4 = _apply3 < 2
-  _apply5 = bool(_apply4)
+  _1 = typeof(n)
+  _n_2 = make_handle(_1)
+  _2 = universe_setitem(_n_2, n)
+  _3 = universe_getitem(_n_2)
+  _4 = _3 < 2
+  _5 = bool(_4)
 
   def if_false_factorial():
-    _apply6 = universe_getitem(_n_2)
-    _apply7 = universe_getitem(_n_2)
-    _apply8 = _apply7 - 1
-    _apply9 = factorial(_apply8)
-    return _apply6 * _apply9
+    _6 = universe_getitem(_n_2)
+    _7 = universe_getitem(_n_2)
+    _8 = _7 - 1
+    _9 = factorial(_8)
+    return _6 * _9
 
   def if_true_factorial():
     return 1
 
-  _apply10 = if_true_factorial if _apply5 else if_false_factorial
-  return _apply10()
+  _10 = if_true_factorial if _5 else if_false_factorial
+  return _10()
 """
     )
     assert fn(5) == 120
@@ -486,75 +486,75 @@ def test_no_debug():
 # Dynamic external import: python_hasnext
 # Dynamic external import: python_next
 
-def _graph1(_parameter1):
-  _apply1 = typeof(_parameter1)
-  _apply2 = typeof(10)
-  _apply3 = make_handle(_apply1)
-  _apply4 = make_handle(_apply2)
-  _apply5 = universe_setitem(_apply3, _parameter1)
-  _apply6 = universe_setitem(_apply4, 10)
-  _apply7 = universe_getitem(_apply3)
-  _apply8 = _apply7 % 2
-  _apply9 = _apply8 == 0
+def _1(_2):
+  _3 = typeof(_2)
+  _4 = typeof(10)
+  _5 = make_handle(_3)
+  _6 = make_handle(_4)
+  _7 = universe_setitem(_5, _2)
+  _8 = universe_setitem(_6, 10)
+  _9 = universe_getitem(_5)
+  _10 = _9 % 2
+  _11 = _10 == 0
 
-  def _graph2():
-    _apply10 = typeof(0)
-    _apply11 = universe_getitem(_apply3)
-    _apply12 = make_handle(_apply10)
-    _apply13 = factorial(_apply11)
-    _apply14 = universe_getitem(_apply12)
-    _apply15 = _apply13 - _apply14
-    _apply16 = universe_getitem(_apply4)
-    return _apply15 + _apply16
+  def _12():
+    _13 = typeof(0)
+    _14 = universe_getitem(_5)
+    _15 = make_handle(_13)
+    _16 = factorial(_14)
+    _17 = universe_getitem(_15)
+    _18 = _16 - _17
+    _19 = universe_getitem(_6)
+    return _18 + _19
 
-  _apply17 = bool(_apply9)
+  _20 = bool(_11)
 
-  def _graph3():
-    _apply18 = universe_getitem(_apply3)
-    _apply19 = _apply18 ** 2
-    _apply20 = universe_getitem(_apply3)
-    _apply21 = 2 * _apply20
-    _apply10 = typeof(0)
-    _apply22 = _apply19 + _apply21
-    _apply12 = make_handle(_apply10)
-    _apply23 = _apply22 + 1
-    _apply24 = universe_setitem(_apply12, _apply23)
-    return _graph2()
+  def _21():
+    _22 = universe_getitem(_5)
+    _23 = _22 ** 2
+    _24 = universe_getitem(_5)
+    _25 = 2 * _24
+    _13 = typeof(0)
+    _26 = _23 + _25
+    _15 = make_handle(_13)
+    _27 = _26 + 1
+    _28 = universe_setitem(_15, _27)
+    return _12()
 
-  def _graph4():
-    _apply10 = typeof(0)
-    _apply12 = make_handle(_apply10)
-    _apply25 = universe_setitem(_apply12, 0)
-    _apply26 = universe_getitem(_apply3)
-    _apply27 = range(_apply26)
+  def _29():
+    _13 = typeof(0)
+    _15 = make_handle(_13)
+    _30 = universe_setitem(_15, 0)
+    _31 = universe_getitem(_5)
+    _32 = range(_31)
 
-    def _graph5():
-      return _graph2()
+    def _33():
+      return _12()
 
-    _apply28 = python_iter(_apply27)
+    _34 = python_iter(_32)
 
-    def _graph6(_parameter2):
-      _apply29 = python_hasnext(_parameter2)
+    def _35(_36):
+      _37 = python_hasnext(_36)
 
-      def _graph7():
-        return _graph5()
+      def _38():
+        return _33()
 
-      def _graph8():
-        _apply30 = python_next(_parameter2)
-        _apply31 = _apply30[0]
-        _apply32 = _apply30[1]
-        _apply33 = universe_getitem(_apply12)
-        _apply34 = _apply33 + _apply31
-        _apply35 = universe_setitem(_apply12, _apply34)
-        return _graph6(_apply32)
+      def _39():
+        _40 = python_next(_36)
+        _41 = _40[0]
+        _42 = _40[1]
+        _43 = universe_getitem(_15)
+        _44 = _43 + _41
+        _45 = universe_setitem(_15, _44)
+        return _35(_42)
 
-      _apply36 = _graph8 if _apply29 else _graph7
-      return _apply36()
+      _46 = _39 if _37 else _38
+      return _46()
 
-    return _graph6(_apply28)
+    return _35(_34)
 
-  _apply37 = _graph4 if _apply17 else _graph3
-  return _apply37()
+  _47 = _29 if _20 else _21
+  return _47()
 """
     )
 
@@ -591,16 +591,16 @@ def test_constants():
 def f():
   b = -2.33
   c = -1.44e-09
-  _apply1 = -1
-  g = (5, 7.7, _apply1, False)
-  _apply2 = -1
-  h = [5, 7.7, _apply2, False]
+  _1 = -1
+  g = (5, 7.7, _1, False)
+  _2 = -1
+  h = [5, 7.7, _2, False]
   i = {}
   j = {'a': '1', True: 2}
   k = dict()
-  _apply3 = {'a': 1, 'b': 2}
-  _apply4 = ()
-  m = dict(*_apply4, **_apply3)
+  _3 = {'a': 1, 'b': 2}
+  _4 = ()
+  m = dict(*_4, **_3)
   n = operator.add
   p = math.sin
   return (3, b, c, True, 'a string', g, h, i, j, k, m, n, p)
