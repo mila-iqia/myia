@@ -1048,27 +1048,27 @@ def test_break_continue():
             str_graph(parse(f))
             == """graph f(a) {
   #1 = python_iter(a)
-  #2 = for_header(#1)
+  #2 = for:f(#1)
   return #2
 }
 
-graph for_header(it) {
+graph for:f(it) {
   #3 = python_hasnext(it)
-  #4 = user_switch(#3, for_body, for_else)
+  #4 = user_switch(#3, for:body:f, for:else:f)
   #5 = #4()
   return #5
 }
 
-graph for_else() {
-  #6 = for_after()
+graph for:else:f() {
+  #6 = for_after:f()
   return #6
 }
 
-graph for_after() {
+graph for_after:f() {
   return 0
 }
 
-graph for_body() {
+graph for:body:f() {
   #7 = python_next(it)
   #8 = <built-in function getitem>(#7, 0)
   #9 = typeof(#8)
@@ -1078,42 +1078,42 @@ graph for_body() {
   #12 = universe_getitem(b)
   #13 = <built-in function lt>(#12, 2)
   #14 = <built-in function truth>(#13)
-  #15 = user_switch(#14, if_true:for_body, if_false:for_body)
+  #15 = user_switch(#14, for:body:if_true:f, for:body:if_false:f)
   #16 = #15()
   return #16
 }
 
-graph if_false:for_body() {
-  #17 = if_after()
+graph for:body:if_false:f() {
+  #17 = for:body:if_after:f()
   return #17
 }
 
-graph if_after() {
+graph for:body:if_after:f() {
   #18 = universe_getitem(b)
   #19 = <built-in function gt>(#18, 4)
   #20 = <built-in function truth>(#19)
-  #21 = user_switch(#20, if_true:if_after, if_false:if_after)
+  #21 = user_switch(#20, for:body:if_after:if_true:f, for:body:if_after:if_false:f)
   #22 = #21()
   return #22
 }
 
-graph if_false:if_after() {
-  #23 = if_after.2()
+graph for:body:if_after:if_false:f() {
+  #23 = for:body:if_after:if_after:f()
   return #23
 }
 
-graph if_after.2() {
-  #24 = for_header(#11)
+graph for:body:if_after:if_after:f() {
+  #24 = for:f(#11)
   return #24
 }
 
-graph if_true:if_after() {
-  #25 = for_header(#11)
+graph for:body:if_after:if_true:f() {
+  #25 = for:f(#11)
   return #25
 }
 
-graph if_true:for_body() {
-  #26 = for_after()
+graph for:body:if_true:f() {
+  #26 = for_after:f()
   return #26
 }
 """
@@ -1135,35 +1135,35 @@ def test_for():
   x = make_handle(#1)
   #2 = universe_setitem(x, 0)
   #3 = python_iter(b)
-  #4 = for_header(#3)
+  #4 = for:f(#3)
   return #4
 }
 
-graph for_header(it) {
+graph for:f(it) {
   #5 = python_hasnext(it)
-  #6 = user_switch(#5, for_body, for_else)
+  #6 = user_switch(#5, for:body:f, for:else:f)
   #7 = #6()
   return #7
 }
 
-graph for_else() {
-  #8 = for_after()
+graph for:else:f() {
+  #8 = for_after:f()
   return #8
 }
 
-graph for_after() {
+graph for_after:f() {
   #9 = universe_getitem(x)
   return #9
 }
 
-graph for_body() {
+graph for:body:f() {
   #10 = python_next(it)
   a = <built-in function getitem>(#10, 0)
   #11 = <built-in function getitem>(#10, 1)
   #12 = universe_getitem(x)
   #13 = <built-in function add>(#12, 1)
   #14 = universe_setitem(x, #13)
-  #15 = for_header(#11)
+  #15 = for:f(#11)
   return #15
 }
 """
@@ -1187,31 +1187,31 @@ def test_for2():
   x = make_handle(#1)
   #2 = universe_setitem(x, 0)
   #3 = python_iter(a)
-  #4 = for_header(#3)
+  #4 = for:f(#3)
   return #4
 }
 
-graph for_header(it) {
+graph for:f(it) {
   #5 = python_hasnext(it)
-  #6 = user_switch(#5, for_body, for_else)
+  #6 = user_switch(#5, for:body:f, for:else:f)
   #7 = #6()
   return #7
 }
 
-graph for_else() {
+graph for:else:f() {
   #8 = universe_getitem(x)
   #9 = <built-in function sub>(#8, 1)
   #10 = universe_setitem(x, #9)
-  #11 = for_after()
+  #11 = for_after:f()
   return #11
 }
 
-graph for_after() {
+graph for_after:f() {
   #12 = universe_getitem(x)
   return #12
 }
 
-graph for_body() {
+graph for:body:f() {
   #13 = python_next(it)
   #14 = <built-in function getitem>(#13, 0)
   b = <built-in function getitem>(#14, 0)
@@ -1220,7 +1220,7 @@ graph for_body() {
   #16 = universe_getitem(x)
   #17 = <built-in function add>(#16, 1)
   #18 = universe_setitem(x, #17)
-  #19 = for_header(#15)
+  #19 = for:f(#15)
   return #19
 }
 """
@@ -1249,28 +1249,28 @@ def test_for3():
   #6 = universe_getitem(n.2)
   #7 = #5(#6)
   #8 = python_iter(#7)
-  #9 = for_header(#8)
+  #9 = for:f(#8)
   return #9
 }
 
-graph for_header(it) {
+graph for:f(it) {
   #10 = python_hasnext(it)
-  #11 = user_switch(#10, for_body, for_else)
+  #11 = user_switch(#10, for:body:f, for:else:f)
   #12 = #11()
   return #12
 }
 
-graph for_else() {
-  #13 = for_after()
+graph for:else:f() {
+  #13 = for_after:f()
   return #13
 }
 
-graph for_after() {
+graph for_after:f() {
   #14 = universe_getitem(acc)
   return #14
 }
 
-graph for_body() {
+graph for:body:f() {
   #15 = python_next(it)
   i = <built-in function getitem>(#15, 0)
   #16 = <built-in function getitem>(#15, 1)
@@ -1278,35 +1278,35 @@ graph for_body() {
   #18 = universe_getitem(n.2)
   #19 = #17(#18)
   #20 = python_iter(#19)
-  #21 = for_header.2(#20)
+  #21 = for:body:for:f(#20)
   return #21
 }
 
-graph for_header.2(it.2) {
+graph for:body:for:f(it.2) {
   #22 = python_hasnext(it.2)
-  #23 = user_switch(#22, for_body.2, for_else.2)
+  #23 = user_switch(#22, for:body:for:body:f, for:body:for:else:f)
   #24 = #23()
   return #24
 }
 
-graph for_else.2() {
-  #25 = for_after.2()
+graph for:body:for:else:f() {
+  #25 = for:body:for_after:f()
   return #25
 }
 
-graph for_after.2() {
-  #26 = for_header(#16)
+graph for:body:for_after:f() {
+  #26 = for:f(#16)
   return #26
 }
 
-graph for_body.2() {
+graph for:body:for:body:f() {
   #27 = python_next(it.2)
   j = <built-in function getitem>(#27, 0)
   #28 = <built-in function getitem>(#27, 1)
   #29 = universe_getitem(acc)
   #30 = <built-in function add>(#29, j)
   #31 = universe_setitem(acc, #30)
-  #32 = for_header.2(#28)
+  #32 = for:body:for:f(#28)
   return #32
 }
 """
@@ -1369,18 +1369,18 @@ def test_if2():
 }
 
 graph if_false:f() {
-  #6 = if_after()
+  #6 = if_after:f()
   return #6
 }
 
-graph if_after() {
+graph if_after:f() {
   #7 = universe_getitem(y.2)
   return #7
 }
 
 graph if_true:f() {
   #8 = universe_setitem(y.2, 0)
-  #9 = if_after()
+  #9 = if_after:f()
   return #9
 }
 """
@@ -1419,28 +1419,28 @@ def test_while():
   #5 = typeof(y)
   y.2 = make_handle(#5)
   #6 = universe_setitem(y.2, y)
-  #7 = while_header()
+  #7 = while:f()
   return #7
 }
 
-graph while_header() {
+graph while:f() {
   #8 = universe_getitem(b.2)
-  #9 = user_switch(#8, while_body, while_else)
+  #9 = user_switch(#8, while:body:f, while:else:f)
   #10 = #9()
   return #10
 }
 
-graph while_else() {
-  #11 = while_after()
+graph while:else:f() {
+  #11 = while_after:f()
   return #11
 }
 
-graph while_after() {
+graph while_after:f() {
   #12 = universe_getitem(y.2)
   return #12
 }
 
-graph while_body() {
+graph while:body:f() {
   #13 = universe_getitem(x.2)
   return #13
 }
@@ -1461,32 +1461,32 @@ def test_while2():
   #1 = typeof(x)
   x.2 = make_handle(#1)
   #2 = universe_setitem(x.2, x)
-  #3 = while_header()
+  #3 = while:f()
   return #3
 }
 
-graph while_header() {
+graph while:f() {
   #4 = universe_getitem(x.2)
-  #5 = user_switch(#4, while_body, while_else)
+  #5 = user_switch(#4, while:body:f, while:else:f)
   #6 = #5()
   return #6
 }
 
-graph while_else() {
-  #7 = while_after()
+graph while:else:f() {
+  #7 = while_after:f()
   return #7
 }
 
-graph while_after() {
+graph while_after:f() {
   #8 = universe_getitem(x.2)
   return #8
 }
 
-graph while_body() {
+graph while:body:f() {
   #9 = universe_getitem(x.2)
   #10 = <built-in function sub>(#9, 1)
   #11 = universe_setitem(x.2, #10)
-  #12 = while_header()
+  #12 = while:f()
   return #12
 }
 """

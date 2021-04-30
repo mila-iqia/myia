@@ -882,13 +882,15 @@ class Parser:
     def _process_For(self, block, node):
         init = block.apply("python_iter", self.process_node(block, node.iter))
 
-        with debug_inherit(name="for_header"):
+        with about(block.graph, relation="for"):
             header_block = block.function.new_block(block)
         it = header_block.graph.add_parameter("it")
         cond = header_block.apply("python_hasnext", it)
 
-        with debug_inherit(
-            name="for_body", location=self.make_location(node.body)
+        with about(
+            header_block.graph,
+            relation="body",
+            location=self.make_location(node.body),
         ):
             body_block = block.function.new_block(
                 header_block,
@@ -898,13 +900,15 @@ class Parser:
         self._assign(body_block, node.target, None, val)
         it2 = body_block.apply(operator.getitem, app, 1)
 
-        with debug_inherit(
-            name="for_else", location=self.make_location(node.orelse)
+        with about(
+            header_block.graph,
+            relation="else",
+            location=self.make_location(node.orelse),
         ):
             else_block = block.function.new_block(
                 header_block,
             )
-        with debug_inherit(name="for_after"):
+        with about(block.graph, relation="for_after"):
             after_block = block.function.new_block(block)
 
         block.jump(header_block, init)
@@ -940,7 +944,7 @@ class Parser:
 
         # TODO: figure out how to add a location here
         # (we would need the list of nodes that follow the if)
-        with debug_inherit(name="if_after"):
+        with about(block.graph, relation="if_after"):
             after_block = block.function.new_block(block)
         after_block.used = False
 
@@ -985,27 +989,33 @@ class Parser:
         return block
 
     def _process_While(self, block, node):
-        with debug_inherit(
-            name="while_header", location=self.make_location(node.test)
+        with about(
+            block.graph,
+            relation="while",
+            location=self.make_location(node.test),
         ):
             header_block = block.function.new_block(
                 block,
             )
-        with debug_inherit(
-            name="while_body", location=self.make_location(node.body)
+        with about(
+            header_block.graph,
+            relation="body",
+            location=self.make_location(node.body),
         ):
             body_block = block.function.new_block(
                 header_block,
             )
-        with debug_inherit(
-            name="while_else", location=self.make_location(node.orelse)
+        with about(
+            header_block.graph,
+            relation="else",
+            location=self.make_location(node.orelse),
         ):
             else_block = block.function.new_block(
                 header_block,
             )
         # TODO: Same as If we need the list of nodes that follow
         # for the location
-        with debug_inherit(name="while_after"):
+        with about(block.graph, relation="while_after"):
             after_block = block.function.new_block(header_block)
 
         block.jump(header_block)
