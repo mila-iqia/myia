@@ -201,6 +201,34 @@ def test_resolve_read():
         )
 
 
+def test_self_recursion():
+    def f():
+        def g():
+            return g()
+
+        return g()
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = typeof(g)
+  g.2 = make_handle(#1)
+  #2 = universe_setitem(g.2, g)
+  #3 = universe_getitem(g.2)
+  #4 = #3()
+  return #4
+}
+
+graph g() {
+  #5 = universe_getitem(g.2)
+  #6 = #5()
+  return #6
+}
+"""
+        )
+
+
 def test_def():
     def f():  # pragma: no cover
         def g(a):
