@@ -125,7 +125,7 @@ def abstract_any(self, xs: object, **kwargs):  # noqa: F811
 
 @ovld.dispatch(initial_state=lambda: {"cache": {}, "prop": None})
 def abstract_collect(self, x, **kwargs):
-    """Find all instances."""
+    """Find all instances matching some condition."""
     __call__ = self.resolve(x)
 
     def proceed():
@@ -157,33 +157,33 @@ def abstract_collect(self, x, **kwargs):
 
 
 @ovld
-def abstract_collect(self, x: data.Tracks, **kwargs):
+def abstract_collect(self, x: data.Tracks, **kwargs):  # noqa: F811
     return reduce(operator.or_, [self(v, **kwargs) for v in x.values()])
 
 
-@ovld  # noqa: F811
-def abstract_collect(self, x: data.AbstractAtom, **kwargs):
+@ovld
+def abstract_collect(self, x: data.AbstractAtom, **kwargs):  # noqa: F811
     return self(x.tracks, **kwargs)
 
 
-@ovld  # noqa: F811
-def abstract_collect(self, xs: data.AbstractStructure, **kwargs):
+@ovld
+def abstract_collect(self, xs: data.AbstractStructure, **kwargs):  # noqa: F811
     return self(xs.tracks, **kwargs) | reduce(
         operator.or_,
         [self(x, **kwargs) for x in xs.elements],
     )
 
 
-@ovld  # noqa: F811
-def abstract_collect(self, xs: data.AbstractUnion, **kwargs):
+@ovld
+def abstract_collect(self, xs: data.AbstractUnion, **kwargs):  # noqa: F811
     return self(xs.tracks, **kwargs) | reduce(
         operator.or_,
         [self(x, **kwargs) for x in xs.options],
     )
 
 
-@ovld  # noqa: F811
-def abstract_collect(self, xs: object, **kwargs):
+@ovld
+def abstract_collect(self, xs: object, **kwargs):  # noqa: F811
     return set()
 
 

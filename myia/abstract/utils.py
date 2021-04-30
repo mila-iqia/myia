@@ -22,7 +22,9 @@ from .map import (
     initial_state=lambda: {"cache": {}, "prop": "$generics"}
 )
 def get_generics(self, gn: data.Generic):
+    """Collect all generics."""
     return {gn}
+
 
 #############
 # canonical #
