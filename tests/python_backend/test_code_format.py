@@ -558,7 +558,8 @@ def _graph1(_parameter1):
   return _apply37()
 """)
 
-    # TODO
+    # TODO There is currently a bug with universe_getitem called with an unreachable key.
+    # Thus, compiled code can't currently run.
     # assert fn(1) == 7
     # assert fn(5) == 94
     # assert fn(10) == 3628765

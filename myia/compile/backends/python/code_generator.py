@@ -175,38 +175,31 @@ class CodeGenerator:
         self.globals[name] = value
         return name
 
-    def _parse_resolve_node(self, node):
-        namespace = node.inputs[0].value
-        symbol_name = node.inputs[1].value
-        symbol = namespace[symbol_name]
-        # We register node as an inline node.
-        # Node usage will be directly replaced with resolved name.
-        self.inline_nodes[node] = self._register_global(
-            symbol_name, symbol
-        )
-
-    def _apply_to_expr(self, fn, inputs):
+    def _node_to_expr(self, node):
+        """Convert an apply node to an expr."""
+        fn = node.fn
         if fn.is_constant():
-            # if fn.value == "apply":
-            #     return self._apply_to_expr(inputs[0], inputs[1:])
             if fn.value in SIMPLE_MAP:
-                return default_str(self, SIMPLE_MAP[fn.value], inputs)
+                return default_str(self, SIMPLE_MAP[fn.value], node.inputs)
             elif fn.value in COMPLEX_MAP:
-                return COMPLEX_MAP[fn.value](self, *inputs)
+                return COMPLEX_MAP[fn.value](self, *node.inputs)
             elif fn.value in self.module_implementations:
                 name = self._register_global(
                     fn.value, self.module_implementations[fn.value]
                 )
-                return f"{name}({', '.join(map(self.label, inputs))})"
-        return f"{self.label(fn)}({', '.join(map(self.label, inputs))})"
-
-    def _node_to_expr(self, node):
-        """Convert an apply node to an expr."""
-        fn = node.fn
-        if fn.is_constant() and fn.value == "resolve":
-            self._parse_resolve_node(node)
-            return None
-        return self._apply_to_expr(fn, node.inputs)
+                return f"{name}({', '.join(map(self.label, node.inputs))})"
+            elif fn.value == "resolve":
+                namespace = node.inputs[0].value
+                symbol_name = node.inputs[1].value
+                symbol = namespace[symbol_name]
+                # We register node as an inline node.
+                # Node usage will be directly replaced with resolved name.
+                self.inline_nodes[node] = self._register_global(
+                    symbol_name, symbol
+                )
+                # We return None to notify that node does not need an assignment.
+                return None
+        return f"{self.label(fn)}({', '.join(map(self.label, node.inputs))})"
 
     def _node_to_line(self, node):
         """Convert an apply node to a line of code."""
@@ -223,6 +216,7 @@ class CodeGenerator:
         )
 
     def rvalue(self, node):
+        """Inline constant strings and get name for other nodes."""
         if isinstance(node, Node) and node.is_constant(str):
             return repr(node.value)
         return self.label(node)
@@ -258,6 +252,7 @@ class CodeGenerator:
                 line = self._node_to_line(element)
                 if line:
                     code.append(line)
+
         # We then convert graph return node.
         code.append(
             f"return {self._node_to_expr(graph.output) if inline_return else self.label(graph.output)}"

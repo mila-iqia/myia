@@ -4,9 +4,16 @@ class PdbRunCall:
     we need to save code into a file and import it as a valid module later.
     """
 
-    def __init__(self, code):
-        """Initialize."""
+    def __init__(self, code, name, symbols):
+        """Initialize.
+        :param code: code to compile
+        :param name: name of function to run
+        :param external_symbols: external symbols needed to execute the code.
+            Dictionary mapping name to symbol
+        """
         self.code = code
+        self.name = name
+        self.symbols = symbols or {}
 
     def __call__(self, *args):
         """Execute main function with given args."""
@@ -31,8 +38,9 @@ class PdbRunCall:
                 code_file.write(self.code)
             # Import module.
             module = importlib.import_module(module_name)
+            module.__dict__.update(self.symbols)
             # Run main function.
-            output = pdb.runcall(getattr(module, "main"), *args)
+            output = pdb.runcall(getattr(module, self.name), *args)
 
         # NB: I don't know why, but code executed after PDB call is
         # systematically reported as uncovered by pytest-cov, so I am

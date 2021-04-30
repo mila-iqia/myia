@@ -1,7 +1,7 @@
 """Implementation of a directed graph.
 
 Used to convert a myia graph to a directed graph.
-Directed graph is then visited to generate Python cod.e
+Directed graph is then visited to generate Python code.
 """
 
 
@@ -14,9 +14,6 @@ class DirectedNode:
         :param value: value associated to the node (e.g. an apply or a myia graph)
         """
         self.value = value
-
-    def __repr__(self):
-        return f"DirectedNode({self.value})"
 
 
 class DirectedGraph:
@@ -31,9 +28,6 @@ class DirectedGraph:
         self.uses = {}
         self.used_by = {}
         self.value_to_node = {}
-
-    def __repr__(self):
-        return f"DirectedGraph({self.data})"
 
     def add_arrow(self, a, b):
         """Add arrow a -> b to graph. Values a and b are added if they don't exist.
@@ -85,7 +79,7 @@ class DirectedGraph:
         return cp
 
     def pop(self, user):
-        """Remove given value. Value to removed should be unused.
+        """Remove given value. Value to remove should be unused.
 
         :param user: value to remove
         :return: list of values used by removed value

@@ -1,11 +1,11 @@
 """Python backend.
 
 Current compilation strategy consists of:
-- convvert myia graph to a directed graph of applies and closures.
-  - Link apply -> apply_or_closure if apply uses apply_or_closure.
+- convert myia graph to a directed graph of applies and closures.
+  - Link (apply -> apply_or_closure) if apply uses apply_or_closure.
   - All graphs and closures are recursively converted.
 - visit directed graphs recursively.
-- for each graph, use sequence of visited nodes in reverse order to compile function.
+- for each graph, use visited nodes in reverse order to compile function.
 """
 
 import sys
@@ -47,14 +47,14 @@ class GraphToDirected(_GraphConverter):
     def make_arrow(self, user, used_graph):
         """Link a user node to a graph.
 
-        Create link in current directed graph
-        if used graph is a closure of current function.
+        Create link in current directed graph if used graph is a closure of current function.
         Otherwise, ask parent to link current function to used graph.
 
         :param user: user node
         :param used_graph: used graph
         """
         if user is used_graph:
+            # Do not link a graph to itself.
             return
         if used_graph.parent is self.graph:
             assert self.directed.has(user)
@@ -70,6 +70,8 @@ class GraphToDirected(_GraphConverter):
 
     def generate_directed_graph(self):
         """Converted myia graph to directed graph."""
+        # Generate directed graph.
+        # Use (None -> graph.return_) as first arrow.
         todo_arrows = [(None, self.graph.return_)]
         while todo_arrows:
             user, node = todo_arrows.pop()
@@ -84,15 +86,18 @@ class GraphToDirected(_GraphConverter):
                         todo_arrows.append((node, n))
                     elif n.is_constant_graph():
                         self.make_arrow(node, n.value)
-        graph_to_directed = {}
+        # Convert closures to directed graphs.
+        closure_to_directed = {}
         while self.todo_closures:
             g = self.todo_closures.pop()
-            if g not in graph_to_directed:
-                graph_to_directed[g] = GraphToDirected(
+            if g not in closure_to_directed:
+                closure_to_directed[g] = GraphToDirected(
                     g, self
                 ).generate_directed_graph()
-        for g, d in graph_to_directed.items():
+        # Replace closures with related directed graphs.
+        for g, d in closure_to_directed.items():
             self.directed.replace(g, d)
+        # Return directed graph. ALl nodes are either apply nodes or directed graphs.
         return self.directed
 
 
@@ -111,8 +116,8 @@ class GraphToModule(_GraphConverter):
         return False
 
     def make_arrow(self, user, graph):
-        """Collect graph."""
-        del user
+        """Collect graph at module level."""
+        assert user is self, user
         assert graph.parent is None
         self.todo_graphs.append(graph)
 
@@ -182,8 +187,6 @@ class PythonBackend:
         code_generator = CodeGenerator()
         code = []
         for directed in GraphToModule().generate_directed_graphs(graph):
-            if code:
-                code.append("")
             code.extend(code_generator.directed_graph_to_code(directed))
 
         module = code_generator.globals
@@ -199,7 +202,7 @@ class PythonBackend:
             self.debug.write(final_code)
 
         if self.pdb:
-            return PdbRunCall(final_code)
+            return PdbRunCall(final_code, code_generator.label(graph), module)
 
         # Compile code string to a Python executable function
         # reference: https://stackoverflow.com/a/19850183

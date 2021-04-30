@@ -65,17 +65,16 @@ class MakeHandle:
 
 
 class Universe:
-    """Helper class for Universe.
-
-    TODO: May be replaced with just a global dictionary in compiled code.
-    """
+    """Helper class for Universe."""
 
     def __init__(self):
         """Initialize."""
         self.universe = {}
 
     def setitem(self, key, value):
+        """Associate a key to a value."""
         self.universe[key] = value
 
-    def getitem(self, value):
-        return self.universe[value]
+    def getitem(self, key):
+        """Return value associated to given key."""
+        return self.universe[key]
