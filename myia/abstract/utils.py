@@ -1,3 +1,5 @@
+"""Utilities on abstract data."""
+
 from collections import defaultdict
 
 from ovld import ovld
@@ -12,6 +14,13 @@ from .map import MapError, abstract_all, abstract_map, abstract_map2
 
 @abstract_map.variant
 def canonical(self, gn: data.Generic, *, mapping):
+    """Return an AbstractValue with canonical generics.
+
+    Essentially remaps the first encountered generic to Opaque(0), the
+    second to Opaque(1), etc.
+
+    The mapping from generic to canonical is stored in mapping.
+    """
     if gn not in mapping:
         mapping[gn] = data.Opaque(len(mapping))
     return mapping[gn]
@@ -24,10 +33,15 @@ def canonical(self, gn: data.Generic, *, mapping):
 
 @abstract_map.variant
 def _uncanonical(self, gn: data.Generic, *, invmapping):
+    """Undo the canonical transform."""
     return invmapping[gn]
 
 
 def uncanonical(x, *, mapping):
+    """Undo the mapping of canonical.
+
+    uncanonical(canonical(x, mapping), mapping) is x.
+    """
     invmapping = {v: k for k, v in mapping.items()}
     return _uncanonical(x, invmapping=invmapping)
 
@@ -39,6 +53,7 @@ def uncanonical(x, *, mapping):
 
 @abstract_map.variant
 def fresh_generics(self, gn: data.Generic, *, mapping):
+    """Map every generic to a fresh Placeholder."""
     if gn not in mapping:
         mapping[gn] = data.Placeholder()
     return mapping[gn]
@@ -50,16 +65,18 @@ def fresh_generics(self, gn: data.Generic, *, mapping):
 
 
 @abstract_all.variant
-def is_concrete(self, _: (data.Opaque, data.Placeholder), **kwargs):
+def is_concrete(self, _: data.Generic, **kwargs):
+    """Return whether an AbstractValue contains any generics."""
     return False
 
 
 @abstract_map.variant(
     initial_state=lambda: {"cache": {}, "prop": None, "check": is_concrete}
 )
-def reify(self, opq: data.Opaque, *, unif):
-    sub = unif.get(opq, opq)
-    if sub is opq:
+def reify(self, gn: data.Generic, *, unif):
+    """Replace generics by the concrete type they correspond to."""
+    sub = unif.get(gn, gn)
+    if sub is gn:
         return sub
     else:
         return self(sub, unif=unif)
@@ -71,11 +88,19 @@ def reify(self, opq: data.Opaque, *, unif):
 
 
 class Unificator:
+    """Class to perform unification.
+
+    Attributes:
+        eqv: Dictionary of equivalence classes.
+        canon: Map variables to a canonical variable or result.
+    """
+
     def __init__(self):
         self.eqv = defaultdict(set)
         self.canon = {}
 
     def unify(self, ufn, x, y):
+        """Unify x and y, using the unification function."""
         if y in self.eqv[x]:
             return self.canon[x]
 
@@ -122,7 +147,8 @@ def _unify(self, x: object, y: object, *, U):  # noqa: F811
         raise MapError(x, y, reason="Cannot merge objects")
 
 
-def unify(x, y, U=None):  # noqa: F811
+def unify(x, y, U=None):
+    """Unify x with y using Unificator U."""
     U = U or Unificator()
     res = _unify(x, y, U=U)
     return reify(res, unif=U.canon), U
@@ -142,6 +168,11 @@ def _merge(self, x: data.AbstractUnion, y: data.AbstractUnion, *, U):
 
 
 def merge(x, y, U=None):
+    """Merge x with y using Unificator U.
+
+    Works like unify except for AbstractUnion: merge(union1, union2) will
+    append both unions' possibilities rather than unify them.
+    """
     U = U or Unificator()
     res = _merge(x, y, U=U)
     return reify(res, unif=U.canon), U

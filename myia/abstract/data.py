@@ -1,3 +1,5 @@
+"""Definitions for Myia's abstract data structures."""
+
 from itertools import count
 
 from hrepr import pstr
@@ -14,7 +16,12 @@ _id = count(1)
 
 
 class Cachable:
-    pass
+    """Base class for objects in which cached transforms can be stored.
+
+    This class is checked for in abstract_map and similar functions to
+    determine whether the result of the map/transform can be stored as
+    an extra field in the object.
+    """
 
 
 ABSENT = Named("ABSENT")
@@ -22,10 +29,33 @@ ANYTHING = Named("ANYTHING")
 
 
 class Tracks:
+    """Collection of properties for an abstract object.
+
+    The main "tracks" (each track is a kind of property) are:
+
+    * "value" -> ValueTrack for the value, if present
+    * "interface" -> InterfaceTrack for the Python type that encapsulates
+        the interface of the object being represented
+
+    Note that there are two ways to get a track, one that returns the value
+    directly, the other that returns a Track object:
+
+    * tracks_obj.interface => type
+    * tracks_obj.get_track("interface") => InterfaceTrack(type)
+      * tracks_obj.values() or .items() also return Track objects.
+    """
+
     track_handlers = {}
 
     @classmethod
     def register_track(cls, track_name, track_handler):
+        """Register a new track under the given name.
+
+        This adds the corresponding property to Tracks instances. The
+        property returns the value of a track rather than a Track instance,
+        but the Track is returned by `get_track`, `values` and `items`.
+        """
+
         @property
         def prop(self):
             return self.get_track(track_name).value
@@ -35,6 +65,14 @@ class Tracks:
         return track_handler
 
     def __init__(self, tracks=None, **kwargs):
+        """Initialize Tracks.
+
+        Arguments:
+            tracks: The dictionary of tracks to use, mapping names to
+                Track objects.
+            kwargs: A dictionary mapping names to values, which will be
+                wrapped into Track objects.
+        """
         if tracks is not None:
             self._tracks = tracks
         else:
@@ -44,14 +82,17 @@ class Tracks:
         )
 
     def get_track(self, name):
+        """Return the Track for the given track name."""
         if name not in self._tracks:
             self._tracks[name] = self.track_handlers[name].default()
         return self._tracks[name]
 
     def items(self):
+        """Return the track_name: Track mapping."""
         return self._tracks.items()
 
     def values(self):
+        """Return a collection of Tracks."""
         return self._tracks.values()
 
     def __hrepr_short__(self, H, hrepr):
@@ -76,8 +117,14 @@ class Tracks:
 
 
 class Track:
+    """Encapsulates a particular property on an abstract object.
+
+    Subclasses of Track implement different kinds of properties.
+    """
+
     @classmethod
     def default(cls):
+        """Return a default Track instance."""
         return cls(ABSENT)
 
     def __init__(self, value):
@@ -91,13 +138,16 @@ class Track:
 
 
 class ValueTrack(Track):
+    """Represents the actual value of an abstract object."""
+
     @classmethod
     def default(cls):
+        """Return the default ValueTrack with value ANYTHING."""
         return cls(ANYTHING)
 
 
 class InterfaceTrack(Track):
-    pass
+    """Represents the Python type of an abstract object."""
 
 
 Tracks.register_track("value", ValueTrack)
@@ -129,6 +179,7 @@ class AbstractValue(Interned, PossiblyRecursive, Cachable):
 
     @property
     def t(self):
+        """Returns the AbstractValue's tracks."""
         return self.tracks
 
     def __eqkey__(self):
@@ -246,10 +297,18 @@ class AbstractUnion(AbstractValue):
 
 
 class Generic(Cachable):
-    pass
+    """Represents a generic type.
+
+    A Generic is meant to be unified with an AbstractValue eventually.
+    """
 
 
 class Opaque(Generic):
+    """Subtype of Generic used to create canonical signatures.
+
+    Equal if they have the same key: Opaque(x) == Opaque(x)
+    """
+
     def __init__(self, rank):
         self.rank = rank
 
@@ -280,6 +339,11 @@ class Opaque(Generic):
 
 
 class Placeholder(Generic):
+    """Subtype of Generic used as placeholders when processing a node.
+
+    Placeholders are never equal to each other.
+    """
+
     def __init__(self):
         self.id = next(_id)
 

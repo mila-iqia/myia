@@ -1,3 +1,5 @@
+"""General functions to process or transform AbstractValues."""
+
 from types import GeneratorType
 
 from ovld import ovld
@@ -51,6 +53,7 @@ def abstract_predicate(self, x, **kwargs):
 
 @abstract_predicate.variant
 def abstract_all(self, x: data.Tracks, **kwargs):
+    """Check that a predicate applies recursively to the whole structure."""
     return all(self(v, **kwargs) for v in x.values())
 
 
@@ -85,6 +88,7 @@ def abstract_all(self, xs: object, **kwargs):  # noqa: F811
 
 @abstract_predicate.variant
 def abstract_any(self, x: data.Tracks, **kwargs):
+    """Check that a predicate applies to part of the structure."""
     return any(self(v, **kwargs) for v in x.values())
 
 
@@ -216,6 +220,8 @@ def abstract_map(self, x: object, **kwargs):  # noqa: F811
 
 
 class MapError(Exception):
+    """Represents a matching error between two objects."""
+
     def __init__(self, x, y, reason):
         super().__init__(reason)
         self.x = x
