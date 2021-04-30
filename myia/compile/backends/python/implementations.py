@@ -1,6 +1,4 @@
 """Global implementations useful for compiled modules."""
-from collections import Counter
-
 from ovld import ovld
 
 
@@ -39,18 +37,11 @@ def typeof(obj: object):
     return type(obj)
 
 
-class MakeHandle:
-    """Helper class for apply `make_handle`."""
+class Handle:
+    """Handle class for `make_handle`."""
 
-    def __init__(self):
-        self.counter = Counter()
-
-    def __call__(self, object_type):
-        """Generate an handle for given object type."""
-        name = object_type.__name__
-        self.counter.update([name])
-        count = self.counter[name]
-        return f"{name}_h{count}"
+    def __init__(self, object_type):
+        self.type = object_type
 
 
 class Universe:

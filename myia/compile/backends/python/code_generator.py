@@ -6,7 +6,7 @@ from collections import Counter
 
 from myia.compile.backends.python.directed_graph import DirectedGraph
 from myia.compile.backends.python.implementations import (
-    MakeHandle,
+    Handle,
     Universe,
     myia_hasnext,
     myia_iter,
@@ -159,7 +159,7 @@ class CodeGenerator:
         self.global_counter = Counter()
         self.globals = {}
         self.module_implementations = {
-            "make_handle": MakeHandle(),
+            "make_handle": Handle,
             "universe_setitem": universe.setitem,
             "universe_getitem": universe.getitem,
             "python_iter": myia_iter,
