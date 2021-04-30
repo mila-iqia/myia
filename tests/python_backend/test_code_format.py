@@ -149,8 +149,8 @@ def test_ifexp():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -184,8 +184,8 @@ def test_boolop():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -229,8 +229,8 @@ def test_compare2():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -269,8 +269,8 @@ def test_if():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -306,8 +306,8 @@ def test_if2():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -347,8 +347,8 @@ def test_while():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -394,8 +394,8 @@ def test_while2():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -432,11 +432,11 @@ def f(x):
 def test_recursion():
     fn, output = parse_and_compile(factorial)
     assert output == (
-        """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
+from test_code_format import factorial
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
-# Dynamic external import: factorial
 
 def factorial(n):
   _1 = typeof(n)
@@ -477,14 +477,14 @@ def test_no_debug():
     fn, output = parse_and_compile(f, debug=False)
 
     assert output == (
-        """# Dynamic external import: typeof
-# Dynamic external import: make_handle
+        """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
+from test_code_format import factorial
+from myia.compile.backends.python.implementations import myia_iter as python_iter
+from myia.compile.backends.python.implementations import myia_hasnext as python_hasnext
+from myia.compile.backends.python.implementations import myia_next as python_next
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
-# Dynamic external import: factorial
-# Dynamic external import: python_iter
-# Dynamic external import: python_hasnext
-# Dynamic external import: python_next
 
 def _1(_2):
   _3 = typeof(_2)
@@ -585,8 +585,8 @@ def test_constants():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: operator
-# Dynamic external import: math
+        == """import operator
+import math
 
 def f():
   b = -2.33

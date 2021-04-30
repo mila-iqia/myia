@@ -9,9 +9,10 @@ To handle these issues, compilation strategy consists of convert each myia graph
 into a directed graph which links user to used nodes. At code generation, we can then
 visit each directed graph in a reverse order, so that used nodes easily come before user nodes.
 """
-
+import importlib
 import sys
 from abc import abstractmethod
+from types import ModuleType
 
 from myia.compile.backends.python.code_generator import CodeGenerator
 from myia.compile.backends.python.directed_graph import DirectedGraph
@@ -184,6 +185,36 @@ class PythonBackend:
                     code += "\n"
         return code
 
+    @classmethod
+    def generate_static_import(cls, value, import_name):
+        """Generate a static import string if possible.
+
+        :param value: value to import in static import
+        :param import_name: name to import value (`value as name`)
+        :return: static import if possible, else None
+        """
+        if isinstance(value, ModuleType):
+            package = value.__package__
+            name = value.__name__
+            if importlib.import_module(name, package) is value:
+                return (
+                    (f"from {package} " if package else "")
+                    + f"import {name}"
+                    + (f" as {import_name}" if name != import_name else "")
+                )
+        else:
+            modname = value.__module__
+            name = value.__name__
+            qualname = value.__qualname__
+            if (
+                "." not in qualname
+                and getattr(importlib.import_module(modname), name) is value
+            ):
+                return f"from {modname} import {name}" + (
+                    f" as {import_name}" if name != import_name else ""
+                )
+        return None
+
     def compile(self, graph):
         """Compile given graph.
 
@@ -195,10 +226,21 @@ class PythonBackend:
         for directed in GraphToModule().generate_directed_graphs(graph):
             code.extend(code_generator.directed_graph_to_code(directed))
 
-        module = code_generator.globals
-        dynamic_imports = [
-            f"# Dynamic external import: {name}" for name in module
-        ]
+        static_imports = []
+        runtime_imports = []
+        module = {}
+        # Generate static imports if possible.
+        # Otherwise, symbols will be dynamically imported.
+        for name, value in code_generator.globals.items():
+            static_import = self.generate_static_import(value, name)
+            if static_import:
+                static_imports.append(static_import)
+            else:
+                runtime_imports.append(f"# Dynamic external import: {name}")
+                # Collect dynamic imports.
+                module[name] = value
+
+        dynamic_imports = static_imports + runtime_imports
         final_structure = (
             dynamic_imports + ([""] if dynamic_imports else []) + code
         )

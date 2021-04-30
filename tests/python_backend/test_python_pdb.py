@@ -37,7 +37,7 @@ def run_pdb(return_cell, *args):
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """# Dynamic external import: operator
+        == """import operator
 
 def f(a, b, c, d):
   x = a ** b
