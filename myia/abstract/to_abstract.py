@@ -11,7 +11,7 @@ def to_abstract(self, xs: tuple):
 
 
 @ovld
-def to_abstract(self, x: object):
+def to_abstract(self, x: object):  # noqa: F811
     return data.AbstractAtom({"interface": type(x)})
 
 

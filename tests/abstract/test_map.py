@@ -121,7 +121,9 @@ def add(self, x: data.ValueTrack, y: data.ValueTrack):
 
 
 @ovld
-def add(self, x: data.InterfaceTrack, y: data.InterfaceTrack, **kwargs):
+def add(  # noqa: F811
+    self, x: data.InterfaceTrack, y: data.InterfaceTrack, **kwargs
+):
     assert x.value == y.value
     return x
 

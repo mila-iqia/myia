@@ -1,5 +1,3 @@
-# from ..utils import ABSENT, Atom, AttrEK, Interned, PossiblyRecursive
-from dataclasses import dataclass
 from itertools import count
 
 from hrepr import pstr
@@ -238,7 +236,7 @@ class AbstractUnion(AbstractValue):
                 *hrepr(
                     self.tracks, omit_tracks={"interface"}, bare_tracks=True
                 ).children,
-                type=f"*U",
+                type="*U",
             )
 
 

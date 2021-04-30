@@ -5,7 +5,6 @@ from ovld import ovld
 from . import data
 from .map import MapError, abstract_all, abstract_map, abstract_map2
 
-
 #############
 # canonical #
 #############
@@ -106,24 +105,24 @@ def _unify(self, x: data.Generic, y: object, *, U):
 
 
 @ovld
-def _unify(self, x: object, y: data.Generic, *, U):
+def _unify(self, x: object, y: data.Generic, *, U):  # noqa: F811
     return U.unify(self, x, y)
 
 
 @ovld
-def _unify(self, x: data.Generic, y: data.Generic, *, U):
+def _unify(self, x: data.Generic, y: data.Generic, *, U):  # noqa: F811
     return U.unify(self, x, y)
 
 
 @ovld
-def _unify(self, x: object, y: object, *, U):
+def _unify(self, x: object, y: object, *, U):  # noqa: F811
     if x == y:
         return x
     else:
         raise MapError(x, y, reason="Cannot merge objects")
 
 
-def unify(x, y, U=None):
+def unify(x, y, U=None):  # noqa: F811
     U = U or Unificator()
     res = _unify(x, y, U=U)
     return reify(res, unif=U.canon), U

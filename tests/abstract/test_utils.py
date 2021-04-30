@@ -1,7 +1,6 @@
 from myia.abstract import data
 from myia.abstract.utils import (
     MapError,
-    Unificator,
     canonical,
     fresh_generics,
     is_concrete,
@@ -46,7 +45,9 @@ def test_canonical():
     assert canonical(A(ph2, ph1), mapping={}) is A(o0, o1)
     assert canonical(A(ph1, ph1), mapping={}) is A(o0, o0)
 
-    assert canonical(A((ph2, ph2), (ph1, ph1)), mapping={}) is A((o0, o0), (o1, o1))
+    assert canonical(A((ph2, ph2), (ph1, ph1)), mapping={}) is A(
+        (o0, o0), (o1, o1)
+    )
 
     assert canonical(A(o0, o1), mapping={}) is A(o0, o1)
     assert canonical(A(o1, o0), mapping={}) is A(o0, o1)
