@@ -247,7 +247,10 @@ class CodeGenerator:
         header = f"def {self.label(graph)}({', '.join(self.label(p) for p in graph.parameters)}):"
         code = []
 
-        sequence = list(reversed(directed.visit()))
+        # Get nodes from user to used nodes.
+        sequence = list(directed.visit())
+        # Reverse sequences to have used nodes then user nodes.
+        sequence.reverse()
         # We skip graph.return_, as it is converted later.
         assert sequence[-1] is graph.return_
         sequence.pop()

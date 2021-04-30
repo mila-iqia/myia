@@ -102,17 +102,15 @@ class DirectedGraph:
 
         Use `None` value to get the first unused values.
 
-        :return: sequence of graph values in visited order.
+        :return: generator: sequence of graph values in visited order.
         """
         assert self.has(None)
         cp = self._copy()
-        sequence = []
         todo = cp.pop(None)
         while todo:
             element = todo.pop(0)
-            sequence.append(element)
+            yield element
             related = cp.pop(element)
             todo.extend(used for used in related if cp.is_unused(used))
         assert not cp.uses
         assert not cp.used_by
-        return sequence
