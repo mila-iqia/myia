@@ -1,11 +1,13 @@
 """Python backend.
 
-Current compilation strategy consists of:
-- convert myia graph to a directed graph of applies and closures.
-  - Link (apply -> apply_or_closure) if apply uses apply_or_closure.
-  - All graphs and closures are recursively converted.
-- visit directed graphs recursively.
-- for each graph, use visited nodes in reverse order to compile function.
+Myia graph does not initially provide a list of all graphs and closures it uses.
+So, we need to recursively visit graph to found them. Plus, in generated code,
+each closure must be correctly positioned into its parent graph,
+after nodes it needs and before nodes that use it.
+
+To handle these issues, compilation strategy consists of convert each myia graph
+into a directed graph which links user to used nodes. At code generation, we can then
+visit each directed graph in a reverse order, so that used nodes easily come before user nodes.
 """
 
 import sys
