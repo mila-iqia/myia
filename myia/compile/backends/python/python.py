@@ -115,7 +115,11 @@ class GraphToModule(_GraphConverter):
         """No node can be registered at this level."""
         return False
 
-    def make_arrow(self, user, graph):
+    # NB: This method is never called currently.
+    # This means we only compile one module graph (graph with no parent) per compilation,
+    # and we never encounter another module graph called by main compiled graph.
+    # I guess this could change in the future ?
+    def make_arrow(self, user, graph):  # pragma: no cover
         """Collect graph at module level."""
         assert user is self, user
         assert graph.parent is None
@@ -132,12 +136,11 @@ class GraphToModule(_GraphConverter):
         directed_graphs = []
         while self.todo_graphs:
             graph = self.todo_graphs.pop()
-            if graph in seen_graphs:
-                continue
-            seen_graphs.add(graph)
-            directed_graphs.append(
-                GraphToDirected(graph, self).generate_directed_graph()
-            )
+            if graph not in seen_graphs:
+                seen_graphs.add(graph)
+                directed_graphs.append(
+                    GraphToDirected(graph, self).generate_directed_graph()
+                )
         return directed_graphs
 
 

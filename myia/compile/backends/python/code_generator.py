@@ -58,12 +58,9 @@ def str_apply(c, fn, args, kwargs):
 
 def str_getattr(c, *params):
     """Formatter for apply getattr."""
-    assert len(params) in (2, 3)
-    if len(params) == 2:
-        obj, symb = params
-        return f"{c.label(obj)}.{c.label(symb)}"
-    obj, name, default = params
-    return f"getattr({c.label(obj)}, {c.rvalue(name)}, {c.rvalue(default)})"
+    assert len(params) == 2
+    obj, symbol = params
+    return f"{c.label(obj)}.{c.label(symbol)}"
 
 
 SIMPLE_MAP = {
