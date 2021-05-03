@@ -21,7 +21,7 @@ from .map import (
 @abstract_collect.variant(
     initial_state=lambda: {"cache": {}, "prop": "$generics"}
 )
-def get_generics(self, gn: data.Generic):
+def get_generics(self, gn: data.GenericBase):
     """Collect all generics."""
     return {gn}
 
@@ -32,16 +32,16 @@ def get_generics(self, gn: data.Generic):
 
 
 @abstract_map.variant
-def canonical(self, gn: data.Generic, *, mapping):
+def canonical(self, gn: data.GenericBase, *, mapping):
     """Return an AbstractValue with canonical generics.
 
-    Essentially remaps the first encountered generic to Opaque(0), the
-    second to Opaque(1), etc.
+    Essentially remaps the first encountered generic to CanonGeneric(0), the
+    second to CanonGeneric(1), etc.
 
     The mapping from generic to canonical is stored in mapping.
     """
     if gn not in mapping:
-        mapping[gn] = data.Opaque(len(mapping))
+        mapping[gn] = data.CanonGeneric(len(mapping))
     return mapping[gn]
 
 
@@ -51,7 +51,7 @@ def canonical(self, gn: data.Generic, *, mapping):
 
 
 @abstract_map.variant
-def _uncanonical(self, gn: data.Generic, *, invmapping):
+def _uncanonical(self, gn: data.GenericBase, *, invmapping):
     """Undo the canonical transform."""
     return invmapping[gn]
 
@@ -71,7 +71,7 @@ def uncanonical(x, *, mapping):
 
 
 @abstract_map.variant
-def fresh_generics(self, gn: data.Generic, *, mapping):
+def fresh_generics(self, gn: data.GenericBase, *, mapping):
     """Map every generic to a fresh Placeholder."""
     if gn not in mapping:
         mapping[gn] = data.Placeholder()
@@ -84,7 +84,7 @@ def fresh_generics(self, gn: data.Generic, *, mapping):
 
 
 @abstract_all.variant
-def is_concrete(self, _: data.Generic, **kwargs):
+def is_concrete(self, _: data.GenericBase, **kwargs):
     """Return whether an AbstractValue contains any generics."""
     return False
 
@@ -92,7 +92,7 @@ def is_concrete(self, _: data.Generic, **kwargs):
 @abstract_map.variant(
     initial_state=lambda: {"cache": {}, "prop": None, "check": is_concrete}
 )
-def reify(self, gn: data.Generic, *, unif):
+def reify(self, gn: data.GenericBase, *, unif):
     """Replace generics by the concrete type they correspond to."""
     sub = unif.get(gn, gn)
     if sub is gn:
@@ -129,9 +129,9 @@ class Unificator:
         cx = self.canon.get(x, x)
         cy = self.canon.get(y, y)
 
-        if isinstance(cx, data.Generic):
+        if isinstance(cx, data.GenericBase):
             merged = cy
-        elif isinstance(cy, data.Generic):
+        elif isinstance(cy, data.GenericBase):
             merged = cx
         else:
             merged = ufn(cx, cy, U=self)
@@ -144,17 +144,17 @@ class Unificator:
 
 
 @abstract_map2.variant
-def _unify(self, x: data.Generic, y: object, *, U):
+def _unify(self, x: data.GenericBase, y: object, *, U):
     return U.unify(self, x, y)
 
 
 @ovld
-def _unify(self, x: object, y: data.Generic, *, U):  # noqa: F811
+def _unify(self, x: object, y: data.GenericBase, *, U):  # noqa: F811
     return U.unify(self, x, y)
 
 
 @ovld
-def _unify(self, x: data.Generic, y: data.Generic, *, U):  # noqa: F811
+def _unify(self, x: data.GenericBase, y: data.GenericBase, *, U):  # noqa: F811
     return U.unify(self, x, y)
 
 

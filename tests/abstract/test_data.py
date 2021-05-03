@@ -52,15 +52,15 @@ def test_recursive():
     assert rec is rec2
 
 
-def test_Opaque():
-    o1 = data.Opaque(1)
-    o2 = data.Opaque(2)
-    o1p = data.Opaque(1)
+def test_CanonGeneric():
+    g1 = data.CanonGeneric(1)
+    g2 = data.CanonGeneric(2)
+    g1p = data.CanonGeneric(1)
 
-    assert o1 == o1p
-    assert o1 != o2
+    assert g1 == g1p
+    assert g1 != g2
 
-    assert {o1: 5}[o1p] == 5
+    assert {g1: 5}[g1p] == 5
 
 
 def test_Placeholder():
@@ -80,7 +80,7 @@ def test_repr():
     rec = makerec()
     assert str(rec) == "#1=*tuple(#2=*U(*int(), #1=*tuple()), #2=*U())"
 
-    assert str(data.Opaque(4)) == "?4"
+    assert str(data.CanonGeneric(4)) == "?4"
     assert str(data.Placeholder()).startswith("??")
 
 
