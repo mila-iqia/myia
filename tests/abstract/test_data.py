@@ -52,10 +52,25 @@ def test_recursive():
     assert rec is rec2
 
 
+def test_Generic():
+    gx = data.Generic("x")
+    gy = data.Generic("y")
+    gx2 = data.Generic("x")
+
+    assert gx.name == "x"
+    assert gy.name == "y"
+
+    assert gx != gy
+    assert gx != gx2
+
+
 def test_CanonGeneric():
     g1 = data.CanonGeneric(1)
     g2 = data.CanonGeneric(2)
     g1p = data.CanonGeneric(1)
+
+    assert g1.rank == 1
+    assert g2.rank == 2
 
     assert g1 == g1p
     assert g1 != g2
@@ -80,6 +95,7 @@ def test_repr():
     rec = makerec()
     assert str(rec) == "#1=*tuple(#2=*U(*int(), #1=*tuple()), #2=*U())"
 
+    assert str(data.Generic("xylophone")) == "?xylophone"
     assert str(data.CanonGeneric(4)) == "?4"
     assert str(data.Placeholder()).startswith("??")
 

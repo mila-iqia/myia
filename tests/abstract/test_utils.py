@@ -54,7 +54,9 @@ def test_canonical():
 
 
 def test_fresh_generics():
-    assert fresh_generics(cg0, mapping={}) is not fresh_generics(cg0, mapping={})
+    assert fresh_generics(cg0, mapping={}) is not fresh_generics(
+        cg0, mapping={}
+    )
 
     tu1 = A(cg0, cg0)
     tu1_unc = fresh_generics(tu1, mapping={})
@@ -105,10 +107,16 @@ def test_unify():
     assert _utest(cg0, A(1), A(1), {cg0: A(1)})
     assert _utest(A(1), cg0, A(1), {cg0: A(1)})
     assert _utest(
-        A(cg0, 1, cg1), A(3, cg2, 7), A(3, 1, 7), {cg0: A(3), cg1: A(7), cg2: A(1)}
+        A(cg0, 1, cg1),
+        A(3, cg2, 7),
+        A(3, 1, 7),
+        {cg0: A(3), cg1: A(7), cg2: A(1)},
     )
     assert _utest(
-        A(cg0, cg1, cg2), A(8, cg0, cg1), A(8, 8, 8), {cg0: A(8), cg1: A(8), cg2: A(8)}
+        A(cg0, cg1, cg2),
+        A(8, cg0, cg1),
+        A(8, 8, 8),
+        {cg0: A(8), cg1: A(8), cg2: A(8)},
     )
 
     assert _utest(A(cg0, cg0), A(6, cg0), A(6, 6))

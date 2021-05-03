@@ -13,17 +13,20 @@
     background: darkred;
     border-color: darkred;
 }
-.myia-canon-generic {
-    color: white;
-    background: black;
+.myia-generic, .myia-canon-generic, .myia-placeholder {
     padding: 2px;
     margin: 2px;
     font-weight: bold;
 }
+.myia-generic {
+    color: white;
+    background: magenta;
+}
+.myia-canon-generic {
+    color: white;
+    background: black;
+}
 .myia-placeholder {
     color: white;
     background: brown;
-    padding: 2px;
-    margin: 2px;
-    font-weight: bold;
 }
