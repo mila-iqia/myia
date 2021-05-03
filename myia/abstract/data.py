@@ -286,6 +286,27 @@ class GenericBase(Cachable):
     A GenericBase is meant to be unified with an AbstractValue eventually.
     """
 
+    @classmethod
+    def __hrepr_resources__(self, H):
+        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
+
+    __str__ = __repr__ = pstr
+
+
+class Generic(GenericBase):
+    """Represents any type, for use in type signatures.
+
+    Attributes:
+        name: The name of the generic. Serves no other purpose than display.
+            Different generics can have the same name.
+    """
+
+    def __init__(self, name):
+        self.name = name
+
+    def __hrepr_short__(self, H, hrepr):
+        return H.atom["myia-generic"](f"?{self.name}")
+
 
 class CanonGeneric(GenericBase):
     """Subtype of GenericBase used to create canonical signatures.
@@ -302,14 +323,8 @@ class CanonGeneric(GenericBase):
     def __hash__(self):
         return hash(self.rank)
 
-    @classmethod
-    def __hrepr_resources__(self, H):
-        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
-
     def __hrepr_short__(self, H, hrepr):
         return H.atom["myia-canon-generic"](f"?{self.rank}")
-
-    __str__ = __repr__ = pstr
 
 
 class Placeholder(GenericBase):
@@ -321,11 +336,5 @@ class Placeholder(GenericBase):
     def __init__(self):
         self.id = next(_id)
 
-    @classmethod
-    def __hrepr_resources__(self, H):
-        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
-
     def __hrepr_short__(self, H, hrepr):
         return H.atom["myia-placeholder"](f"??{self.id}")
-
-    __str__ = __repr__ = pstr
