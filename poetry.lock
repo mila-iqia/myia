@@ -91,6 +91,17 @@ pycodestyle = ">=2.7.0,<2.8.0"
 pyflakes = ">=2.3.0,<2.4.0"
 
 [[package]]
+name = "hrepr"
+version = "0.3.11"
+description = "Extensible HTML representation for Python objects."
+category = "main"
+optional = false
+python-versions = ">=3.6,<4.0"
+
+[package.dependencies]
+ovld = ">=0.2.7,<0.3.0"
+
+[[package]]
 name = "iniconfig"
 version = "1.1.1"
 description = "iniconfig: brain-dead simple config-ini parsing"
@@ -287,7 +298,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "548b97fd1ffcdeea82f2cac70222e7160a08eee9c137486fc3cfd6e90b2bb0ac"
+content-hash = "c714b30f833c89f72593896e40aaade64b45a09b0b19a0bbd2c608e46179c6d4"
 
 [metadata.files]
 appdirs = [
@@ -370,6 +381,10 @@ coverage = [
 flake8 = [
     {file = "flake8-3.9.1-py2.py3-none-any.whl", hash = "sha256:3b9f848952dddccf635be78098ca75010f073bfe14d2c6bda867154bea728d2a"},
     {file = "flake8-3.9.1.tar.gz", hash = "sha256:1aa8990be1e689d96c745c5682b687ea49f2e05a443aff1f8251092b0014e378"},
+]
+hrepr = [
+    {file = "hrepr-0.3.11-py3-none-any.whl", hash = "sha256:16827a2d54e47e6e01f4d5d98a05e2ee13a31334aae45d11224d13b8a27ef860"},
+    {file = "hrepr-0.3.11.tar.gz", hash = "sha256:c45f062916719817931e621b00b75bf8c61d2c269902a046b862c1fef4e39fe6"},
 ]
 iniconfig = [
     {file = "iniconfig-1.1.1-py2.py3-none-any.whl", hash = "sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3"},

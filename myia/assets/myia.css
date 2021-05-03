@@ -1,0 +1,29 @@
+.hrepr-instance.myia-abstract {
+    margin: 2px;
+    background: purple;
+    border-color: purple;
+}
+.hrepr-instance.myia-abstract-structure {
+    margin: 2px;
+    background: blue;
+    border-color: blue;
+}
+.hrepr-instance.myia-abstract-union {
+    margin: 2px;
+    background: darkred;
+    border-color: darkred;
+}
+.myia-opaque {
+    color: white;
+    background: black;
+    padding: 2px;
+    margin: 2px;
+    font-weight: bold;
+}
+.myia-placeholder {
+    color: white;
+    background: brown;
+    padding: 2px;
+    margin: 2px;
+    font-weight: bold;
+}

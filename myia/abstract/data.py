@@ -1,5 +1,6 @@
 """Definitions for Myia's abstract data structures."""
 
+import os
 from itertools import count
 
 from hrepr import pstr
@@ -8,6 +9,7 @@ from ..utils.intern import Atom, AttrEK, Interned, PossiblyRecursive
 from ..utils.misc import Named
 
 _id = count(1)
+assets = os.path.join(os.path.dirname(__file__), "..", "assets")
 
 
 #############
@@ -97,9 +99,9 @@ class Tracks:
 
     def __hrepr_short__(self, H, hrepr):
         if hrepr.config.bare_tracks:
-            return H.span()
+            return H.atom()
         else:
-            return H.span("<Tracks>")
+            return H.atom("<Tracks>")
 
     def __hrepr__(self, H, hrepr):
         omit = hrepr.config.omit_tracks or set()
@@ -187,25 +189,7 @@ class AbstractValue(Interned, PossiblyRecursive, Cachable):
 
     @classmethod
     def __hrepr_resources__(self, H):
-        return H.style(
-            """
-            .hrepr-instance.myia-abstract {
-                margin: 2px;
-                background: purple;
-                border-color: purple;
-            }
-            .hrepr-instance.myia-abstract-structure {
-                margin: 2px;
-                background: blue;
-                border-color: blue;
-            }
-            .hrepr-instance.myia-abstract-union {
-                margin: 2px;
-                background: darkred;
-                border-color: darkred;
-            }
-            """
-        )
+        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
 
     def __hrepr_short__(self, H, hrepr):
         return H.instance["myia-abstract"](
@@ -320,17 +304,7 @@ class Opaque(Generic):
 
     @classmethod
     def __hrepr_resources__(self, H):
-        return H.style(
-            """
-            .myia-opaque {
-                color: white;
-                background: black;
-                padding: 2px;
-                margin: 2px;
-                font-weight: bold;
-            }
-            """
-        )
+        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
 
     def __hrepr_short__(self, H, hrepr):
         return H.atom["myia-opaque"](f"?{self.rank}")
@@ -349,17 +323,7 @@ class Placeholder(Generic):
 
     @classmethod
     def __hrepr_resources__(self, H):
-        return H.style(
-            """
-            .myia-placeholder {
-                color: white;
-                background: brown;
-                padding: 2px;
-                margin: 2px;
-                font-weight: bold;
-            }
-            """
-        )
+        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
 
     def __hrepr_short__(self, H, hrepr):
         return H.atom["myia-placeholder"](f"??{self.id}")
