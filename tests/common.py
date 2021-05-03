@@ -56,7 +56,7 @@ def _to_abstract(self, x: type):
 
 
 @ovld
-def _to_abstract(self, x: (data.Generic, data.AbstractValue)):  # noqa: F811
+def _to_abstract(self, x: (data.GenericBase, data.AbstractValue)):  # noqa: F811
     return x
 
 

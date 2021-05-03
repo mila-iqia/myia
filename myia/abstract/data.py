@@ -280,17 +280,17 @@ class AbstractUnion(AbstractValue):
 ####################
 
 
-class Generic(Cachable):
+class GenericBase(Cachable):
     """Represents a generic type.
 
-    A Generic is meant to be unified with an AbstractValue eventually.
+    A GenericBase is meant to be unified with an AbstractValue eventually.
     """
 
 
-class Opaque(Generic):
-    """Subtype of Generic used to create canonical signatures.
+class CanonGeneric(GenericBase):
+    """Subtype of GenericBase used to create canonical signatures.
 
-    Equal if they have the same key: Opaque(x) == Opaque(x)
+    Equal if they have the same key: CanonGeneric(x) == CanonGeneric(x)
     """
 
     def __init__(self, rank):
@@ -307,13 +307,13 @@ class Opaque(Generic):
         return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
 
     def __hrepr_short__(self, H, hrepr):
-        return H.atom["myia-opaque"](f"?{self.rank}")
+        return H.atom["myia-canon-generic"](f"?{self.rank}")
 
     __str__ = __repr__ = pstr
 
 
-class Placeholder(Generic):
-    """Subtype of Generic used as placeholders when processing a node.
+class Placeholder(GenericBase):
+    """Subtype of GenericBase used as placeholders when processing a node.
 
     Placeholders are never equal to each other.
     """
