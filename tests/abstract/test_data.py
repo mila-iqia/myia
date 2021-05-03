@@ -1,3 +1,5 @@
+from hrepr import pstr
+
 from myia.abstract import data
 from myia.abstract.data import ABSENT, ANYTHING
 from myia.utils.intern import intern
@@ -82,9 +84,20 @@ def test_repr():
     assert str(data.Placeholder()).startswith("??")
 
 
+def test_repr_tracks():
+    i = data.AbstractAtom({"interface": int, "value": 1})
+    assert str(i) == "*int(value ↦ 1)"
+    assert str(i.tracks) == "TrackDict(interface ↦ class int, value ↦ 1)"
+    assert pstr(i.tracks, max_depth=0) == "<Tracks>"
+    assert pstr(i.tracks, bare_tracks=True, max_depth=0) == ""
+
+
 def test_repr_malformed():
     atm = data.AbstractAtom({})
     assert str(atm) == "AbstractAtom()"
 
     empt = data.AbstractStructure.empty()
     assert str(empt) == "AbstractStructure()"
+
+    empt = data.AbstractUnion.empty()
+    assert str(empt) == "AbstractUnion()"
