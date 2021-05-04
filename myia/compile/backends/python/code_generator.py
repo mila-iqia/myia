@@ -273,6 +273,6 @@ class CodeGenerator:
 
         # We then convert graph return node.
         code.append(
-            f"return {self._node_to_expr(graph.output) if inline_return else self.label(graph.output)}"
+            f"return {self._node_to_expr(graph.output) if inline_return else self.rvalue(graph.output)}"
         )
         return [header, code]

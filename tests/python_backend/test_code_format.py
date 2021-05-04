@@ -3,7 +3,6 @@ import math
 import operator
 
 from myia.compile.backends.python.python import compile_graph
-from myia.ir.print import str_graph
 from myia.parser import parse
 from myia.utils.info import enable_debug
 
@@ -14,7 +13,6 @@ def parse_and_compile(function, debug=True):
             graph = parse(function)
     else:
         graph = parse(function)
-    print(str_graph(graph))
     output = io.StringIO()
     fn = compile_graph(graph, debug=output)
     output = output.getvalue()
@@ -607,3 +605,27 @@ def f():
 """
     )
     assert fn()[4] == "a string"
+
+
+def test_if_with_constant_strings():
+    # Test if inline return correctly handles litteral strings.s
+
+    def f(x):
+        return "morning" if x < 12 else "evening"
+
+    fn, output = parse_and_compile(f)
+    assert output == """def f(x):
+  _1 = x < 12
+  _2 = bool(_1)
+
+  def if_false_f():
+    return 'evening'
+
+  def if_true_f():
+    return 'morning'
+
+  _3 = if_true_f if _2 else if_false_f
+  return _3()
+"""
+    assert fn(2) == "morning"
+    assert fn(15) == "evening"
