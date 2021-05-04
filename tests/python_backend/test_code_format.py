@@ -648,3 +648,14 @@ def test_if_with_constant_strings():
 """
     assert fn(2) == "morning"
     assert fn(15) == "evening"
+
+
+def test_inline_operators_with_string():
+    def f(x):
+        return x + ", world!"
+
+    fn, output = parse_and_compile(f)
+    assert output == """def f(x):
+  return x + ', world!'
+"""
+    assert fn("Hello") == "Hello, world!"

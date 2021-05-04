@@ -19,7 +19,7 @@ from myia.utils.info import Labeler
 
 def default_formatter(c, format_string, nodes):
     """Generate code using given format string and input nodes."""
-    return format_string.format(*[c.label(node) for node in nodes])
+    return format_string.format(*[c.rvalue(node) for node in nodes])
 
 
 def str_user_switch(c, cond, if_true, if_false):
