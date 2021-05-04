@@ -214,7 +214,7 @@ class CodeGenerator:
                 )
                 # We return None to notify that node does not need an assignment.
                 return None
-        return f"{self.label(fn)}({', '.join(map(self.label, node.inputs))})"
+        return f"{self.label(fn)}({', '.join(map(self.rvalue, node.inputs))})"
 
     def _node_to_line(self, node):
         """Convert an apply node to a line of code."""
