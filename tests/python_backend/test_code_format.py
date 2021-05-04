@@ -659,3 +659,31 @@ def test_inline_operators_with_string():
   return x + ', world!'
 """
     assert fn("Hello") == "Hello, world!"
+
+
+def test_universe_on_string():
+    def f():
+        x = "hello"
+
+        def g():
+            return x
+
+        return g()
+
+    fn, output = parse_and_compile(f)
+    assert output == """from myia.compile.backends.python.implementations import typeof
+from myia.compile.backends.python.implementations import Handle as make_handle
+# Dynamic external import: universe_setitem
+# Dynamic external import: universe_getitem
+
+def f():
+  _1 = typeof('hello')
+  x = make_handle(_1)
+  _2 = universe_setitem(x, 'hello')
+
+  def g():
+    return universe_getitem(x)
+
+  return g()
+"""
+    assert fn() == "hello"

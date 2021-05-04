@@ -202,7 +202,7 @@ class CodeGenerator:
                 name = self._register_global(
                     fn.value, self.module_implementations[fn.value]
                 )
-                return f"{name}({', '.join(map(self.label, node.inputs))})"
+                return f"{name}({', '.join(map(self.rvalue, node.inputs))})"
             elif fn.value == "resolve":
                 namespace = node.inputs[0].value
                 symbol_name = node.inputs[1].value
