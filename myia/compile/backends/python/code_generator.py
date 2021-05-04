@@ -11,7 +11,6 @@ from myia.compile.backends.python.implementations import (
     myia_hasnext,
     myia_iter,
     myia_next,
-    typeof,
 )
 from myia.ir import Node
 from myia.utils.info import Labeler
@@ -91,6 +90,7 @@ SIMPLE_MAP = {
     operator.truediv: "{} / {}",
     operator.truth: "bool({})",
     operator.xor: "{} ^ {}",
+    "typeof": "type({})",
 }
 COMPLEX_MAP = {
     "user_switch": str_user_switch,
@@ -165,7 +165,6 @@ class CodeGenerator:
             "python_iter": myia_iter,
             "python_hasnext": myia_hasnext,
             "python_next": myia_next,
-            "typeof": typeof,
         }
 
     def _register_global(self, name, value):

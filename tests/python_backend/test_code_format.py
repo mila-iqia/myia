@@ -148,14 +148,13 @@ def test_ifexp():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f(x, y, b):
-  _1 = typeof(x)
-  _2 = typeof(y)
+  _1 = type(x)
+  _2 = type(y)
   _x_2 = make_handle(_1)
   _y_2 = make_handle(_2)
   _3 = universe_setitem(_x_2, x)
@@ -183,14 +182,13 @@ def test_boolop():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f(a, b, c):
-  _1 = typeof(b)
-  _2 = typeof(c)
+  _1 = type(b)
+  _2 = type(c)
   _b_2 = make_handle(_1)
   _c_2 = make_handle(_2)
   _3 = universe_setitem(_b_2, b)
@@ -228,13 +226,12 @@ def test_compare2():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f(x):
-  _1 = typeof(x)
+  _1 = type(x)
   _x_2 = make_handle(_1)
   _2 = universe_setitem(_x_2, x)
   _3 = universe_getitem(_x_2)
@@ -268,14 +265,13 @@ def test_if():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f(b, x, y):
-  _1 = typeof(x)
-  _2 = typeof(y)
+  _1 = type(x)
+  _2 = type(y)
   _x_2 = make_handle(_1)
   _y_2 = make_handle(_2)
   _3 = universe_setitem(_x_2, x)
@@ -305,14 +301,13 @@ def test_if2():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f(b, x, y):
-  _1 = typeof(x)
-  _2 = typeof(y)
+  _1 = type(x)
+  _2 = type(y)
   _x_2 = make_handle(_1)
   _y_2 = make_handle(_2)
   _3 = universe_setitem(_x_2, x)
@@ -346,16 +341,15 @@ def test_while():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f(b, x, y):
-  _1 = typeof(b)
-  _2 = typeof(x)
+  _1 = type(b)
+  _2 = type(x)
   _b_2 = make_handle(_1)
-  _3 = typeof(y)
+  _3 = type(y)
   _x_2 = make_handle(_2)
   _4 = universe_setitem(_b_2, b)
   _y_2 = make_handle(_3)
@@ -393,13 +387,12 @@ def test_while2():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f(x):
-  _1 = typeof(x)
+  _1 = type(x)
   _x_2 = make_handle(_1)
   _2 = universe_setitem(_x_2, x)
 
@@ -431,14 +424,13 @@ def f(x):
 def test_recursion():
     fn, output = parse_and_compile(factorial)
     assert output == (
-        """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        """from myia.compile.backends.python.implementations import Handle as make_handle
 from test_code_format import factorial
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def factorial(n):
-  _1 = typeof(n)
+  _1 = type(n)
   _n_2 = make_handle(_1)
   _2 = universe_setitem(_n_2, n)
   _3 = universe_getitem(_n_2)
@@ -476,8 +468,7 @@ def test_no_debug():
     fn, output = parse_and_compile(f, debug=False)
 
     assert output == (
-        """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+        """from myia.compile.backends.python.implementations import Handle as make_handle
 from test_code_format import factorial
 from myia.compile.backends.python.implementations import myia_iter as python_iter
 from myia.compile.backends.python.implementations import myia_hasnext as python_hasnext
@@ -486,8 +477,8 @@ from myia.compile.backends.python.implementations import myia_next as python_nex
 # Dynamic external import: universe_getitem
 
 def _1(_2):
-  _3 = typeof(_2)
-  _4 = typeof(10)
+  _3 = type(_2)
+  _4 = type(10)
   _5 = make_handle(_3)
   _6 = make_handle(_4)
   _7 = universe_setitem(_5, _2)
@@ -497,7 +488,7 @@ def _1(_2):
   _11 = _10 == 0
 
   def _12():
-    _13 = typeof(0)
+    _13 = type(0)
     _14 = universe_getitem(_5)
     _15 = make_handle(_13)
     _16 = factorial(_14)
@@ -513,7 +504,7 @@ def _1(_2):
     _23 = _22 ** 2
     _24 = universe_getitem(_5)
     _25 = 2 * _24
-    _13 = typeof(0)
+    _13 = type(0)
     _26 = _23 + _25
     _15 = make_handle(_13)
     _27 = _26 + 1
@@ -521,7 +512,7 @@ def _1(_2):
     return _12()
 
   def _29():
-    _13 = typeof(0)
+    _13 = type(0)
     _15 = make_handle(_13)
     _30 = universe_setitem(_15, 0)
     _31 = universe_getitem(_5)
@@ -671,13 +662,12 @@ def test_universe_on_string():
         return g()
 
     fn, output = parse_and_compile(f)
-    assert output == """from myia.compile.backends.python.implementations import typeof
-from myia.compile.backends.python.implementations import Handle as make_handle
+    assert output == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
 def f():
-  _1 = typeof('hello')
+  _1 = type('hello')
   x = make_handle(_1)
   _2 = universe_setitem(x, 'hello')
 
