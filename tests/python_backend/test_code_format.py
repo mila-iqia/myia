@@ -1,6 +1,7 @@
 import io
 import math
 import operator
+import sys
 
 from myia.compile.backends.python.python import compile_graph
 from myia.parser import parse
@@ -607,8 +608,26 @@ def f():
     assert fn()[4] == "a string"
 
 
+def test_print():
+    def f(x):
+        print("X is", x)
+        return x
+
+    fn, output = parse_and_compile(f)
+    assert output == """def f(x):
+  _1 = print('X is', x)
+  return x
+"""
+    default_buf = sys.stdout
+    sys.stdout = io.StringIO()
+    assert fn(2) == 2
+    output = sys.stdout.getvalue()
+    sys.stdout = default_buf
+    assert output == "X is 2\n"
+
+
 def test_if_with_constant_strings():
-    # Test if inline return correctly handles litteral strings.s
+    # Test if inline return correctly handles literal strings.
 
     def f(x):
         return "morning" if x < 12 else "evening"

@@ -1,6 +1,4 @@
 import pytest
-from io import StringIO
-import sys
 
 from myia.compile.backends.python.python import compile_graph
 from myia.parser import parse
@@ -275,17 +273,3 @@ def test_deep_closure():
         return f1(x)
 
     assert f(100) == 165
-
-
-def test_print():
-    @parse_and_compile
-    def f(x):
-        print("X is", x)
-        return x
-
-    default_buf = sys.stdout
-    sys.stdout = StringIO()
-    assert f(2) == 2
-    output = sys.stdout.getvalue()
-    sys.stdout = default_buf
-    assert output == "X is 2\n"
