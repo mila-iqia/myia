@@ -50,6 +50,16 @@ class DirectedGraph:
         """Return True if given value is in graph."""
         return v in self.value_to_node
 
+    def has_arrow(self, a, b):
+        """Return True if graph has arrow a -> b."""
+        if a not in self.value_to_node:
+            return False
+        if b not in self.value_to_node:
+            return False
+        node_a = self.value_to_node[a]
+        node_b = self.value_to_node[b]
+        return node_a in self.uses and node_b in self.uses[node_a]
+
     def is_unused(self, v):
         """Return True if there is no arrow pointing to given value."""
         return (
@@ -106,7 +116,8 @@ class DirectedGraph:
         """
         assert self.has(None)
         cp = self._copy()
-        todo = cp.pop(None)
+        # Starts with unused nodes.
+        todo = [e for e in cp.pop(None) if cp.is_unused(e)]
         while todo:
             element = todo.pop(0)
             yield element

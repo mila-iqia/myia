@@ -79,7 +79,11 @@ class GraphToDirected(_GraphConverter):
         while todo_arrows:
             user, node = todo_arrows.pop()
             assert node.is_apply()
-            if self.has_directed(node):
+            # If node is registered in a parent graph, don't treat it here.
+            if self.parent.has_directed(node):
+                continue
+            # If arrow (user -> node) is already registered, skip it.
+            if self.directed.has_arrow(user, node):
                 continue
             self.directed.add_arrow(user, node)
             for e in node.edges.values():
