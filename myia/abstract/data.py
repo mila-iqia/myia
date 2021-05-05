@@ -179,11 +179,6 @@ class AbstractValue(Interned, PossiblyRecursive, Cachable):
             tracks = Tracks(**tracks)
         self.tracks = tracks
 
-    @property
-    def t(self):
-        """Returns the AbstractValue's tracks."""
-        return self.tracks
-
     def __eqkey__(self):
         return Atom(self, tuple(sorted(self.tracks.items())))
 
@@ -248,7 +243,7 @@ class AbstractUnion(AbstractValue):
 
     def __init__(self, options, tracks):
         super().__init__(tracks)
-        self.options = list(options)  # Possibilities(options)
+        self.options = list(options)
 
     def __eqkey__(self):
         v = AbstractValue.__eqkey__(self)
