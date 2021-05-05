@@ -30,11 +30,8 @@ def test_AbstractAtom():
     assert s1.tracks.value == 1
     assert s1.tracks.interface is int
 
-    assert s1.t.value == 1
-    assert s1.t.interface is int
-
-    assert s2.t.value is ANYTHING
-    assert s2.t.interface is int
+    assert s2.tracks.value is ANYTHING
+    assert s2.tracks.interface is int
 
 
 def makerec():
