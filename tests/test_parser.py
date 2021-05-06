@@ -229,6 +229,44 @@ graph g() {
         )
 
 
+def test_nested_resolve():
+    def f(b):
+        if b:
+            a = 0
+        else:
+            a = 1
+        return a
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b) {
+  #1 = <built-in function truth>(b)
+  #2 = user_switch(#1, if_true:f, if_false:f)
+  #3 = #2()
+  return #3
+}
+
+graph if_false:f() {
+  #5 = universe_setitem(a, 1)
+  #6 = if_after:f()
+  return #6
+}
+
+graph if_after:f() {
+  #7 = universe_getitem(a)
+  return #7
+}
+
+graph if_true:f() {
+  #8 = universe_setitem(a, 0)
+  #9 = if_after:f()
+  return #9
+}
+"""
+        )
+
+
 def test_def():
     def f():  # pragma: no cover
         def g(a):
