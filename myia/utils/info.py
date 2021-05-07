@@ -70,7 +70,7 @@ class DebugInfo:
 
     """
 
-    def __init__(self, obj=None, **kwargs):
+    def __init__(self, obj=None, __no_current=False, **kwargs):
         self.name = None
         self.about = None
         self.relation = None
@@ -78,11 +78,12 @@ class DebugInfo:
         self.trace = None
         self._obj = None
 
-        top = current_info()
-        if top:
-            # Only need to look at the top of the stack
-            self.__dict__.update(top.__dict__)
-        self.__dict__.update(kwargs)
+        if not __no_current:
+            top = current_info()
+            if top:
+                # Only need to look at the top of the stack
+                self.__dict__.update(top.__dict__)
+            self.__dict__.update(kwargs)
 
         if obj is not None:
             self._obj = weakref.ref(obj)
@@ -121,6 +122,21 @@ def make_debug(obj=None, **kwargs):
         return None
     else:
         return DebugInfo(obj, **kwargs)
+
+
+def clone_debug(dbg, objmap):
+    """Clone the debug information chain for an object."""
+    if dbg is None:
+        return None
+    old = dbg._obj()
+    obj = objmap.get(old, old)
+    res = DebugInfo(obj, __no_current=True, save_trace=False)
+    res.about = clone_debug(res.about, objmap)
+    d = dbg.__dict__.copy()
+    del d["_obj"]
+    del d["about"]
+    res.__dict__.update(d)
+    return res
 
 
 @contextmanager

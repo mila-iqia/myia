@@ -87,6 +87,43 @@ def test_constant():
     assert c2.is_constant_graph()
 
 
+def test_clone():
+    f = Graph()
+    a = f.add_parameter("a")
+    g = Graph()
+    b = g.add_parameter("b")
+    f.output = f.apply(g, a)
+    g.output = g.apply("fma", b, 0, a)
+    g.return_.add_edge(SEQ, g.output)
+
+    g2 = g.clone()
+
+    assert len(g2.parameters) == 1
+    assert g2.return_
+    assert g2.return_ is not g.return_
+    assert g2.output.is_apply("fma")
+    assert g2.output is not g.output
+
+    fma2 = g2.output
+    fma = g.output
+    assert fma2.edges[0].node is not fma.edges[0].node
+    assert fma2.edges[1].node is not fma.edges[1].node
+    assert fma2.edges[2].node is fma.edges[2].node
+
+    f2 = f.clone()
+    f2.output.fn.value is f.output.fn.value
+
+    op = f.apply("op", fma)
+    op2 = op.clone(f, {f: f})
+    assert op2.edges[0].node is op.edges[0].node
+
+    c = Constant(1)
+    op3 = g.apply("op", c, c)
+    op4 = op3.clone(g, {g: g})
+    assert op3.edges[0].node is not op4.edges[0].node
+    assert op4.edges[0].node is op4.edges[1].node
+
+
 def test_graph_replace():
     g = Graph()
     p = g.add_parameter("p")
