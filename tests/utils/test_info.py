@@ -224,4 +224,13 @@ def test_clone_debug():
 
     o = Ob()
     di = DebugInfo(obj=o)
+    di.value = 33
+
     di2 = clone_debug(di, {})
+    assert di2.value == 33
+    assert di._obj() is di2._obj()
+
+    o2 = Ob()
+    di3 = clone_debug(di, {o: o2})
+    assert di._obj() is not di3._obj()
+    assert di3._obj() is o2
