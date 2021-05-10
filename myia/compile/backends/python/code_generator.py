@@ -91,6 +91,7 @@ SIMPLE_MAP = {
     operator.truth: "bool({})",
     operator.xor: "{} ^ {}",
     "typeof": "type({})",
+    "assign": "{}",
 }
 COMPLEX_MAP = {
     "user_switch": str_user_switch,
@@ -152,8 +153,33 @@ class NodeLabeler:
 class CodeGenerator:
     """Helper class to convert graph and nodes to code string."""
 
-    def __init__(self):
+    def __init__(self, *, skip=None, nonlocals=None, replace=None, rename=None):
+        """Initialize.
+
+        Optional dictionaries can be passed to control code generation.
+
+        :param skip: nodes to skip
+            Dictionary mapping a myia graph to a sequence of myia nodes to skip.
+            If found, these nodes won't be converted to code lines.
+        :param nonlocals: non-local variables
+            Dictionary mapping a myia graph to a sequence of non-local myia nodes.
+            Nodes in `nonlocals` will be marked with `nonlocal` keyword at the top
+            of closure code.
+        :param replace: nodes to replace
+            Dictionary mapping a myia node to a myia replacement node.
+            During code generation, node will be replaced eeverywhere it appears, ie.,
+            for its code line and inside any apply node that uses it.
+        :param rename: nodes to rename
+            Dictionary mapping a myia node to a label-provider myia node
+            Node label will be label of associated node in this dictionary.
+            Node label will be replace everywhere the node appears, ie.,
+            in its code line (`label` = `expr`) and inside any apply noe that uses it.
+        """
         universe = Universe()
+        self.skip = skip or {}
+        self.nonlocals = nonlocals or {}
+        self.replace = replace or {}
+        self.rename = rename or {}
         self.inline_nodes = {}
         self.lbl = NodeLabeler()
         self.global_counter = Counter()
@@ -189,22 +215,22 @@ class CodeGenerator:
 
     def _node_to_expr(self, node):
         """Convert an apply node to an expr."""
-        fn = node.fn
+        node = self.replace.get(node, node)
+        fn = self.replace.get(node.fn, node.fn)
+        inputs = [self.replace.get(inp, inp) for inp in node.inputs]
         if fn.is_constant():
             if fn.value in SIMPLE_MAP:
-                return default_formatter(
-                    self, SIMPLE_MAP[fn.value], node.inputs
-                )
+                return default_formatter(self, SIMPLE_MAP[fn.value], inputs)
             elif fn.value in COMPLEX_MAP:
-                return COMPLEX_MAP[fn.value](self, *node.inputs)
+                return COMPLEX_MAP[fn.value](self, *inputs)
             elif fn.value in self.module_implementations:
                 name = self._register_global(
                     fn.value, self.module_implementations[fn.value]
                 )
-                return f"{name}({', '.join(map(self.rvalue, node.inputs))})"
+                return f"{name}({', '.join(map(self.rvalue, inputs))})"
             elif fn.value == "resolve":
-                namespace = node.inputs[0].value
-                symbol_name = node.inputs[1].value
+                namespace = inputs[0].value
+                symbol_name = inputs[1].value
                 symbol = namespace[symbol_name]
                 # We register node as an inline node.
                 # Node usage will be directly replaced with resolved name.
@@ -213,7 +239,7 @@ class CodeGenerator:
                 )
                 # We return None to notify that node does not need an assignment.
                 return None
-        return f"{self.label(fn)}({', '.join(map(self.rvalue, node.inputs))})"
+        return f"{self.label(fn)}({', '.join(map(self.rvalue, inputs))})"
 
     def _node_to_line(self, node):
         """Convert an apply node to a line of code."""
@@ -223,14 +249,15 @@ class CodeGenerator:
 
     def label(self, node):
         """Get name for given node."""
-        return (
-            self.inline_nodes[node]
-            if node in self.inline_nodes
-            else self.lbl(node)
-        )
+        node = self.replace.get(node, node)
+        node = self.rename.get(node, node)
+        if node in self.inline_nodes:
+            return self.inline_nodes[node]
+        return self.lbl(node)
 
     def rvalue(self, node):
         """Inline constant strings and get name for other nodes."""
+        node = self.replace.get(node, node)
         if isinstance(node, Node) and node.is_constant(str):
             return repr(node.value)
         return self.label(node)
@@ -244,7 +271,11 @@ class CodeGenerator:
         """
         graph = directed.data
         header = f"def {self.label(graph)}({', '.join(self.label(p) for p in graph.parameters)}):"
-        code = []
+        # Register nonlocal variables.
+        code = [
+            f"nonlocal {self.label(outer_variable)}"
+            for outer_variable in self.nonlocals.get(graph, ())
+        ]
 
         # Get nodes from user to used nodes.
         sequence = list(directed.visit())
@@ -260,6 +291,8 @@ class CodeGenerator:
             inline_return = True
 
         for element in sequence:
+            if element in self.skip.get(graph, ()):
+                continue
             if isinstance(element, DirectedGraph):
                 code.extend(
                     ([""] if code else [])

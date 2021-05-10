@@ -16,6 +16,7 @@ from types import ModuleType
 
 from myia.compile.backends.python.code_generator import CodeGenerator
 from myia.compile.backends.python.directed_graph import DirectedGraph
+from myia.compile.backends.python.optimizer import Optimizer
 from myia.compile.backends.python.pdb_run_call import PdbRunCall
 
 
@@ -78,6 +79,7 @@ class GraphToDirected(_GraphConverter):
         todo_arrows = [(None, self.graph.return_)]
         while todo_arrows:
             user, node = todo_arrows.pop()
+            assert user is None or user.is_apply()
             assert node.is_apply()
             # If node is registered in a parent graph, don't treat it here.
             if self.parent.has_directed(node):
@@ -153,7 +155,7 @@ class GraphToModule(_GraphConverter):
 class PythonBackend:
     """Python backend main class."""
 
-    def __init__(self, debug=False, pdb=False):
+    def __init__(self, debug=False, pdb=False, optimize=True):
         """Initialize.
 
         :param debug: if False or None, do nothing.
@@ -161,6 +163,7 @@ class PythonBackend:
             Otherwise, should be an output stream (e.g. stdout or a StringIO)
             and generated code will be written into given stream.
         :param pdb: if True, compiled function will be run in a pdb instance
+        :param optimize: if True, apply Python compilation optimizer before generating the code.
         """
         if debug:
             debug = sys.stdout if debug is True else debug
@@ -168,6 +171,7 @@ class PythonBackend:
 
         self.debug = debug
         self.pdb = bool(pdb)
+        self.optimize = bool(optimize)
 
     @classmethod
     def nested_list_to_code_string(cls, structure, indentation=""):
@@ -225,9 +229,12 @@ class PythonBackend:
         :param graph: myia graph to compile
         :return: executable
         """
-        code_generator = CodeGenerator()
         code = []
-        for directed in GraphToModule().generate_directed_graphs(graph):
+        directed_graphs = GraphToModule().generate_directed_graphs(graph)
+        code_generator = CodeGenerator(
+            **(Optimizer().optimize(directed_graphs) if self.optimize else {})
+        )
+        for directed in directed_graphs:
             code.extend(code_generator.directed_graph_to_code(directed))
 
         static_imports = []

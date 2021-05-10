@@ -8,14 +8,14 @@ from myia.parser import parse
 from myia.utils.info import enable_debug
 
 
-def parse_and_compile(function, debug=True):
+def parse_and_compile(function, debug=True, optimize=True):
     if debug:
         with enable_debug():
             graph = parse(function)
     else:
         graph = parse(function)
     output = io.StringIO()
-    fn = compile_graph(graph, debug=output)
+    fn = compile_graph(graph, debug=output, optimize=optimize)
     output = output.getvalue()
     print()
     print(output)
@@ -145,7 +145,7 @@ def test_ifexp():
     def f(x, y, b):
         return x if b else y
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
         == """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -175,11 +175,37 @@ def f(x, y, b):
     assert f(2, 3, 1) == fn(2, 3, 1) == 2
 
 
+def test_ifexp_optimized():
+    def f(x, y, b):
+        return x if b else y
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(x, y, b):
+  _x_2 = x
+  _y_2 = y
+  _1 = bool(b)
+
+  def if_false_f():
+    return _y_2
+
+  def if_true_f():
+    return _x_2
+
+  _2 = if_true_f if _1 else if_false_f
+  return _2()
+"""
+    )
+    assert f(2, 3, 0) == fn(2, 3, 0) == 3
+    assert f(2, 3, 1) == fn(2, 3, 1) == 2
+
+
 def test_boolop():
     def f(a, b, c):
         return a and b or c
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
         == """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -219,11 +245,47 @@ def f(a, b, c):
     assert f(1, 0, 4) == fn(1, 0, 4) == 4
 
 
+def test_boolop_optimized():
+    def f(a, b, c):
+        return a and b or c
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(a, b, c):
+  _b_2 = b
+  _c_2 = c
+  _1 = bool(a)
+
+  def if_false_f():
+    return False
+
+  def if_true_f():
+    return _b_2
+
+  _2 = if_true_f if _1 else if_false_f
+  _3 = _2()
+  _4 = bool(_3)
+
+  def _if_false_f_2():
+    return _c_2
+
+  def _if_true_f_2():
+    return True
+
+  _5 = _if_true_f_2 if _4 else _if_false_f_2
+  return _5()
+"""
+    )
+    assert f(1, 2, 3) == 2 and fn(1, 2, 3) is True
+    assert f(1, 0, 4) == fn(1, 0, 4) == 4
+
+
 def test_compare2():
     def f(x):
         return 0 < x < 42
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
         == """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -255,6 +317,36 @@ def f(x):
     assert f(100) is fn(100) is False
 
 
+def test_compare2_optimized():
+    def f(x):
+        return 0 < x < 42
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(x):
+  _x_2 = x
+  _1 = _x_2
+  _2 = 0 < _1
+  _3 = bool(_2)
+
+  def if_false_f():
+    return False
+
+  def if_true_f():
+    _4 = _x_2
+    return _4 < 42
+
+  _5 = if_true_f if _3 else if_false_f
+  return _5()
+"""
+    )
+    assert f(1) is fn(1) is True
+    assert f(30) is fn(30) is True
+    assert f(0) is fn(0) is False
+    assert f(100) is fn(100) is False
+
+
 def test_if():
     def f(b, x, y):
         if b:
@@ -262,7 +354,7 @@ def test_if():
         else:
             return y
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
         == """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -292,13 +384,42 @@ def f(b, x, y):
     assert f(5, 1, 2) == fn(5, 1, 2) == 1
 
 
+def test_if_optimized():
+    def f(b, x, y):
+        if b:
+            return x
+        else:
+            return y
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(b, x, y):
+  _x_2 = x
+  _y_2 = y
+  _1 = bool(b)
+
+  def if_false_f():
+    return _y_2
+
+  def if_true_f():
+    return _x_2
+
+  _2 = if_true_f if _1 else if_false_f
+  return _2()
+"""
+    )
+    assert f(0, 1, 2) == fn(0, 1, 2) == 2
+    assert f(5, 1, 2) == fn(5, 1, 2) == 1
+
+
 def test_if2():
     def f(b, x, y):
         if b:
             return x
         return y
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
         == """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -332,13 +453,45 @@ def f(b, x, y):
     assert f(3, 1, 2) == fn(3, 1, 2) == 1
 
 
+def test_if2_optimized():
+    def f(b, x, y):
+        if b:
+            return x
+        return y
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(b, x, y):
+  _x_2 = x
+  _y_2 = y
+
+  def if_after():
+    return _y_2
+
+  _1 = bool(b)
+
+  def if_false_f():
+    return if_after()
+
+  def if_true_f():
+    return _x_2
+
+  _2 = if_true_f if _1 else if_false_f
+  return _2()
+"""
+    )
+    assert f(0, 1, 2) == fn(0, 1, 2) == 2
+    assert f(3, 1, 2) == fn(3, 1, 2) == 1
+
+
 def test_while():
     def f(b, x, y):
         while b:
             return x
         return y
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
         == """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -378,13 +531,49 @@ def f(b, x, y):
     assert f(3, 1, 2) == fn(3, 1, 2) == 1
 
 
+def test_while_optimized():
+    def f(b, x, y):
+        while b:
+            return x
+        return y
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(b, x, y):
+  _b_2 = b
+  _x_2 = x
+  _y_2 = y
+
+  def while_header():
+    def while_after():
+      return _y_2
+
+    _1 = _b_2
+
+    def while_else():
+      return while_after()
+
+    def while_body():
+      return _x_2
+
+    _2 = while_body if _1 else while_else
+    return _2()
+
+  return while_header()
+"""
+    )
+    assert f(0, 1, 2) == fn(0, 1, 2) == 2
+    assert f(3, 1, 2) == fn(3, 1, 2) == 1
+
+
 def test_while2():
     def f(x):
         while x:
             x = x - 1
         return x
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
         == """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -421,8 +610,46 @@ def f(x):
     assert f(100) == fn(100) == 0
 
 
+def test_while2_optimized():
+    def f(x):
+        while x:
+            x = x - 1
+        return x
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(x):
+  _x_2 = x
+
+  def while_header():
+    def while_after():
+      return _x_2
+
+    _1 = _x_2
+
+    def while_else():
+      return while_after()
+
+    def while_body():
+      nonlocal _x_2
+      _2 = _x_2
+      _3 = _2 - 1
+      _x_2 = _3
+      return while_header()
+
+    _4 = while_body if _1 else while_else
+    return _4()
+
+  return while_header()
+"""
+    )
+    assert f(0) == fn(0) == 0
+    assert f(100) == fn(100) == 0
+
+
 def test_recursion():
-    fn, output = parse_and_compile(factorial)
+    fn, output = parse_and_compile(factorial, optimize=False)
     assert output == (
         """from myia.compile.backends.python.implementations import Handle as make_handle
 from test_code_format import factorial
@@ -454,6 +681,34 @@ def factorial(n):
     assert fn(5) == 120
 
 
+def test_recursion_optimized():
+    fn, output = parse_and_compile(factorial)
+    assert output == (
+        """from test_code_format import factorial
+
+def factorial(n):
+  _n_2 = n
+  _1 = _n_2
+  _2 = _1 < 2
+  _3 = bool(_2)
+
+  def if_false_factorial():
+    _4 = _n_2
+    _5 = _n_2
+    _6 = _5 - 1
+    _7 = factorial(_6)
+    return _4 * _7
+
+  def if_true_factorial():
+    return 1
+
+  _8 = if_true_factorial if _3 else if_false_factorial
+  return _8()
+"""
+    )
+    assert fn(5) == 120
+
+
 def test_no_debug():
     def f(x):
         val = 10
@@ -465,7 +720,7 @@ def test_no_debug():
             a = x ** 2 + 2 * x + 1
         return factorial(x) - a + val
 
-    fn, output = parse_and_compile(f, debug=False)
+    fn, output = parse_and_compile(f, debug=False, optimize=False)
 
     assert output == (
         """from myia.compile.backends.python.implementations import Handle as make_handle
@@ -555,6 +810,95 @@ def _1(_2):
     # assert fn(10) == 3628765
 
 
+def test_no_debug_optimized():
+    def f(x):
+        val = 10
+        if x % 2 == 0:
+            a = 0
+            for i in range(x):
+                a = a + i
+        else:
+            a = x ** 2 + 2 * x + 1
+        return factorial(x) - a + val
+
+    fn, output = parse_and_compile(f, debug=False)
+
+    assert output == (
+        """from test_code_format import factorial
+from myia.compile.backends.python.implementations import myia_iter as python_iter
+from myia.compile.backends.python.implementations import myia_hasnext as python_hasnext
+from myia.compile.backends.python.implementations import myia_next as python_next
+
+def _1(_2):
+  _3 = _2
+  _4 = 10
+  _5 = _3
+  _6 = _5 % 2
+  _7 = _6 == 0
+
+  def _8():
+    _9 = _3
+    _10 = factorial(_9)
+    _12 = _11
+    _13 = _10 - _12
+    _14 = _4
+    return _13 + _14
+
+  _15 = bool(_7)
+
+  def _16():
+    _17 = _3
+    _18 = _17 ** 2
+    _19 = _3
+    _20 = 2 * _19
+    _21 = _18 + _20
+    _22 = _21 + 1
+    _11 = _22
+    return _8()
+
+  def _23():
+    _11 = 0
+    _24 = _3
+    _25 = range(_24)
+
+    def _26():
+      return _8()
+
+    _27 = python_iter(_25)
+
+    def _28(_29):
+      _30 = python_hasnext(_29)
+
+      def _31():
+        return _26()
+
+      def _32():
+        nonlocal _11
+        _33 = python_next(_29)
+        _34 = _33[0]
+        _35 = _33[1]
+        _36 = _11
+        _37 = _36 + _34
+        _11 = _37
+        return _28(_35)
+
+      _38 = _32 if _30 else _31
+      return _38()
+
+    return _28(_27)
+
+  _39 = _23 if _15 else _16
+  return _39()
+"""
+    )
+
+    # TODO There is currently a bug with universe_getitem called with an unreachable key.
+    # Thus, compiled code can't currently run.
+    # assert fn(1) == 7
+    # assert fn(5) == 94
+    # assert fn(10) == 3628765
+
+
 def test_constants():
     def f():
         a = 3
@@ -605,10 +949,13 @@ def test_print():
         return x
 
     fn, output = parse_and_compile(f)
-    assert output == """def f(x):
+    assert (
+        output
+        == """def f(x):
   _1 = print('X is', x)
   return x
 """
+    )
     default_buf = sys.stdout
     sys.stdout = io.StringIO()
     assert fn(2) == 2
@@ -624,7 +971,9 @@ def test_if_with_constant_strings():
         return "morning" if x < 12 else "evening"
 
     fn, output = parse_and_compile(f)
-    assert output == """def f(x):
+    assert (
+        output
+        == """def f(x):
   _1 = x < 12
   _2 = bool(_1)
 
@@ -637,6 +986,7 @@ def test_if_with_constant_strings():
   _3 = if_true_f if _2 else if_false_f
   return _3()
 """
+    )
     assert fn(2) == "morning"
     assert fn(15) == "evening"
 
@@ -646,9 +996,12 @@ def test_inline_operators_with_string():
         return x + ", world!"
 
     fn, output = parse_and_compile(f)
-    assert output == """def f(x):
+    assert (
+        output
+        == """def f(x):
   return x + ', world!'
 """
+    )
     assert fn("Hello") == "Hello, world!"
 
 
@@ -661,8 +1014,10 @@ def test_universe_on_string():
 
         return g()
 
-    fn, output = parse_and_compile(f)
-    assert output == """from myia.compile.backends.python.implementations import Handle as make_handle
+    fn, output = parse_and_compile(f, optimize=False)
+    assert (
+        output
+        == """from myia.compile.backends.python.implementations import Handle as make_handle
 # Dynamic external import: universe_setitem
 # Dynamic external import: universe_getitem
 
@@ -676,4 +1031,61 @@ def f():
 
   return g()
 """
+    )
     assert fn() == "hello"
+
+
+def test_universe_on_string_optimized():
+    def f():
+        x = "hello"
+
+        def g():
+            return x
+
+        return g()
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f():
+  x = 'hello'
+
+  def g():
+    return x
+
+  return g()
+"""
+    )
+    assert fn() == "hello"
+
+
+def test_no_return():
+    def f(x):
+        y = 2 * x
+
+        def g(i):
+            j = i + x + y  # noqa: F841
+
+        z = g(0)  # noqa: F841
+
+    fn, output = parse_and_compile(f, optimize=True)
+    assert (
+        output
+        == """def f(x):
+  _x_2 = x
+  _1 = _x_2
+  _2 = 2 * _1
+  y = _2
+
+  def g(i):
+    _3 = _x_2
+    _4 = i + _3
+    _5 = y
+    j = _4 + _5
+    return None
+
+  z = g(0)
+  return None
+"""
+    )
+    assert fn(1) is None
