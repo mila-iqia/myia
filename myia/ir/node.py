@@ -179,7 +179,7 @@ class Node:
             for k, v in kwargs.items():
                 setattr(self.debug, k, v)
 
-    def _clone(self, old, objmap):
+    def _copy_fields(self, old, objmap):
         self.abstract = old.abstract
         self.annotation = old.annotation
         self.debug = clone_debug(old.debug, objmap)
@@ -282,7 +282,7 @@ class Apply(Node):
         res = Apply(objmap[g])
         objmap[self] = res
         res.edges = _edgemap(e.clone(g, objmap) for e in self.edges.values())
-        res._clone(self, objmap)
+        res._copy_fields(self, objmap)
         return res
 
 
@@ -321,7 +321,7 @@ class Parameter(Node):
             return self
         res = Parameter(g, self.name)
         objmap[self] = res
-        res._clone(self, objmap)
+        res._copy_fields(self, objmap)
         return res
 
 
@@ -362,5 +362,5 @@ class Constant(Node):
         else:
             res = Constant(self.value)
         objmap[self] = res
-        res._clone(self, objmap)
+        res._copy_fields(self, objmap)
         return res
