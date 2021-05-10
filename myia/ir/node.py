@@ -74,10 +74,13 @@ class Graph:
 
         return Apply(self, *edges)
 
-    def clone(self):
+    def clone(self, objmap=None):
         """Make a copy of this graph."""
         res = Graph(self.parent)
-        objmap = {self: res}
+        if objmap is None:
+            objmap = {self: res}
+        else:
+            objmap[self] = res
         res.parameters = [p.clone(self, objmap) for p in self.parameters]
         res.flags = self.flags.copy()
         if self.return_:
@@ -354,7 +357,10 @@ class Constant(Node):
         """
         if self in objmap:
             return objmap[self]
-        res = Constant(self.value)
+        if self.is_constant_graph() and self.value.parent is g:
+            res = Constant(self.value.clone(objmap))
+        else:
+            res = Constant(self.value)
         objmap[self] = res
         res._clone(self, objmap)
         return res

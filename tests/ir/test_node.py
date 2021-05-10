@@ -124,6 +124,18 @@ def test_clone():
     assert op4.edges[0].node is op4.edges[1].node
 
 
+def test_clone_closure():
+    g = Graph()
+    p = g.add_parameter("p")
+    g2 = Graph(parent=g)
+    g2.output = g2.apply("add", p, 1)
+    g.output = g.apply(g2)
+
+    h = g.clone()
+    assert h.output.fn.value is not g2
+    assert h.output.fn.value.output.edges[0].node is h.parameters[0]
+
+
 def test_graph_replace():
     g = Graph()
     p = g.add_parameter("p")
