@@ -79,6 +79,8 @@ class Graph:
         res = Graph(self.parent)
         if objmap is None:
             objmap = {self: res}
+        elif self in objmap:
+            return objmap[self]
         else:
             objmap[self] = res
         res.parameters = [p.clone(self, objmap) for p in self.parameters]
