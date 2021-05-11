@@ -8,13 +8,22 @@ from myia.utils.info import (
     Labeler,
     about,
     attach_debug_info,
+    clone_debug,
     debug_inherit,
     enable_debug,
+    get_debug,
+    make_debug,
 )
 
 
 class Ob:
     pass
+
+
+def test_get_debug():
+    assert not get_debug()
+    with enable_debug():
+        assert get_debug()
 
 
 def test_nested_info():
@@ -180,6 +189,11 @@ def test_labeler_nonames():
     assert lbl(x2) == "assassin:#1"
     assert lbl(x3) == "#2"
 
+    o = Ob()
+    o.debug = None
+    assert lbl(o) == "#3"
+    assert lbl(o) == "#3"
+
 
 def test_labeler_object_describer():
     def descr(obj):
@@ -196,3 +210,27 @@ def test_labeler_debuginfo():
 
     lbl = Labeler()
     assert lbl(di) == "DI"
+
+
+def test_make_debug():
+    o = Ob()
+    assert make_debug(obj=o) is None
+    with enable_debug():
+        make_debug(obj=o)
+
+
+def test_clone_debug():
+    assert clone_debug(None, {}) is None
+
+    o = Ob()
+    di = DebugInfo(obj=o)
+    di.value = 33
+
+    di2 = clone_debug(di, {})
+    assert di2.value == 33
+    assert di._obj() is di2._obj()
+
+    o2 = Ob()
+    di3 = clone_debug(di, {o: o2})
+    assert di._obj() is not di3._obj()
+    assert di3._obj() is o2

@@ -1,7 +1,7 @@
 """Graph representation."""
 
 from myia.utils import Named
-from myia.utils.info import make_debug
+from myia.utils.info import clone_debug, make_debug
 
 FN = Named("$fn")
 SEQ = Named("$seq")
@@ -73,6 +73,30 @@ class Graph:
         )
 
         return Apply(self, *edges)
+
+    def clone(self, objmap=None):
+        """Make a copy of this graph."""
+        res = Graph(self.parent)
+        if objmap is None:
+            objmap = {self: res}
+        elif self in objmap:
+            return objmap[self]
+        else:
+            objmap[self] = res
+        res.parameters = [p.clone(self, objmap) for p in self.parameters]
+        res.flags = self.flags.copy()
+        if self.return_:
+            res.return_ = self.return_.clone(self, objmap)
+        res.varargs = (
+            self.varargs.clone(self, objmap) if self.varargs else self.varargs
+        )
+        res.kwargs = (
+            self.kwargs.clone(self, objmap) if self.kwargs else self.kwargs
+        )
+        res.defaults = self.defaults
+        res.kwonly = self.kwonly
+        res.debug = clone_debug(self.debug, objmap)
+        return res
 
     def replace(self, mapping, mapping_seq={}):
         """Replace nodes in the graph.
@@ -157,6 +181,11 @@ class Node:
             for k, v in kwargs.items():
                 setattr(self.debug, k, v)
 
+    def _copy_fields(self, old, objmap):
+        self.abstract = old.abstract
+        self.annotation = old.annotation
+        self.debug = clone_debug(old.debug, objmap)
+
 
 class Edge:
     """Link between `Node` in `Graph`.
@@ -171,6 +200,15 @@ class Edge:
     def __init__(self, label, node):
         self.label = label
         self.node = node
+
+    def clone(self, g, objmap):
+        """Make a copy, in the context of a graph clone.
+
+        Arguments:
+          g: The graph that is cloned.
+          objmap: Map of cloned objets
+        """
+        return Edge(self.label, self.node.clone(g, objmap))
 
 
 def _edgemap(edges):
@@ -232,6 +270,23 @@ class Apply(Node):
             i += 1
         return tuple(res)
 
+    def clone(self, g, objmap):
+        """Copy a node in the context of a graph clone.
+
+        Arguments:
+          g: The graph that is cloned.
+          objmap: Cloned object map.
+        """
+        if self in objmap:
+            return objmap[self]
+        if self.graph is not g:
+            return self
+        res = Apply(objmap[g])
+        objmap[self] = res
+        res.edges = _edgemap(e.clone(g, objmap) for e in self.edges.values())
+        res._copy_fields(self, objmap)
+        return res
+
 
 class Parameter(Node):
     """Node that represents a parameter for a `Graph`.
@@ -254,6 +309,22 @@ class Parameter(Node):
     def is_parameter(self):
         """See `Node.is_parameter`."""
         return True
+
+    def clone(self, g, objmap):
+        """Copy a node in the context of a graph clone.
+
+        Arguments:
+          g: The graph that is cloned.
+          objmap: Cloned object map.
+        """
+        if self in objmap:
+            return objmap[self]
+        if self.graph is not g:
+            return self
+        res = Parameter(g, self.name)
+        objmap[self] = res
+        res._copy_fields(self, objmap)
+        return res
 
 
 class Constant(Node):
@@ -278,3 +349,20 @@ class Constant(Node):
     def is_constant_graph(self):
         """See `Node.is_constant_graph`."""
         return self.is_constant(Graph)
+
+    def clone(self, g, objmap):
+        """Copy a node in the context of a graph clone.
+
+        Arguments:
+          g: The graph that is cloned.
+          objmap: Cloned object map.
+        """
+        if self in objmap:
+            return objmap[self]
+        if self.is_constant_graph() and self.value.parent is g:
+            res = Constant(self.value.clone(objmap))
+        else:
+            res = Constant(self.value)
+        objmap[self] = res
+        res._copy_fields(self, objmap)
+        return res
