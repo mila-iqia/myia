@@ -188,7 +188,7 @@ def default_relation_translator(rel):
     Given a relation, creates a label like "relation:", using a colon as a
     delimiter.
     """
-    return f"{rel or '_'}:"
+    return [":", rel or "_"]
 
 
 def default_name_generator(id):
@@ -236,7 +236,7 @@ class AbbreviationTranslator:
     def __call__(self, relation):
         """Generate a label for the relation."""
         if relation in self.relation_map:
-            return self.relation_map[relation]
+            return [self.relation_map[relation]]
         else:
             return self.default_translator(relation)
 
@@ -245,13 +245,19 @@ class Labeler:
     """Labeling system for DebugInfo.
 
     Arguments:
-        relation_translator: Function from a relation string to a label part.
+        relation_translator: Function from a relation string to a list of
+            label parts. Typically a list of one or two elements.
         name_generator: Function to generate a fresh name from a numeric id.
         disambiguator: Function to disambiguate duplicate labels. Takes the
             label and a number (monotonically increasing for each duplicate.)
         object_describer: Function to describe a non-DebugInfo object. If the
             function returns None, the DebugInfo will be labeled instead. The
             default object_describer always returns None.
+        reverse_order: Whether to reverse the order of relations (defaults to
+            False). The parts returned by relation_translator will be reversed.
+            Values:
+                False: Generate something like "f:while:body"
+                True: Generate something like "body:while:f"
     """
 
     def __init__(
@@ -260,6 +266,7 @@ class Labeler:
         name_generator=default_name_generator,
         disambiguator=default_disambiguator,
         object_describer=default_object_describer,
+        reverse_order=False,
     ):
         """Initialize the Labeler."""
         self.generated_names = Counter()
@@ -270,6 +277,7 @@ class Labeler:
         self.name_generator = name_generator
         self.disambiguator = disambiguator
         self.object_describer = object_describer
+        self.reverse_order = reverse_order
 
     def label(self, info):
         """Generate a label for the DebugInfo.
@@ -279,18 +287,26 @@ class Labeler:
         """
         chain = info.get_chain()
         chain.reverse()
-        first = chain[0][0]
-        if first not in self.namecache:
-            rval = first.name
-            if rval is None:
-                rval = self.name_generator(next(self.name_id))
-            self.namecache[first] = rval
-        else:
-            rval = self.namecache[first]
+        (first, _), *rest = chain
 
-        for info, relation in chain[1:]:
-            rval = f"{self.relation_translator(relation)}{rval}"
-        return rval
+        rval = []
+
+        if first not in self.namecache:
+            name = first.name
+            if name is None:
+                name = self.name_generator(next(self.name_id))
+            rval.append(name)
+            self.namecache[first] = name
+        else:
+            rval.append(self.namecache[first])
+
+        for info, relation in rest:
+            rval.extend(self.relation_translator(relation))
+
+        if self.reverse_order:
+            rval.reverse()
+
+        return "".join(rval)
 
     def __call__(self, obj):
         """Generate a unique label for the object or DebugInfo."""
