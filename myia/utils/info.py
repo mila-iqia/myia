@@ -278,7 +278,8 @@ class Labeler:
         label.
         """
         chain = info.get_chain()
-        first = chain[-1][0]
+        chain.reverse()
+        first = chain[0][0]
         if first not in self.namecache:
             rval = first.name
             if rval is None:
@@ -287,7 +288,7 @@ class Labeler:
         else:
             rval = self.namecache[first]
 
-        for info, relation in chain[:-1]:
+        for info, relation in chain[1:]:
             rval = f"{self.relation_translator(relation)}{rval}"
         return rval
 
