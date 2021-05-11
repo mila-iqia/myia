@@ -129,11 +129,15 @@ def test_clone_closure():
     p = g.add_parameter("p")
     g2 = Graph(parent=g)
     g2.output = g2.apply("add", p, 1)
-    g.output = g.apply(g2)
+    g.output = g.apply("mul", g.apply(g2), g.apply(g2))
 
     h = g.clone()
-    assert h.output.fn.value is not g2
-    assert h.output.fn.value.output.edges[0].node is h.parameters[0]
+    m = h.output
+    h2 = m.edges[0].node.fn.value
+    h2b = m.edges[1].node.fn.value
+    assert h2 is not g2
+    assert h2 is h2b
+    assert h2.output.edges[0].node is h.parameters[0]
 
 
 def test_graph_replace():
