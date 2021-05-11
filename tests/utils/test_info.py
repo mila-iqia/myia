@@ -155,9 +155,9 @@ def test_labeler(manyinfo):
     assert lbl(m.x2) == "apple:toyota"
     assert lbl(m.x2c) == "apple:toyota//2"
     assert lbl(m.x2b) == "apple:toyota//3"
-    assert lbl(m.x3) == "apple:blueberry:toyota"
-    assert lbl(m.x4) == "apple:blueberry:corn:toyota"
-    assert lbl(m.x4b) == "apple:blueberry:corn:toyota//2"
+    assert lbl(m.x3) == "blueberry:apple:toyota"
+    assert lbl(m.x4) == "corn:blueberry:apple:toyota"
+    assert lbl(m.x4b) == "corn:blueberry:apple:toyota//2"
 
 
 def test_labeler_abbrv(manyinfo):
@@ -173,9 +173,9 @@ def test_labeler_abbrv(manyinfo):
     assert lbl(m.x2) == "&toyota"
     assert lbl(m.x2c) == "&toyota//2"
     assert lbl(m.x2b) == "&toyota//3"
-    assert lbl(m.x3) == "&blueberry:toyota"
-    assert lbl(m.x4) == "&blueberry:#toyota"
-    assert lbl(m.x4b) == "&blueberry:#toyota//2"
+    assert lbl(m.x3) == "blueberry:&toyota"
+    assert lbl(m.x4) == "#blueberry:&toyota"
+    assert lbl(m.x4b) == "#blueberry:&toyota//2"
 
 
 def test_labeler_nonames():
