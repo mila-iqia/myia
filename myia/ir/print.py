@@ -130,7 +130,9 @@ class _NodeCache:
 
     def __init__(self):
         self.lbl = Labeler(
-            disambiguator=_disambiguator, object_describer=_constant_describer
+            disambiguator=_disambiguator,
+            object_describer=_constant_describer,
+            reverse_order=True,
         )
 
     def __call__(self, node):

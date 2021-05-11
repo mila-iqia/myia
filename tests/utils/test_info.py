@@ -152,6 +152,18 @@ def test_labeler(manyinfo):
     m = manyinfo
     lbl = Labeler()
     assert lbl(m.x1) == "toyota"
+    assert lbl(m.x2) == "toyota:apple"
+    assert lbl(m.x2c) == "toyota:apple//2"
+    assert lbl(m.x2b) == "toyota:apple//3"
+    assert lbl(m.x3) == "toyota:apple:blueberry"
+    assert lbl(m.x4) == "toyota:apple:blueberry:corn"
+    assert lbl(m.x4b) == "toyota:apple:blueberry:corn//2"
+
+
+def test_labeler_reverse(manyinfo):
+    m = manyinfo
+    lbl = Labeler(reverse_order=True)
+    assert lbl(m.x1) == "toyota"
     assert lbl(m.x2) == "apple:toyota"
     assert lbl(m.x2c) == "apple:toyota//2"
     assert lbl(m.x2b) == "apple:toyota//3"
@@ -168,7 +180,7 @@ def test_labeler_abbrv(manyinfo):
             "corn": "#",
         }
     )
-    lbl = Labeler(relation_translator=tr)
+    lbl = Labeler(relation_translator=tr, reverse_order=True)
     assert lbl(m.x1) == "toyota"
     assert lbl(m.x2) == "&toyota"
     assert lbl(m.x2c) == "&toyota//2"
@@ -186,7 +198,7 @@ def test_labeler_nonames():
 
     lbl = Labeler()
     assert lbl(x1) == "#1"
-    assert lbl(x2) == "assassin:#1"
+    assert lbl(x2) == "#1:assassin"
     assert lbl(x3) == "#2"
 
     o = Ob()

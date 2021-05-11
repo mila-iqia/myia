@@ -117,6 +117,7 @@ class NodeLabeler:
             name_generator=self._name_generator,
             disambiguator=self._disambiguator,
             object_describer=self._object_describer,
+            reverse_order=True,
         )
 
     def __call__(self, node):
@@ -130,7 +131,7 @@ class NodeLabeler:
 
     @classmethod
     def _relation_translator(cls, rel):
-        return f"{rel}_"
+        return ["_", rel]
 
     @classmethod
     def _name_generator(cls, identifier):
