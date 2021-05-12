@@ -56,14 +56,9 @@ class Optimizer:
 
     def _optimize_universe_setitem(self, dg: DirectedGraph):
         """Optimize `universe_setitem` nodes for given directed graph."""
-        # Dictionary mapping typename to myia node to assignation object
-        nodes = {TYPEOF: set(), MAKE_HANDLE: set(), UNIVERSE_SETITEM: set()}
-        for element in dg.value_to_node:
-            if isinstance(element, Apply):
-                fn = element.fn
-                if fn.is_constant() and fn.value in nodes:
-                    assert element not in nodes[fn.value]
-                    nodes[fn.value].add(element)
+        nodes = self._collect_apply_nodes(
+            dg, TYPEOF, MAKE_HANDLE, UNIVERSE_SETITEM
+        )
 
         # Skip all `typeof` nodes.
         for n_typeof in nodes[TYPEOF]:
@@ -89,17 +84,31 @@ class Optimizer:
 
     def _optimize_universe_getitem(self, dg: DirectedGraph):
         """Optimize `universe_getitem` nodes for given directed graph."""
-        nodes_universe_getitem = []
-        for element in dg.value_to_node:
-            if isinstance(element, Apply):
-                fn = element.fn
-                if fn.is_constant() and fn.value == UNIVERSE_GETITEM:
-                    nodes_universe_getitem.append(element)
         # Replace each `universe_getitem(handle)` with a new node `assign(handle)`.
         # New `assign` node will be labeled with `universe_getitem` node label.
-        for n_universe_getitem in nodes_universe_getitem:
+        nodes = self._collect_apply_nodes(dg, UNIVERSE_GETITEM)
+        for n_universe_getitem in nodes[UNIVERSE_GETITEM]:
             (n_make_handle,) = n_universe_getitem.inputs
             n_assign = dg.data.apply("assign", n_make_handle)
             assert n_universe_getitem not in self.replace
             self.replace[n_universe_getitem] = n_assign
             self.rename[n_assign] = n_universe_getitem
+
+    def _collect_apply_nodes(
+        self, directed_graph: DirectedGraph, *function_values
+    ):
+        """Collect apply nodes whose function is a constant in given values.
+
+        :param directed_graph: DirectGraph to visit to collect nodes
+        :param function_values: function values to collect
+        :return: a dictionary mapping each given function value to a set of apply nodes.
+            Set may be empty if no apply node was found for associated function value.
+        """
+        nodes = {fn_value: set() for fn_value in function_values}
+        for element in directed_graph.value_to_node:
+            if isinstance(element, Apply) and any(
+                element.is_apply(fn_value) for fn_value in function_values
+            ):
+                assert element not in nodes[element.fn.value]
+                nodes[element.fn.value].add(element)
+        return nodes
