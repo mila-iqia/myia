@@ -32,11 +32,6 @@ def myia_next(obj: tuple):  # noqa: F811
     return obj[0], obj[1:]
 
 
-def typeof(obj: object):
-    """Implementation for apply `typeof`."""
-    return type(obj)
-
-
 class Handle:
     """Handle class for `make_handle`."""
 

@@ -273,3 +273,15 @@ def test_deep_closure():
         return f1(x)
 
     assert f(100) == 165
+
+
+def test_pointer():
+    @parse_and_compile
+    def f(x):
+        a = (1, 2, 3)
+        b = (4, 5, 6)
+        c = a if x < 0 else b
+        return sum(c)
+
+    assert f(-1) == 6
+    assert f(1) == 15
