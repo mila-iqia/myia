@@ -98,7 +98,7 @@ class Graph:
         res.debug = clone_debug(self.debug, objmap)
         return res
 
-    def replace(self, mapping, mapping_seq={}):
+    def replace(self, mapping, mapping_seq={}, recursive=True):
         """Replace nodes in the graph.
 
         This will recursively replace `node` with `mapping[node]` in
@@ -106,6 +106,9 @@ class Graph:
 
         If `node` comes from a sequence edge, it will first look in
         `mapping_seq` for a replacement.
+
+        If `recursive` is True, it will also replace nodes in the
+        children of this graph.
 
         A node can be in either mapping or mapping_seq or both.
         """
@@ -126,8 +129,17 @@ class Graph:
                         edge.node = mapping_seq[edge.node]
                 elif edge.node in mapping:
                     edge.node = mapping[edge.node]
-                if edge.node and edge.node.is_apply():
-                    todo.append(edge.node)
+                if edge.node:
+                    if edge.node.is_apply():
+                        todo.append(edge.node)
+                    elif (
+                        recursive
+                        and edge.node.is_constant_graph()
+                        and edge.node.value.parent is self
+                    ):
+                        edge.node.value.replace(
+                            mapping, mapping_seq, recursive=True
+                        )
 
     def add_debug(self, **kwargs):
         """Add debug information.

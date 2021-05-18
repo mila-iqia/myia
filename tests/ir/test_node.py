@@ -154,9 +154,46 @@ def test_graph_replace():
     r_s = {a: None}
     g.replace(r, r_s)
 
-    assert g.output.edges[SEQ].node.edges[SEQ].node is None
+    assert SEQ not in g.output.edges[SEQ].node.edges
     assert g.output.edges[1].node is p
     assert g.output.edges[0].node.edges[1].node is p
+
+
+def test_graph_replace2():
+    g = Graph()
+    p = g.add_parameter("p")
+    a = g.apply("add", p, 0)
+    a2 = g.apply("add", p, a)
+    a2.add_edge(SEQ, a)
+    a3 = g.apply("op", a2, a)
+    a3.add_edge(SEQ, a2)
+    g.output = a3
+
+    b = g.apply("make_int", p)
+
+    r = {a: b}
+    r_s = {a2: b}
+    g.replace(r, r_s)
+
+    assert g.output.edges[SEQ].node is b
+    assert g.output.edges[1].node is b
+    assert g.output.edges[0].node.edges[0].node is p
+
+
+def test_graph_replace3():
+    g = Graph()
+    p = g.add_parameter("p")
+    a = g.apply("add", p, 0)
+    g2 = Graph(parent=g)
+    g2.output = g2.apply("add", p, a)
+    g.output = g.apply(g2)
+    g.output.add_edge(SEQ, a)
+
+    r = {a: p}
+    r_s = {a: None}
+    g.replace(r, r_s)
+
+    assert g.output.fn.value.output.edges[1].node is p
 
 
 def test_graph_add_debug():
