@@ -376,10 +376,9 @@ class Parser:
         elif var in function.variables_local:
             assert st.is_apply()
             repl[ld] = st.edges[1].node
-            if SEQ in ld.edges:
-                repl_seq[ld] = ld.edges[SEQ].node
-            else:
-                repl_seq[ld] = None
+            # There should always be at least one store before this load
+            assert SEQ in ld.edges
+            repl_seq[ld] = ld.edges[SEQ].node
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"

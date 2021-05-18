@@ -178,6 +178,29 @@ def test_seq2():
         )
 
 
+def test_resolve_read():
+    def f():
+        global a
+        global b
+        a2 = a + 1
+        b2 = b + 2
+        return a2 + b2
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = resolve(:tests.test_parser, a)
+  a2 = <built-in function add>(#1, 1)
+  #2 = resolve(:tests.test_parser, b)
+  b2 = <built-in function add>(#2, 2)
+  #3 = <built-in function add>(a2, b2)
+  return #3
+}
+"""
+        )
+
+
 def test_def():
     def f():  # pragma: no cover
         def g(a):
