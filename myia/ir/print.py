@@ -131,7 +131,7 @@ class _NodeCache:
         )
 
     def __call__(self, node):
-        if isinstance(node, Node) and node.is_constant_graph():
+        if node.is_constant_graph():
             return self.lbl(node.value)
         else:
             return self.lbl(node)

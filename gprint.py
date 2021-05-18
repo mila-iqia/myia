@@ -1,84 +1,43 @@
 import os
-from collections import defaultdict
+
+from hrepr import Hrepr, hrepr
 from snektalk import pastevar
-from hrepr import hrepr, Hrepr
-from myia.ir.node import Graph
-import io
-from myia.compile.backends.python.python import compile_graph
-from myia.ir.print import str_graph, _NodeCache
+
+from myia.ir.node import FN, SEQ, Apply, Constant, Graph, Node
 from myia.parser import parse
-from myia.utils.info import enable_debug
-from myia.ir.node import SEQ, FN
+from myia.utils.info import Labeler, enable_debug
 
 
-class GraphHrepr:
-    def __init__(self, graph: Graph, on_node=None):
-        self.graph_to_edges = self.get_simplified(graph)
-        self.nodecache = _NodeCache()
-        self._on_node = on_node
+class _NodeCache:
+    """Adapter for the Labeler to deal with Constant graphs.
 
-    def repr(self, node):
-        assert node.is_apply()
-        return f"{self.nodecache(node)} = {self.nodecache(node.fn)}({', '.join(self.nodecache(inp) for inp in node.inputs)})"
+    Copied from myia.ir.print
+    """
 
-    @classmethod
-    def get_simplified(cls, g: Graph):
-        graph_to_edges = {}
-        seen_edges = set()
-        todo_graphs = [g]
-        while todo_graphs:
-            graph = todo_graphs.pop(0)
-            if graph in graph_to_edges:
-                continue
-            edges = []
-            graph_to_edges[graph] = edges
-            todo_edges = [(None, None, graph.return_)]
-            while todo_edges:
-                edge = todo_edges.pop(0)
-                if edge in seen_edges:
-                    continue
-                seen_edges.add(edge)
-                user, edge_label, used = edge
-                assert used.is_apply()
-                if user is not None:
-                    edges.append(edge)
-                for e in used.edges.values():
-                    if e.node is not None:
-                        node = e.node
-                        if node.is_apply():
-                            todo_edges.append((used, e.label, node))
-                        elif node.is_constant_graph():
-                            todo_graphs.append(node.value)
-        return graph_to_edges
+    def __init__(self):
+        self.lbl = Labeler(
+            disambiguator=self._disambiguator,
+            object_describer=self._constant_describer,
+            reverse_order=True,
+        )
+
+    def __call__(self, node):
+        if isinstance(node, Constant) and node.is_constant_graph():
+            return self.lbl(node.value)
+        else:
+            return self.lbl(node)
 
     @classmethod
-    def get_node_class(cls, node):
-        if node is node.graph.return_:
-            return "output"
-        return type(node).__name__.lower()
+    def _disambiguator(cls, label, identifier):
+        return f"{label}.{identifier}"
 
     @classmethod
-    def get_edge_class(cls, edge_label):
-        if edge_label is SEQ:
-            return "link-edge"
-        if edge_label is FN:
-            return "fn-edge"
-        if isinstance(edge_label, int):
-            return "input-edge"
-        return None
-
-    def on_node(self, data):
-        if not self._on_node:
-            return
-        return self._on_node(data)
+    def _constant_describer(cls, node):
+        if isinstance(node, Constant) and not node.is_constant_graph():
+            return str(node.value)
 
 
 class GraphMixin(Hrepr):
-
-    @classmethod
-    def cystyle(cls):
-        return open(os.path.join(os.path.dirname(__file__), "graph.css")).read()
-
     def hrepr_resources(self, graph_cls: Graph):
         h = self.H
         return [
@@ -118,52 +77,171 @@ class GraphMixin(Hrepr):
             ),
         ]
 
-    def hrepr(self, graph: Graph):
-        h = self.H
-        wrapper = GraphHrepr(graph, on_node=pastevar)
+    def hrepr(self, g: Graph):
+        nodecache = _NodeCache()
+        graphs, edges = self.get_graphs_and_edges(g)
+        nodes = {user for user, _, _ in edges} | {used for _, _, used in edges}
+        data = []
+
+        data += [
+            {
+                "data": {
+                    "id": str(id(graph)),
+                    "label": nodecache(graph),
+                    "parent": str(id(graph.parent)) if graph.parent else None,
+                },
+                "classes": "function",
+            }
+            for graph in graphs
+        ]
+
+        data += [
+            {
+                "data": {
+                    "id": str(id(node)),
+                    "label": self.expr(node, nodecache),
+                    "parent": str(id(node.graph))
+                    if not node.is_constant()
+                    else None,
+                },
+                "classes": self.get_node_class(node),
+            }
+            for node in nodes
+            if isinstance(node, Node)
+        ]
+
+        data += [
+            {
+                "data": {"source": str(id(tgt)), "target": str(id(src))},
+                "classes": self.get_edge_class(edge_label),
+            }
+            for src, edge_label, tgt in edges
+        ]
+
         width = self.config.graph_width or 800
         height = self.config.graph_height or 800
         style = self.config.graph_style or self.cystyle()
-        data = []
-
-        for graph, edges in wrapper.graph_to_edges.items():
-            nodes = {user for user, _, _ in edges} | {used for _, _, used in edges}
-            data += [{
-                "data": {
-                    "id": str(id(graph)),
-                    "label": wrapper.nodecache(graph),
-                    "parent": str(id(graph.parent)) if graph.parent else None
-                },
-                "classes": "function",
-            }]
-            data += [{
-                "data": {"id": str(id(node)), "label": wrapper.repr(node), "parent": str(id(graph))},
-                "classes": wrapper.get_node_class(node),
-            } for node in nodes]
-            data += [{
-                "data": {"source": str(id(tgt)), "target": str(id(src))},
-                "classes": wrapper.get_edge_class(edge_label),
-            } for src, edge_label, tgt in edges]
-
-        return h.div(
+        return self.H.div(
             style=f"width:{width}px;height:{height}px;",
             constructor="make_graph",
             options={
                 "elements": data,
                 "style": style,
                 "layout": {"name": "dagre"},
-                "on_node": wrapper.on_node,
+                "on_node": self.generate_on_node(pastevar),
             },
         )
 
+    @classmethod
+    def get_graphs_and_edges(cls, g: Graph):
+        all_graphs = []
+        all_edges = []
+        seen_graphs = set()
+        seen_edges = set()
+        cls.collect_graph(g, all_graphs, all_edges, seen_graphs, seen_edges)
+        all_edges.reverse()
+        return all_graphs, all_edges
 
-def parse_graph(function, debug=True):
-    if debug:
-        with enable_debug():
-            graph = parse(function)
-    else:
-        graph = parse(function)
-    return graph
+    @classmethod
+    def collect_graph(
+        cls,
+        graph: Graph,
+        all_graphs: list,
+        all_edges: list,
+        seen_graphs: set,
+        seen_edges: set,
+    ):
+        if graph not in seen_graphs:
+            seen_graphs.add(graph)
+            all_graphs.append(graph)
+            cls.collect_edge(
+                (None, None, graph.return_),
+                all_graphs,
+                all_edges,
+                seen_graphs,
+                seen_edges,
+            )
+
+    @classmethod
+    def collect_edge(
+        cls,
+        edge: tuple,
+        all_graphs: list,
+        all_edges: list,
+        seen_graphs: set,
+        seen_edges: set,
+    ):
+        if edge not in seen_edges:
+            seen_edges.add(edge)
+            user, label, used = edge
+            if user is not None:
+                all_edges.append(edge)
+            if isinstance(used, Apply):
+                for e in used.edges.values():
+                    if e.node is not None:
+                        node = e.node
+                        if node.is_constant_graph():
+                            cls.collect_edge(
+                                (used, e.label, node.value),
+                                all_graphs,
+                                all_edges,
+                                seen_graphs,
+                                seen_edges,
+                            )
+                            cls.collect_graph(
+                                node.value,
+                                all_graphs,
+                                all_edges,
+                                seen_graphs,
+                                seen_edges,
+                            )
+                        else:
+                            cls.collect_edge(
+                                (used, e.label, node),
+                                all_graphs,
+                                all_edges,
+                                seen_graphs,
+                                seen_edges,
+                            )
+
+    @classmethod
+    def cystyle(cls):
+        return open(os.path.join(os.path.dirname(__file__), "graph.css")).read()
+
+    @classmethod
+    def generate_on_node(cls, on_node):
+        def fn(data):
+            if not on_node:
+                return
+            return on_node(data)
+
+        return fn
+
+    @classmethod
+    def expr(cls, node, nodecache):
+        if isinstance(node, Apply):
+            return f"{nodecache(node)} = {nodecache(node.fn)}({', '.join(nodecache(inp) for inp in node.inputs)})"
+        return nodecache(node)
+
+    @classmethod
+    def get_node_class(cls, node):
+        if node.is_parameter():
+            return "input"
+        if node.is_constant():
+            return "constant"
+        if node is node.graph.return_:
+            return "output"
+        return "intermediate"
+
+    @classmethod
+    def get_edge_class(cls, edge_label):
+        if edge_label is SEQ:
+            return "link-edge"
+        if edge_label is FN:
+            return "fn-edge"
+        if isinstance(edge_label, int):
+            return "input-edge"
+        return None
 
 
 def main():
@@ -174,8 +252,10 @@ def main():
             x = x - 1
         return x
 
-    graph = parse_graph(f)
+    with enable_debug():
+        graph = parse(f)
     print(graph)
+    # hrepr.page(graph, file="output.html")
 
 
 if __name__ == "__main__":

@@ -30,8 +30,6 @@ edge {
 }
 edge.input-edge {
     target-label: data(label);
-    line-color: green;
-    source-arrow-color: green;
     color: white;
 }
 edge.fn-edge {
