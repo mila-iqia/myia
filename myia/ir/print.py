@@ -122,7 +122,7 @@ def _constant_describer(node):
 
 
 class _NodeCache:
-    """Adapter for the Labeller to deal with Constant graphs."""
+    """Adapter for the Labeler to deal with Constant graphs."""
 
     def __init__(self):
         self.lbl = Labeler(
@@ -131,7 +131,7 @@ class _NodeCache:
         )
 
     def __call__(self, node):
-        if node.is_constant_graph():
+        if isinstance(node, Node) and node.is_constant_graph():
             return self.lbl(node.value)
         else:
             return self.lbl(node)

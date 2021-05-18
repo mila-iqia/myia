@@ -13,7 +13,8 @@ node.function {
     text-valign: top;
     text-halign: center;
     color: black;
-    background-color: #eee;
+    background-color: pink;
+    background-opacity: 0.125;
 }
 node.function.focus {
     background-color: #ddd;
@@ -29,12 +30,14 @@ edge {
 }
 edge.input-edge {
     target-label: data(label);
-    text-outline-color: #aaa;
+    line-color: green;
+    source-arrow-color: green;
     color: white;
 }
 edge.fn-edge {
     label: data(label);
-    text-outline-color: #ddd;
+    line-color: red;
+    source-arrow-color: red;
     color: blue;
     font-size: 14;
 }
@@ -63,11 +66,7 @@ edge.nest-edge:selected, edge.use-edge:selected {
     opacity: 1;
 }
 edge.link-edge {
-    width: 1;
-    line-color: black;
-    source-arrow-shape: none;
     line-style: dashed;
-    opacity: 0.1;
 }
 edge.link-edge:selected {
     opacity: 1;
