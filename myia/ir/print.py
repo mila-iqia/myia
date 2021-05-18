@@ -79,22 +79,18 @@ def str_graph(g, allow_cycles=False, recursive=True):
             applies.append(node)
 
             seq = node.edges.get(SEQ, None)
-            if seq and seq.node is not None:
+            if seq:
                 todo.append(seq.node)
             if recursive:
                 nodes = [e.node for e in node.edges.values()]
                 for node in nodes:
-                    if node is not None and node.is_constant_graph():
+                    if node.is_constant_graph():
                         todo_graphs.append(node.value)
 
         def _print_stragglers(n):
             nodes = [e.node for e in n.edges.values()]
             for node in nodes:
-                if (
-                    node is not None
-                    and node.is_apply()
-                    and node not in seen_nodes
-                ):
+                if node.is_apply() and node not in seen_nodes:
                     seen_nodes.add(node)
                     _print_stragglers(node)
                     _print_node(node, buf, nodecache, offset=2)
