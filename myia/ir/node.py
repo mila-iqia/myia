@@ -116,9 +116,14 @@ class Graph:
             if node in seen:
                 continue
             seen.add(node)
-            for edge in node.edges.values():
+            for edge in list(node.edges.values()):
                 if edge.label is SEQ and edge.node in mapping_seq:
-                    edge.node = mapping_seq[edge.node]
+                    repl = mapping_seq[edge.node]
+                    if repl is None:
+                        edge.node = None
+                        del node.edges[SEQ]
+                    else:
+                        edge.node = mapping_seq[edge.node]
                 elif edge.node in mapping:
                     edge.node = mapping[edge.node]
                 if edge.node and edge.node.is_apply():

@@ -158,7 +158,8 @@ class Block:
 
     def link_seq(self, node):
         """Append a node in the sequence chain."""
-        node.add_edge(SEQ, self.last_apply)
+        if self.last_apply is not None:
+            node.add_edge(SEQ, self.last_apply)
         self.last_apply = node
         return node
 
@@ -364,16 +365,21 @@ class Parser:
                 n = ld.graph.apply("resolve", self.global_namespace, var)
             else:
                 n = ld.graph.apply("universe_getitem", local_namespace[var])
-            n.edges[SEQ] = ld.edges[SEQ]
+            if SEQ in ld.edges:
+                n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
         elif var in function.variables_global:
             n = ld.graph.apply("resolve", self.global_namespace, var)
-            n.edges[SEQ] = ld.edges[SEQ]
+            if SEQ in ld.edges:
+                n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
         elif var in function.variables_local:
             assert st.is_apply()
             repl[ld] = st.edges[1].node
-            repl_seq[ld] = ld.edges[SEQ].node
+            if SEQ in ld.edges:
+                repl_seq[ld] = ld.edges[SEQ].node
+            else:
+                repl_seq[ld] = None
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"
@@ -389,14 +395,18 @@ class Parser:
             | function.variables_local_closure
         ):
             n = st.graph.apply("universe_setitem", local_namespace[var], value)
-            n.edges[SEQ] = st.edges[SEQ]
+            if SEQ in st.edges:
+                n.edges[SEQ] = st.edges[SEQ]
             repl[st] = n
         elif var in function.variables_global:
             raise NotImplementedError("attempt to write to a global variable")
         elif var in function.variables_local:
             if get_debug():
                 st.edges[1].node.debug.name = st.edges[0].node.value
-            repl_seq[st] = st.edges[SEQ].node
+            if SEQ in st.edges:
+                repl_seq[st] = st.edges[SEQ].node
+            else:
+                repl_seq[st] = None
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"
