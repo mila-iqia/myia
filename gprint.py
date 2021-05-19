@@ -1,6 +1,5 @@
 import os
 
-from hrepr import Hrepr, hrepr
 from snektalk import pastevar
 
 from myia.ir.node import FN, SEQ, Apply, Constant, Graph, Node
@@ -37,23 +36,36 @@ class _NodeCache:
             return str(node.value)
 
 
-class GraphMixin(Hrepr):
-    def hrepr_resources(self, graph_cls: Graph):
-        h = self.H
+class GraphPrinter:
+    __slots__ = ("graph", "_on_node")
+
+    __cystyle__ = open(os.path.join(os.path.dirname(__file__), "graph.css")).read()
+
+    def __init__(self, graph: Graph, on_node=None):
+        self.graph = graph
+        self._on_node = on_node
+
+    def on_node(self, data):
+        if not self._on_node:
+            return
+        return self._on_node(data)
+
+    @classmethod
+    def __hrepr_resources__(cls, H):
         return [
-            h.javascript(
+            H.javascript(
                 src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.17.0/cytoscape.min.js",
                 export="cytoscape",
             ),
-            h.javascript(
+            H.javascript(
                 src="https://cdn.rawgit.com/cytoscape/cytoscape.js-dagre/1.5.0/cytoscape-dagre.js",
                 export="cytoscape-dagre",
             ),
-            h.javascript(
+            H.javascript(
                 src="https://cdn.rawgit.com/cpettitt/dagre/v0.7.4/dist/dagre.js",
                 export="dagre",
             ),
-            h.javascript(
+            H.javascript(
                 """
                 // Load dagre layout
                 cydagre(cytoscape, dagre);
@@ -77,9 +89,9 @@ class GraphMixin(Hrepr):
             ),
         ]
 
-    def hrepr(self, g: Graph):
+    def __hrepr__(self, H, hrepr):
         nodecache = _NodeCache()
-        graphs, edges = self.get_graphs_and_edges(g)
+        graphs, edges = self.get_graphs_and_edges(self.graph)
         nodes = {user for user, _, _ in edges} | {used for _, _, used in edges}
         data = []
 
@@ -118,17 +130,17 @@ class GraphMixin(Hrepr):
             for src, edge_label, tgt in edges
         ]
 
-        width = self.config.graph_width or 800
-        height = self.config.graph_height or 800
-        style = self.config.graph_style or self.cystyle()
-        return self.H.div(
+        width = hrepr.config.graph_width or 800
+        height = hrepr.config.graph_height or 800
+        style = hrepr.config.graph_style or self.__cystyle__
+        return H.div(
             style=f"width:{width}px;height:{height}px;",
             constructor="make_graph",
             options={
                 "elements": data,
                 "style": style,
                 "layout": {"name": "dagre"},
-                "on_node": self.generate_on_node(pastevar),
+                "on_node": self.on_node,
             },
         )
 
@@ -205,19 +217,6 @@ class GraphMixin(Hrepr):
                             )
 
     @classmethod
-    def cystyle(cls):
-        return open(os.path.join(os.path.dirname(__file__), "graph.css")).read()
-
-    @classmethod
-    def generate_on_node(cls, on_node):
-        def fn(data):
-            if not on_node:
-                return
-            return on_node(data)
-
-        return fn
-
-    @classmethod
     def expr(cls, node, nodecache):
         if isinstance(node, Apply):
             return f"{nodecache(node)} = {nodecache(node.fn)}({', '.join(nodecache(inp) for inp in node.inputs)})"
@@ -245,8 +244,6 @@ class GraphMixin(Hrepr):
 
 
 def main():
-    hrepr.configure(mixins=GraphMixin)
-
     def f(x):
         while x:
             x = x - 1
@@ -254,7 +251,8 @@ def main():
 
     with enable_debug():
         graph = parse(f)
-    print(graph)
+    print(GraphPrinter(graph, on_node=pastevar))
+    # from hrepr import hrepr
     # hrepr.page(graph, file="output.html")
 
 
