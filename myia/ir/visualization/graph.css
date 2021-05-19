@@ -34,8 +34,8 @@ edge.input-edge {
 }
 edge.fn-edge {
     label: data(label);
-    line-color: red;
-    source-arrow-color: red;
+    line-color: rgb(150, 0, 0);
+    source-arrow-color: rgb(150, 0, 0);
     color: blue;
     font-size: 14;
 }
