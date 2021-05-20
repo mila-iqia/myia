@@ -89,15 +89,18 @@ class GraphPrinter:
         ]
 
     def __hrepr__(self, H, hrepr):
+        elements = self.graphs + self.nodes
+        identifiers = {element: indice for indice, element in enumerate(elements)}
+        assert len(identifiers) == len(elements)
         data = []
 
         # Graphs.
         data += [
             {
                 "data": {
-                    "id": str(id(graph)),
+                    "id": str(identifiers[graph]),
                     "label": self._lbl(graph),
-                    "parent": str(id(graph.parent)) if graph.parent else None,
+                    "parent": str(identifiers[graph.parent]) if graph.parent else None,
                 },
                 "classes": "function",
             }
@@ -108,9 +111,9 @@ class GraphPrinter:
         data += [
             {
                 "data": {
-                    "id": str(id(node)),
+                    "id": str(identifiers[node]),
                     "label": self.expr(node),
-                    "parent": str(id(node.graph))
+                    "parent": str(identifiers[node.graph])
                     if not node.is_constant()
                     else None,
                 },
@@ -122,7 +125,7 @@ class GraphPrinter:
         # Edges.
         data += [
             {
-                "data": {"source": str(id(tgt)), "target": str(id(src)), "label": str(edge_label)},
+                "data": {"source": str(identifiers[tgt]), "target": str(identifiers[src]), "label": str(edge_label)},
                 "classes": self.get_edge_class(edge_label),
             }
             for src, edge_label, tgt in self.edges
