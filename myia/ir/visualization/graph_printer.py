@@ -31,7 +31,7 @@ class _NodeCache:
     @classmethod
     def _constant_describer(cls, node):
         if isinstance(node, Constant) and not node.is_constant_graph():
-            return str(node.value)
+            return repr(node.value)
 
 
 class GraphPrinter:
