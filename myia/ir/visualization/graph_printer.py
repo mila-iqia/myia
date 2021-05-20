@@ -34,6 +34,38 @@ class _NodeCache:
             return repr(node.value)
 
 
+class _GraphCollector:
+    def __init__(self, g: Graph):
+        self.all_graphs = []
+        self.all_edges = []
+        self._seen_graphs = set()
+        self._seen_edges = set()
+        self._collect_graph(g)
+        self.all_edges.reverse()
+
+    def _collect_graph(self, graph: Graph):
+        if graph not in self._seen_graphs:
+            self._seen_graphs.add(graph)
+            self.all_graphs.append(graph)
+            self._collect_edge((None, None, graph.return_))
+
+    def _collect_edge(self, edge: tuple):
+        if edge not in self._seen_edges:
+            self._seen_edges.add(edge)
+            user, label, used = edge
+            if user is not None:
+                self.all_edges.append(edge)
+            if isinstance(used, Apply):
+                for e in used.edges.values():
+                    if e.node is not None:
+                        node = e.node
+                        if node.is_constant_graph():
+                            self._collect_edge((used, e.label, node.value))
+                            self._collect_graph(node.value)
+                        else:
+                            self._collect_edge((used, e.label, node))
+
+
 class GraphPrinter:
     __slots__ = ("graph", "_on_node")
 
@@ -89,7 +121,8 @@ class GraphPrinter:
 
     def __hrepr__(self, H, hrepr):
         nodecache = _NodeCache()
-        graphs, edges = self.get_graphs_and_edges(self.graph)
+        collector = _GraphCollector(self.graph)
+        graphs, edges = collector.all_graphs, collector.all_edges
         nodes = {user for user, _, _ in edges} | {used for _, _, used in edges}
         data = []
 
@@ -144,78 +177,6 @@ class GraphPrinter:
                 "on_node": self.on_node,
             },
         )
-
-    @classmethod
-    def get_graphs_and_edges(cls, g: Graph):
-        all_graphs = []
-        all_edges = []
-        seen_graphs = set()
-        seen_edges = set()
-        cls.collect_graph(g, all_graphs, all_edges, seen_graphs, seen_edges)
-        all_edges.reverse()
-        return all_graphs, all_edges
-
-    @classmethod
-    def collect_graph(
-        cls,
-        graph: Graph,
-        all_graphs: list,
-        all_edges: list,
-        seen_graphs: set,
-        seen_edges: set,
-    ):
-        if graph not in seen_graphs:
-            seen_graphs.add(graph)
-            all_graphs.append(graph)
-            cls.collect_edge(
-                (None, None, graph.return_),
-                all_graphs,
-                all_edges,
-                seen_graphs,
-                seen_edges,
-            )
-
-    @classmethod
-    def collect_edge(
-        cls,
-        edge: tuple,
-        all_graphs: list,
-        all_edges: list,
-        seen_graphs: set,
-        seen_edges: set,
-    ):
-        if edge not in seen_edges:
-            seen_edges.add(edge)
-            user, label, used = edge
-            if user is not None:
-                all_edges.append(edge)
-            if isinstance(used, Apply):
-                for e in used.edges.values():
-                    if e.node is not None:
-                        node = e.node
-                        if node.is_constant_graph():
-                            cls.collect_edge(
-                                (used, e.label, node.value),
-                                all_graphs,
-                                all_edges,
-                                seen_graphs,
-                                seen_edges,
-                            )
-                            cls.collect_graph(
-                                node.value,
-                                all_graphs,
-                                all_edges,
-                                seen_graphs,
-                                seen_edges,
-                            )
-                        else:
-                            cls.collect_edge(
-                                (used, e.label, node),
-                                all_graphs,
-                                all_edges,
-                                seen_graphs,
-                                seen_edges,
-                            )
 
     @classmethod
     def expr(cls, node, nodecache):
