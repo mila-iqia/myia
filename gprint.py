@@ -30,11 +30,11 @@ def _g():
     return a, b, c, d, e, g, h, i, j, k, m, n, p
 
 
-
-def visualize(function):
+def visualize(function, **print_options):
     with enable_debug():
         graph = parse(function)
-    print(GraphPrinter(graph, on_node=pastevar, show_constants=False))
+    print_options.setdefault("on_node", pastevar)
+    print(GraphPrinter(graph, **print_options))
 
 
 def main():

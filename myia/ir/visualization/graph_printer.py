@@ -35,10 +35,12 @@ class _NodeCache:
 
 
 class _GraphCollector:
-    def __init__(self, g: Graph, show_constants=True):
+    def __init__(self, g: Graph, show_constants=True, link_fn_graphs=True, link_inp_graphs=True):
         self.all_graphs = []
         self.all_edges = []
         self._show_constants = show_constants
+        self._link_fn_graphs = link_fn_graphs
+        self._link_inp_graphs = link_inp_graphs
         self._seen_graphs = set()
         self._seen_edges = set()
         self._collect_graph(g)
@@ -61,7 +63,8 @@ class _GraphCollector:
                     if e.node is not None:
                         node = e.node
                         if node.is_constant_graph():
-                            self._collect_edge((used, e.label, node.value))
+                            if ((self._link_fn_graphs and node is used.fn) or (self._link_inp_graphs and node in used.inputs)):
+                                self._collect_edge((used, e.label, node.value))
                             self._collect_graph(node.value)
                         elif self._show_constants or not node.is_constant():
                             self._collect_edge((used, e.label, node))
@@ -72,8 +75,8 @@ class GraphPrinter:
 
     __cystyle__ = open(os.path.join(os.path.dirname(__file__), "graph.css")).read()
 
-    def __init__(self, graph: Graph, *, on_node=None, show_constants=True):
-        collector = _GraphCollector(graph, show_constants=show_constants)
+    def __init__(self, graph: Graph, *, on_node=None, show_constants=True, link_fn_graphs=True, link_inp_graphs=True):
+        collector = _GraphCollector(graph, show_constants=show_constants, link_fn_graphs=link_fn_graphs, link_inp_graphs=link_inp_graphs)
         self.graphs = collector.all_graphs
         self.edges = collector.all_edges
         self._on_node = on_node
