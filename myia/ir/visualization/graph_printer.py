@@ -35,9 +35,10 @@ class _NodeCache:
 
 
 class _GraphCollector:
-    def __init__(self, g: Graph):
+    def __init__(self, g: Graph, show_constants=True):
         self.all_graphs = []
         self.all_edges = []
+        self._show_constants = show_constants
         self._seen_graphs = set()
         self._seen_edges = set()
         self._collect_graph(g)
@@ -62,17 +63,19 @@ class _GraphCollector:
                         if node.is_constant_graph():
                             self._collect_edge((used, e.label, node.value))
                             self._collect_graph(node.value)
-                        else:
+                        elif self._show_constants or not node.is_constant():
                             self._collect_edge((used, e.label, node))
 
 
 class GraphPrinter:
-    __slots__ = ("graph", "_on_node")
+    __slots__ = ("graphs", "edges", "_on_node", "_show_constants")
 
     __cystyle__ = open(os.path.join(os.path.dirname(__file__), "graph.css")).read()
 
-    def __init__(self, graph: Graph, on_node=None):
-        self.graph = graph
+    def __init__(self, graph: Graph, *, on_node=None, show_constants=True):
+        collector = _GraphCollector(graph, show_constants=show_constants)
+        self.graphs = collector.all_graphs
+        self.edges = collector.all_edges
         self._on_node = on_node
 
     def on_node(self, data):
@@ -121,9 +124,7 @@ class GraphPrinter:
 
     def __hrepr__(self, H, hrepr):
         nodecache = _NodeCache()
-        collector = _GraphCollector(self.graph)
-        graphs, edges = collector.all_graphs, collector.all_edges
-        nodes = {user for user, _, _ in edges} | {used for _, _, used in edges}
+        nodes = {user for user, _, _ in self.edges} | {used for _, _, used in self.edges}
         data = []
 
         # Graphs.
@@ -136,7 +137,7 @@ class GraphPrinter:
                 },
                 "classes": "function",
             }
-            for graph in graphs
+            for graph in self.graphs
         ]
 
         # Nodes.
@@ -161,7 +162,7 @@ class GraphPrinter:
                 "data": {"source": str(id(tgt)), "target": str(id(src)), "label": str(edge_label)},
                 "classes": self.get_edge_class(edge_label),
             }
-            for src, edge_label, tgt in edges
+            for src, edge_label, tgt in self.edges
         ]
 
         width = hrepr.config.graph_width or 800

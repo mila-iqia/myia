@@ -13,7 +13,7 @@ def f(x):
     return x
 
 
-def g():
+def _g():
     a = 3
     b = -2.33
     c = -1.44e-9
@@ -34,11 +34,11 @@ def g():
 def visualize(function):
     with enable_debug():
         graph = parse(function)
-    print(GraphPrinter(graph, on_node=pastevar))
+    print(GraphPrinter(graph, on_node=pastevar, show_constants=False))
 
 
 def main():
-    visualize(g)
+    visualize(_g)
     # from hrepr import hrepr
     # hrepr.page(graph, file="output.html")
 
