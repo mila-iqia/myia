@@ -34,52 +34,15 @@ class _NodeCache:
             return repr(node.value)
 
 
-class _GraphCollector:
-    def __init__(self, g: Graph, show_constants=True, link_fn_graphs=True, link_inp_graphs=True):
-        self.all_graphs = []
-        self.all_edges = []
-        self._show_constants = show_constants
-        self._link_fn_graphs = link_fn_graphs
-        self._link_inp_graphs = link_inp_graphs
-        self._seen_graphs = set()
-        self._seen_edges = set()
-        self._collect_graph(g)
-        self.all_edges.reverse()
-
-    def _collect_graph(self, graph: Graph):
-        if graph not in self._seen_graphs:
-            self._seen_graphs.add(graph)
-            self.all_graphs.append(graph)
-            self._collect_edge((None, None, graph.return_))
-
-    def _collect_edge(self, edge: tuple):
-        if edge not in self._seen_edges:
-            self._seen_edges.add(edge)
-            user, label, used = edge
-            if user is not None:
-                self.all_edges.append(edge)
-            if isinstance(used, Apply):
-                for e in used.edges.values():
-                    if e.node is not None:
-                        node = e.node
-                        if node.is_constant_graph():
-                            if ((self._link_fn_graphs and node is used.fn) or (self._link_inp_graphs and node in used.inputs)):
-                                self._collect_edge((used, e.label, node.value))
-                            self._collect_graph(node.value)
-                        elif self._show_constants or not node.is_constant():
-                            self._collect_edge((used, e.label, node))
-
-
 class GraphPrinter:
-    __slots__ = ("graphs", "edges", "_on_node", "_show_constants")
+    __slots__ = ("graphs", "nodes", "edges", "_on_node", "_lbl")
 
     __cystyle__ = open(os.path.join(os.path.dirname(__file__), "graph.css")).read()
 
     def __init__(self, graph: Graph, *, on_node=None, show_constants=True, link_fn_graphs=True, link_inp_graphs=True):
-        collector = _GraphCollector(graph, show_constants=show_constants, link_fn_graphs=link_fn_graphs, link_inp_graphs=link_inp_graphs)
-        self.graphs = collector.all_graphs
-        self.edges = collector.all_edges
+        self.graphs, self.nodes, self.edges = self.collect_myia_elements(graph, show_constants, link_fn_graphs, link_inp_graphs)
         self._on_node = on_node
+        self._lbl = _NodeCache()
 
     def on_node(self, data):
         if not self._on_node:
@@ -126,8 +89,6 @@ class GraphPrinter:
         ]
 
     def __hrepr__(self, H, hrepr):
-        nodecache = _NodeCache()
-        nodes = {user for user, _, _ in self.edges} | {used for _, _, used in self.edges}
         data = []
 
         # Graphs.
@@ -135,7 +96,7 @@ class GraphPrinter:
             {
                 "data": {
                     "id": str(id(graph)),
-                    "label": nodecache(graph),
+                    "label": self._lbl(graph),
                     "parent": str(id(graph.parent)) if graph.parent else None,
                 },
                 "classes": "function",
@@ -148,15 +109,14 @@ class GraphPrinter:
             {
                 "data": {
                     "id": str(id(node)),
-                    "label": self.expr(node, nodecache),
+                    "label": self.expr(node),
                     "parent": str(id(node.graph))
                     if not node.is_constant()
                     else None,
                 },
                 "classes": self.get_node_class(node),
             }
-            for node in nodes
-            if isinstance(node, Node)
+            for node in self.nodes
         ]
 
         # Edges.
@@ -183,10 +143,52 @@ class GraphPrinter:
         )
 
     @classmethod
-    def expr(cls, node, nodecache):
+    def collect_myia_elements(cls, g: Graph, show_constants=True, link_fn_graphs=True, link_inp_graphs=True):
+        all_graphs = []
+        all_nodes = []
+        all_edges = []
+        seen_graphs = set()
+        seen_nodes = set()
+        seen_edges = set()
+        todo_graphs = [g]
+        while todo_graphs:
+            graph = todo_graphs.pop(0)
+            if graph in seen_graphs:
+                continue
+            seen_graphs.add(graph)
+            all_graphs.append(graph)
+            for p in graph.parameters:
+                if p not in seen_nodes:
+                    seen_nodes.add(p)
+                    all_nodes.append(p)
+            todo_edges = [(None, None, graph.return_)]
+            while todo_edges:
+                edge = todo_edges.pop(0)
+                if edge in seen_edges:
+                    continue
+                seen_edges.add(edge)
+                user, label, used = edge
+                if user is not None:
+                    all_edges.append(edge)
+                if isinstance(used, Node) and used not in seen_nodes:
+                    seen_nodes.add(used)
+                    all_nodes.append(used)
+                if isinstance(used, Apply):
+                    inputs = set(used.inputs)
+                    for e in used.edges.values():
+                        node = e.node
+                        if node.is_constant_graph():
+                            todo_graphs.append(node.value)
+                            if ((link_fn_graphs and node is used.fn) or (link_inp_graphs and node in inputs)):
+                                todo_edges.append((used, e.label, node.value))
+                        elif show_constants or not node.is_constant():
+                            todo_edges.append((used, e.label, node))
+        return all_graphs, all_nodes, all_edges
+
+    def expr(self, node):
         if isinstance(node, Apply):
-            return f"{nodecache(node)} = {nodecache(node.fn)}({', '.join(nodecache(inp) for inp in node.inputs)})"
-        return nodecache(node)
+            return f"{self._lbl(node)} = {self._lbl(node.fn)}({', '.join(self._lbl(inp) for inp in node.inputs)})"
+        return self._lbl(node)
 
     @classmethod
     def get_node_class(cls, node):
