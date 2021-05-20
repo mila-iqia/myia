@@ -93,6 +93,7 @@ class GraphPrinter:
         nodes = {user for user, _, _ in edges} | {used for _, _, used in edges}
         data = []
 
+        # Graphs.
         data += [
             {
                 "data": {
@@ -105,6 +106,7 @@ class GraphPrinter:
             for graph in graphs
         ]
 
+        # Nodes.
         data += [
             {
                 "data": {
@@ -120,9 +122,10 @@ class GraphPrinter:
             if isinstance(node, Node)
         ]
 
+        # Edges.
         data += [
             {
-                "data": {"source": str(id(tgt)), "target": str(id(src))},
+                "data": {"source": str(id(tgt)), "target": str(id(src)), "label": str(edge_label)},
                 "classes": self.get_edge_class(edge_label),
             }
             for src, edge_label, tgt in edges

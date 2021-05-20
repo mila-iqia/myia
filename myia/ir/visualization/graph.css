@@ -19,61 +19,8 @@ node.function {
 node.function.focus {
     background-color: #ddd;
 }
-edge {
-    target-text-offset: 10;
-    color: white;
-    font-size: 12;
-    text-outline-width: 3;
-    curve-style: bezier;
-    source-arrow-shape: triangle;
-    line-color: #aaa;
-}
-edge.input-edge {
-    target-label: data(label);
-    color: white;
-}
-edge.fn-edge {
-    label: data(label);
-    line-color: rgb(150, 0, 0);
-    source-arrow-color: rgb(150, 0, 0);
-    color: blue;
-    font-size: 14;
-}
-/* edge.link-edge {
-    width: 0.00000001;
-    line-color: black;
-    source-arrow-shape: none;
-    target-arrow-shape: diamond;
-    target-arrow-color: black;
-    line-style: dashed;
-}
-edge.link-edge:selected {
-    width: 1;
-} */
-edge.nest-edge, edge.use-edge {
-    width: 1;
-    line-color: green;
-    line-style: dashed;
-    target-arrow-shape: circle;
-    opacity: 0.3;
-}
-edge.nest-edge {
-    line-color: blueviolet;
-}
-edge.nest-edge:selected, edge.use-edge:selected {
-    opacity: 1;
-}
-edge.link-edge {
-    line-style: dashed;
-}
-edge.link-edge:selected {
-    opacity: 1;
-}
 node.input {
     background-color: green;
-}
-node.input.unlisted {
-    background-color: red;
 }
 node.output {
     background-color: orange;
@@ -90,19 +37,25 @@ node.const_output {
     height: 10;
     background-color: orange;
 }
-node.freevar {
-    background-color: blueviolet;
+edge {
+    target-text-offset: 10;
+    color: white;
+    font-size: 12;
+    text-outline-width: 1;
+    curve-style: bezier;
+    source-arrow-shape: triangle;
+    line-color: #aaa;
 }
-node.error {
-    border-style: solid;
-    border-width: 2px;
-    border-color: red;
+edge.input-edge {
+    target-label: data(label);
 }
-
-node.special-VarNode, node.special-SVar {
-    background-color: white;
-    color: black;
-    border-style: dashed;
-    border-width: 1px;
-    border-color: blue;
+edge.fn-edge {
+    label: data(label);
+    line-color: rgb(150, 0, 0);
+    source-arrow-color: rgb(150, 0, 0);
+    font-size: 14;
+}
+edge.link-edge {
+	label: data(label);
+    line-style: dashed;
 }
