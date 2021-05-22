@@ -434,13 +434,13 @@ def f(b, x, y):
   _3 = universe_setitem(_x_2, x)
   _4 = universe_setitem(_y_2, y)
 
-  def if_after():
+  def if_after_f():
     return universe_getitem(_y_2)
 
   _5 = bool(b)
 
   def if_false_f():
-    return if_after()
+    return if_after_f()
 
   def if_true_f():
     return universe_getitem(_x_2)
@@ -466,13 +466,13 @@ def test_if2_optimized():
   _x_2 = x
   _y_2 = y
 
-  def if_after():
+  def if_after_f():
     return _y_2
 
   _1 = bool(b)
 
   def if_false_f():
-    return if_after()
+    return if_after_f()
 
   def if_true_f():
     return _x_2
@@ -509,22 +509,22 @@ def f(b, x, y):
   _5 = universe_setitem(_x_2, x)
   _6 = universe_setitem(_y_2, y)
 
-  def while_header():
-    def while_after():
+  def while_f():
+    def while_after_f():
       return universe_getitem(_y_2)
 
     _7 = universe_getitem(_b_2)
 
-    def while_else():
-      return while_after()
+    def else_while_f():
+      return while_after_f()
 
-    def while_body():
+    def body_while_f():
       return universe_getitem(_x_2)
 
-    _8 = while_body if _7 else while_else
+    _8 = body_while_f if _7 else else_while_f
     return _8()
 
-  return while_header()
+  return while_f()
 """
     )
     assert f(0, 1, 2) == fn(0, 1, 2) == 2
@@ -545,22 +545,22 @@ def test_while_optimized():
   _x_2 = x
   _y_2 = y
 
-  def while_header():
-    def while_after():
+  def while_f():
+    def while_after_f():
       return _y_2
 
     _1 = _b_2
 
-    def while_else():
-      return while_after()
+    def else_while_f():
+      return while_after_f()
 
-    def while_body():
+    def body_while_f():
       return _x_2
 
-    _2 = while_body if _1 else while_else
+    _2 = body_while_f if _1 else else_while_f
     return _2()
 
-  return while_header()
+  return while_f()
 """
     )
     assert f(0, 1, 2) == fn(0, 1, 2) == 2
@@ -585,25 +585,25 @@ def f(x):
   _x_2 = make_handle(_1)
   _2 = universe_setitem(_x_2, x)
 
-  def while_header():
-    def while_after():
+  def while_f():
+    def while_after_f():
       return universe_getitem(_x_2)
 
     _3 = universe_getitem(_x_2)
 
-    def while_else():
-      return while_after()
+    def else_while_f():
+      return while_after_f()
 
-    def while_body():
+    def body_while_f():
       _4 = universe_getitem(_x_2)
       _5 = _4 - 1
       _6 = universe_setitem(_x_2, _5)
-      return while_header()
+      return while_f()
 
-    _7 = while_body if _3 else while_else
+    _7 = body_while_f if _3 else else_while_f
     return _7()
 
-  return while_header()
+  return while_f()
 """
     )
     assert f(0) == fn(0) == 0
@@ -622,26 +622,26 @@ def test_while2_optimized():
         == """def f(x):
   _x_2 = x
 
-  def while_header():
-    def while_after():
+  def while_f():
+    def while_after_f():
       return _x_2
 
     _1 = _x_2
 
-    def while_else():
-      return while_after()
+    def else_while_f():
+      return while_after_f()
 
-    def while_body():
+    def body_while_f():
       nonlocal _x_2
       _2 = _x_2
       _3 = _2 - 1
       _x_2 = _3
-      return while_header()
+      return while_f()
 
-    _4 = while_body if _1 else while_else
+    _4 = body_while_f if _1 else else_while_f
     return _4()
 
-  return while_header()
+  return while_f()
 """
     )
     assert f(0) == fn(0) == 0
