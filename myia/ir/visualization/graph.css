@@ -1,0 +1,61 @@
+node {
+    color: white;
+    background-color: blue;
+    content: data(label);
+    text-valign: center;
+    text-halign: center;
+    shape: rectangle;
+    width: label;
+    padding: 3;
+}
+node.function {
+    padding: 10px;
+    text-valign: top;
+    text-halign: center;
+    color: black;
+    background-color: pink;
+    background-opacity: 0.125;
+}
+node.function.focus {
+    background-color: #ddd;
+}
+node.input {
+    background-color: green;
+}
+node.output {
+    background-color: orange;
+}
+node.intermediate {
+    background-color: blue;
+}
+node.constant {
+    background-color: orchid;
+}
+node.const_output {
+    shape: ellipse;
+    width: 10;
+    height: 10;
+    background-color: orange;
+}
+edge {
+    target-text-offset: 10;
+    color: white;
+    font-size: 12;
+    text-outline-width: 1;
+    curve-style: bezier;
+    source-arrow-shape: triangle;
+    line-color: #aaa;
+}
+edge.input-edge {
+    target-label: data(label);
+}
+edge.fn-edge {
+    label: data(label);
+    line-color: rgb(150, 0, 0);
+    source-arrow-color: rgb(150, 0, 0);
+    font-size: 14;
+}
+edge.link-edge {
+	label: data(label);
+    line-style: dashed;
+}

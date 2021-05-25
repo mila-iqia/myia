@@ -1,0 +1,246 @@
+<!DOCTYPE html><html><head><meta http-equiv="Content-type" content="text/html" charset="UTF-8" /><script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script><script>requirejs.config({paths: {"cytoscape": "https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.17.0/cytoscape.min.js?noext"}});</script><script>requirejs.config({paths: {"cytoscape-dagre": "https://cdn.rawgit.com/cytoscape/cytoscape.js-dagre/1.5.0/cytoscape-dagre.js?noext"}});</script><script>requirejs.config({paths: {"dagre": "https://cdn.rawgit.com/cpettitt/dagre/v0.7.4/dist/dagre.js?noext"}});</script><script>define('make_graph', ['cytoscape', 'dagre', 'cytoscape-dagre'], (cytoscape, dagre, cydagre) => {
+                // Load dagre layout
+                cydagre(cytoscape, dagre);
+
+                function make_graph(element, options) {
+                    options.container = element;
+                    this.cy = cytoscape(options);
+                    if (options.on_node) {
+                        this.cy.on('click', 'node', function(evt){
+                            options.on_node(evt.target.data());
+                        });
+                    }
+                }
+                
+return make_graph;});require(['make_graph'], _ => {});</script><style>
+:root, :host {
+	--instance-color: #00a;
+	--dict-color: #00a;
+	--tuple-color: #080;
+	--list-color: #080;
+	--set-color: #080;
+	--frozenset-color: #88f;
+	--error-color: #f00;
+	--struct-border: 2px;
+}
+
+/* Scalar/string formatting */
+
+.hreprv-True, .hreprv-False, .hreprv-None, .hreprt-int, .hreprt-float {
+	font-weight: bold;
+}
+
+.hreprt-int, .hreprt-float {
+	color: #88f;
+}
+
+.hreprt-str {
+	color: #666;
+	white-space: pre-wrap;
+}
+
+.hreprt-str:before {
+	content: "“";
+	color: #888;
+}
+
+.hreprt-str:after {
+	content: "”";
+	color: #888;
+}
+
+.hreprt-bytes {
+	color: #666;
+	font-family: monospace;
+	white-space: pre-wrap;
+}
+
+.hreprt-bytes:before {
+	content: "b“";
+}
+
+.hreprt-bytes:after {
+	content: "”";
+}
+
+.hreprv-True {
+	color: green;
+}
+
+.hreprv-False {
+	color: red;
+}
+
+.hreprv-None {
+	color: grey;
+}
+
+.hreprk-class > .hrepr-defn-key {
+	color: blue;
+}
+
+.hreprk-module > .hrepr-defn-key {
+	color: purple;
+}
+
+.hreprk-function > .hrepr-defn-key,
+.hreprk-builtin > .hrepr-defn-key,
+.hreprk-method > .hrepr-defn-key,
+.hreprk-descriptor > .hrepr-defn-key {
+	color: #080;
+}
+
+.hrepr-defn-key {
+	font-weight: bold;
+}
+
+
+/* Generic layouts */
+
+.hreprl-h, .hreprl-s {
+	display: inline-flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+}
+
+.hreprl-v {
+	display: inline-flex;
+	flex-direction: column;
+}
+
+.hrepr-body.hreprl-h,
+.hrepr-body.hreprl-v {
+	gap: 4px;
+	background: #ddd;
+}
+
+.hrepr-body.hreprl-h {
+	align-items: center;
+}
+
+.hrepr-body.hreprl-v > *,
+.hrepr-body.hreprl-h > * {
+	background: white;
+	display: inline-flex;
+	place-items: center;
+}
+
+.hrepr-body.hreprl-h > div > .hrepr-ellipsis,
+.hrepr-body.hreprl-v > div > .hrepr-ellipsis {
+	background: #ddd;
+}
+
+.hrepr-body.hreprl-h > div > .hrepr-ellipsis {
+	padding-left: 5px;
+	padding-right: 5px;
+}
+
+.hrepr-body.hreprl-v > div > .hrepr-ellipsis {
+	padding-top: 5px;
+	padding-bottom: 5px;
+}
+
+.hrepr-body.hreprl-s > * {
+	padding: 1px;
+}
+
+.hrepr-bracketed {
+	display: inline-flex;
+	flex-direction: row;
+	place-items: center;
+	background: black;
+	border: var(--struct-border) solid black;
+	box-sizing: border-box;
+}
+
+.hrepr-bracketed > .hrepr-open {
+	padding-right: var(--struct-border);
+}
+.hrepr-bracketed > .hrepr-close {
+	padding-left: var(--struct-border);
+}
+.hrepr-bracketed > .hrepr-open,
+.hrepr-bracketed > .hrepr-close,
+.hrepr-instance > .hrepr-title,
+.hreprl-s {
+	color: white;
+	font-weight: bold;
+}
+
+.hrepr-instance {
+	background: var(--instance-color);
+	border: var(--struct-border) solid var(--instance-color);
+	box-sizing: border-box;
+}
+.hrepr-instance > .hrepr-title {
+	color: white;
+	font-weight: bold;
+}
+.hrepr-instance.hreprl-v > .hrepr-title {
+	padding-bottom: var(--struct-border);
+}
+.hrepr-instance.hreprl-h > .hrepr-title,
+.hrepr-instance.hreprl-s > .hrepr-title {
+	padding-right: var(--struct-border);
+	place-self: center;
+}
+.hrepr-instance.hrepr-error {
+	background: var(--error-color);
+	border: var(--struct-border) solid var(--error-color);
+}
+
+
+/* Colors for structures. */
+
+.hreprt-dict {
+	background: var(--dict-color);
+	border-color: var(--dict-color);
+}
+
+.hreprt-list {
+	background: var(--list-color);
+	border-color: var(--list-color);
+}
+
+.hreprt-tuple {
+	background: var(--tuple-color);
+	border-color: var(--tuple-color);
+}
+
+.hreprt-set {
+	background: var(--set-color);
+	border-color: var(--set-color);
+}
+
+.hreprt-frozenset {
+	background: var(--frozenset-color);
+	border-color: var(--frozenset-color);
+}
+
+table.hrepr-body {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+table.hrepr-body > tbody > tr:nth-child(even) {
+	background: #ddd;
+}
+
+table.hrepr-body > tbody > tr:nth-child(odd) {
+	background: #fff;
+}
+
+
+/* References */
+
+.hrepr-ref {
+	font-weight: bold;
+	color: magenta;
+}
+
+.hrepr-refbox {
+	display: inline-flex;
+	position: relative;
+	place-items: center;
+}
+</style></head><body><div style="width:800px;height:800px;" id="_hrepr_elem3"></div><script>require(['make_graph'], (make_graph) => {new make_graph(document.getElementById('_hrepr_elem3'), {"elements": [{"data": {"id": "0", "label": "f0", "parent": null}, "classes": "function"}, {"data": {"id": "1", "label": "while:f0", "parent": "0"}, "classes": "function"}, {"data": {"id": "2", "label": "body:while:f0", "parent": "1"}, "classes": "function"}, {"data": {"id": "3", "label": "else:while:f0", "parent": "1"}, "classes": "function"}, {"data": {"id": "4", "label": "while_after:f0", "parent": "1"}, "classes": "function"}, {"data": {"id": "5", "label": "x", "parent": "0"}, "classes": "input"}, {"data": {"id": "6", "label": "#1 = 'return_'(#2)", "parent": "0"}, "classes": "output"}, {"data": {"id": "7", "label": "#2 = while:f0()", "parent": "0"}, "classes": "intermediate"}, {"data": {"id": "8", "label": "#3 = 'universe_setitem'(x.2, x)", "parent": "0"}, "classes": "intermediate"}, {"data": {"id": "9", "label": "x.2 = 'make_handle'(#4)", "parent": "0"}, "classes": "intermediate"}, {"data": {"id": "10", "label": "#4 = 'typeof'(x)", "parent": "0"}, "classes": "intermediate"}, {"data": {"id": "11", "label": "#5 = 'return_'(#6)", "parent": "1"}, "classes": "output"}, {"data": {"id": "12", "label": "#6 = #7()", "parent": "1"}, "classes": "intermediate"}, {"data": {"id": "13", "label": "#7 = 'user_switch'(#8, body:while:f0, else:while:f0)", "parent": "1"}, "classes": "intermediate"}, {"data": {"id": "14", "label": "#8 = 'universe_getitem'(x.2)", "parent": "1"}, "classes": "intermediate"}, {"data": {"id": "15", "label": "#9 = 'return_'(#10)", "parent": "2"}, "classes": "output"}, {"data": {"id": "16", "label": "#10 = while:f0()", "parent": "2"}, "classes": "intermediate"}, {"data": {"id": "17", "label": "#11 = 'universe_setitem'(x.2, #12)", "parent": "2"}, "classes": "intermediate"}, {"data": {"id": "18", "label": "#12 = <built-in function sub>(#13, 1)", "parent": "2"}, "classes": "intermediate"}, {"data": {"id": "19", "label": "#13 = 'universe_getitem'(x.2)", "parent": "2"}, "classes": "intermediate"}, {"data": {"id": "20", "label": "#14 = 'return_'(#15)", "parent": "3"}, "classes": "output"}, {"data": {"id": "21", "label": "#15 = while_after:f0()", "parent": "3"}, "classes": "intermediate"}, {"data": {"id": "22", "label": "#16 = 'return_'(#17)", "parent": "4"}, "classes": "output"}, {"data": {"id": "23", "label": "#17 = 'universe_getitem'(x.2)", "parent": "4"}, "classes": "intermediate"}, {"data": {"source": "7", "target": "6", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "7", "target": "6", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "1", "target": "7", "label": "$fn"}, "classes": "fn-edge"}, {"data": {"source": "8", "target": "7", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "9", "target": "8", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "5", "target": "8", "label": "1"}, "classes": "input-edge"}, {"data": {"source": "10", "target": "9", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "5", "target": "10", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "12", "target": "11", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "12", "target": "11", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "13", "target": "12", "label": "$fn"}, "classes": "fn-edge"}, {"data": {"source": "13", "target": "12", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "14", "target": "13", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "2", "target": "13", "label": "1"}, "classes": "input-edge"}, {"data": {"source": "3", "target": "13", "label": "2"}, "classes": "input-edge"}, {"data": {"source": "14", "target": "13", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "9", "target": "14", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "16", "target": "15", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "16", "target": "15", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "1", "target": "16", "label": "$fn"}, "classes": "fn-edge"}, {"data": {"source": "17", "target": "16", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "9", "target": "17", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "18", "target": "17", "label": "1"}, "classes": "input-edge"}, {"data": {"source": "18", "target": "17", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "19", "target": "18", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "19", "target": "18", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "9", "target": "19", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "21", "target": "20", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "21", "target": "20", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "4", "target": "21", "label": "$fn"}, "classes": "fn-edge"}, {"data": {"source": "23", "target": "22", "label": "0"}, "classes": "input-edge"}, {"data": {"source": "23", "target": "22", "label": "$seq"}, "classes": "link-edge"}, {"data": {"source": "9", "target": "23", "label": "0"}, "classes": "input-edge"}], "style": "node {\n    color: white;\n    background-color: blue;\n    content: data(label);\n    text-valign: center;\n    text-halign: center;\n    shape: rectangle;\n    width: label;\n    padding: 3;\n}\nnode.function {\n    padding: 10px;\n    text-valign: top;\n    text-halign: center;\n    color: black;\n    background-color: pink;\n    background-opacity: 0.125;\n}\nnode.function.focus {\n    background-color: #ddd;\n}\nnode.input {\n    background-color: green;\n}\nnode.output {\n    background-color: orange;\n}\nnode.intermediate {\n    background-color: blue;\n}\nnode.constant {\n    background-color: orchid;\n}\nnode.const_output {\n    shape: ellipse;\n    width: 10;\n    height: 10;\n    background-color: orange;\n}\nedge {\n    target-text-offset: 10;\n    color: white;\n    font-size: 12;\n    text-outline-width: 1;\n    curve-style: bezier;\n    source-arrow-shape: triangle;\n    line-color: #aaa;\n}\nedge.input-edge {\n    target-label: data(label);\n}\nedge.fn-edge {\n    label: data(label);\n    line-color: rgb(150, 0, 0);\n    source-arrow-color: rgb(150, 0, 0);\n    font-size: 14;\n}\nedge.link-edge {\n\tlabel: data(label);\n    line-style: dashed;\n}\n", "layout": {"name": "dagre"}, "on_node": null});});</script></body></html>

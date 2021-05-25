@@ -122,7 +122,7 @@ def _constant_describer(node):
 
 
 class _NodeCache:
-    """Adapter for the Labeller to deal with Constant graphs."""
+    """Adapter for the Labeler to deal with Constant graphs."""
 
     def __init__(self):
         self.lbl = Labeler(
