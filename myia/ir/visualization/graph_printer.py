@@ -121,7 +121,7 @@ class GraphPrinter:
         # Generate identifiers to make hrepr output deterministic.
         elements = self.graphs + self.nodes
         identifiers = {
-            element: indice for indice, element in enumerate(elements)
+            element: str(index) for index, element in enumerate(elements)
         }
         assert len(identifiers) == len(elements)
 
@@ -131,9 +131,9 @@ class GraphPrinter:
         data += [
             {
                 "data": {
-                    "id": str(identifiers[graph]),
+                    "id": identifiers[graph],
                     "label": self._lbl(graph),
-                    "parent": str(identifiers[graph.parent])
+                    "parent": identifiers[graph.parent]
                     if graph.parent
                     else None,
                 },
@@ -146,9 +146,9 @@ class GraphPrinter:
         data += [
             {
                 "data": {
-                    "id": str(identifiers[node]),
+                    "id": identifiers[node],
                     "label": self.expr(node),
-                    "parent": str(identifiers[node.graph])
+                    "parent": identifiers[node.graph]
                     if not node.is_constant()
                     else None,
                 },
@@ -161,8 +161,8 @@ class GraphPrinter:
         data += [
             {
                 "data": {
-                    "source": str(identifiers[tgt]),
-                    "target": str(identifiers[src]),
+                    "source": identifiers[tgt],
+                    "target": identifiers[src],
                     "label": str(edge_label),
                 },
                 "classes": self.get_edge_class(edge_label),
