@@ -15,9 +15,9 @@ from abc import abstractmethod
 from types import ModuleType
 
 from myia.compile.backends.python.code_generator import CodeGenerator
-from myia.compile.backends.python.directed_graph import DirectedGraph
 from myia.compile.backends.python.optimizer import Optimizer
 from myia.compile.backends.python.pdb_run_call import PdbRunCall
+from myia.utils.directed_graph import DirectedGraph
 
 
 class _GraphConverter:
@@ -72,6 +72,28 @@ class GraphToDirected(_GraphConverter):
         """Return True if given myia node is in a directed graph."""
         return self.directed.has(node) or self.parent.has_directed(node)
 
+    def _replace_directed_node(self, from_node, to_node):
+        """Replace a value with another one in directed graph.
+
+        Currently used to replace a closure with corresponding DirectedGraph instance.
+        """
+        if from_node in self.directed.uses:
+            self.directed.uses.setdefault(to_node, [])
+            to_uses = self.directed.uses[to_node]
+            for used in self.directed.uses.pop(from_node):
+                if used not in to_uses:
+                    to_uses.append(used)
+                index = self.directed.used_by[used].index(from_node)
+                self.directed.used_by[used][index] = to_node
+        if from_node in self.directed.used_by:
+            self.directed.used_by.setdefault(to_node, [])
+            to_used = self.directed.used_by[to_node]
+            for user in self.directed.used_by.pop(from_node):
+                if user not in to_used:
+                    to_used.append(user)
+                index = self.directed.uses[user].index(from_node)
+                self.directed.uses[user][index] = to_node
+
     def generate_directed_graph(self):
         """Converted myia graph to directed graph."""
         # Generate directed graph.
@@ -84,10 +106,9 @@ class GraphToDirected(_GraphConverter):
             # If node is registered in a parent graph, don't treat it here.
             if self.parent.has_directed(node):
                 continue
-            # If arrow (user -> node) is already registered, skip it.
-            if self.directed.has_arrow(user, node):
+            # If arrow (user -> node) is already registered, skip it, else add it.
+            if not self.directed.add_arrow(user, node):
                 continue
-            self.directed.add_arrow(user, node)
             for e in node.edges.values():
                 if e.node is not None:
                     n = e.node
@@ -105,7 +126,7 @@ class GraphToDirected(_GraphConverter):
                 ).generate_directed_graph()
         # Replace closures with related directed graphs.
         for g, d in closure_to_directed.items():
-            self.directed.replace(g, d)
+            self._replace_directed_node(g, d)
         # Return directed graph. ALl nodes are either apply nodes or directed graphs.
         return self.directed
 

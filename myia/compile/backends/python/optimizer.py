@@ -9,9 +9,9 @@ Neither directed graphs nor myia graphs will be modified. Instead, code generato
 "patch" dictionaries to generate optimized code on-the-fly.
 """
 from myia import basics
-from myia.compile.backends.python.directed_graph import DirectedGraph
 from myia.ir.node import Apply
 from myia.utils import Named
+from myia.utils.directed_graph import DirectedGraph
 
 ASSIGN = Named("ASSIGN")
 TYPEOF = type
@@ -39,7 +39,7 @@ class Optimizer:
         todo = list(directed_graphs)
         seen = set()
         while todo:
-            dg = todo.pop(0)
+            dg = todo.pop(0)  # type: DirectedGraph
             # Each directed graph should be visited once.
             assert dg not in seen
             seen.add(dg)
@@ -47,7 +47,7 @@ class Optimizer:
             self._optimize_universe_getitem(dg)
             todo.extend(
                 element
-                for element in dg.value_to_node
+                for element in dg.vertices()
                 if isinstance(element, DirectedGraph)
             )
         return {
@@ -108,7 +108,7 @@ class Optimizer:
             Set may be empty if no apply node was found for associated function value.
         """
         nodes = {fn_value: set() for fn_value in function_values}
-        for element in directed_graph.value_to_node:
+        for element in directed_graph.vertices():
             if isinstance(element, Apply) and any(
                 element.is_apply(fn_value) for fn_value in function_values
             ):
