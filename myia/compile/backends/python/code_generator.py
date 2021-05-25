@@ -8,9 +8,9 @@ from collections import Counter
 from ovld.core import _Ovld
 
 from myia import basics
-from myia.compile.backends.python.directed_graph import DirectedGraph
 from myia.compile.backends.python.optimizer import ASSIGN
 from myia.ir import Constant
+from myia.utils.directed_graph import DirectedGraph
 from myia.utils.info import Labeler
 
 
@@ -150,9 +150,10 @@ class CodeGenerator:
         sequence = list(directed.visit())
         # Reverse sequences to have used nodes then user nodes.
         sequence.reverse()
+        # Remove None node.
+        assert sequence.pop() is None
         # We skip graph.return_, as it is converted later.
-        assert sequence[-1] is graph.return_
-        sequence.pop()
+        assert sequence.pop() is graph.return_
         # If graph.output was just before graph.return_, we can inline return statement as `return <expr>`
         inline_return = False
         if sequence and sequence[-1] is graph.output:
