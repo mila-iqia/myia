@@ -8,13 +8,16 @@ Output: a list of special dictionaries to pass to code generator to "patch" dire
 Neither directed graphs nor myia graphs will be modified. Instead, code generator will use
 "patch" dictionaries to generate optimized code on-the-fly.
 """
+from myia import basics
 from myia.compile.backends.python.directed_graph import DirectedGraph
 from myia.ir.node import Apply
+from myia.utils import Named
 
-TYPEOF = "typeof"
-MAKE_HANDLE = "make_handle"
-UNIVERSE_SETITEM = "universe_setitem"
-UNIVERSE_GETITEM = "universe_getitem"
+ASSIGN = Named("ASSIGN")
+TYPEOF = type
+MAKE_HANDLE = basics.make_handle
+UNIVERSE_SETITEM = basics.global_universe_setitem
+UNIVERSE_GETITEM = basics.global_universe_getitem
 
 
 class Optimizer:
@@ -72,7 +75,7 @@ class Optimizer:
         # New `assign` node will be labeled with handle name from `make_handle` node.
         for n_universe_setitem in nodes[UNIVERSE_SETITEM]:
             n_make_handle, n_value = n_universe_setitem.inputs
-            n_assign = dg.data.apply("assign", n_value)
+            n_assign = dg.data.apply(ASSIGN, n_value)
 
             assert n_universe_setitem not in self.replace
             self.replace[n_universe_setitem] = n_assign
@@ -89,7 +92,7 @@ class Optimizer:
         nodes = self._collect_apply_nodes(dg, UNIVERSE_GETITEM)
         for n_universe_getitem in nodes[UNIVERSE_GETITEM]:
             (n_make_handle,) = n_universe_getitem.inputs
-            n_assign = dg.data.apply("assign", n_make_handle)
+            n_assign = dg.data.apply(ASSIGN, n_make_handle)
             assert n_universe_getitem not in self.replace
             self.replace[n_universe_getitem] = n_assign
             self.rename[n_assign] = n_universe_getitem

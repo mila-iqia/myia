@@ -3,6 +3,8 @@
 import io
 import types
 
+from ovld.core import _Ovld
+
 from ..utils.info import Labeler
 from .node import SEQ, Constant, Node
 
@@ -117,10 +119,20 @@ def _constant_describer(node):
     if not isinstance(node, Node) or node.is_constant_graph():
         return None
     elif node.is_constant(
-        (types.FunctionType, types.BuiltinFunctionType, types.BuiltinMethodType)
+        (
+            type,
+            types.FunctionType,
+            types.BuiltinFunctionType,
+            types.BuiltinMethodType,
+            _Ovld,
+        )
     ):
         f = node.value
-        return f"{f.__module__}.{f.__qualname__}"
+        m = f.__module__
+        if m == "builtins":
+            return f.__qualname__
+        else:
+            return f"{m}.{f.__qualname__}"
     elif node.is_constant():
         return str(node.value)
     else:
