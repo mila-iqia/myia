@@ -111,6 +111,23 @@ def parse(func):
     return graph
 
 
+class _CondJump(NamedTuple):
+    from_: 'Block'
+    true: 'Block'
+    false: 'Block'
+    jump: 'Apply'
+    vars: dict
+    done: set
+
+
+class _Jump(NamedTuple):
+    from_: 'Block'
+    target: 'Block'
+    jump: 'Apply'
+    vars: dict
+    done: set
+
+
 class Block:
     """This is used to represent a basic block in a python function."""
 
@@ -121,9 +138,11 @@ class Block:
         self.graph.set_flags(reference=True)
         self.graph.flags.update(flags)
 
-        self.jump_tag = None
-        self.last_apply = None
         self.used = True
+        self.preds = []
+        self.phis = dict()
+
+        self.last_apply = None
 
         self.variables_written = {}
         self.variables_read = {}
@@ -171,13 +190,18 @@ class Block:
         """End the block with a conditional jump to one of two blocks."""
         assert self.graph.return_ is None
         switch = self.apply(basics.user_switch, cond, true.graph, false.graph)
-        self.returns(self.apply(switch))
+        jump = self.apply(switch)
+        tag = _CondJump(self, true, false, jump, self.variables_written.copy(), set())
+        true.preds.append(tag)
+        false.preds.append(tag)
+        self.returns(jump)
+
 
     def jump(self, target, *args):
         """End the block in a jump to another block, with optional arguments."""
         assert self.graph.return_ is None
         jump = self.apply(target.graph, *args)
-        self.jump_tag = (target, jump)
+        target.preds.append(_Jump(self, target, jump, self.variables_written.copy(), set()))
         self.returns(jump)
 
     def raises(self, exc):
@@ -354,17 +378,14 @@ class Parser:
                         var in function.variables_local
                         and reads[0].edges["prevwrite"].node is None
                     ):
+                        block.phis[var] = None
                         function.variables_local_closure.add(var)
 
-    def resolve_read(self, repl, repl_seq, ld, function, local_namespace):
+    def resolve_read(self, repl, repl_seq, ld, function, block, local_namespace):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
         st = ld.edges["prevwrite"].node
-        if var in (
-            function.variables_root
-            | function.variables_free
-            | function.variables_local_closure
-        ):
+        if var in (function.variables_root | function.variables_free):
             if var not in local_namespace:
                 n = ld.graph.apply(basics.resolve, self.global_namespace, var)
             else:
@@ -374,6 +395,13 @@ class Parser:
             if SEQ in ld.edges:
                 n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
+        elif var in function.variables_local_closure:
+            if st is None:
+                repl[ld] = local_namespace[var]
+            else:
+                assert st.is_apply()
+                repl[ld] = st.edges[1].node
+            repl_seq[ld] = ld.edges[SEQ].node
         elif var in function.variables_global:
             n = ld.graph.apply(basics.resolve, self.global_namespace, var)
             if SEQ in ld.edges:
@@ -390,15 +418,11 @@ class Parser:
                 f"unclassified variable '{var}'"
             )  # pragma: no cover
 
-    def resolve_write(self, repl, repl_seq, st, function, local_namespace):
+    def resolve_write(self, repl, repl_seq, st, function, block, local_namespace):
         """Resolve a 'store' operation with pre-collected information."""
         var = st.edges[0].node.value
         value = st.edges[1].node
-        if var in (
-            function.variables_root
-            | function.variables_free
-            | function.variables_local_closure
-        ):
+        if var in (function.variables_root | function.variables_free):
             n = st.graph.apply(
                 basics.global_universe_setitem, local_namespace[var], value
             )
@@ -418,6 +442,34 @@ class Parser:
             raise AssertionError(
                 f"unclassified variable '{var}'"
             )  # pragma: no cover
+
+    def process_phi(self, block, phi):
+        # Skip processing if it's already there
+        val = block.phis.get(phi, None)
+        if val is not None:
+            return val
+
+        # Add an argument for the value of the phi
+        block.phis[phi] = block.graph.add_parameter("phi_" + phi)
+
+        # Add the arguments in all the pred calls
+        for pred in block.preds:
+            assert phi in block.function.variables_local_closure
+            if phi not in pred.vars:
+                val = self.process_phi(pred.from_, phi)
+            else:
+                val = pred.vars[phi][-1].edges[1].node
+            if phi not in pred.done:
+                pred.jump.append_input(val)
+                pred.done.add(phi)
+            if isinstance(pred, _CondJump):
+                if pred.true.phis.get(phi, None) is None:
+                    p = pred.true.graph.add_parameter("phi_" + phi)
+                    pred.true.phis[phi] = p
+                if pred.false.phis.get(phi, None) is None:
+                    p = pred.false.graph.add_parameter("phi_" + phi)
+                    pred.false.phis[phi] = p
+        return block.phis[phi]
 
     def resolve(self, functions):
         """Resolve all the 'load' and 'store' operations.
@@ -454,19 +506,23 @@ class Parser:
                     continue
                 repl = {}
                 repl_seq = {}
+                local_namespace = namespace.copy()
+
+                for phi in list(block.phis.keys()):
+                    local_namespace[phi] = self.process_phi(block, phi)
 
                 # resolve all variable reads
                 for var, items in block.variables_read.items():
                     for item in items:
                         self.resolve_read(
-                            repl, repl_seq, item, function, local_namespace
+                            repl, repl_seq, item, function, block, local_namespace
                         )
 
                 # resolve write that need to stay
                 for var, items in block.variables_written.items():
                     for item in items:
                         self.resolve_write(
-                            repl, repl_seq, item, function, local_namespace
+                            repl, repl_seq, item, function, block, local_namespace
                         )
 
                 # make sure to "bake in" top level chain replacements
@@ -526,7 +582,7 @@ class Parser:
                     raise MyiaSyntaxError(
                         "default value on the entry function",
                         self.make_location(arg),
-                    )
+                   )
                 # XXX: This might not work correctly with our framework,
                 # but we need to evaluate the default arguments in the parent
                 # context for proper name resolution.
@@ -630,7 +686,11 @@ class Parser:
                 tb.returns(Constant(True))
                 fb.returns(self._fold_bool(fb, rest, mode))
             switch = block.apply(basics.switch, test, tb.graph, fb.graph)
-            return block.apply(switch)
+            jmp = block.apply(switch)
+            tag = _CondJump(block, tb, fb, jmp, block.variables_written.copy(), set())
+            tb.preds.append(tag)
+            fb.preds.append(tag)
+            return jmp
         else:
             return test
 
@@ -742,7 +802,11 @@ class Parser:
         fb.returns(fn)
 
         switch = block.apply(basics.user_switch, cond, tb.graph, fb.graph)
-        return block.apply(switch)
+        jmp = block.apply(switch)
+        tag = _CondJump(block, tb, fb, jmp, block.variables_written.copy(), set())
+        tb.preds.append(tag)
+        fb.preds.append(tag)
+        return jmp
 
     def _process_Index(self, block, node):
         return self.process_node(block, node.value)
