@@ -1,35 +1,9 @@
 """Wrapper for graph visualization in hrepr and snektalk."""
 import os
 
-from myia.ir import Apply, Constant, Graph, Node
+from myia.ir import Apply, Graph, Node
 from myia.ir.node import FN, SEQ
-from myia.utils.info import Labeler
-
-
-class _NodeCache:
-    """Adapter for the Labeler to deal with Constant graphs.
-
-    Derived from myia.ir.print
-    """
-
-    def __init__(self):
-        self.lbl = Labeler(
-            disambiguator=self._disambiguator,
-            reverse_order=True,
-        )
-
-    def __call__(self, node):
-        if isinstance(node, Constant):
-            if node.is_constant_graph():
-                return self.lbl(node.value)
-            else:
-                return repr(node.value)
-        else:
-            return self.lbl(node)
-
-    @classmethod
-    def _disambiguator(cls, label, identifier):
-        return f"{label}.{identifier}"
+from myia.ir.print import _NodeCache
 
 
 class GraphPrinter:

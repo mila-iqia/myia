@@ -16,7 +16,7 @@ def test_print1():
     assert (
         str_graph(g)
         == """graph #1(#2: ptype) -> NoneType {
-  #3 = op(None) ; type=NoneType
+  #3 = 'op'(None) ; type=NoneType
   return #3
 }
 """

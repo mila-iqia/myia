@@ -1,7 +1,6 @@
 """Global implementations useful for compiled modules."""
 from ovld import ovld
 
-
 #####################
 # Iterator protocol #
 #####################

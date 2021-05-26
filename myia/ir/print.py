@@ -134,7 +134,7 @@ def _constant_describer(node):
         else:
             return f"{m}.{f.__qualname__}"
     elif node.is_constant():
-        return str(node.value)
+        return repr(node.value)
     else:
         return None
 
@@ -149,7 +149,7 @@ class _NodeCache:
         )
 
     def __call__(self, node):
-        if node.is_constant_graph():
+        if isinstance(node, Node) and node.is_constant_graph():
             return self.lbl(node.value)
         else:
             return self.lbl(node)
