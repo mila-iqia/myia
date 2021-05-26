@@ -6,10 +6,14 @@ import operator
 import textwrap
 from typing import NamedTuple
 
+from . import basics
 from .ir import Constant, Graph, Parameter
 from .ir.node import SEQ
-from .utils import ModuleNamespace
+from .utils import ModuleNamespace, Named
 from .utils.info import about, debug_inherit, get_debug
+
+STORE = Named("STORE")
+LOAD = Named("LOAD")
 
 
 class Location(NamedTuple):
@@ -137,7 +141,7 @@ class Block:
         resolved later when we have more information about where the
         variable is read from.
         """
-        ld = self.apply("load", varnum)
+        ld = self.apply(LOAD, varnum)
         st = self.variables_written.get(varnum, [None])[-1]
         ld.add_edge("prevwrite", st)
         self.variables_read.setdefault(varnum, []).append(ld)
@@ -151,7 +155,7 @@ class Block:
         This will add a placeholder 'store' operation in the sequence
         chain that will be resolved later.
         """
-        st = self.apply("store", varnum, node)
+        st = self.apply(STORE, varnum, node)
         self.variables_written.setdefault(varnum, []).append(st)
         self.function.variables_local.add(varnum)
         self.function.variables_first_write.setdefault(varnum, st)
@@ -166,7 +170,7 @@ class Block:
     def cond(self, cond, true, false):
         """End the block with a conditional jump to one of two blocks."""
         assert self.graph.return_ is None
-        switch = self.apply("user_switch", cond, true.graph, false.graph)
+        switch = self.apply(basics.user_switch, cond, true.graph, false.graph)
         self.returns(self.apply(switch))
 
     def jump(self, target, *args):
@@ -178,7 +182,7 @@ class Block:
 
     def raises(self, exc):
         """End the block with an exception."""
-        self.returns(self.apply("raise", exc))
+        self.returns(self.apply(basics.raise_, exc))
 
     def returns(self, value):
         """End the block with an arbitrary expression."""
@@ -362,14 +366,16 @@ class Parser:
             | function.variables_local_closure
         ):
             if var not in local_namespace:
-                n = ld.graph.apply("resolve", self.global_namespace, var)
+                n = ld.graph.apply(basics.resolve, self.global_namespace, var)
             else:
-                n = ld.graph.apply("universe_getitem", local_namespace[var])
+                n = ld.graph.apply(
+                    basics.global_universe_getitem, local_namespace[var]
+                )
             if SEQ in ld.edges:
                 n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
         elif var in function.variables_global:
-            n = ld.graph.apply("resolve", self.global_namespace, var)
+            n = ld.graph.apply(basics.resolve, self.global_namespace, var)
             if SEQ in ld.edges:
                 n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
@@ -393,7 +399,9 @@ class Parser:
             | function.variables_free
             | function.variables_local_closure
         ):
-            n = st.graph.apply("universe_setitem", local_namespace[var], value)
+            n = st.graph.apply(
+                basics.global_universe_setitem, local_namespace[var], value
+            )
             if SEQ in st.edges:
                 n.edges[SEQ] = st.edges[SEQ]
             repl[st] = n
@@ -430,16 +438,16 @@ class Parser:
 
             for var in function.variables_root:
                 st = function.variables_first_write[var]
-                t = st.graph.apply("typeof", st.edges[1].node)
+                t = st.graph.apply(type, st.edges[1].node)
                 with debug_inherit(name=st.edges[0].node.value):
-                    namespace[var] = st.graph.apply("make_handle", t)
+                    namespace[var] = st.graph.apply(basics.make_handle, t)
 
             local_namespace = namespace.copy()
             for var in function.variables_local_closure:
                 st = function.variables_first_write[var]
-                t = st.graph.apply("typeof", st.edges[1].node)
+                t = st.graph.apply(type, st.edges[1].node)
                 with debug_inherit(name=st.edges[0].node.value):
-                    local_namespace[var] = st.graph.apply("make_handle", t)
+                    local_namespace[var] = st.graph.apply(basics.make_handle, t)
 
             for block in function.blocks:
                 if not block.used:
@@ -621,7 +629,7 @@ class Parser:
                 tb, fb = self.make_condition_blocks(block, None, rest)
                 tb.returns(Constant(True))
                 fb.returns(self._fold_bool(fb, rest, mode))
-            switch = block.apply("switch", test, tb.graph, fb.graph)
+            switch = block.apply(basics.switch, test, tb.graph, fb.graph)
             return block.apply(switch)
         else:
             return test
@@ -665,7 +673,7 @@ class Parser:
             dlist = []
             for kw in kwlist:
                 dlist.extend(kw)
-            groups.append(block.apply("make_dict", *dlist))
+            groups.append(block.apply(basics.make_dict, *dlist))
 
         if len(groups) == 1:
             (args,) = groups
@@ -674,10 +682,10 @@ class Parser:
             args = []
             for group in groups:
                 if isinstance(group, list):
-                    args.append(block.apply("make_tuple", *group))
+                    args.append(block.apply(basics.make_tuple, *group))
                 else:
                     args.append(group)
-            return block.apply("apply", func, *args)
+            return block.apply(basics.apply, func, *args)
 
     def _process_Compare(self, block, node):
         if len(node.ops) == 1:
@@ -715,12 +723,12 @@ class Parser:
             dlist.append(self.process_node(block, k))
             dlist.append(self.process_node(block, v))
 
-        return block.apply("make_dict", *dlist)
+        return block.apply(basics.make_dict, *dlist)
 
     def _process_ExtSlice(self, block, node):
         # This node is removed in 3.9+
         slices = [self.process_node(block, dim) for dim in node.dims]
-        return block.apply("make_tuple", *slices)
+        return block.apply(basics.make_tuple, *slices)
 
     def _process_IfExp(self, block, node):
         cond = self.process_node(block, node.test)
@@ -733,7 +741,7 @@ class Parser:
         tb.returns(tn)
         fb.returns(fn)
 
-        switch = block.apply("user_switch", cond, tb.graph, fb.graph)
+        switch = block.apply(basics.user_switch, cond, tb.graph, fb.graph)
         return block.apply(switch)
 
     def _process_Index(self, block, node):
@@ -754,7 +762,7 @@ class Parser:
 
     def _process_List(self, block, node):
         elts = [self.process_node(block, e) for e in node.elts]
-        return block.apply("make_list", *elts)
+        return block.apply(basics.make_list, *elts)
 
     def _process_Name(self, block, node):
         assert isinstance(node.ctx, ast.Load)
@@ -773,7 +781,7 @@ class Parser:
             step = Constant(None)
         else:
             step = self.process_node(block, node.step)
-        return block.apply("slice", lower, upper, step)
+        return block.apply(slice, lower, upper, step)
 
     def _process_Subscript(self, block, node):
         value = self.process_node(block, node.value)
@@ -785,7 +793,7 @@ class Parser:
         if len(elts) == 0:
             return Constant(())
         else:
-            return block.apply("make_tuple", *elts)
+            return block.apply(basics.make_tuple, *elts)
 
     def _process_UnaryOp(self, block, node):
         val = self.process_node(block, node.operand)
@@ -847,7 +855,7 @@ class Parser:
 
         true_block, false_block = self.make_condition_blocks(block, None, None)
         block.cond(cond, true_block, false_block)
-        false_block.raises(false_block.apply("exception", msg))
+        false_block.raises(false_block.apply(Exception, msg))
         return true_block
 
     def _process_Assign(self, block, node):
@@ -880,12 +888,14 @@ class Parser:
         return block
 
     def _process_For(self, block, node):
-        init = block.apply("python_iter", self.process_node(block, node.iter))
+        init = block.apply(
+            basics.myia_iter, self.process_node(block, node.iter)
+        )
 
         with about(block.graph, relation="for"):
             header_block = block.function.new_block(block)
         it = header_block.graph.add_parameter("it")
-        cond = header_block.apply("python_hasnext", it)
+        cond = header_block.apply(basics.myia_hasnext, it)
 
         with about(
             header_block.graph,
@@ -895,7 +905,7 @@ class Parser:
             body_block = block.function.new_block(
                 header_block,
             )
-        app = body_block.apply("python_next", it)
+        app = body_block.apply(basics.myia_next, it)
         val = body_block.apply(operator.getitem, app, 0)
         self._assign(body_block, node.target, None, val)
         it2 = body_block.apply(operator.getitem, app, 1)

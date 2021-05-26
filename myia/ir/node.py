@@ -1,5 +1,6 @@
 """Graph representation."""
 
+from myia import basics
 from myia.utils import Named
 from myia.utils.info import clone_debug, make_debug
 
@@ -39,7 +40,7 @@ class Graph:
         if self.return_:
             self.return_.edges[0].node = value
         else:
-            self.return_ = self.apply("return_", value)
+            self.return_ = self.apply(basics.return_, value)
         self.return_.abstract = value.abstract
         # XXX: add typing for the "return_" primitive (or maybe not)
 

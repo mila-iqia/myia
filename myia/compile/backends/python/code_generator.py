@@ -2,16 +2,14 @@
 
 import builtins
 import operator
+import types
 from collections import Counter
 
+from ovld.core import _Ovld
+
+from myia import basics
 from myia.compile.backends.python.directed_graph import DirectedGraph
-from myia.compile.backends.python.implementations import (
-    Handle,
-    Universe,
-    myia_hasnext,
-    myia_iter,
-    myia_next,
-)
+from myia.compile.backends.python.optimizer import ASSIGN
 from myia.ir import Constant
 from myia.utils.info import Labeler
 
@@ -84,7 +82,6 @@ class CodeGenerator:
             Node label will be replaced everywhere the node appears, ie.,
             in its code line (`label` = `expr`) and inside any apply noe that uses it.
         """
-        universe = Universe()
         self.skip = skip or {}
         self.nonlocals = nonlocals or {}
         self.replace = replace or {}
@@ -122,25 +119,16 @@ class CodeGenerator:
             operator.truediv: "{} / {}",
             operator.truth: "bool({})",
             operator.xor: "{} ^ {}",
-            "typeof": "type({})",
-            "assign": "{}",
+            ASSIGN: "{}",
         }
         self.complex_map = {
-            "user_switch": self._str_user_switch,
-            "switch": self._str_user_switch,
-            "make_tuple": self._str_make_tuple,
-            "make_list": self._str_make_list,
-            "make_dict": self._str_make_dict,
-            "apply": self._str_apply,
+            basics.user_switch: self._str_user_switch,
+            basics.switch: self._str_user_switch,
+            basics.make_tuple: self._str_make_tuple,
+            basics.make_list: self._str_make_list,
+            basics.make_dict: self._str_make_dict,
+            basics.apply: self._str_apply,
             getattr: self._str_getattr,
-        }
-        self.module_implementations = {
-            "make_handle": Handle,
-            "universe_setitem": universe.setitem,
-            "universe_getitem": universe.getitem,
-            "python_iter": myia_iter,
-            "python_hasnext": myia_hasnext,
-            "python_next": myia_next,
         }
 
     def directed_graph_to_code(self, directed: DirectedGraph):
@@ -214,12 +202,7 @@ class CodeGenerator:
                 )
             elif fn.value in self.complex_map:
                 return self.complex_map[fn.value](*inputs)
-            elif fn.value in self.module_implementations:
-                name = self._register_global(
-                    fn.value, self.module_implementations[fn.value]
-                )
-                return f"{name}({', '.join(map(self._rvalue, inputs))})"
-            elif fn.value == "resolve":
+            elif fn.value is basics.resolve:
                 namespace = inputs[0].value
                 symbol_name = inputs[1].value
                 symbol = namespace[symbol_name]
@@ -230,6 +213,18 @@ class CodeGenerator:
                 )
                 # We return None to notify that node does not need an assignment.
                 return None
+            elif isinstance(
+                fn.value,
+                (
+                    type,
+                    types.FunctionType,
+                    types.BuiltinFunctionType,
+                    types.BuiltinMethodType,
+                    _Ovld,
+                ),
+            ):
+                name = self._register_global(fn.value.__name__, fn.value)
+                return f"{name}({', '.join(map(self._rvalue, inputs))})"
         return f"{self._label(fn)}({', '.join(map(self._rvalue, inputs))})"
 
     def _rvalue(self, replaced_node):

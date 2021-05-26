@@ -148,24 +148,24 @@ def test_ifexp():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f(x, y, b):
   _1 = type(x)
   _2 = type(y)
   _x_2 = make_handle(_1)
   _y_2 = make_handle(_2)
-  _3 = universe_setitem(_x_2, x)
-  _4 = universe_setitem(_y_2, y)
+  _3 = global_universe_setitem(_x_2, x)
+  _4 = global_universe_setitem(_y_2, y)
   _5 = bool(b)
 
   def if_false_f():
-    return universe_getitem(_y_2)
+    return global_universe_getitem(_y_2)
 
   def if_true_f():
-    return universe_getitem(_x_2)
+    return global_universe_getitem(_x_2)
 
   _6 = if_true_f if _5 else if_false_f
   return _6()
@@ -208,31 +208,31 @@ def test_boolop():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f(a, b, c):
   _1 = type(b)
   _2 = type(c)
   _b_2 = make_handle(_1)
   _c_2 = make_handle(_2)
-  _3 = universe_setitem(_b_2, b)
-  _4 = universe_setitem(_c_2, c)
+  _3 = global_universe_setitem(_b_2, b)
+  _4 = global_universe_setitem(_c_2, c)
   _5 = bool(a)
 
   def if_false_f():
     return False
 
   def if_true_f():
-    return universe_getitem(_b_2)
+    return global_universe_getitem(_b_2)
 
   _6 = if_true_f if _5 else if_false_f
   _7 = _6()
   _8 = bool(_7)
 
   def _if_false_f_2():
-    return universe_getitem(_c_2)
+    return global_universe_getitem(_c_2)
 
   def _if_true_f_2():
     return True
@@ -288,15 +288,15 @@ def test_compare2():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f(x):
   _1 = type(x)
   _x_2 = make_handle(_1)
-  _2 = universe_setitem(_x_2, x)
-  _3 = universe_getitem(_x_2)
+  _2 = global_universe_setitem(_x_2, x)
+  _3 = global_universe_getitem(_x_2)
   _4 = 0 < _3
   _5 = bool(_4)
 
@@ -304,7 +304,7 @@ def f(x):
     return False
 
   def if_true_f():
-    _6 = universe_getitem(_x_2)
+    _6 = global_universe_getitem(_x_2)
     return _6 < 42
 
   _7 = if_true_f if _5 else if_false_f
@@ -357,24 +357,24 @@ def test_if():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f(b, x, y):
   _1 = type(x)
   _2 = type(y)
   _x_2 = make_handle(_1)
   _y_2 = make_handle(_2)
-  _3 = universe_setitem(_x_2, x)
-  _4 = universe_setitem(_y_2, y)
+  _3 = global_universe_setitem(_x_2, x)
+  _4 = global_universe_setitem(_y_2, y)
   _5 = bool(b)
 
   def if_false_f():
-    return universe_getitem(_y_2)
+    return global_universe_getitem(_y_2)
 
   def if_true_f():
-    return universe_getitem(_x_2)
+    return global_universe_getitem(_x_2)
 
   _6 = if_true_f if _5 else if_false_f
   return _6()
@@ -422,20 +422,20 @@ def test_if2():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f(b, x, y):
   _1 = type(x)
   _2 = type(y)
   _x_2 = make_handle(_1)
   _y_2 = make_handle(_2)
-  _3 = universe_setitem(_x_2, x)
-  _4 = universe_setitem(_y_2, y)
+  _3 = global_universe_setitem(_x_2, x)
+  _4 = global_universe_setitem(_y_2, y)
 
   def if_after_f():
-    return universe_getitem(_y_2)
+    return global_universe_getitem(_y_2)
 
   _5 = bool(b)
 
@@ -443,7 +443,7 @@ def f(b, x, y):
     return if_after_f()
 
   def if_true_f():
-    return universe_getitem(_x_2)
+    return global_universe_getitem(_x_2)
 
   _6 = if_true_f if _5 else if_false_f
   return _6()
@@ -494,9 +494,9 @@ def test_while():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f(b, x, y):
   _1 = type(b)
@@ -504,22 +504,22 @@ def f(b, x, y):
   _b_2 = make_handle(_1)
   _3 = type(y)
   _x_2 = make_handle(_2)
-  _4 = universe_setitem(_b_2, b)
+  _4 = global_universe_setitem(_b_2, b)
   _y_2 = make_handle(_3)
-  _5 = universe_setitem(_x_2, x)
-  _6 = universe_setitem(_y_2, y)
+  _5 = global_universe_setitem(_x_2, x)
+  _6 = global_universe_setitem(_y_2, y)
 
   def while_f():
     def while_after_f():
-      return universe_getitem(_y_2)
+      return global_universe_getitem(_y_2)
 
-    _7 = universe_getitem(_b_2)
+    _7 = global_universe_getitem(_b_2)
 
     def else_while_f():
       return while_after_f()
 
     def body_while_f():
-      return universe_getitem(_x_2)
+      return global_universe_getitem(_x_2)
 
     _8 = body_while_f if _7 else else_while_f
     return _8()
@@ -576,28 +576,28 @@ def test_while2():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f(x):
   _1 = type(x)
   _x_2 = make_handle(_1)
-  _2 = universe_setitem(_x_2, x)
+  _2 = global_universe_setitem(_x_2, x)
 
   def while_f():
     def while_after_f():
-      return universe_getitem(_x_2)
+      return global_universe_getitem(_x_2)
 
-    _3 = universe_getitem(_x_2)
+    _3 = global_universe_getitem(_x_2)
 
     def else_while_f():
       return while_after_f()
 
     def body_while_f():
-      _4 = universe_getitem(_x_2)
+      _4 = global_universe_getitem(_x_2)
       _5 = _4 - 1
-      _6 = universe_setitem(_x_2, _5)
+      _6 = global_universe_setitem(_x_2, _5)
       return while_f()
 
     _7 = body_while_f if _3 else else_while_f
@@ -651,22 +651,22 @@ def test_while2_optimized():
 def test_recursion():
     fn, output = parse_and_compile(factorial, optimize=False)
     assert output == (
-        """from myia.compile.backends.python.implementations import Handle as make_handle
+        """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 from test_code_format import factorial
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
 
 def factorial(n):
   _1 = type(n)
   _n_2 = make_handle(_1)
-  _2 = universe_setitem(_n_2, n)
-  _3 = universe_getitem(_n_2)
+  _2 = global_universe_setitem(_n_2, n)
+  _3 = global_universe_getitem(_n_2)
   _4 = _3 < 2
   _5 = bool(_4)
 
   def if_false_factorial():
-    _6 = universe_getitem(_n_2)
-    _7 = universe_getitem(_n_2)
+    _6 = global_universe_getitem(_n_2)
+    _7 = global_universe_getitem(_n_2)
     _8 = _7 - 1
     _9 = factorial(_8)
     return _6 * _9
@@ -723,74 +723,74 @@ def test_no_debug():
     fn, output = parse_and_compile(f, debug=False, optimize=False)
 
     assert output == (
-        """from myia.compile.backends.python.implementations import Handle as make_handle
+        """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 from test_code_format import factorial
-from myia.compile.backends.python.implementations import myia_iter as python_iter
-from myia.compile.backends.python.implementations import myia_hasnext as python_hasnext
-from myia.compile.backends.python.implementations import myia_next as python_next
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+from myia.basics import myia_iter
+from myia.basics import myia_hasnext
+from myia.basics import myia_next
 
 def _1(_2):
   _3 = type(_2)
   _4 = type(10)
   _5 = make_handle(_3)
   _6 = make_handle(_4)
-  _7 = universe_setitem(_5, _2)
-  _8 = universe_setitem(_6, 10)
-  _9 = universe_getitem(_5)
+  _7 = global_universe_setitem(_5, _2)
+  _8 = global_universe_setitem(_6, 10)
+  _9 = global_universe_getitem(_5)
   _10 = _9 % 2
   _11 = _10 == 0
 
   def _12():
     _13 = type(0)
-    _14 = universe_getitem(_5)
+    _14 = global_universe_getitem(_5)
     _15 = make_handle(_13)
     _16 = factorial(_14)
-    _17 = universe_getitem(_15)
+    _17 = global_universe_getitem(_15)
     _18 = _16 - _17
-    _19 = universe_getitem(_6)
+    _19 = global_universe_getitem(_6)
     return _18 + _19
 
   _20 = bool(_11)
 
   def _21():
-    _22 = universe_getitem(_5)
+    _22 = global_universe_getitem(_5)
     _23 = _22 ** 2
-    _24 = universe_getitem(_5)
+    _24 = global_universe_getitem(_5)
     _25 = 2 * _24
     _13 = type(0)
     _26 = _23 + _25
     _15 = make_handle(_13)
     _27 = _26 + 1
-    _28 = universe_setitem(_15, _27)
+    _28 = global_universe_setitem(_15, _27)
     return _12()
 
   def _29():
     _13 = type(0)
     _15 = make_handle(_13)
-    _30 = universe_setitem(_15, 0)
-    _31 = universe_getitem(_5)
+    _30 = global_universe_setitem(_15, 0)
+    _31 = global_universe_getitem(_5)
     _32 = range(_31)
 
     def _33():
       return _12()
 
-    _34 = python_iter(_32)
+    _34 = myia_iter(_32)
 
     def _35(_36):
-      _37 = python_hasnext(_36)
+      _37 = myia_hasnext(_36)
 
       def _38():
         return _33()
 
       def _39():
-        _40 = python_next(_36)
+        _40 = myia_next(_36)
         _41 = _40[0]
         _42 = _40[1]
-        _43 = universe_getitem(_15)
+        _43 = global_universe_getitem(_15)
         _44 = _43 + _41
-        _45 = universe_setitem(_15, _44)
+        _45 = global_universe_setitem(_15, _44)
         return _35(_42)
 
       _46 = _39 if _37 else _38
@@ -825,9 +825,9 @@ def test_no_debug_optimized():
 
     assert output == (
         """from test_code_format import factorial
-from myia.compile.backends.python.implementations import myia_iter as python_iter
-from myia.compile.backends.python.implementations import myia_hasnext as python_hasnext
-from myia.compile.backends.python.implementations import myia_next as python_next
+from myia.basics import myia_iter
+from myia.basics import myia_hasnext
+from myia.basics import myia_next
 
 def _1(_2):
   _3 = _2
@@ -864,17 +864,17 @@ def _1(_2):
     def _26():
       return _8()
 
-    _27 = python_iter(_25)
+    _27 = myia_iter(_25)
 
     def _28(_29):
-      _30 = python_hasnext(_29)
+      _30 = myia_hasnext(_29)
 
       def _31():
         return _26()
 
       def _32():
         nonlocal _11
-        _33 = python_next(_29)
+        _33 = myia_next(_29)
         _34 = _33[0]
         _35 = _33[1]
         _36 = _11
@@ -1017,17 +1017,17 @@ def test_universe_on_string():
     fn, output = parse_and_compile(f, optimize=False)
     assert (
         output
-        == """from myia.compile.backends.python.implementations import Handle as make_handle
-# Dynamic external import: universe_setitem
-# Dynamic external import: universe_getitem
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
 
 def f():
   _1 = type('hello')
   x = make_handle(_1)
-  _2 = universe_setitem(x, 'hello')
+  _2 = global_universe_setitem(x, 'hello')
 
   def g():
-    return universe_getitem(x)
+    return global_universe_getitem(x)
 
   return g()
 """
