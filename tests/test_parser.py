@@ -83,7 +83,7 @@ def test_free():
     assert (
         str_graph(parse(f))
         == """graph #1() {
-  #2 = myia.basics.resolve(:tests.test_parser, x)
+  #2 = myia.basics.resolve(:tests.test_parser, 'x')
   return #2
 }
 """
@@ -99,7 +99,7 @@ def test_global():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.resolve(:tests.test_parser, x)
+  #1 = myia.basics.resolve(:tests.test_parser, 'x')
   return #1
 }
 """
@@ -190,9 +190,9 @@ def test_resolve_read():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.resolve(:tests.test_parser, a)
+  #1 = myia.basics.resolve(:tests.test_parser, 'a')
   a2 = _operator.add(#1, 1)
-  #2 = myia.basics.resolve(:tests.test_parser, b)
+  #2 = myia.basics.resolve(:tests.test_parser, 'b')
   b2 = _operator.add(#2, 2)
   #3 = _operator.add(a2, b2)
   return #3
@@ -403,7 +403,7 @@ def test_getattr():
         assert (
             str_graph(parse(f))
             == """graph f(a) {
-  #1 = getattr(a, b)
+  #1 = getattr(a, 'b')
   return #1
 }
 """
@@ -533,7 +533,7 @@ def test_call2():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.make_dict(b, 2)
+  #1 = myia.basics.make_dict('b', 2)
   #2 = myia.basics.make_tuple(1)
   #3 = myia.basics.apply(g, #2, #1)
   return #3
@@ -623,7 +623,7 @@ def test_call6():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.make_dict(b, 2, c, 3)
+  #1 = myia.basics.make_dict('b', 2, 'c', 3)
   #2 = myia.basics.make_tuple(1)
   #3 = myia.basics.apply(g, #2, #1)
   return #3
@@ -671,7 +671,7 @@ def test_call8():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.make_dict(a, 1, b, 2)
+  #1 = myia.basics.make_dict('a', 1, 'b', 2)
   #2 = myia.basics.make_dict()
   #3 = myia.basics.make_tuple()
   #4 = myia.basics.apply(g, #3, #1, #2)
@@ -699,7 +699,7 @@ def test_call_order():
   #1 = _operator.add(a, b)
   #2 = _operator.add(c, d)
   #3 = _operator.add(e, f.2)
-  #4 = myia.basics.make_dict(c, 33, e, #3)
+  #4 = myia.basics.make_dict('c', 33, 'e', #3)
   #5 = myia.basics.make_tuple(#1, #2)
   #6 = myia.basics.apply(g, #5, #4)
   return #6
@@ -766,7 +766,7 @@ def test_dict():
     assert (
         str_graph(parse(f))
         == """graph #1() {
-  #2 = myia.basics.make_dict(a, 1)
+  #2 = myia.basics.make_dict('a', 1)
   return #2
 }
 """
@@ -987,7 +987,7 @@ def test_assert():
 }
 
 graph f:if_false() {
-  #5 = Exception(not 1)
+  #5 = Exception('not 1')
   #6 = myia.basics.raise_(#5)
   return #6
 }
@@ -1313,7 +1313,7 @@ def test_for3():
   #3 = type(0)
   acc = myia.basics.make_handle(#3)
   #4 = myia.basics.global_universe_setitem(acc, 0)
-  #5 = myia.basics.resolve(:tests.test_parser, range)
+  #5 = myia.basics.resolve(:tests.test_parser, 'range')
   #6 = myia.basics.global_universe_getitem(n.2)
   #7 = #5(#6)
   #8 = myia.basics.myia_iter(#7)
@@ -1342,7 +1342,7 @@ graph f:for:body() {
   #15 = myia.basics.myia_next(it)
   i = _operator.getitem(#15, 0)
   #16 = _operator.getitem(#15, 1)
-  #17 = myia.basics.resolve(:tests.test_parser, range)
+  #17 = myia.basics.resolve(:tests.test_parser, 'range')
   #18 = myia.basics.global_universe_getitem(n.2)
   #19 = #17(#18)
   #20 = myia.basics.myia_iter(#19)
