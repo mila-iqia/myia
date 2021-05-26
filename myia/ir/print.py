@@ -1,6 +1,7 @@
 """Utilities to print a textual representation of graphs."""
 
 import io
+import types
 
 from ..utils.info import Labeler
 from .node import SEQ, Constant, Node
@@ -113,12 +114,17 @@ def _disambiguator(label, id):
 
 
 def _constant_describer(node):
-    if (
-        isinstance(node, Node)
-        and node.is_constant()
-        and not node.is_constant_graph()
+    if not isinstance(node, Node) or node.is_constant_graph():
+        return None
+    elif node.is_constant(
+        (types.FunctionType, types.BuiltinFunctionType, types.BuiltinMethodType)
     ):
+        f = node.value
+        return f"{f.__module__}.{f.__qualname__}"
+    elif node.is_constant():
         return str(node.value)
+    else:
+        return None
 
 
 class _NodeCache:

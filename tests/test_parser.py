@@ -131,7 +131,7 @@ def test_nonlocal():
 
 graph g() {
   #5 = universe_getitem(x)
-  #6 = <built-in function add>(#5, 1)
+  #6 = _operator.add(#5, 1)
   #7 = universe_setitem(x, #6)
   return None
 }
@@ -156,7 +156,7 @@ def test_seq():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  x.2 = <built-in function add>(x, 1)
+  x.2 = _operator.add(x, 1)
   return 0
 }
 """
@@ -171,7 +171,7 @@ def test_seq2():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  #1 = <built-in function add>(x, x)
+  #1 = _operator.add(x, x)
   return #1
 }
 """
@@ -191,10 +191,10 @@ def test_resolve_read():
             str_graph(parse(f))
             == """graph f() {
   #1 = resolve(:tests.test_parser, a)
-  a2 = <built-in function add>(#1, 1)
+  a2 = _operator.add(#1, 1)
   #2 = resolve(:tests.test_parser, b)
-  b2 = <built-in function add>(#2, 2)
-  #3 = <built-in function add>(a2, b2)
+  b2 = _operator.add(#2, 2)
+  #3 = _operator.add(a2, b2)
   return #3
 }
 """
@@ -241,7 +241,7 @@ def test_nested_resolve():
         assert (
             str_graph(parse(f))
             == """graph f(b) {
-  #1 = <built-in function truth>(b)
+  #1 = _operator.truth(b)
   #2 = user_switch(#1, f:if_true, f:if_false)
   #3 = #2()
   return #3
@@ -403,7 +403,7 @@ def test_getattr():
         assert (
             str_graph(parse(f))
             == """graph f(a) {
-  #1 = <built-in function getattr>(a, b)
+  #1 = builtins.getattr(a, b)
   return #1
 }
 """
@@ -418,7 +418,7 @@ def test_binop():
         assert (
             str_graph(parse(f))
             == """graph f(a, b) {
-  #1 = <built-in function truediv>(a, b)
+  #1 = _operator.truediv(a, b)
   return #1
 }
 """
@@ -433,7 +433,7 @@ def test_binop2():
         assert (
             str_graph(parse(f))
             == """graph f(x, y) {
-  #1 = <built-in function add>(x, y)
+  #1 = _operator.add(x, y)
   return #1
 }
 """
@@ -448,8 +448,8 @@ def test_binop3():
         assert (
             str_graph(parse(f))
             == """graph f(x, y) {
-  #1 = <built-in function contains>(x, y)
-  #2 = <built-in function not_>(#1)
+  #1 = _operator.contains(x, y)
+  #2 = _operator.not_(#1)
   return #2
 }
 """
@@ -470,10 +470,10 @@ def test_boolop():
   #3 = typeof(c)
   c.2 = make_handle(#3)
   #4 = universe_setitem(c.2, c)
-  #5 = <built-in function truth>(a)
+  #5 = _operator.truth(a)
   #6 = switch(#5, f:if_true, f:if_false)
   #7 = #6()
-  #8 = <built-in function truth>(#7)
+  #8 = _operator.truth(#7)
   #9 = switch(#8, f:if_true.2, f:if_false.2)
   #10 = #9()
   return #10
@@ -696,9 +696,9 @@ def test_call_order():
         assert (
             str_graph(parse(f))
             == """graph f(a, b, c, d, e, f.2) {
-  #1 = <built-in function add>(a, b)
-  #2 = <built-in function add>(c, d)
-  #3 = <built-in function add>(e, f.2)
+  #1 = _operator.add(a, b)
+  #2 = _operator.add(c, d)
+  #3 = _operator.add(e, f.2)
   #4 = make_dict(c, 33, e, #3)
   #5 = make_tuple(#1, #2)
   #6 = apply(g, #5, #4)
@@ -720,7 +720,7 @@ def test_compare():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  #1 = <built-in function gt>(x, 0)
+  #1 = _operator.gt(x, 0)
   return #1
 }
 """
@@ -739,8 +739,8 @@ def test_compare2():
   x.2 = make_handle(#1)
   #2 = universe_setitem(x.2, x)
   #3 = universe_getitem(x.2)
-  #4 = <built-in function lt>(0, #3)
-  #5 = <built-in function truth>(#4)
+  #4 = _operator.lt(0, #3)
+  #5 = _operator.truth(#4)
   #6 = switch(#5, f:if_true, f:if_false)
   #7 = #6()
   return #7
@@ -752,7 +752,7 @@ graph f:if_false() {
 
 graph f:if_true() {
   #8 = universe_getitem(x.2)
-  #9 = <built-in function lt>(#8, 42)
+  #9 = _operator.lt(#8, 42)
   return #9
 }
 """
@@ -784,10 +784,10 @@ def test_dict2():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = <built-in function add>(1, 2)
-  #2 = <built-in function sub>(3, 2)
-  #3 = <built-in function mul>(1, 3)
-  #4 = <built-in function truediv>(2, 3)
+  #1 = _operator.add(1, 2)
+  #2 = _operator.sub(3, 2)
+  #3 = _operator.mul(1, 3)
+  #4 = _operator.truediv(2, 3)
   #5 = make_dict(#1, #2, #3, #4)
   return #5
 }
@@ -805,7 +805,7 @@ def test_extslice():
             == """graph f(a) {
   #1 = slice(1, 2, None)
   #2 = make_tuple(#1, 3)
-  #3 = <built-in function getitem>(a, #2)
+  #3 = _operator.getitem(a, #2)
   return #3
 }
 """
@@ -826,7 +826,7 @@ def test_ifexp():
   #3 = typeof(y)
   y.2 = make_handle(#3)
   #4 = universe_setitem(y.2, y)
-  #5 = <built-in function truth>(b)
+  #5 = _operator.truth(b)
   #6 = user_switch(#5, f:if_true, f:if_false)
   #7 = #6()
   return #7
@@ -853,7 +853,7 @@ def test_index():
         assert (
             str_graph(parse(f))
             == """graph f(a) {
-  #1 = <built-in function getitem>(a, 0)
+  #1 = _operator.getitem(a, 0)
   return #1
 }
 """
@@ -888,9 +888,9 @@ def test_list():
         assert (
             str_graph(parse(f))
             == """graph f(a, b) {
-  #1 = <built-in function add>(a, b)
-  #2 = <built-in function sub>(4, a)
-  #3 = <built-in function sub>(4, b)
+  #1 = _operator.add(a, b)
+  #2 = _operator.sub(4, a)
+  #3 = _operator.sub(4, b)
   #4 = make_list(#1, #2, 0, #3)
   return #4
 }
@@ -922,7 +922,7 @@ def test_slice():
   #1 = slice(1, None, 2)
   #2 = slice(None, 1, None)
   #3 = make_tuple(#1, #2)
-  #4 = <built-in function getitem>(a, #3)
+  #4 = _operator.getitem(a, #3)
   return #4
 }
 """
@@ -950,7 +950,7 @@ def test_unary():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  #1 = <built-in function neg>(x)
+  #1 = _operator.neg(x)
   return #1
 }
 """
@@ -979,8 +979,8 @@ def test_assert():
         assert (
             str_graph(parse(f))
             == """graph f(a) {
-  #1 = <built-in function eq>(a, 1)
-  #2 = <built-in function truth>(#1)
+  #1 = _operator.eq(a, 1)
+  #2 = _operator.truth(#1)
   #3 = user_switch(#2, f:if_true, f:if_false)
   #4 = #3()
   return #4
@@ -1009,8 +1009,8 @@ def test_assign():
             str_graph(parse(f))
             == """graph f() {
   #1 = make_tuple(1, 2)
-  x = <built-in function getitem>(#1, 0)
-  y = <built-in function getitem>(#1, 1)
+  x = _operator.getitem(#1, 0)
+  y = _operator.getitem(#1, 1)
   return y
 }
 """
@@ -1027,8 +1027,8 @@ def test_assign2():
             str_graph(parse(f))
             == """graph f() {
   #1 = make_tuple(1, 2)
-  x = <built-in function getitem>(#1, 0)
-  y = <built-in function getitem>(#1, 1)
+  x = _operator.getitem(#1, 0)
+  y = _operator.getitem(#1, 1)
   return y
 }
 """
@@ -1046,10 +1046,10 @@ def test_assign3():
             == """graph f() {
   #1 = make_tuple(2, 3)
   #2 = make_tuple(1, #1)
-  x = <built-in function getitem>(#2, 0)
-  #3 = <built-in function getitem>(#2, 1)
-  y = <built-in function getitem>(#3, 0)
-  z = <built-in function getitem>(#3, 1)
+  x = _operator.getitem(#2, 0)
+  #3 = _operator.getitem(#2, 1)
+  y = _operator.getitem(#3, 0)
+  z = _operator.getitem(#3, 1)
   #4 = make_tuple(x, y, z)
   return #4
 }
@@ -1138,14 +1138,14 @@ graph f:for_after() {
 
 graph f:for:body() {
   #7 = python_next(it)
-  #8 = <built-in function getitem>(#7, 0)
+  #8 = _operator.getitem(#7, 0)
   #9 = typeof(#8)
   b = make_handle(#9)
   #10 = universe_setitem(b, #8)
-  #11 = <built-in function getitem>(#7, 1)
+  #11 = _operator.getitem(#7, 1)
   #12 = universe_getitem(b)
-  #13 = <built-in function lt>(#12, 2)
-  #14 = <built-in function truth>(#13)
+  #13 = _operator.lt(#12, 2)
+  #14 = _operator.truth(#13)
   #15 = user_switch(#14, f:for:body:if_true, f:for:body:if_false)
   #16 = #15()
   return #16
@@ -1158,8 +1158,8 @@ graph f:for:body:if_false() {
 
 graph f:for:body:if_after() {
   #18 = universe_getitem(b)
-  #19 = <built-in function gt>(#18, 4)
-  #20 = <built-in function truth>(#19)
+  #19 = _operator.gt(#18, 4)
+  #20 = _operator.truth(#19)
   #21 = user_switch(#20, f:for:body:if_after:if_true, f:for:body:if_after:if_false)
   #22 = #21()
   return #22
@@ -1226,10 +1226,10 @@ graph f:for_after() {
 
 graph f:for:body() {
   #10 = python_next(it)
-  a = <built-in function getitem>(#10, 0)
-  #11 = <built-in function getitem>(#10, 1)
+  a = _operator.getitem(#10, 0)
+  #11 = _operator.getitem(#10, 1)
   #12 = universe_getitem(x)
-  #13 = <built-in function add>(#12, 1)
+  #13 = _operator.add(#12, 1)
   #14 = universe_setitem(x, #13)
   #15 = f:for(#11)
   return #15
@@ -1268,7 +1268,7 @@ graph f:for(it) {
 
 graph f:for:else() {
   #8 = universe_getitem(x)
-  #9 = <built-in function sub>(#8, 1)
+  #9 = _operator.sub(#8, 1)
   #10 = universe_setitem(x, #9)
   #11 = f:for_after()
   return #11
@@ -1281,12 +1281,12 @@ graph f:for_after() {
 
 graph f:for:body() {
   #13 = python_next(it)
-  #14 = <built-in function getitem>(#13, 0)
-  b = <built-in function getitem>(#14, 0)
-  c = <built-in function getitem>(#14, 1)
-  #15 = <built-in function getitem>(#13, 1)
+  #14 = _operator.getitem(#13, 0)
+  b = _operator.getitem(#14, 0)
+  c = _operator.getitem(#14, 1)
+  #15 = _operator.getitem(#13, 1)
   #16 = universe_getitem(x)
-  #17 = <built-in function add>(#16, 1)
+  #17 = _operator.add(#16, 1)
   #18 = universe_setitem(x, #17)
   #19 = f:for(#15)
   return #19
@@ -1340,8 +1340,8 @@ graph f:for_after() {
 
 graph f:for:body() {
   #15 = python_next(it)
-  i = <built-in function getitem>(#15, 0)
-  #16 = <built-in function getitem>(#15, 1)
+  i = _operator.getitem(#15, 0)
+  #16 = _operator.getitem(#15, 1)
   #17 = resolve(:tests.test_parser, range)
   #18 = universe_getitem(n.2)
   #19 = #17(#18)
@@ -1369,10 +1369,10 @@ graph f:for:body:for_after() {
 
 graph f:for:body:for:body() {
   #27 = python_next(it.2)
-  j = <built-in function getitem>(#27, 0)
-  #28 = <built-in function getitem>(#27, 1)
+  j = _operator.getitem(#27, 0)
+  #28 = _operator.getitem(#27, 1)
   #29 = universe_getitem(acc)
-  #30 = <built-in function add>(#29, j)
+  #30 = _operator.add(#29, j)
   #31 = universe_setitem(acc, #30)
   #32 = f:for:body:for(#28)
   return #32
@@ -1398,7 +1398,7 @@ def test_if():
   #3 = typeof(y)
   y.2 = make_handle(#3)
   #4 = universe_setitem(y.2, y)
-  #5 = <built-in function truth>(b)
+  #5 = _operator.truth(b)
   #6 = user_switch(#5, f:if_true, f:if_false)
   #7 = #6()
   return #7
@@ -1430,7 +1430,7 @@ def test_if2():
   #1 = typeof(y)
   y.2 = make_handle(#1)
   #2 = universe_setitem(y.2, y)
-  #3 = <built-in function truth>(b)
+  #3 = _operator.truth(b)
   #4 = user_switch(#3, f:if_true, f:if_false)
   #5 = #4()
   return #5
@@ -1552,7 +1552,7 @@ graph f:while_after() {
 
 graph f:while:body() {
   #9 = universe_getitem(x.2)
-  #10 = <built-in function sub>(#9, 1)
+  #10 = _operator.sub(#9, 1)
   #11 = universe_setitem(x.2, #10)
   #12 = f:while()
   return #12
