@@ -112,18 +112,18 @@ def parse(func):
 
 
 class _CondJump(NamedTuple):
-    from_: 'Block'
-    true: 'Block'
-    false: 'Block'
-    jump: 'Apply'
+    from_: "Block"
+    true: "Block"
+    false: "Block"
+    jump: "Apply"
     vars: dict
     done: set
 
 
 class _Jump(NamedTuple):
-    from_: 'Block'
-    target: 'Block'
-    jump: 'Apply'
+    from_: "Block"
+    target: "Block"
+    jump: "Apply"
     vars: dict
     done: set
 
@@ -191,7 +191,9 @@ class Block:
         assert self.graph.return_ is None
         switch = self.apply(basics.user_switch, cond, true.graph, false.graph)
         jump = self.apply(switch)
-        tag = _CondJump(self, true, false, jump, self.variables_written.copy(), set())
+        tag = _CondJump(
+            self, true, false, jump, self.variables_written.copy(), set()
+        )
         true.preds.append(tag)
         false.preds.append(tag)
         self.returns(jump)
@@ -201,7 +203,9 @@ class Block:
         """End the block in a jump to another block, with optional arguments."""
         assert self.graph.return_ is None
         jump = self.apply(target.graph, *args)
-        target.preds.append(_Jump(self, target, jump, self.variables_written.copy(), set()))
+        target.preds.append(
+            _Jump(self, target, jump, self.variables_written.copy(), set())
+        )
         self.returns(jump)
 
     def raises(self, exc):
@@ -381,7 +385,9 @@ class Parser:
                         block.phis[var] = None
                         function.variables_local_closure.add(var)
 
-    def resolve_read(self, repl, repl_seq, ld, function, block, local_namespace):
+    def resolve_read(
+        self, repl, repl_seq, ld, function, block, local_namespace
+    ):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
         st = ld.edges["prevwrite"].node
@@ -421,7 +427,9 @@ class Parser:
                 f"unclassified variable '{var}'"
             )  # pragma: no cover
 
-    def resolve_write(self, repl, repl_seq, st, function, block, local_namespace):
+    def resolve_write(
+        self, repl, repl_seq, st, function, block, local_namespace
+    ):
         """Resolve a 'store' operation with pre-collected information."""
         var = st.edges[0].node.value
         value = st.edges[1].node
@@ -497,13 +505,6 @@ class Parser:
                 with debug_inherit(name=st.edges[0].node.value):
                     namespace[var] = st.graph.apply(basics.make_handle, t)
 
-            local_namespace = namespace.copy()
-            for var in function.variables_local_closure:
-                st = function.variables_first_write[var]
-                t = st.graph.apply(type, st.edges[1].node)
-                with debug_inherit(name=st.edges[0].node.value):
-                    local_namespace[var] = st.graph.apply(basics.make_handle, t)
-
             for block in function.blocks:
                 if not block.used:
                     continue
@@ -518,14 +519,24 @@ class Parser:
                 for var, items in block.variables_read.items():
                     for item in items:
                         self.resolve_read(
-                            repl, repl_seq, item, function, block, local_namespace
+                            repl,
+                            repl_seq,
+                            item,
+                            function,
+                            block,
+                            local_namespace,
                         )
 
                 # resolve write that need to stay
                 for var, items in block.variables_written.items():
                     for item in items:
                         self.resolve_write(
-                            repl, repl_seq, item, function, block, local_namespace
+                            repl,
+                            repl_seq,
+                            item,
+                            function,
+                            block,
+                            local_namespace,
                         )
 
                 # make sure to "bake in" top level chain replacements
@@ -585,7 +596,7 @@ class Parser:
                     raise MyiaSyntaxError(
                         "default value on the entry function",
                         self.make_location(arg),
-                   )
+                    )
                 # XXX: This might not work correctly with our framework,
                 # but we need to evaluate the default arguments in the parent
                 # context for proper name resolution.
@@ -690,7 +701,9 @@ class Parser:
                 fb.returns(self._fold_bool(fb, rest, mode))
             switch = block.apply(basics.switch, test, tb.graph, fb.graph)
             jmp = block.apply(switch)
-            tag = _CondJump(block, tb, fb, jmp, block.variables_written.copy(), set())
+            tag = _CondJump(
+                block, tb, fb, jmp, block.variables_written.copy(), set()
+            )
             tb.preds.append(tag)
             fb.preds.append(tag)
             return jmp
@@ -806,7 +819,9 @@ class Parser:
 
         switch = block.apply(basics.user_switch, cond, tb.graph, fb.graph)
         jmp = block.apply(switch)
-        tag = _CondJump(block, tb, fb, jmp, block.variables_written.copy(), set())
+        tag = _CondJump(
+            block, tb, fb, jmp, block.variables_written.copy(), set()
+        )
         tb.preds.append(tag)
         fb.preds.append(tag)
         return jmp
