@@ -210,7 +210,7 @@ class PythonBackend:
                     + f"import {name}"
                     + (f" as {import_name}" if name != import_name else "")
                 )
-        else:
+        elif hasattr(value, "__module__"):
             modname = value.__module__
             name = value.__name__
             qualname = value.__qualname__
