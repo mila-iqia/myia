@@ -24,7 +24,8 @@ def test_iter_tuple():
 
 
 def test_global_universe():
-    h = basics.make_handle(int, value=3)
+    h = basics.make_handle(int)
+    basics.global_universe_setitem(h, 3)
     assert basics.global_universe_getitem(h) == 3
     basics.global_universe_setitem(h, 19)
     assert basics.global_universe_getitem(h) == 19
