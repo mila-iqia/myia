@@ -58,12 +58,12 @@ def make_handle(object_type):
 
 
 def global_universe_getitem(h):
-    """Set the value of a handle."""
+    """Get the value of a handle."""
     return h.value
 
 
 def global_universe_setitem(h, value):
-    """Get the value of a handle."""
+    """Set the value of a handle."""
     h.value = value
 
 
