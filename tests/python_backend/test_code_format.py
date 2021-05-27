@@ -1089,3 +1089,22 @@ def test_no_return():
 """
     )
     assert fn(1) is None
+
+
+thingy = 10
+
+
+def test_global_integer():
+    def f(x):
+        return x * thingy
+
+    fn, output = parse_and_compile(f, optimize=True)
+    assert (
+        output
+        == """# Dynamic external import: thingy
+
+def f(x):
+  return x * thingy
+"""
+    )
+    assert fn(2) == 20
