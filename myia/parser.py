@@ -401,7 +401,10 @@ class Parser:
             else:
                 assert st.is_apply()
                 repl[ld] = st.edges[1].node
-            repl_seq[ld] = ld.edges[SEQ].node
+            if SEQ in ld.edges:
+                repl_seq[ld] = ld.edges[SEQ].node
+            else:
+                repl_seq[ld] = None
         elif var in function.variables_global:
             n = ld.graph.apply(basics.resolve, self.global_namespace, var)
             if SEQ in ld.edges:
