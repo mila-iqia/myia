@@ -44,13 +44,13 @@ def myia_next(obj: tuple):  # noqa: F811
 class Handle:
     """Handle class for `make_handle`."""
 
-    def __init__(self, object_type):
+    def __init__(self, object_type, value=None):
         self.type = object_type
-        self.value = None
+        self.value = value
 
 
-def make_handle(object_type):
-    return Handle(object_type)
+def make_handle(object_type, value=None):
+    return Handle(object_type, value=value)
 
 
 def global_universe_getitem(h):
