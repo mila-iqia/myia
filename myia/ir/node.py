@@ -99,6 +99,13 @@ class Graph:
         res.debug = clone_debug(self.debug, objmap)
         return res
 
+    def has_ancestor(self, ancestor):
+        """Return True if graph has given ancestor."""
+        assert ancestor
+        return self.parent and (
+            self.parent is ancestor or self.parent.has_ancestor(ancestor)
+        )
+
     def replace(self, mapping, mapping_seq={}, recursive=True):
         """Replace nodes in the graph.
 
@@ -121,14 +128,12 @@ class Graph:
                 continue
             seen.add(node)
             for edge in list(node.edges.values()):
+                replaced = False
                 if edge.label is SEQ and edge.node in mapping_seq:
-                    repl = mapping_seq[edge.node]
-                    if repl is None:
-                        edge.node = None
-                        del node.edges[SEQ]
-                    else:
-                        edge.node = mapping_seq[edge.node]
+                    replaced = True
+                    edge.node = mapping_seq[edge.node]
                 elif edge.node in mapping:
+                    replaced = True
                     edge.node = mapping[edge.node]
                 if edge.node:
                     if edge.node.is_apply():
@@ -141,6 +146,9 @@ class Graph:
                         edge.node.value.replace(
                             mapping, mapping_seq, recursive=True
                         )
+                elif replaced:
+                    # If node was replace with None, delete associated edge.
+                    del node.edges[edge.label]
 
     def add_debug(self, **kwargs):
         """Add debug information.

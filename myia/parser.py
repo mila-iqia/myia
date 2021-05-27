@@ -9,6 +9,7 @@ from typing import NamedTuple
 from . import basics
 from .ir import Apply, Constant, Graph, Parameter
 from .ir.node import SEQ
+from .parser_opt import parser_opts
 from .utils import ModuleNamespace, Named
 from .utils.info import about, debug_inherit, get_debug
 
@@ -77,14 +78,17 @@ ast_map = {
 _parse_cache = {}
 
 
-def parse(func):
+def parse(func, parser_opt=False):
     """Parse a python function and return the myia graph.
 
     This takes a python function object and will extract and parse its
     source code.
+
+    :param parser_opt: if True, apply supplementary optimizations on graph after parsing.
     """
-    if func in _parse_cache:
-        return _parse_cache[func]
+    parsing_key = (func, parser_opt)
+    if parsing_key in _parse_cache:
+        return _parse_cache[parsing_key]
 
     flags = dict(getattr(func, "_myia_flags", {}))
 
@@ -107,7 +111,12 @@ def parse(func):
 
     if name is not None:
         graph.add_debug(name=name)
-    _parse_cache[func] = graph
+    _parse_cache[parsing_key] = graph
+
+    if parser_opt:
+        for post_opt in parser_opts:
+            post_opt(graph)
+
     return graph
 
 

@@ -229,6 +229,29 @@ graph g() {
         )
 
 
+def test_self_recursion_parser_opt():
+    def f():
+        def g():
+            return g()
+
+        return g()
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f, parser_opt=True))
+            == """graph f() {
+  #1 = g()
+  return #1
+}
+
+graph g() {
+  #2 = g()
+  return #2
+}
+"""
+        )
+
+
 def test_nested_resolve():
     def f(b):
         if b:
