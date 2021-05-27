@@ -248,22 +248,17 @@ def test_nested_resolve():
 }
 
 graph f:if_false() {
-  #4 = type(0)
-  a = myia.basics.make_handle(#4)
-  #5 = myia.basics.global_universe_setitem(a, 1)
-  #6 = f:if_after()
-  return #6
+  #4 = f:if_after(1)
+  return #4
 }
 
-graph f:if_after() {
-  #7 = myia.basics.global_universe_getitem(a)
-  return #7
+graph f:if_after(phi_a) {
+  return phi_a
 }
 
 graph f:if_true() {
-  #8 = myia.basics.global_universe_setitem(a, 0)
-  #9 = f:if_after()
-  return #9
+  #5 = f:if_after(0)
+  return #5
 }
 """
         )
@@ -464,36 +459,28 @@ def test_boolop():
         assert (
             str_graph(parse(f))
             == """graph f(a, b, c) {
-  #1 = type(b)
-  b.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(b.2, b)
-  #3 = type(c)
-  c.2 = myia.basics.make_handle(#3)
-  #4 = myia.basics.global_universe_setitem(c.2, c)
-  #5 = _operator.truth(a)
-  #6 = myia.basics.switch(#5, f:if_true, f:if_false)
-  #7 = #6()
-  #8 = _operator.truth(#7)
-  #9 = myia.basics.switch(#8, f:if_true.2, f:if_false.2)
-  #10 = #9()
-  return #10
+  #1 = _operator.truth(a)
+  #2 = myia.basics.switch(#1, f:if_true, f:if_false)
+  #3 = #2(b)
+  #4 = _operator.truth(#3)
+  #5 = myia.basics.switch(#4, f:if_true.2, f:if_false.2)
+  #6 = #5(c)
+  return #6
 }
 
-graph f:if_false() {
+graph f:if_false(phi_b) {
   return False
 }
 
-graph f:if_true() {
-  #11 = myia.basics.global_universe_getitem(b.2)
-  return #11
+graph f:if_true(phi_b.2) {
+  return phi_b.2
 }
 
-graph f:if_false.2() {
-  #12 = myia.basics.global_universe_getitem(c.2)
-  return #12
+graph f:if_false.2(phi_c) {
+  return phi_c
 }
 
-graph f:if_true.2() {
+graph f:if_true.2(phi_c.2) {
   return True
 }
 """
@@ -735,25 +722,20 @@ def test_compare2():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  #1 = type(x)
-  x.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x.2, x)
-  #3 = myia.basics.global_universe_getitem(x.2)
-  #4 = _operator.lt(0, #3)
-  #5 = _operator.truth(#4)
-  #6 = myia.basics.switch(#5, f:if_true, f:if_false)
-  #7 = #6()
-  return #7
+  #1 = _operator.lt(0, x)
+  #2 = _operator.truth(#1)
+  #3 = myia.basics.switch(#2, f:if_true, f:if_false)
+  #4 = #3(x)
+  return #4
 }
 
-graph f:if_false() {
+graph f:if_false(phi_x) {
   return False
 }
 
-graph f:if_true() {
-  #8 = myia.basics.global_universe_getitem(x.2)
-  #9 = _operator.lt(#8, 42)
-  return #9
+graph f:if_true(phi_x.2) {
+  #5 = _operator.lt(phi_x.2, 42)
+  return #5
 }
 """
         )
@@ -820,26 +802,18 @@ def test_ifexp():
         assert (
             str_graph(parse(f))
             == """graph f(x, y, b) {
-  #1 = type(x)
-  x.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x.2, x)
-  #3 = type(y)
-  y.2 = myia.basics.make_handle(#3)
-  #4 = myia.basics.global_universe_setitem(y.2, y)
-  #5 = _operator.truth(b)
-  #6 = myia.basics.user_switch(#5, f:if_true, f:if_false)
-  #7 = #6()
-  return #7
+  #1 = _operator.truth(b)
+  #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
+  #3 = #2(x, y)
+  return #3
 }
 
-graph f:if_false() {
-  #8 = myia.basics.global_universe_getitem(y.2)
-  return #8
+graph f:if_false(phi_x, phi_y) {
+  return phi_y
 }
 
-graph f:if_true() {
-  #9 = myia.basics.global_universe_getitem(x.2)
-  return #9
+graph f:if_true(phi_x.2, phi_y.2) {
+  return phi_x.2
 }
 """
         )
@@ -1138,51 +1112,46 @@ graph f:for_after() {
 
 graph f:for:body() {
   #7 = myia.basics.myia_next(it)
-  #8 = _operator.getitem(#7, 0)
-  #9 = type(#8)
-  b = myia.basics.make_handle(#9)
-  #10 = myia.basics.global_universe_setitem(b, #8)
-  #11 = _operator.getitem(#7, 1)
-  #12 = myia.basics.global_universe_getitem(b)
-  #13 = _operator.lt(#12, 2)
-  #14 = _operator.truth(#13)
-  #15 = myia.basics.user_switch(#14, f:for:body:if_true, f:for:body:if_false)
-  #16 = #15()
-  return #16
+  b = _operator.getitem(#7, 0)
+  #8 = _operator.getitem(#7, 1)
+  #9 = _operator.lt(b, 2)
+  #10 = _operator.truth(#9)
+  #11 = myia.basics.user_switch(#10, f:for:body:if_true, f:for:body:if_false)
+  #12 = #11(b)
+  return #12
 }
 
-graph f:for:body:if_false() {
-  #17 = f:for:body:if_after()
+graph f:for:body:if_false(phi_b) {
+  #13 = f:for:body:if_after(phi_b)
+  return #13
+}
+
+graph f:for:body:if_after(phi_b.2) {
+  #14 = _operator.gt(phi_b.2, 4)
+  #15 = _operator.truth(#14)
+  #16 = myia.basics.user_switch(#15, f:for:body:if_after:if_true, f:for:body:if_after:if_false)
+  #17 = #16()
   return #17
 }
 
-graph f:for:body:if_after() {
-  #18 = myia.basics.global_universe_getitem(b)
-  #19 = _operator.gt(#18, 4)
-  #20 = _operator.truth(#19)
-  #21 = myia.basics.user_switch(#20, f:for:body:if_after:if_true, f:for:body:if_after:if_false)
-  #22 = #21()
-  return #22
-}
-
 graph f:for:body:if_after:if_false() {
-  #23 = f:for:body:if_after:if_after()
-  return #23
+  #18 = f:for:body:if_after:if_after()
+  return #18
 }
 
 graph f:for:body:if_after:if_after() {
-  #24 = f:for(#11)
-  return #24
+  #19 = f:for(#8)
+  return #19
 }
 
 graph f:for:body:if_after:if_true() {
-  #25 = f:for(#11)
-  return #25
+  #20 = f:for(#8)
+  return #20
 }
 
-graph f:for:body:if_true() {
-  #26 = f:for_after()
-  return #26
+graph f:for:body:if_true(phi_b.3) {
+  #21 = f:for_after()
+  return #21
 }
 """
         )
@@ -1199,40 +1168,34 @@ def test_for():
         assert (
             str_graph(parse(f))
             == """graph f(b) {
-  #1 = type(0)
-  x = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x, 0)
-  #3 = myia.basics.myia_iter(b)
-  #4 = f:for(#3)
-  return #4
+  #1 = myia.basics.myia_iter(b)
+  #2 = f:for(#1, 0)
+  return #2
 }
 
-graph f:for(it) {
-  #5 = myia.basics.myia_hasnext(it)
-  #6 = myia.basics.user_switch(#5, f:for:body, f:for:else)
-  #7 = #6()
-  return #7
+graph f:for(it, phi_x) {
+  #3 = myia.basics.myia_hasnext(it)
+  #4 = myia.basics.user_switch(#3, f:for:body, f:for:else)
+  #5 = #4(phi_x)
+  return #5
 }
 
-graph f:for:else() {
-  #8 = f:for_after()
-  return #8
+graph f:for:else(phi_x.2) {
+  #6 = f:for_after(phi_x.2)
+  return #6
 }
 
-graph f:for_after() {
-  #9 = myia.basics.global_universe_getitem(x)
+graph f:for_after(phi_x.3) {
+  return phi_x.3
+}
+
+graph f:for:body(phi_x.4) {
+  #7 = myia.basics.myia_next(it)
+  a = _operator.getitem(#7, 0)
+  #8 = _operator.getitem(#7, 1)
+  x = _operator.add(phi_x.4, 1)
+  #9 = f:for(#8, x)
   return #9
-}
-
-graph f:for:body() {
-  #10 = myia.basics.myia_next(it)
-  a = _operator.getitem(#10, 0)
-  #11 = _operator.getitem(#10, 1)
-  #12 = myia.basics.global_universe_getitem(x)
-  #13 = _operator.add(#12, 1)
-  #14 = myia.basics.global_universe_setitem(x, #13)
-  #15 = f:for(#11)
-  return #15
 }
 """
         )
@@ -1251,45 +1214,37 @@ def test_for2():
         assert (
             str_graph(parse(f))
             == """graph f(a) {
-  #1 = type(0)
-  x = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x, 0)
-  #3 = myia.basics.myia_iter(a)
-  #4 = f:for(#3)
-  return #4
+  #1 = myia.basics.myia_iter(a)
+  #2 = f:for(#1, 0)
+  return #2
 }
 
-graph f:for(it) {
-  #5 = myia.basics.myia_hasnext(it)
-  #6 = myia.basics.user_switch(#5, f:for:body, f:for:else)
-  #7 = #6()
-  return #7
+graph f:for(it, phi_x) {
+  #3 = myia.basics.myia_hasnext(it)
+  #4 = myia.basics.user_switch(#3, f:for:body, f:for:else)
+  #5 = #4(phi_x)
+  return #5
 }
 
-graph f:for:else() {
-  #8 = myia.basics.global_universe_getitem(x)
-  #9 = _operator.sub(#8, 1)
-  #10 = myia.basics.global_universe_setitem(x, #9)
-  #11 = f:for_after()
-  return #11
+graph f:for:else(phi_x.2) {
+  x = _operator.sub(phi_x.2, 1)
+  #6 = f:for_after(x)
+  return #6
 }
 
-graph f:for_after() {
-  #12 = myia.basics.global_universe_getitem(x)
-  return #12
+graph f:for_after(phi_x.3) {
+  return phi_x.3
 }
 
-graph f:for:body() {
-  #13 = myia.basics.myia_next(it)
-  #14 = _operator.getitem(#13, 0)
-  b = _operator.getitem(#14, 0)
-  c = _operator.getitem(#14, 1)
-  #15 = _operator.getitem(#13, 1)
-  #16 = myia.basics.global_universe_getitem(x)
-  #17 = _operator.add(#16, 1)
-  #18 = myia.basics.global_universe_setitem(x, #17)
-  #19 = f:for(#15)
-  return #19
+graph f:for:body(phi_x.4) {
+  #7 = myia.basics.myia_next(it)
+  #8 = _operator.getitem(#7, 0)
+  b = _operator.getitem(#8, 0)
+  c = _operator.getitem(#8, 1)
+  #9 = _operator.getitem(#7, 1)
+  x.2 = _operator.add(phi_x.4, 1)
+  #10 = f:for(#9, x.2)
+  return #10
 }
 """
         )
@@ -1307,75 +1262,64 @@ def test_for3():
         assert (
             str_graph(parse(f))
             == """graph f(n) {
-  #1 = type(n)
-  n.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(n.2, n)
-  #3 = type(0)
-  acc = myia.basics.make_handle(#3)
-  #4 = myia.basics.global_universe_setitem(acc, 0)
-  #5 = myia.basics.resolve(:tests.test_parser, 'range')
-  #6 = myia.basics.global_universe_getitem(n.2)
-  #7 = #5(#6)
-  #8 = myia.basics.myia_iter(#7)
-  #9 = f:for(#8)
-  return #9
+  #1 = myia.basics.resolve(:tests.test_parser, 'range')
+  #2 = #1(n)
+  #3 = myia.basics.myia_iter(#2)
+  #4 = f:for(#3, n, 0)
+  return #4
 }
 
-graph f:for(it) {
-  #10 = myia.basics.myia_hasnext(it)
-  #11 = myia.basics.user_switch(#10, f:for:body, f:for:else)
-  #12 = #11()
-  return #12
+graph f:for(it, phi_n, phi_acc) {
+  #5 = myia.basics.myia_hasnext(it)
+  #6 = myia.basics.user_switch(#5, f:for:body, f:for:else)
+  #7 = #6(phi_n, phi_acc)
+  return #7
 }
 
-graph f:for:else() {
-  #13 = f:for_after()
-  return #13
+graph f:for:else(phi_n.2, phi_acc.2) {
+  #8 = f:for_after(phi_acc.2)
+  return #8
 }
 
-graph f:for_after() {
-  #14 = myia.basics.global_universe_getitem(acc)
+graph f:for_after(phi_acc.3) {
+  return phi_acc.3
+}
+
+graph f:for:body(phi_n.3, phi_acc.4) {
+  #9 = myia.basics.myia_next(it)
+  i = _operator.getitem(#9, 0)
+  #10 = _operator.getitem(#9, 1)
+  #11 = myia.basics.resolve(:tests.test_parser, 'range')
+  #12 = #11(phi_n.3)
+  #13 = myia.basics.myia_iter(#12)
+  #14 = f:for:body:for(#13, phi_n.3, phi_acc.4)
   return #14
 }
 
-graph f:for:body() {
-  #15 = myia.basics.myia_next(it)
-  i = _operator.getitem(#15, 0)
-  #16 = _operator.getitem(#15, 1)
-  #17 = myia.basics.resolve(:tests.test_parser, 'range')
-  #18 = myia.basics.global_universe_getitem(n.2)
-  #19 = #17(#18)
-  #20 = myia.basics.myia_iter(#19)
-  #21 = f:for:body:for(#20)
-  return #21
+graph f:for:body:for(it.2, phi_n.4, phi_acc.5) {
+  #15 = myia.basics.myia_hasnext(it.2)
+  #16 = myia.basics.user_switch(#15, f:for:body:for:body, f:for:body:for:else)
+  #17 = #16(phi_n.4, phi_acc.5)
+  return #17
 }
 
-graph f:for:body:for(it.2) {
-  #22 = myia.basics.myia_hasnext(it.2)
-  #23 = myia.basics.user_switch(#22, f:for:body:for:body, f:for:body:for:else)
-  #24 = #23()
-  return #24
+graph f:for:body:for:else(phi_n.5, phi_acc.6) {
+  #18 = f:for:body:for_after(phi_n.5, phi_acc.6)
+  return #18
 }
 
-graph f:for:body:for:else() {
-  #25 = f:for:body:for_after()
-  return #25
+graph f:for:body:for_after(phi_n.6, phi_acc.7) {
+  #19 = f:for(#10, phi_n.6, phi_acc.7)
+  return #19
 }
 
-graph f:for:body:for_after() {
-  #26 = f:for(#16)
-  return #26
-}
-
-graph f:for:body:for:body() {
-  #27 = myia.basics.myia_next(it.2)
-  j = _operator.getitem(#27, 0)
-  #28 = _operator.getitem(#27, 1)
-  #29 = myia.basics.global_universe_getitem(acc)
-  #30 = _operator.add(#29, j)
-  #31 = myia.basics.global_universe_setitem(acc, #30)
-  #32 = f:for:body:for(#28)
-  return #32
+graph f:for:body:for:body(phi_n.7, phi_acc.8) {
+  #20 = myia.basics.myia_next(it.2)
+  j = _operator.getitem(#20, 0)
+  #21 = _operator.getitem(#20, 1)
+  acc = _operator.add(phi_acc.8, j)
+  #22 = f:for:body:for(#21, phi_n.7, acc)
+  return #22
 }
 """
         )
@@ -1392,26 +1336,18 @@ def test_if():
         assert (
             str_graph(parse(f))
             == """graph f(b, x, y) {
-  #1 = type(x)
-  x.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x.2, x)
-  #3 = type(y)
-  y.2 = myia.basics.make_handle(#3)
-  #4 = myia.basics.global_universe_setitem(y.2, y)
-  #5 = _operator.truth(b)
-  #6 = myia.basics.user_switch(#5, f:if_true, f:if_false)
-  #7 = #6()
-  return #7
+  #1 = _operator.truth(b)
+  #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
+  #3 = #2(x, y)
+  return #3
 }
 
-graph f:if_false() {
-  #8 = myia.basics.global_universe_getitem(y.2)
-  return #8
+graph f:if_false(phi_x, phi_y) {
+  return phi_y
 }
 
-graph f:if_true() {
-  #9 = myia.basics.global_universe_getitem(x.2)
-  return #9
+graph f:if_true(phi_x.2, phi_y.2) {
+  return phi_x.2
 }
 """
         )
@@ -1427,29 +1363,24 @@ def test_if2():
         assert (
             str_graph(parse(f))
             == """graph f(b, x, y) {
-  #1 = type(y)
-  y.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(y.2, y)
-  #3 = _operator.truth(b)
-  #4 = myia.basics.user_switch(#3, f:if_true, f:if_false)
-  #5 = #4()
+  #1 = _operator.truth(b)
+  #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
+  #3 = #2(y)
+  return #3
+}
+
+graph f:if_false(phi_y) {
+  #4 = f:if_after(phi_y)
+  return #4
+}
+
+graph f:if_after(phi_y.2) {
+  return phi_y.2
+}
+
+graph f:if_true(phi_y.3) {
+  #5 = f:if_after(0)
   return #5
-}
-
-graph f:if_false() {
-  #6 = f:if_after()
-  return #6
-}
-
-graph f:if_after() {
-  #7 = myia.basics.global_universe_getitem(y.2)
-  return #7
-}
-
-graph f:if_true() {
-  #8 = myia.basics.global_universe_setitem(y.2, 0)
-  #9 = f:if_after()
-  return #9
 }
 """
         )
@@ -1478,39 +1409,27 @@ def test_while():
         assert (
             str_graph(parse(f))
             == """graph f(b, x, y) {
-  #1 = type(b)
-  b.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(b.2, b)
-  #3 = type(x)
-  x.2 = myia.basics.make_handle(#3)
-  #4 = myia.basics.global_universe_setitem(x.2, x)
-  #5 = type(y)
-  y.2 = myia.basics.make_handle(#5)
-  #6 = myia.basics.global_universe_setitem(y.2, y)
-  #7 = f:while()
-  return #7
+  #1 = f:while(b, x, y)
+  return #1
 }
 
-graph f:while() {
-  #8 = myia.basics.global_universe_getitem(b.2)
-  #9 = myia.basics.user_switch(#8, f:while:body, f:while:else)
-  #10 = #9()
-  return #10
+graph f:while(phi_b, phi_x, phi_y) {
+  #2 = myia.basics.user_switch(phi_b, f:while:body, f:while:else)
+  #3 = #2(phi_x, phi_y)
+  return #3
 }
 
-graph f:while:else() {
-  #11 = f:while_after()
-  return #11
+graph f:while:else(phi_x.2, phi_y.2) {
+  #4 = f:while_after(phi_y.2)
+  return #4
 }
 
-graph f:while_after() {
-  #12 = myia.basics.global_universe_getitem(y.2)
-  return #12
+graph f:while_after(phi_y.3) {
+  return phi_y.3
 }
 
-graph f:while:body() {
-  #13 = myia.basics.global_universe_getitem(x.2)
-  return #13
+graph f:while:body(phi_x.3, phi_y.4) {
+  return phi_x.3
 }
 """
         )
@@ -1526,36 +1445,29 @@ def test_while2():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  #1 = type(x)
-  x.2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x.2, x)
-  #3 = f:while()
+  #1 = f:while(x)
+  return #1
+}
+
+graph f:while(phi_x) {
+  #2 = myia.basics.user_switch(phi_x, f:while:body, f:while:else)
+  #3 = #2(phi_x)
   return #3
 }
 
-graph f:while() {
-  #4 = myia.basics.global_universe_getitem(x.2)
-  #5 = myia.basics.user_switch(#4, f:while:body, f:while:else)
-  #6 = #5()
-  return #6
+graph f:while:else(phi_x.2) {
+  #4 = f:while_after(phi_x.2)
+  return #4
 }
 
-graph f:while:else() {
-  #7 = f:while_after()
-  return #7
+graph f:while_after(phi_x.3) {
+  return phi_x.3
 }
 
-graph f:while_after() {
-  #8 = myia.basics.global_universe_getitem(x.2)
-  return #8
-}
-
-graph f:while:body() {
-  #9 = myia.basics.global_universe_getitem(x.2)
-  #10 = _operator.sub(#9, 1)
-  #11 = myia.basics.global_universe_setitem(x.2, #10)
-  #12 = f:while()
-  return #12
+graph f:while:body(phi_x.4) {
+  x.2 = _operator.sub(phi_x.4, 1)
+  #5 = f:while(x.2)
+  return #5
 }
 """
         )
