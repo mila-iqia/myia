@@ -7,7 +7,7 @@ import textwrap
 from typing import NamedTuple
 
 from . import basics
-from .ir import Constant, Graph, Parameter
+from .ir import Apply, Constant, Graph, Parameter
 from .ir.node import SEQ
 from .utils import ModuleNamespace, Named
 from .utils.info import about, debug_inherit, get_debug
