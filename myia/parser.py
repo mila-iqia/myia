@@ -455,6 +455,12 @@ class Parser:
             )  # pragma: no cover
 
     def process_phi(self, block, phi):
+        """Add the phi argument to the block.
+
+        This also fixes call sites to pass in the value. This may act
+        recursively in case the parent block doesn't have the value as
+        a local value.
+        """
         # Skip processing if it's already there
         val = block.phis.get(phi, None)
         if val is not None:
