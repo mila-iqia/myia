@@ -198,7 +198,6 @@ class Block:
         false.preds.append(tag)
         self.returns(jump)
 
-
     def jump(self, target, *args):
         """End the block in a jump to another block, with optional arguments."""
         assert self.graph.return_ is None
