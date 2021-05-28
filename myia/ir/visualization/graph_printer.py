@@ -4,7 +4,7 @@ from collections import deque
 
 from myia.ir import Apply, Graph, Node
 from myia.ir.node import FN, SEQ
-from myia.ir.print import _NodeCache
+from myia.ir.print import NodeLabeler
 
 
 class GraphPrinter:
@@ -39,7 +39,7 @@ class GraphPrinter:
             graph, show_constants, link_fn_graphs, link_inp_graphs
         )
         self._on_node = on_node
-        self._lbl = _NodeCache()
+        self._lbl = NodeLabeler()
 
     def on_node(self, data):  # pragma: no cover
         """Callback on given data when a node is clicked.
