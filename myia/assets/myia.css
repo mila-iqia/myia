@@ -30,3 +30,18 @@
     color: white;
     background: brown;
 }
+
+.myia-Graph, .myia-Node {
+    padding: 2px;
+    color: white;
+    background: black;
+}
+.myia-Graph {
+    background: tan;
+}
+.myia-Apply {
+    background: blue;
+}
+.myia-Constant {
+    background: magenta;
+}

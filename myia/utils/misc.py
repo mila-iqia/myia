@@ -571,6 +571,7 @@ assets = os.path.join(os.path.dirname(__file__), "..", "assets")
 
 @classmethod
 def myia_hrepr_resources(cls, H):
+    """Resources to load to display representations of Myia objects."""
     return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
 
 

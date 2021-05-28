@@ -1,7 +1,7 @@
 """Graph representation."""
 
 from myia import basics
-from myia.utils import Named
+from myia.utils import Named, myia_hrepr_resources
 from myia.utils.info import clone_debug, make_debug
 
 FN = Named("$fn")
@@ -170,6 +170,13 @@ class Graph:
             for k, v in kwargs.items():
                 setattr(self.debug, k, v)
 
+    __hrepr_resources__ = myia_hrepr_resources
+
+    def __hrepr__(self, H, hrepr):
+        from .print import global_labeler
+
+        return H.atom["myia-Graph"](global_labeler(self))
+
 
 class Node:
     """Element in the compute graph for `Graph`.
@@ -222,6 +229,14 @@ class Node:
         self.abstract = old.abstract
         self.annotation = old.annotation
         self.debug = clone_debug(old.debug, objmap)
+
+    def __hrepr__(self, H, hrepr):
+        from .print import global_labeler
+
+        typ = type(self).__name__
+        return H.atom["myia-Node", f"myia-{typ}"](
+            global_labeler.informative(self)
+        )
 
 
 class Edge:

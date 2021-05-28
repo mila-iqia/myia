@@ -10,8 +10,6 @@ from myia.ir.print import NodeLabeler
 class GraphPrinter:
     """Wrapper for graph visualization."""
 
-    __slots__ = ("graphs", "nodes", "edges", "_on_node", "_lbl")
-
     # CSS style for graph.
     __cystyle__ = open(
         os.path.join(os.path.dirname(__file__), "graph.css")
@@ -23,8 +21,10 @@ class GraphPrinter:
         *,
         on_node=None,
         show_constants=True,
+        show_args=True,
         link_fn_graphs=True,
         link_inp_graphs=True,
+        labeler=None,
     ):
         """Initialize.
 
@@ -34,12 +34,15 @@ class GraphPrinter:
             Constant graphs are always displayed.
         :param link_fn_graphs: if True, display edges from apply FNs to constant graphs
         :param link_inp_graphs: if True, display edges from apply inputs to constant graphs
+        :param labeler: NodeLabeler to use for labeling nodes and graphs
         """
-        self.graphs, self.nodes, self.edges = self.collect_myia_elements(
-            graph, show_constants, link_fn_graphs, link_inp_graphs
-        )
+        self.show_constants = show_constants
+        self.show_args = show_args
+        self.link_fn_graphs = link_fn_graphs
+        self.link_inp_graphs = link_inp_graphs
+        self.graphs, self.nodes, self.edges = self.collect_myia_elements(graph)
         self._on_node = on_node
-        self._lbl = NodeLabeler()
+        self._lbl = labeler or NodeLabeler()
 
     def on_node(self, data):  # pragma: no cover
         """Callback on given data when a node is clicked.
@@ -108,9 +111,7 @@ class GraphPrinter:
                 "data": {
                     "id": identifiers[graph],
                     "label": self._lbl(graph),
-                    "parent": identifiers[graph.parent]
-                    if graph.parent
-                    else None,
+                    "parent": identifiers.get(graph.parent, None),
                 },
                 "classes": "function",
             }
@@ -122,8 +123,10 @@ class GraphPrinter:
             {
                 "data": {
                     "id": identifiers[node],
-                    "label": self.expr(node),
-                    "parent": identifiers[node.graph]
+                    "label": self._lbl.informative(
+                        node, show_args=self.show_args, hide_anonymous=True
+                    ),
+                    "parent": identifiers.get(node.graph, None)
                     if not node.is_constant()
                     else None,
                 },
@@ -159,20 +162,10 @@ class GraphPrinter:
             },
         )
 
-    @classmethod
-    def collect_myia_elements(
-        cls,
-        g: Graph,
-        show_constants=True,
-        link_fn_graphs=True,
-        link_inp_graphs=True,
-    ):
+    def collect_myia_elements(self, g: Graph):
         """Collect all elements to display.
 
         :param g: graph to visualize
-        :param show_constants: (see __init__ for more details)
-        :param link_fn_graphs: (see __init__ for more details)
-        :param link_inp_graphs: (see __init__ for more details)
         :return: a tuple:
             - list of myia graphs
             - list of myia nodes
@@ -215,22 +208,15 @@ class GraphPrinter:
                         node = e.node
                         if node.is_constant_graph():
                             todo_graphs.append(node.value)
-                            if (link_fn_graphs and node is used.fn) or (
-                                link_inp_graphs and node in inputs
+                            if (self.link_fn_graphs and node is used.fn) or (
+                                self.link_inp_graphs and node in inputs
                             ):
                                 todo_edges.append((used, e.label, node.value))
-                        elif show_constants or not node.is_constant():
+                        elif self.show_constants or not node.is_constant():
                             todo_edges.append((used, e.label, node))
         return all_graphs, all_nodes, all_edges
 
-    def expr(self, node):
-        """Generate expression (lvalue = rvalue) for apply node and simple label for other nodes."""
-        if isinstance(node, Apply):
-            return f"{self._lbl(node)} = {self._lbl(node.fn)}({', '.join(self._lbl(inp) for inp in node.inputs)})"
-        return self._lbl(node)
-
-    @classmethod
-    def get_node_class(cls, node):
+    def get_node_class(self, node):
         """Get CSS class for given node."""
         if node.is_parameter():
             return "input"
@@ -240,8 +226,7 @@ class GraphPrinter:
             return "output"
         return "intermediate"
 
-    @classmethod
-    def get_edge_class(cls, edge_label):
+    def get_edge_class(self, edge_label):
         """Get CSS class for given edge label."""
         assert edge_label in (SEQ, FN) or isinstance(edge_label, int)
         if edge_label is SEQ:

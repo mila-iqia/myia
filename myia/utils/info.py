@@ -232,7 +232,7 @@ class Labeler:
         """
         return None
 
-    def label(self, info):
+    def label(self, info, generate=True):
         """Generate a label for the DebugInfo.
 
         The label may not be unique. Multiple DebugInfo could have the same
@@ -247,6 +247,8 @@ class Labeler:
         if first not in self.namecache:
             name = first.name
             if name is None:
+                if not generate:
+                    return None
                 name = self.generate_name(next(self.name_id))
             rval.append(name)
             self.namecache[first] = name
@@ -261,7 +263,7 @@ class Labeler:
 
         return "".join(rval)
 
-    def __call__(self, obj):
+    def __call__(self, obj, generate=True):
         """Generate a unique label for the object or DebugInfo."""
         if isinstance(obj, DebugInfo):
             info = obj
@@ -273,10 +275,13 @@ class Labeler:
         if key in self.cache:
             return self.cache[key]
 
+        lbl = None
         if info is not None:
-            lbl = self.label(info)
-        else:
+            lbl = self.label(info, generate=generate)
+        elif generate:
             lbl = self.generate_name(next(self.name_id))
+        if lbl is None:
+            return None
         self.generated_names[lbl] += 1
         n = self.generated_names[lbl]
         if n > 1:
