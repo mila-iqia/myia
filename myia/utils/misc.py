@@ -1,6 +1,7 @@
 """Miscellaneous utilities."""
 
 import builtins
+import os
 
 # import functools
 # from collections import deque
@@ -565,9 +566,17 @@ class ModuleNamespace(Namespace):
 #     "tags",
 # ]
 
+assets = os.path.join(os.path.dirname(__file__), "..", "assets")
+
+
+@classmethod
+def myia_hrepr_resources(cls, H):
+    return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
+
 
 __all__ = [
     "ABSENT",
     "Named",
     "ModuleNamespace",
+    "myia_hrepr_resources",
 ]

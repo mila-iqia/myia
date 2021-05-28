@@ -6,7 +6,7 @@ from itertools import count
 from hrepr import pstr
 
 from ..utils.intern import Atom, AttrEK, Interned, PossiblyRecursive
-from ..utils.misc import Named
+from ..utils.misc import Named, myia_hrepr_resources
 
 _id = count(1)
 assets = os.path.join(os.path.dirname(__file__), "..", "assets")
@@ -182,9 +182,7 @@ class AbstractValue(Interned, PossiblyRecursive, Cachable):
     def __eqkey__(self):
         return Atom(self, tuple(sorted(self.tracks.items())))
 
-    @classmethod
-    def __hrepr_resources__(self, H):
-        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
+    __hrepr_resources__ = myia_hrepr_resources
 
     def __hrepr_short__(self, H, hrepr):
         return H.instance["myia-abstract"](
@@ -281,10 +279,7 @@ class GenericBase(Cachable):
     A GenericBase is meant to be unified with an AbstractValue eventually.
     """
 
-    @classmethod
-    def __hrepr_resources__(self, H):
-        return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
-
+    __hrepr_resources__ = myia_hrepr_resources
     __str__ = __repr__ = pstr
 
 
