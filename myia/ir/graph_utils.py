@@ -5,11 +5,11 @@ from myia.ir.node import Apply, Graph
 from myia.utils.directed_graph import DirectedGraph
 
 
-def toposort(graph: Graph, reverse=True):
-    """Return graph nodes in topological order.
+def toposort(graph: Graph, reverse=False):
+    """Return graph nodes in execution order.
 
     :param graph: myia graph
-    :param reverse: if True, return nodes in execution order (default)
+    :param reverse: if True, return nodes in raw topological order, from user to used nodes
     :return: graph nodes in topological order (from user to used nodes)
         or execution order (from used to user order) if reverse is True
     """
@@ -33,7 +33,9 @@ def toposort(graph: Graph, reverse=True):
             )
     output = list(directed.visit())
     assert output.pop(0) is None
-    if reverse:
+    # If reverse is False, we return nodes in execution order.
+    # Otherwise, we return default topological order (from user to used nodes).
+    if not reverse:
         output.reverse()
     return output
 
@@ -59,7 +61,8 @@ def get_node_users(node, graph=None, recursive=True):
         g = todo_graphs.popleft()
         if g not in seen_graphs:
             seen_graphs.add(g)
-            for candidate in toposort(g, reverse=False):
+            # Iterate nodes in raw order to speed-up execution
+            for candidate in toposort(g, reverse=True):
                 if isinstance(candidate, Apply) and (
                     node is candidate.fn or node in candidate.inputs
                 ):

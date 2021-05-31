@@ -50,7 +50,8 @@ def remove_useless_universe_getitem(g: Graph):
         if graph in seen_graphs:
             continue
         seen_graphs.add(graph)
-        graph_nodes = toposort(graph, reverse=False)
+        # Iterate nodes in raw order to speed-up code
+        graph_nodes = toposort(graph, reverse=True)
         # Optimize each make_handle node.
         nodes_make_handle = [
             node for node in graph_nodes if node.is_apply(make_handle)
