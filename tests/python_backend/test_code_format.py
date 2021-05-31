@@ -27,6 +27,69 @@ def factorial(n):
     return 1 if n < 2 else n * factorial(n - 1)
 
 
+def test_nonlocal_handle():
+    def f():
+        a = 0
+
+        def g():
+            nonlocal a
+            a = 1
+
+        g()
+        return a
+
+    fn, output = parse_and_compile(f, optimize=False)
+    assert (
+        output
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
+
+def f():
+  _1 = type(0)
+  a = make_handle(_1)
+  _2 = global_universe_setitem(a, 0)
+
+  def g():
+    _3 = global_universe_setitem(a, 1)
+    return None
+
+  _4 = g()
+  return global_universe_getitem(a)
+"""
+    )
+    assert f() == 1
+
+
+def test_nonlocal_handle_optimized():
+    def f():
+        a = 0
+
+        def g():
+            nonlocal a
+            a = 1
+
+        g()
+        return a
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f():
+  a = 0
+
+  def g():
+    nonlocal a
+    a = 1
+    return None
+
+  _1 = g()
+  return a
+"""
+    )
+    assert f() == 1
+
+
 def test_operations():
     def f(x, y):
         a = x + y
