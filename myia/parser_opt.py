@@ -1,4 +1,6 @@
 """Parser optimizations, applicable on graph after parsing."""
+from collections import deque
+
 from myia.basics import (
     global_universe_getitem,
     global_universe_setitem,
@@ -19,9 +21,9 @@ def _replace_apply_node(root_graph: Graph, node: Apply, new_node):
     mapping = {node: new_node}
     mapping_seq = {node: node.edges[SEQ].node} if SEQ in node.edges else {}
     seen_graphs = set()
-    todo_graphs = [root_graph]
+    todo_graphs = deque([root_graph])
     while todo_graphs:
-        g = todo_graphs.pop(0)
+        g = todo_graphs.popleft()
         if g in seen_graphs:
             continue
         seen_graphs.add(g)
@@ -42,9 +44,9 @@ def remove_useless_universe_getitem(g: Graph):
     """
     # Apply optimization to all graphs.
     seen_graphs = set()
-    todo_graphs = [g]
+    todo_graphs = deque([g])
     while todo_graphs:
-        graph = todo_graphs.pop(0)
+        graph = todo_graphs.popleft()
         if graph in seen_graphs:
             continue
         seen_graphs.add(graph)
