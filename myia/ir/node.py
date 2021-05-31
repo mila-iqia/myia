@@ -1,5 +1,7 @@
 """Graph representation."""
 
+from hrepr import pstr
+
 from myia import basics
 from myia.utils import Named, myia_hrepr_resources
 from myia.utils.info import clone_debug, make_debug
@@ -177,6 +179,9 @@ class Graph:
 
         return H.atom["myia-Graph"](global_labeler(self))
 
+    __str__ = pstr
+    __repr__ = pstr
+
 
 class Node:
     """Element in the compute graph for `Graph`.
@@ -237,6 +242,9 @@ class Node:
         return H.atom["myia-Node", f"myia-{typ}"](
             global_labeler.informative(self)
         )
+
+    __str__ = pstr
+    __repr__ = pstr
 
 
 class Edge:
