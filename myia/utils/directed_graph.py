@@ -3,6 +3,7 @@
 Used to convert a myia graph to a directed graph.
 Directed graph is then visited to generate Python code or topological order of nodes.
 """
+from collections import deque
 
 
 class DirectedGraph:
@@ -81,9 +82,9 @@ class DirectedGraph:
         # Use a copy to visit graph, so that current graph is not modified.
         cp = self._copy()
         # Starts with unused nodes.
-        todo = [n for n in cp.uses if n not in cp.used_by]
+        todo = deque(n for n in cp.uses if n not in cp.used_by)
         while todo:
-            element = todo.pop(0)
+            element = todo.popleft()
             yield element
             todo.extend(n for n in cp.pop(element) if n not in cp.used_by)
         assert not cp.uses

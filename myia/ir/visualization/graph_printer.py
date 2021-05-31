@@ -1,5 +1,6 @@
 """Wrapper for graph visualization in hrepr and snektalk."""
 import os
+from collections import deque
 
 from myia.ir import Apply, Graph, Node
 from myia.ir.node import FN, SEQ
@@ -184,9 +185,9 @@ class GraphPrinter:
         seen_graphs = set()
         seen_nodes = set()
         seen_edges = set()
-        todo_graphs = [g]
+        todo_graphs = deque([g])
         while todo_graphs:
-            graph = todo_graphs.pop(0)
+            graph = todo_graphs.popleft()
             if graph in seen_graphs:
                 continue
             seen_graphs.add(graph)
@@ -196,9 +197,9 @@ class GraphPrinter:
                 if p not in seen_nodes:
                     seen_nodes.add(p)
                     all_nodes.append(p)
-            todo_edges = [(None, None, graph.return_)]
+            todo_edges = deque([(None, None, graph.return_)])
             while todo_edges:
-                edge = todo_edges.pop(0)
+                edge = todo_edges.popleft()
                 if edge in seen_edges:
                     continue
                 seen_edges.add(edge)

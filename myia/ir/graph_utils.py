@@ -1,4 +1,6 @@
 """Utility functions for myia graph."""
+from collections import deque
+
 from myia.ir.node import Apply, Graph
 from myia.utils.directed_graph import DirectedGraph
 
@@ -8,7 +10,7 @@ def toposort(graph: Graph, reverse=True):
 
     :param graph: myia graph
     :param reverse: if True, return nodes in execution order (default)
-    :return: graphes nodes in topological order (from user to used nodes)
+    :return: graph nodes in topological order (from user to used nodes)
         or execution order (from used to user order) if reverse is True
     """
     # Use directed graph to get topological order.
@@ -17,9 +19,9 @@ def toposort(graph: Graph, reverse=True):
     directed = DirectedGraph()
     # Use None as first user node, so that graph.return_ is always added,
     # even when it's the only one node in the graph.
-    todo_arrows = [(None, graph.return_)]
+    todo_arrows = deque([(None, graph.return_)])
     while todo_arrows:
-        user, node = todo_arrows.pop(0)
+        user, node = todo_arrows.popleft()
         # Add only constants and nodes that belong to this graph.
         if not node.is_constant() and node.graph is not graph:
             continue
@@ -52,9 +54,9 @@ def get_node_users(node, graph=None, recursive=True):
         graph = node.graph
     users = []
     seen_graphs = set()
-    todo_graphs = [graph]
+    todo_graphs = deque([graph])
     while todo_graphs:
-        g = todo_graphs.pop(0)
+        g = todo_graphs.popleft()
         if g not in seen_graphs:
             seen_graphs.add(g)
             for candidate in toposort(g, reverse=False):

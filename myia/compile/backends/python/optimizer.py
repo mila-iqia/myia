@@ -8,6 +8,8 @@ Output: a list of special dictionaries to pass to code generator to "patch" dire
 Neither directed graphs nor myia graphs will be modified. Instead, code generator will use
 "patch" dictionaries to generate optimized code on-the-fly.
 """
+from collections import deque
+
 from myia import basics
 from myia.ir.node import Apply
 from myia.utils import Named
@@ -36,10 +38,10 @@ class Optimizer:
         :return: patch: a map of dictionaries to pass to code generator to apply optimization during code generator.
         """
         # Recursively optimize directed graphs.
-        todo = list(directed_graphs)
+        todo = deque(directed_graphs)
         seen = set()
         while todo:
-            dg = todo.pop(0)  # type: DirectedGraph
+            dg: DirectedGraph = todo.popleft()
             # Each directed graph should be visited once.
             assert dg not in seen
             seen.add(dg)
