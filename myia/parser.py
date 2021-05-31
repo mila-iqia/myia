@@ -513,12 +513,19 @@ class Parser:
             for block in function.blocks:
                 if not block.used:
                     continue
+                # We need to do the phis before the replacements as
+                # they could otherwise reintroduce nodes that were
+                # supposed to be replaced.
+                for phi in list(block.phis.keys()):
+                    self.process_phi(block, phi)
+
+            for block in function.blocks:
+                if not block.used:
+                    continue
                 repl = {}
                 repl_seq = {}
                 local_namespace = namespace.copy()
-
-                for phi in list(block.phis.keys()):
-                    local_namespace[phi] = self.process_phi(block, phi)
+                local_namespace.update(block.phis)
 
                 # resolve all variable reads
                 for var, items in block.variables_read.items():
