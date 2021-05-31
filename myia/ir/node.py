@@ -269,6 +269,17 @@ class Apply(Node):
         e = Edge(label, node)
         self.edges[label] = e
 
+    def append_input(self, node):
+        """Add a node at the end of the input list.
+
+        This assumes that the inputs are labelled numerically starting
+        from 0 and have no gaps.
+        """
+        i = 0
+        while i in self.edges:
+            i += 1
+        self.add_edge(i, node)
+
     @property
     def fn(self):
         """The function that this Apply calls."""
