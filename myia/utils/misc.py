@@ -3,6 +3,8 @@
 import builtins
 import os
 
+from hrepr import pstr
+
 # import functools
 # from collections import deque
 # from typing import Any, Dict, List, TypeVar
@@ -61,9 +63,10 @@ class Named:
         """
         self.name = self.__name__ = name
 
-    def __repr__(self):
-        """Return the object's name."""
-        return self.name
+    def __hrepr_short__(self, H, hrepr):
+        return H.atom["myia-Named"](self.name)
+
+    __str__ = __repr__ = pstr
 
 
 ABSENT = Named("ABSENT")

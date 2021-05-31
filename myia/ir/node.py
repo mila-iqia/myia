@@ -179,8 +179,7 @@ class Graph:
 
         return H.atom["myia-Graph"](global_labeler(self))
 
-    __str__ = pstr
-    __repr__ = pstr
+    __str__ = __repr__ = pstr
 
 
 class Node:
@@ -235,7 +234,7 @@ class Node:
         self.annotation = old.annotation
         self.debug = clone_debug(old.debug, objmap)
 
-    def __hrepr__(self, H, hrepr):
+    def __hrepr_short__(self, H, hrepr):
         from .print import global_labeler
 
         typ = type(self).__name__
@@ -243,8 +242,7 @@ class Node:
             global_labeler.informative(self)
         )
 
-    __str__ = pstr
-    __repr__ = pstr
+    __str__ = __repr__ = pstr
 
 
 class Edge:

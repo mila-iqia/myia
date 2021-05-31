@@ -45,3 +45,7 @@
 .myia-Constant {
     background: magenta;
 }
+.myia-Named {
+    font-weight: bold;
+    color: green;
+}
