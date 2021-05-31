@@ -252,6 +252,121 @@ graph g() {
         )
 
 
+def test_universe_on_string():
+    def f():
+        x = "hello"
+
+        def g():
+            return x
+
+        return g()
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = type('hello')
+  x = myia.basics.make_handle(#1)
+  #2 = myia.basics.global_universe_setitem(x, 'hello')
+  #3 = g()
+  return #3
+}
+
+graph g() {
+  #4 = myia.basics.global_universe_getitem(x)
+  return #4
+}
+"""
+        )
+
+
+def test_universe_on_string_parser_opt():
+    def f():
+        x = "hello"
+
+        def g():
+            return x
+
+        return g()
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f, parser_opt=True))
+            == """graph f() {
+  #1 = g()
+  return #1
+}
+
+graph g() {
+  return 'hello'
+}
+"""
+        )
+
+
+def test_no_return():
+    def f(x):
+        y = 2 * x
+
+        def g(i):
+            j = i + x + y  # noqa: F841
+
+        z = g(0)  # noqa: F841
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  #1 = type(x)
+  x.2 = myia.basics.make_handle(#1)
+  #2 = myia.basics.global_universe_setitem(x.2, x)
+  #3 = myia.basics.global_universe_getitem(x.2)
+  #4 = _operator.mul(2, #3)
+  #5 = type(#4)
+  y = myia.basics.make_handle(#5)
+  #6 = myia.basics.global_universe_setitem(y, #4)
+  z = g(0)
+  return None
+}
+
+graph g(i) {
+  #7 = myia.basics.global_universe_getitem(x.2)
+  #8 = _operator.add(i, #7)
+  #9 = myia.basics.global_universe_getitem(y)
+  j = _operator.add(#8, #9)
+  return None
+}
+"""
+        )
+
+
+def test_no_return_parser_opt():
+    def f(x):
+        y = 2 * x
+
+        def g(i):
+            j = i + x + y  # noqa: F841
+
+        z = g(0)  # noqa: F841
+
+    with enable_debug():
+        assert (
+            str_graph(parse(f, parser_opt=True))
+            == """graph f(x) {
+  #1 = _operator.mul(2, x)
+  z = g(0)
+  return None
+}
+
+graph g(i) {
+  #2 = _operator.add(i, x)
+  j = _operator.add(#2, #1)
+  return None
+}
+"""
+        )
+
+
 def test_nested_resolve():
     def f(b):
         if b:

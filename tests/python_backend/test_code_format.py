@@ -8,12 +8,12 @@ from myia.parser import parse
 from myia.utils.info import enable_debug
 
 
-def parse_and_compile(function, debug=True, optimize=True):
+def parse_and_compile(function, debug=True, parser_opt=False, optimize=False):
     if debug:
         with enable_debug():
-            graph = parse(function)
+            graph = parse(function, parser_opt=parser_opt)
     else:
-        graph = parse(function)
+        graph = parse(function, parser_opt=parser_opt)
     output = io.StringIO()
     fn = compile_graph(graph, debug=output, optimize=optimize)
     output = output.getvalue()
@@ -38,7 +38,7 @@ def test_nonlocal_handle():
         g()
         return a
 
-    fn, output = parse_and_compile(f, optimize=False)
+    fn, output = parse_and_compile(f)
     assert (
         output
         == """from myia.basics import make_handle
@@ -62,6 +62,9 @@ def f():
 
 
 def test_nonlocal_handle_optimized():
+    # NB: Graph contains 2 calls to universe_setitem on same make_handle, so parser opt can't optimize graph.
+    # Backend opt can still remove universe usages.
+
     def f():
         a = 0
 
@@ -72,7 +75,7 @@ def test_nonlocal_handle_optimized():
         g()
         return a
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, optimize=True)
     assert (
         output
         == """def f():
@@ -618,7 +621,7 @@ def test_universe_on_string():
 
         return g()
 
-    fn, output = parse_and_compile(f, optimize=False)
+    fn, output = parse_and_compile(f)
     assert (
         output
         == """from myia.basics import make_handle
@@ -639,7 +642,9 @@ def f():
     assert fn() == "hello"
 
 
-def test_universe_on_string_optimized():
+def test_universe_on_string_parser_opt():
+    # NB: Parser opt is enough to remove universe usages. No need of backend opt.
+
     def f():
         x = "hello"
 
@@ -648,14 +653,12 @@ def test_universe_on_string_optimized():
 
         return g()
 
-    fn, output = parse_and_compile(f)
+    fn, output = parse_and_compile(f, parser_opt=True)
     assert (
         output
         == """def f():
-  x = 'hello'
-
   def g():
-    return x
+    return 'hello'
 
   return g()
 """
@@ -672,20 +675,57 @@ def test_no_return():
 
         z = g(0)  # noqa: F841
 
-    fn, output = parse_and_compile(f, optimize=True)
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
+
+def f(x):
+  _1 = type(x)
+  _x_2 = make_handle(_1)
+  _2 = global_universe_setitem(_x_2, x)
+  _3 = global_universe_getitem(_x_2)
+  _4 = 2 * _3
+  _5 = type(_4)
+  y = make_handle(_5)
+  _6 = global_universe_setitem(y, _4)
+
+  def g(i):
+    _7 = global_universe_getitem(_x_2)
+    _8 = i + _7
+    _9 = global_universe_getitem(y)
+    j = _8 + _9
+    return None
+
+  z = g(0)
+  return None
+"""
+    )
+    assert fn(1) is None
+
+
+def test_no_return_parser_opt():
+    # NB: Parser opt is enough to remove universe usages. No need of backend opt.
+
+    def f(x):
+        y = 2 * x
+
+        def g(i):
+            j = i + x + y  # noqa: F841
+
+        z = g(0)  # noqa: F841
+
+    fn, output = parse_and_compile(f, parser_opt=True)
     assert (
         output
         == """def f(x):
-  _x_2 = x
-  _1 = _x_2
-  _2 = 2 * _1
-  y = _2
+  _1 = 2 * x
 
   def g(i):
-    _3 = _x_2
-    _4 = i + _3
-    _5 = y
-    j = _4 + _5
+    _2 = i + x
+    j = _2 + _1
     return None
 
   z = g(0)
@@ -702,7 +742,7 @@ def test_global_integer():
     def f(x):
         return x * thingy
 
-    fn, output = parse_and_compile(f, optimize=True)
+    fn, output = parse_and_compile(f)
     assert (
         output
         == """# Dynamic external import: thingy
