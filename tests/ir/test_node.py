@@ -233,3 +233,41 @@ def test_node():
 
     assert p.debug is not None
     assert p.debug.floating
+
+
+def funfun(x):
+    pass
+
+
+def test_str():
+    from myia.ir import print as irprint
+
+    # str() uses a global labeler so that anonymous labels are consistent
+    # from an execution to another, but that means prints occurring in other
+    # tests could change the output, so we simply replace it by a new one
+    # just for this test.
+    # Note that this works because __hrepr_short__ imports the global_labeler
+    # inside of the function
+
+    glbl = irprint.global_labeler
+    irprint.global_labeler = irprint.NodeLabeler()
+
+    with enable_debug():
+        c = Constant(1234)
+        assert str(c) == "Constant(1234)"
+
+        g = Graph()
+        g.add_debug(name="g")
+        assert str(g) == "Graph(g)"
+
+        a = g.apply(funfun, c)
+        assert str(a) == "Apply(#1 = test_node.funfun(1234))"
+
+        b = g.apply(a, c)
+        b.add_debug(name="b")
+        assert str(b) == "Apply(b = #1(1234))"
+
+        p = g.add_parameter("param")
+        assert str(p) == "Parameter(param)"
+
+    irprint.global_labeler = glbl

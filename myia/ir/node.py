@@ -179,7 +179,11 @@ class Graph:
 
         return H.atom["myia-Graph"](global_labeler(self))
 
-    __str__ = __repr__ = pstr
+    def __str__(self):
+        name = type(self).__name__
+        return f"{name}({pstr(self)})"
+
+    __repr__ = __str__
 
 
 class Node:
@@ -239,10 +243,14 @@ class Node:
 
         typ = type(self).__name__
         return H.atom["myia-Node", f"myia-{typ}"](
-            global_labeler.informative(self)
+            global_labeler.informative(self, hide_anonymous=False)
         )
 
-    __str__ = __repr__ = pstr
+    def __str__(self):
+        name = type(self).__name__
+        return f"{name}({pstr(self)})"
+
+    __repr__ = __str__
 
 
 class Edge:
