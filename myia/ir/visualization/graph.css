@@ -25,6 +25,13 @@ node.input {
 node.output {
     background-color: orange;
 }
+node.return {
+    background-color: orange;
+    shape: ellipse;
+    content: ;
+    width: 10px;
+    height: 10px;
+}
 node.intermediate {
     background-color: blue;
 }

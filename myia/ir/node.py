@@ -174,7 +174,7 @@ class Graph:
 
     __hrepr_resources__ = myia_hrepr_resources
 
-    def __hrepr__(self, H, hrepr):
+    def __hrepr_short__(self, H, hrepr):
         from .print import global_labeler
 
         return H.atom["myia-Graph"](global_labeler(self))

@@ -20,8 +20,8 @@ class GraphPrinter:
         graph: Graph,
         *,
         on_node=None,
-        show_constants=True,
-        show_args=True,
+        show_fn_constants=False,
+        show_args=False,
         link_fn_graphs=True,
         link_inp_graphs=True,
         labeler=None,
@@ -30,13 +30,13 @@ class GraphPrinter:
 
         :param graph: graph to visualize
         :param on_node: optional function to call on printed node when clicked
-        :param show_constants: if True, display constant non-graph nodes.
-            Constant graphs are always displayed.
+        :param show_fn_constants: if True, display constant nodes when they are used
+            in the FN edge of an Apply node.
         :param link_fn_graphs: if True, display edges from apply FNs to constant graphs
         :param link_inp_graphs: if True, display edges from apply inputs to constant graphs
         :param labeler: NodeLabeler to use for labeling nodes and graphs
         """
-        self.show_constants = show_constants
+        self.show_fn_constants = show_fn_constants
         self.show_args = show_args
         self.link_fn_graphs = link_fn_graphs
         self.link_inp_graphs = link_inp_graphs
@@ -54,7 +54,7 @@ class GraphPrinter:
         """
         if not self._on_node:
             return
-        return self._on_node(data)
+        return self._on_node(self.id_to_element[data["id"]])
 
     @classmethod
     def __hrepr_resources__(cls, H):
@@ -97,9 +97,12 @@ class GraphPrinter:
 
     def __hrepr__(self, H, hrepr):
         # Generate identifiers to make hrepr output deterministic.
-        elements = self.graphs + self.nodes
+        elements = self.graphs + [n for _, n in self.nodes]
         identifiers = {
             element: str(index) for index, element in enumerate(elements)
+        }
+        self.id_to_element = {
+            str(index): element for index, element in enumerate(elements)
         }
         assert len(identifiers) == len(elements)
 
@@ -126,13 +129,11 @@ class GraphPrinter:
                     "label": self._lbl.informative(
                         node, show_args=self.show_args, hide_anonymous=True
                     ),
-                    "parent": identifiers.get(node.graph, None)
-                    if not node.is_constant()
-                    else None,
+                    "parent": identifiers.get(g, None),
                 },
                 "classes": self.get_node_class(node),
             }
-            for node in self.nodes
+            for g, node in self.nodes
         ]
 
         # Edges.
@@ -189,7 +190,7 @@ class GraphPrinter:
             for p in graph.parameters:
                 if p not in seen_nodes:
                     seen_nodes.add(p)
-                    all_nodes.append(p)
+                    all_nodes.append((p.graph, p))
             todo_edges = deque([(None, None, graph.return_)])
             while todo_edges:
                 edge = todo_edges.popleft()
@@ -201,7 +202,9 @@ class GraphPrinter:
                     all_edges.append(edge)
                 if isinstance(used, Node) and used not in seen_nodes:
                     seen_nodes.add(used)
-                    all_nodes.append(used)
+                    all_nodes.append(
+                        (getattr(used, "graph", None) or user.graph, used)
+                    )
                 if isinstance(used, Apply):
                     inputs = set(used.inputs)
                     for e in used.edges.values():
@@ -212,7 +215,13 @@ class GraphPrinter:
                                 self.link_inp_graphs and node in inputs
                             ):
                                 todo_edges.append((used, e.label, node.value))
-                        elif self.show_constants or not node.is_constant():
+                            else:
+                                todo_edges.append((used, e.label, node))
+                        elif (
+                            self.show_fn_constants
+                            or e.label is not FN
+                            or not node.is_constant()
+                        ):
                             todo_edges.append((used, e.label, node))
         return all_graphs, all_nodes, all_edges
 
@@ -223,7 +232,7 @@ class GraphPrinter:
         if node.is_constant():
             return "constant"
         if node is node.graph.return_:
-            return "output"
+            return "return"
         return "intermediate"
 
     def get_edge_class(self, edge_label):
