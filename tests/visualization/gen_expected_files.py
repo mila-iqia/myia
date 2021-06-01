@@ -37,6 +37,18 @@ def _generate_expected_files(*functions):
             file.write(str(html))
         print("Generated", output_name)
 
+    for function in functions:
+        with enable_debug():
+            graph = parse(function)
+        html = hrepr.page(graph)
+        output_name = f"{function.__name__}_graph.html"
+        with open(
+            os.path.join(os.path.dirname(__file__), output_name),
+            "w",
+        ) as file:
+            file.write(str(html))
+        print("Generated", output_name)
+
 
 def main():
     functions = (

@@ -271,3 +271,39 @@ def test_str():
         assert str(p) == "Parameter(param)"
 
     irprint.global_labeler = glbl
+
+
+def test_hrepr():
+    from hrepr import H, hrepr
+
+    from myia.ir import print as irprint
+
+    glbl = irprint.global_labeler
+    irprint.global_labeler = irprint.NodeLabeler()
+
+    def _hrepr(x, **kw):
+        rval = hrepr(x, **kw)
+        rval.resources = ()
+        return rval
+
+    with enable_debug():
+        c = Constant(1234)
+        assert _hrepr(c) == H.span["myia-Node", "myia-Constant"]("1234")
+
+        g = Graph()
+        g.add_debug(name="g")
+        assert _hrepr(g, short=True) == H.span["myia-Graph"]("g")
+
+        a = g.apply(funfun, c)
+        assert _hrepr(a) == H.span["myia-Node", "myia-Apply"](
+            "#1 = test_node.funfun(1234)"
+        )
+
+        b = g.apply(a, c)
+        b.add_debug(name="b")
+        assert _hrepr(b) == H.span["myia-Node", "myia-Apply"]("b = #1(1234)")
+
+        p = g.add_parameter("param")
+        assert _hrepr(p) == H.span["myia-Node", "myia-Parameter"]("param")
+
+    irprint.global_labeler = glbl

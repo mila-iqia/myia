@@ -177,6 +177,25 @@ class Graph:
 
         return H.atom["myia-Graph"](global_labeler(self))
 
+    def __hrepr__(self, H, hrepr):
+        if (
+            hrepr.state.depth == 0 or hrepr.config.graph_expand
+        ) and not hrepr.config.short:
+            from .visualization.graph_printer import GraphPrinter
+
+            return hrepr(
+                GraphPrinter(
+                    self,
+                    show_fn_constants=False,
+                    show_args=False,
+                    link_fn_graphs=True,
+                    link_inp_graphs=True,
+                )
+            )
+        else:
+            # Falls back to hrepr_short
+            return NotImplemented
+
     def __str__(self):
         from .print import global_labeler
 
@@ -250,7 +269,8 @@ class Node:
         from .print import global_labeler
 
         name = type(self).__name__
-        return f"{name}({global_labeler(self)})"
+        lbl = global_labeler.informative(self, hide_anonymous=False)
+        return f"{name}({lbl})"
 
     __repr__ = __str__
 

@@ -5,6 +5,7 @@ from collections import deque
 from myia.ir import Apply, Graph, Node
 from myia.ir.node import FN, SEQ
 from myia.ir.print import NodeLabeler
+from myia.utils.misc import hrepr_include
 
 
 class GraphPrinter:
@@ -59,6 +60,7 @@ class GraphPrinter:
     @classmethod
     def __hrepr_resources__(cls, H):
         return [
+            hrepr_include,
             H.javascript(
                 src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.17.0/cytoscape.min.js",
                 export="cytoscape",
@@ -152,7 +154,7 @@ class GraphPrinter:
         width = hrepr.config.graph_width or 800
         height = hrepr.config.graph_height or 800
         style = hrepr.config.graph_style or self.__cystyle__
-        return H.div(
+        return H.div["myia-GraphPrinter"](
             style=f"width:{width}px;height:{height}px;",
             constructor="make_graph",
             options={

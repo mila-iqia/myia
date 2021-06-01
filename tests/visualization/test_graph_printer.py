@@ -57,3 +57,15 @@ def test_graph_printer(function, show_fn_constants, show_args, link):
         os.path.join(os.path.dirname(__file__), expected_filename)
     ).read()
     assert str(html) == expected
+
+
+@pytest.mark.parametrize("function", (f0, f1))
+def test_graph_printer_standard(function):
+    with enable_debug():
+        graph = parse(function)
+    html = hrepr.page(graph)
+    expected_filename = f"{function.__name__}_graph.html"
+    expected = open(
+        os.path.join(os.path.dirname(__file__), expected_filename)
+    ).read()
+    assert str(html) == expected

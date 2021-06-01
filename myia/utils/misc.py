@@ -3,7 +3,7 @@
 import builtins
 import os
 
-from hrepr import pstr
+from hrepr import H, pstr
 
 # import functools
 # from collections import deque
@@ -570,12 +570,15 @@ class ModuleNamespace(Namespace):
 # ]
 
 assets = os.path.join(os.path.dirname(__file__), "..", "assets")
+hrepr_include = H.include(
+    type="text/css", path=os.path.join(assets, "myia.css")
+)
 
 
 @classmethod
 def myia_hrepr_resources(cls, H):
     """Resources to load to display representations of Myia objects."""
-    return H.include(type="text/css", path=os.path.join(assets, "myia.css"))
+    return hrepr_include
 
 
 __all__ = [
