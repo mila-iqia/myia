@@ -114,10 +114,6 @@ def str_graph(g, allow_cycles=False, recursive=True):
 class NodeLabeler(Labeler):
     """Adapter for the Labeler to deal with Constant graphs."""
 
-    def disambiguate(self, label, id):
-        """Disambiguate identical labels."""
-        return f"{label}.{id}"
-
     def describe_object(self, node):
         """Describe constants."""
         if not isinstance(node, Node) or node.is_constant_graph():
