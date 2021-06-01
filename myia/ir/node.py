@@ -1,7 +1,5 @@
 """Graph representation."""
 
-from hrepr import pstr
-
 from myia import basics
 from myia.utils import Named, myia_hrepr_resources
 from myia.utils.info import clone_debug, make_debug
@@ -180,8 +178,10 @@ class Graph:
         return H.atom["myia-Graph"](global_labeler(self))
 
     def __str__(self):
+        from .print import global_labeler
+
         name = type(self).__name__
-        return f"{name}({pstr(self)})"
+        return f"{name}({global_labeler(self)})"
 
     __repr__ = __str__
 
@@ -247,8 +247,10 @@ class Node:
         )
 
     def __str__(self):
+        from .print import global_labeler
+
         name = type(self).__name__
-        return f"{name}({pstr(self)})"
+        return f"{name}({global_labeler(self)})"
 
     __repr__ = __str__
 
