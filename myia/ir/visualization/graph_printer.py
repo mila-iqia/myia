@@ -29,13 +29,16 @@ class GraphPrinter:
     ):
         """Initialize.
 
-        :param graph: graph to visualize
-        :param on_node: optional function to call on printed node when clicked
-        :param show_fn_constants: if True, display constant nodes when they are used
-            in the FN edge of an Apply node.
-        :param link_fn_graphs: if True, display edges from apply FNs to constant graphs
-        :param link_inp_graphs: if True, display edges from apply inputs to constant graphs
-        :param labeler: NodeLabeler to use for labeling nodes and graphs
+        Arguments:
+            graph: graph to visualize
+            on_node: optional function to call on printed node when clicked
+            show_fn_constants: if True, display constant nodes when they are used
+                in the FN edge of an Apply node.
+            show_args: if True, display the list of arguments in shorthand inside
+                an Apply node.
+            link_fn_graphs: if True, display edges from apply FNs to constant graphs
+            link_inp_graphs: if True, display edges from apply inputs to constant graphs
+            labeler: NodeLabeler to use for labeling nodes and graphs
         """
         self.show_fn_constants = show_fn_constants
         self.show_args = show_args
@@ -50,8 +53,9 @@ class GraphPrinter:
 
         Not called in tests. Needs snektalk to be tested.
 
-        :param data: dictionary representing clicked node.
-            Contains at least "id" and "label" fields
+        Arguments:
+            data: dictionary representing clicked node.
+                Contains at least "id" and "label" fields
         """
         if not self._on_node:
             return
@@ -168,8 +172,11 @@ class GraphPrinter:
     def collect_myia_elements(self, g: Graph):
         """Collect all elements to display.
 
-        :param g: graph to visualize
-        :return: a tuple:
+        Arguments:
+            g: graph to visualize
+
+        Returns:
+            A tuple:
             - list of myia graphs
             - list of myia nodes
             - list of edges. Each edge is a tuple (source element, edge label, target element).

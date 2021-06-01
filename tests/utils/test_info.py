@@ -2,7 +2,7 @@ from threading import Thread
 
 import pytest
 
-from myia.utils.info import (  # AbbreviationTranslator,
+from myia.utils.info import (
     AbbrvLabeler,
     DebugInfo,
     Labeler,
