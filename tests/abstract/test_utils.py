@@ -89,6 +89,10 @@ def test_uncanonical():
         assert uncanonical(fgn, mapping=mapping) is x
 
 
+def test_uncanonical_untransformed():
+    assert uncanonical(ph1, mapping={}) is ph1
+
+
 def _utest(a, b, expected=True, mappings={}):
     try:
         c, U = unify(a, b)
