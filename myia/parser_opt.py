@@ -19,7 +19,7 @@ def _replace_apply_node(root_graph: Graph, node: Apply, new_node):
     :param new_node: node to replace with. May be None to delete node.
     """
     mapping = {node: new_node}
-    mapping_seq = {node: node.edges[SEQ].node} if SEQ in node.edges else {}
+    mapping_seq = {node: (node.edges[SEQ].node if SEQ in node.edges else None)}
     root_graph.replace(mapping, mapping_seq, recursive=True)
 
 
