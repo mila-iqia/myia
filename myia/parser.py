@@ -11,6 +11,7 @@ from .ir import Apply, Constant, Graph, Parameter
 from .ir.node import SEQ
 from .utils import ModuleNamespace, Named
 from .utils.info import about, debug_inherit, get_debug
+from .abstract.data import Placeholder
 
 STORE = Named("STORE")
 LOAD = Named("LOAD")
@@ -143,6 +144,7 @@ class Block:
         self.preds = []
         self.phis = dict()
 
+        self.first_apply = None
         self.last_apply = None
 
         self.variables_written = {}
@@ -179,14 +181,14 @@ class Block:
         st = self.apply(STORE, varnum, node)
         self.variables_written.setdefault(varnum, []).append(st)
         self.function.variables_local.add(varnum)
-        self.function.variables_first_write.setdefault(varnum, st)
 
     def link_seq(self, node):
         """Append a node in the sequence chain."""
         if self.last_apply is not None:
             node.add_edge(SEQ, self.last_apply)
+        if self.first_apply is None:
+            self.first_apply = node
         self.last_apply = node
-        return node
 
     def cond(self, cond, true, false):
         """End the block with a conditional jump to one of two blocks."""
@@ -250,7 +252,6 @@ class Function:
         self.variables_local = set()
 
         self.variables_nonlocal = set()
-        self.variables_first_write = dict()
 
     def new_block(self, parent):
         """Create a new block in this function.
@@ -506,11 +507,16 @@ class Parser:
                     f"no binding for variable '{err}' found"
                 )  # pragma: no cover
 
+            # We create all the handles in the initial block of the function
+            # to avoid closure resolution issues
+            handle_block = function.initial_block
             for var in function.variables_root:
-                st = function.variables_first_write[var]
-                t = st.graph.apply(type, st.edges[1].node)
-                with debug_inherit(name=st.edges[0].node.value):
-                    namespace[var] = st.graph.apply(basics.make_handle, t)
+                with debug_inherit(name=var):
+                    handle = handle_block.graph.apply(basics.make_handle, Constant(Placeholder()))
+                namespace[var] = handle
+                # Prepend the make_handle to the seq chain
+                handle_block.first_apply.add_edge(SEQ, handle)
+                handle_block.first_apply = handle
 
             for block in function.blocks:
                 if not block.used:
