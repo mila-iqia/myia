@@ -20,19 +20,7 @@ def _replace_apply_node(root_graph: Graph, node: Apply, new_node):
     """
     mapping = {node: new_node}
     mapping_seq = {node: node.edges[SEQ].node} if SEQ in node.edges else {}
-    seen_graphs = set()
-    todo_graphs = deque([root_graph])
-    while todo_graphs:
-        g = todo_graphs.popleft()
-        if g in seen_graphs:
-            continue
-        seen_graphs.add(g)
-        g.replace(mapping, mapping_seq, recursive=False)
-        todo_graphs.extend(
-            node.value
-            for node in toposort(g)
-            if node.is_constant_graph() and node.value.has_ancestor(root_graph)
-        )
+    root_graph.replace(mapping, mapping_seq, recursive=True)
 
 
 def remove_useless_universe_getitem(g: Graph):
