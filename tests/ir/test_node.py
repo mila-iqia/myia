@@ -114,12 +114,12 @@ def test_clone():
     f2.output.fn.value is f.output.fn.value
 
     op = f.apply("op", fma)
-    op2 = op.clone(f, {f: f})
+    op2 = op.clone({f: f})
     assert op2.edges[0].node is op.edges[0].node
 
     c = Constant(1)
     op3 = g.apply("op", c, c)
-    op4 = op3.clone(g, {g: g})
+    op4 = op3.clone({g: g})
     assert op3.edges[0].node is not op4.edges[0].node
     assert op4.edges[0].node is op4.edges[1].node
 

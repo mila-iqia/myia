@@ -80,23 +80,22 @@ class Graph:
 
     def clone(self, objmap=None):
         """Make a copy of this graph."""
-        res = Graph(self.parent)
         if objmap is None:
+            res = Graph(self.parent)
             objmap = {self: res}
         elif self in objmap:
             return objmap[self]
         else:
+            res = Graph(parent=objmap.get(self.parent, self.parent))
             objmap[self] = res
-        res.parameters = [p.clone(self, objmap) for p in self.parameters]
+        res.parameters = [p.clone(objmap) for p in self.parameters]
         res.flags = self.flags.copy()
         if self.return_:
-            res.return_ = self.return_.clone(self, objmap)
+            res.return_ = self.return_.clone(objmap)
         res.varargs = (
-            self.varargs.clone(self, objmap) if self.varargs else self.varargs
+            self.varargs.clone(objmap) if self.varargs else self.varargs
         )
-        res.kwargs = (
-            self.kwargs.clone(self, objmap) if self.kwargs else self.kwargs
-        )
+        res.kwargs = self.kwargs.clone(objmap) if self.kwargs else self.kwargs
         res.defaults = self.defaults
         res.kwonly = self.kwonly
         res.debug = clone_debug(self.debug, objmap)
@@ -259,14 +258,13 @@ class Edge:
         self._node.users.add(self)
         self._user = None
 
-    def clone(self, g, objmap):
+    def clone(self, objmap):
         """Make a copy, in the context of a graph clone.
 
         Arguments:
-            g: The graph that is cloned.
             objmap: Map of cloned objets
         """
-        return Edge(self.label, self.node.clone(g, objmap))
+        return Edge(self.label, self.node.clone(objmap))
 
     @property
     def node(self):
@@ -362,22 +360,19 @@ class Apply(Node):
             i += 1
         return tuple(res)
 
-    def clone(self, g, objmap):
+    def clone(self, objmap):
         """Copy a node in the context of a graph clone.
 
         Arguments:
-            g: The graph that is cloned.
             objmap: Cloned object map.
         """
         if self in objmap:
             return objmap[self]
-        if self.graph is not g:
+        if self.graph not in objmap:
             return self
-        res = Apply(objmap[g])
+        res = Apply(objmap[self.graph])
         objmap[self] = res
-        res.edges = _edgemap(
-            (e.clone(g, objmap) for e in self.edges.values()), res
-        )
+        res.edges = _edgemap(e.clone(objmap) for e in self.edges.values(), res)
         res._copy_fields(self, objmap)
         return res
 
@@ -404,18 +399,17 @@ class Parameter(Node):
         """See `Node.is_parameter`."""
         return True
 
-    def clone(self, g, objmap):
+    def clone(self, objmap):
         """Copy a node in the context of a graph clone.
 
         Arguments:
-            g: The graph that is cloned.
             objmap: Cloned object map.
         """
         if self in objmap:
             return objmap[self]
-        if self.graph is not g:
+        if self.graph not in objmap:
             return self
-        res = Parameter(g, self.name)
+        res = Parameter(objmap[self.graph], self.name)
         objmap[self] = res
         res._copy_fields(self, objmap)
         return res
@@ -444,16 +438,15 @@ class Constant(Node):
         """See `Node.is_constant_graph`."""
         return self.is_constant(Graph)
 
-    def clone(self, g, objmap):
+    def clone(self, objmap):
         """Copy a node in the context of a graph clone.
 
         Arguments:
-            g: The graph that is cloned.
             objmap: Cloned object map.
         """
         if self in objmap:
             return objmap[self]
-        if self.is_constant_graph() and self.value.parent is g:
+        if self.is_constant_graph() and self.value.parent in objmap:
             res = Constant(self.value.clone(objmap))
         else:
             res = Constant(self.value)
