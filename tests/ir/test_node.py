@@ -193,6 +193,17 @@ def test_graph_replace3():
     assert g.output.fn.value.output.edges[1].node is p
 
 
+def test_graph_replace4():
+    g = Graph()
+    p = g.add_parameter("p")
+    a = g.apply("add", p, 0)
+    g.output = a
+
+    g.replace({(a, 0, p): Constant(1)})
+
+    assert g.output.inputs[0].value == 1
+
+
 def test_graph_add_debug():
     g = Graph()
 
