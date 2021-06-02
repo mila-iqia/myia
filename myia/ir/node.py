@@ -6,6 +6,8 @@ from myia import basics
 from myia.utils import Named, myia_hrepr_resources
 from myia.utils.info import clone_debug, make_debug
 
+from ..utils.info import about
+
 FN = Named("$fn")
 SEQ = Named("$seq")
 
@@ -27,6 +29,7 @@ class Graph:
         self.posonly = 0
         self.kwonly = 0
         self.debug = make_debug(obj=self)
+        self.specializations = {}
 
     @property
     def output(self):
@@ -81,12 +84,14 @@ class Graph:
     def clone(self, objmap=None):
         """Make a copy of this graph."""
         if objmap is None:
-            res = Graph(self.parent)
+            with about(self, "clone"):
+                res = Graph(self.parent)
             objmap = {self: res}
         elif self in objmap:
             return objmap[self]
         else:
-            res = Graph(parent=objmap.get(self.parent, self.parent))
+            with about(self, "clone"):
+                res = Graph(parent=objmap.get(self.parent, self.parent))
             objmap[self] = res
         res.parameters = [p.clone(objmap) for p in self.parameters]
         res.flags = self.flags.copy()
@@ -98,8 +103,16 @@ class Graph:
         res.kwargs = self.kwargs.clone(objmap) if self.kwargs else self.kwargs
         res.defaults = self.defaults
         res.kwonly = self.kwonly
-        res.debug = clone_debug(self.debug, objmap)
         return res
+
+    def specialize(self, sig):
+        """Return a Graph specialized for a type signature."""
+        if sig not in self.specializations:
+            cl = self.clone()
+            for param, typ in zip(cl.parameters, sig):
+                param.abstract = typ
+            self.specializations[sig] = cl
+        return self.specializations[sig]
 
     def replace_node(self, node, lbl, repl, *, recursive=True):
         """Replace a node by another in this graph.
@@ -372,7 +385,9 @@ class Apply(Node):
             return self
         res = Apply(objmap[self.graph])
         objmap[self] = res
-        res.edges = _edgemap(e.clone(objmap) for e in self.edges.values(), res)
+        res.edges = _edgemap(
+            (e.clone(objmap) for e in self.edges.values()), res
+        )
         res._copy_fields(self, objmap)
         return res
 
