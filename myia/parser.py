@@ -163,7 +163,8 @@ class Block:
         """
         ld = self.apply(LOAD, varnum)
         st = self.variables_written.get(varnum, [None])[-1]
-        ld.add_edge("prevwrite", st)
+        if st is not None:
+            ld.add_edge("prevwrite", st)
         self.variables_read.setdefault(varnum, []).append(ld)
         if varnum not in self.function.variables_local:
             self.function.variables_free.add(varnum)
@@ -380,7 +381,7 @@ class Parser:
                 for var, reads in block.variables_read.items():
                     if (
                         var in function.variables_local
-                        and reads[0].edges["prevwrite"].node is None
+                        and 'prevwrite' not in reads[0].edges
                     ):
                         block.phis[var] = None
                         function.variables_local_closure.add(var)
@@ -390,7 +391,7 @@ class Parser:
     ):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
-        st = ld.edges["prevwrite"].node
+        st = ld.edges["prevwrite"].node if 'prevwrite' in ld.edges else None
         if var in (function.variables_root | function.variables_free):
             if var not in local_namespace:
                 n = ld.graph.apply(basics.resolve, self.global_namespace, var)
@@ -405,7 +406,7 @@ class Parser:
             if st is None:
                 repl[ld] = local_namespace[var]
             else:
-                assert st.is_apply()
+                assert st is not None
                 repl[ld] = st.edges[1].node
             if SEQ in ld.edges:
                 repl_seq[ld] = ld.edges[SEQ].node
@@ -417,7 +418,7 @@ class Parser:
                 n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
         elif var in function.variables_local:
-            assert st.is_apply()
+            assert st is not None
             repl[ld] = st.edges[1].node
             # There should always be at least one store before this load
             assert SEQ in ld.edges
