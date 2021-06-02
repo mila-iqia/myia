@@ -212,7 +212,6 @@ def test_self_recursion():
         assert (
             str_graph(parse(f))
             == """graph f() {
-<<<<<<< HEAD
   #1 = g()
   return #1
 }
@@ -247,20 +246,6 @@ graph g(i) {
   #2 = _operator.add(i, x)
   j = _operator.add(#2, #1)
   return None
-=======
-  #1 = type(g)
-  g~2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(g~2, g)
-  #3 = myia.basics.global_universe_getitem(g~2)
-  #4 = #3()
-  return #4
-}
-
-graph g() {
-  #5 = myia.basics.global_universe_getitem(g~2)
-  #6 = #5()
-  return #6
->>>>>>> a2f2bb67 (Change disambiguation character to ~)
 }
 """
         )
