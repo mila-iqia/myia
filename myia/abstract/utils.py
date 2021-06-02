@@ -53,7 +53,7 @@ def canonical(self, gn: data.GenericBase, *, mapping):
 @abstract_map.variant
 def _uncanonical(self, gn: data.GenericBase, *, invmapping):
     """Undo the canonical transform."""
-    return invmapping[gn]
+    return invmapping.get(gn, gn)
 
 
 def uncanonical(x, *, mapping):
