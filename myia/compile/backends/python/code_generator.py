@@ -9,50 +9,27 @@ from ovld.core import _Ovld
 
 from myia import basics
 from myia.compile.backends.python.optimizer import ASSIGN
-from myia.ir import Constant
+from myia.ir import Constant, NodeLabeler
 from myia.utils.directed_graph import DirectedGraph
-from myia.utils.info import Labeler
 
 
-class NodeLabeler:
-    """Node labeler used in Python backend.
+class PythonGenLabeler(NodeLabeler):
+    """Labeler for Python code generation."""
 
-    Combine a Labeler (from myia.utils.info) and a node cache to generate default names when necessary.
-    """
-
-    def __init__(self):
-        self.cache = {}
-        self.default_name_counter = Counter()
-        self.lbl = Labeler(
-            relation_translator=self._relation_translator,
-            name_generator=self._name_generator,
-            disambiguator=self._disambiguator,
-            object_describer=self._object_describer,
-            reverse_order=True,
-        )
-
-    def __call__(self, node):
-        """Generate label for given node."""
-        if isinstance(node, Constant) and node.is_constant_graph():
-            # Use labeler for graph in constant node.
-            return self.lbl(node.value)
-        else:
-            # Use labeler for anything else.
-            return self.lbl(node)
-
-    @classmethod
-    def _relation_translator(cls, rel):
+    def translate_relation(self, rel):
+        """Translate a relation as _ separated name."""
         return ["_", rel]
 
-    @classmethod
-    def _name_generator(cls, identifier):
+    def generate_name(self, identifier):
+        """Generate a new name."""
         return f"_{identifier}"
 
-    @classmethod
-    def _disambiguator(cls, label, element_id):
+    def disambiguate(self, label, element_id):
+        """Disambiguate identical symbols."""
         return f"_{label}_{element_id}"
 
-    def _object_describer(self, node):
+    def describe_object(self, node):
+        """Describe an object by value."""
         if isinstance(node, Constant) and not node.is_constant_graph():
             return str(node.value)
 
@@ -87,7 +64,7 @@ class CodeGenerator:
         self.replace = replace or {}
         self.rename = rename or {}
         self.inline_nodes = {}
-        self.lbl = NodeLabeler()
+        self.lbl = PythonGenLabeler(reverse_order=True)
         self.global_counter = Counter()
         self.globals = {}
 

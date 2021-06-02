@@ -1,6 +1,9 @@
 """Miscellaneous utilities."""
 
 import builtins
+import os
+
+from hrepr import H, pstr
 
 # import functools
 # from collections import deque
@@ -60,9 +63,10 @@ class Named:
         """
         self.name = self.__name__ = name
 
-    def __repr__(self):
-        """Return the object's name."""
-        return self.name
+    def __hrepr_short__(self, H, hrepr):
+        return H.atom["myia-Named"](self.name)
+
+    __str__ = __repr__ = pstr
 
 
 ABSENT = Named("ABSENT")
@@ -565,9 +569,21 @@ class ModuleNamespace(Namespace):
 #     "tags",
 # ]
 
+assets = os.path.join(os.path.dirname(__file__), "..", "assets")
+hrepr_include = H.include(
+    type="text/css", path=os.path.join(assets, "myia.css")
+)
+
+
+@classmethod
+def myia_hrepr_resources(cls, H):
+    """Resources to load to display representations of Myia objects."""
+    return hrepr_include
+
 
 __all__ = [
     "ABSENT",
     "Named",
     "ModuleNamespace",
+    "myia_hrepr_resources",
 ]

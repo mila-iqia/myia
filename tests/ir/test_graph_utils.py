@@ -1,5 +1,5 @@
 from myia.ir.graph_utils import get_node_users, toposort
-from myia.ir.print import _NodeCache
+from myia.ir.print import NodeLabeler
 from myia.parser import parse
 from myia.utils.info import enable_debug
 
@@ -28,7 +28,7 @@ def factorial(n):
 
 
 def test_toposort_factorial():
-    nodecache = _NodeCache()
+    nodecache = NodeLabeler()
     g = parse_function(factorial)
     nodes = toposort(g)
     assert (
@@ -61,7 +61,7 @@ function myia.basics.return_
 
 
 def test_node_users_factorial():
-    nodecache = _NodeCache()
+    nodecache = NodeLabeler()
     g = parse_function(factorial)
     (param_n,) = g.parameters
     # Parameter n should be used twice: to test if n < 2, and passed to result of user_switch.

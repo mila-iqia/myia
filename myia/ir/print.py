@@ -33,7 +33,7 @@ def str_graph(g, allow_cycles=False, recursive=True):
        allow_cycles: Useful for debugging broken graphs that contain cycles
        recursive: Also print subgraphs.
     """
-    nodecache = _NodeCache()
+    nodecache = NodeLabeler()
     buf = io.StringIO()
     seen_nodes = set()
     seen_graphs = set()
@@ -111,45 +111,66 @@ def str_graph(g, allow_cycles=False, recursive=True):
     return buf.getvalue()
 
 
-def _disambiguator(label, id):
-    return f"{label}.{id}"
-
-
-def _constant_describer(node):
-    if not isinstance(node, Node) or node.is_constant_graph():
-        return None
-    elif node.is_constant(
-        (
-            type,
-            types.FunctionType,
-            types.BuiltinFunctionType,
-            types.BuiltinMethodType,
-            _Ovld,
-        )
-    ):
-        f = node.value
-        m = f.__module__
-        if m == "builtins":
-            return f.__qualname__
-        else:
-            return f"{m}.{f.__qualname__}"
-    elif node.is_constant():
-        return repr(node.value)
-    else:
-        return None
-
-
-class _NodeCache:
+class NodeLabeler(Labeler):
     """Adapter for the Labeler to deal with Constant graphs."""
 
-    def __init__(self):
-        self.lbl = Labeler(
-            disambiguator=_disambiguator,
-            object_describer=_constant_describer,
-        )
-
-    def __call__(self, node):
-        if isinstance(node, Node) and node.is_constant_graph():
-            return self.lbl(node.value)
+    def describe_object(self, node):
+        """Describe constants."""
+        if not isinstance(node, Node) or node.is_constant_graph():
+            return None
+        elif node.is_constant(
+            (
+                type,
+                types.FunctionType,
+                types.BuiltinFunctionType,
+                types.BuiltinMethodType,
+                _Ovld,
+            )
+        ):
+            f = node.value
+            m = f.__module__
+            if m == "builtins":
+                return f.__qualname__
+            else:
+                return f"{m}.{f.__qualname__}"
+        elif node.is_constant():
+            return repr(node.value)
         else:
-            return self.lbl(node)
+            return None
+
+    def informative(self, obj, hide_anonymous=True, show_args=True):
+        """Return a more informative label.
+
+        The informative label for an Apply node includes the name of the
+        node, the name of the function being applied and optionally its
+        arguments.
+
+        Arguments:
+            obj: The Node to describe.
+            hide_anonymous: Whether to hide the node's name if it was not
+                given a name by the user in the source code.
+            show_args: Whether to show the list of arguments.
+        """
+        lbl = self(obj, generate=not hide_anonymous)
+        if isinstance(obj, Node) and obj.is_apply():
+            fn = self(obj.fn)
+            if lbl is None:
+                lbl = f"→ {fn}"
+            else:
+                lbl = f"{lbl} = {fn}"
+            if show_args:
+                args = ", ".join(self(inp) for inp in obj.inputs)
+                lbl = f"{lbl}({args})"
+            return lbl
+        else:
+            return lbl
+
+    def __call__(self, obj, generate=True):
+        """Label the given object."""
+        if isinstance(obj, Node) and obj.is_constant_graph():
+            return super().__call__(obj.value, generate=generate)
+        else:
+            return super().__call__(obj, generate=generate)
+
+
+global_labeler = NodeLabeler()

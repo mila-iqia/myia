@@ -1,7 +1,7 @@
 """Graph representation."""
 
 from myia import basics
-from myia.utils import Named
+from myia.utils import Named, myia_hrepr_resources
 from myia.utils.info import clone_debug, make_debug
 
 FN = Named("$fn")
@@ -170,6 +170,40 @@ class Graph:
             for k, v in kwargs.items():
                 setattr(self.debug, k, v)
 
+    __hrepr_resources__ = myia_hrepr_resources
+
+    def __hrepr_short__(self, H, hrepr):
+        from .print import global_labeler
+
+        return H.atom["myia-Graph"](global_labeler(self))
+
+    def __hrepr__(self, H, hrepr):
+        if (
+            hrepr.state.depth == 0 or hrepr.config.graph_expand
+        ) and not hrepr.config.short:
+            from .visualization.graph_printer import GraphPrinter
+
+            return hrepr(
+                GraphPrinter(
+                    self,
+                    show_fn_constants=False,
+                    show_args=False,
+                    link_fn_graphs=True,
+                    link_inp_graphs=True,
+                )
+            )
+        else:
+            # Falls back to hrepr_short
+            return NotImplemented
+
+    def __str__(self):
+        from .print import global_labeler
+
+        name = type(self).__name__
+        return f"{name}({global_labeler(self)})"
+
+    __repr__ = __str__
+
 
 class Node:
     """Element in the compute graph for `Graph`.
@@ -222,6 +256,23 @@ class Node:
         self.abstract = old.abstract
         self.annotation = old.annotation
         self.debug = clone_debug(old.debug, objmap)
+
+    def __hrepr_short__(self, H, hrepr):
+        from .print import global_labeler
+
+        typ = type(self).__name__
+        return H.atom["myia-Node", f"myia-{typ}"](
+            global_labeler.informative(self, hide_anonymous=False)
+        )
+
+    def __str__(self):
+        from .print import global_labeler
+
+        name = type(self).__name__
+        lbl = global_labeler.informative(self, hide_anonymous=False)
+        return f"{name}({lbl})"
+
+    __repr__ = __str__
 
 
 class Edge:

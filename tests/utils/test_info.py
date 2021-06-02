@@ -3,7 +3,7 @@ from threading import Thread
 import pytest
 
 from myia.utils.info import (
-    AbbreviationTranslator,
+    AbbrvLabeler,
     DebugInfo,
     Labeler,
     about,
@@ -153,11 +153,11 @@ def test_labeler(manyinfo):
     lbl = Labeler()
     assert lbl(m.x1) == "toyota"
     assert lbl(m.x2) == "toyota:apple"
-    assert lbl(m.x2c) == "toyota:apple//2"
-    assert lbl(m.x2b) == "toyota:apple//3"
+    assert lbl(m.x2c) == "toyota:apple~2"
+    assert lbl(m.x2b) == "toyota:apple~3"
     assert lbl(m.x3) == "toyota:apple:blueberry"
     assert lbl(m.x4) == "toyota:apple:blueberry:corn"
-    assert lbl(m.x4b) == "toyota:apple:blueberry:corn//2"
+    assert lbl(m.x4b) == "toyota:apple:blueberry:corn~2"
 
 
 def test_labeler_reverse(manyinfo):
@@ -165,29 +165,29 @@ def test_labeler_reverse(manyinfo):
     lbl = Labeler(reverse_order=True)
     assert lbl(m.x1) == "toyota"
     assert lbl(m.x2) == "apple:toyota"
-    assert lbl(m.x2c) == "apple:toyota//2"
-    assert lbl(m.x2b) == "apple:toyota//3"
+    assert lbl(m.x2c) == "apple:toyota~2"
+    assert lbl(m.x2b) == "apple:toyota~3"
     assert lbl(m.x3) == "blueberry:apple:toyota"
     assert lbl(m.x4) == "corn:blueberry:apple:toyota"
-    assert lbl(m.x4b) == "corn:blueberry:apple:toyota//2"
+    assert lbl(m.x4b) == "corn:blueberry:apple:toyota~2"
 
 
 def test_labeler_abbrv(manyinfo):
     m = manyinfo
-    tr = AbbreviationTranslator(
-        {
+    lbl = AbbrvLabeler(
+        relation_map={
             "apple": "&",
             "corn": "#",
-        }
+        },
+        reverse_order=True,
     )
-    lbl = Labeler(relation_translator=tr, reverse_order=True)
     assert lbl(m.x1) == "toyota"
     assert lbl(m.x2) == "&toyota"
-    assert lbl(m.x2c) == "&toyota//2"
-    assert lbl(m.x2b) == "&toyota//3"
+    assert lbl(m.x2c) == "&toyota~2"
+    assert lbl(m.x2b) == "&toyota~3"
     assert lbl(m.x3) == "blueberry:&toyota"
     assert lbl(m.x4) == "#blueberry:&toyota"
-    assert lbl(m.x4b) == "#blueberry:&toyota//2"
+    assert lbl(m.x4b) == "#blueberry:&toyota~2"
 
 
 def test_labeler_nonames():
@@ -208,12 +208,13 @@ def test_labeler_nonames():
 
 
 def test_labeler_object_describer():
-    def descr(obj):
-        return obj.value and str(obj.value)
+    class TestLabeler(Labeler):
+        def describe_object(self, obj):
+            return obj.value and str(obj.value)
 
     x1 = Auto(name="bob", value=12)
 
-    lbl = Labeler(object_describer=descr)
+    lbl = TestLabeler()
     assert lbl(x1) == "12"
 
 
