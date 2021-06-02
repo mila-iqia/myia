@@ -122,7 +122,9 @@ class Graph:
         """
         self._replace(mapping, mapping_seq, recursive, self, set())
 
-    def _replace(self, mapping, mapping_seq, recursive, root_graph, seen_graphs):
+    def _replace(
+        self, mapping, mapping_seq, recursive, root_graph, seen_graphs
+    ):
         if self in seen_graphs:
             return
         seen_graphs.add(self)
@@ -152,7 +154,11 @@ class Graph:
                         and edge.node.value.has_ancestor(root_graph)
                     ):
                         edge.node.value._replace(
-                            mapping, mapping_seq, recursive, root_graph, seen_graphs
+                            mapping,
+                            mapping_seq,
+                            recursive,
+                            root_graph,
+                            seen_graphs,
                         )
 
     def add_debug(self, **kwargs):
