@@ -1,5 +1,5 @@
 from myia.abstract import data
-from myia.abstract.to_abstract import from_value
+from myia.abstract.to_abstract import from_value, type_to_abstract
 
 
 def test_from_value():
@@ -48,4 +48,11 @@ def test_from_value_tuple():
             ),
         ],
         {"interface": tuple},
+    )
+
+
+def test_type_to_abstract():
+    assert type_to_abstract(int) is data.AbstractAtom({"interface": int})
+    assert from_value(int) is data.AbstractStructure(
+        [data.AbstractAtom({"interface": int})], {"interface": type}
     )
