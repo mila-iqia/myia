@@ -78,17 +78,14 @@ ast_map = {
 _parse_cache = {}
 
 
-def parse(func, parser_opt=False):
+def parse(func):
     """Parse a python function and return the myia graph.
 
     This takes a python function object and will extract and parse its
     source code.
-
-    :param parser_opt: if True, apply supplementary optimizations on graph after parsing.
     """
-    parsing_key = (func, parser_opt)
-    if parsing_key in _parse_cache:
-        return _parse_cache[parsing_key]
+    if func in _parse_cache:
+        return _parse_cache[func]
 
     flags = dict(getattr(func, "_myia_flags", {}))
 
@@ -111,11 +108,10 @@ def parse(func, parser_opt=False):
 
     if name is not None:
         graph.add_debug(name=name)
-    _parse_cache[parsing_key] = graph
+    _parse_cache[func] = graph
 
-    if parser_opt:
-        for post_opt in parser_opts:
-            post_opt(graph)
+    for post_opt in parser_opts:
+        post_opt(graph)
 
     return graph
 
