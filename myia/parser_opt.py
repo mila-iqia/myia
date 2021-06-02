@@ -65,10 +65,11 @@ def remove_useless_universe_getitem(g: Graph):
                 # Replace universe_getitem nodes with associated value.
                 for n_getitem in nodes_getitem:
                     _replace_apply_node(graph, n_getitem, n_value)
-                # Remove typeof, universe_setitem and make_handle nodes.
-                _replace_apply_node(graph, n_typeof, None)
-                _replace_apply_node(graph, n_make_handle, None)
-                _replace_apply_node(graph, n_setitem, None)
+                # Just remove universe_setitem.
+                # typeof and make_handle should be deleted with it.
+                mapping_setitem = {}
+                mapping_setitem_seq = {n_setitem: (n_setitem.edges[SEQ].node if SEQ in n_setitem.edges else None)}
+                graph.replace(mapping_setitem, mapping_setitem_seq, recursive=True)
         # Optimize all other closures.
         todo_graphs.extend(
             node.value for node in graph_nodes if node.is_constant_graph()
