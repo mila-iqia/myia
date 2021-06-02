@@ -120,6 +120,12 @@ class Graph:
 
         A node can be in either mapping or mapping_seq or both.
         """
+        self._replace(mapping, mapping_seq, recursive, self, set())
+
+    def _replace(self, mapping, mapping_seq, recursive, root_graph, seen_graphs):
+        if self in seen_graphs:
+            return
+        seen_graphs.add(self)
         todo = [self.return_]
         seen = set()
         while todo:
@@ -141,10 +147,10 @@ class Graph:
                     elif (
                         recursive
                         and edge.node.is_constant_graph()
-                        and edge.node.value.parent is self
+                        and edge.node.value.has_ancestor(root_graph)
                     ):
-                        edge.node.value.replace(
-                            mapping, mapping_seq, recursive=True
+                        edge.node.value._replace(
+                            mapping, mapping_seq, recursive, root_graph, seen_graphs
                         )
                 elif replaced:
                     # If node was replace with None, delete associated edge.
