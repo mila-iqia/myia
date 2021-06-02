@@ -6,6 +6,12 @@ from . import data
 
 
 @ovld
+def type_to_abstract(self, typ: type):
+    """Convert a type to an AbstractValue."""
+    return data.AbstractAtom({"interface": typ})
+
+
+@ovld
 def to_abstract(self, xs: tuple):
     """Convert data to an AbstractValue."""
     return data.AbstractStructure(
@@ -16,6 +22,11 @@ def to_abstract(self, xs: tuple):
 @ovld
 def to_abstract(self, x: object):  # noqa: F811
     return data.AbstractAtom({"interface": type(x)})
+
+
+@ovld
+def to_abstract(self, t: type):  # noqa: F811
+    return data.AbstractStructure([type_to_abstract(t)], {"interface": type})
 
 
 @to_abstract.variant
