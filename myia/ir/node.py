@@ -357,6 +357,12 @@ class Apply(Node):
         return self.edges[FN].node
 
     @property
+    def seq(self):
+        """The previous element in the sequence chain (or None)."""
+        val = self.edges.get(SEQ, None)
+        return val if val is None else val.node
+
+    @property
     def inputs(self):
         """The tuple of inputs for this apply.
 
