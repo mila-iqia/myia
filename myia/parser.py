@@ -7,11 +7,11 @@ import textwrap
 from typing import NamedTuple
 
 from . import basics
+from .abstract.data import Placeholder
 from .ir import Apply, Constant, Graph, Parameter
 from .ir.node import SEQ
 from .utils import ModuleNamespace, Named
 from .utils.info import about, debug_inherit, get_debug
-from .abstract.data import Placeholder
 
 STORE = Named("STORE")
 LOAD = Named("LOAD")
@@ -382,7 +382,7 @@ class Parser:
                 for var, reads in block.variables_read.items():
                     if (
                         var in function.variables_local
-                        and 'prevwrite' not in reads[0].edges
+                        and "prevwrite" not in reads[0].edges
                     ):
                         block.phis[var] = None
                         function.variables_local_closure.add(var)
@@ -392,7 +392,7 @@ class Parser:
     ):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
-        st = ld.edges["prevwrite"].node if 'prevwrite' in ld.edges else None
+        st = ld.edges["prevwrite"].node if "prevwrite" in ld.edges else None
         if var in (function.variables_root | function.variables_free):
             if var not in local_namespace:
                 n = ld.graph.apply(basics.resolve, self.global_namespace, var)
@@ -512,7 +512,9 @@ class Parser:
             handle_block = function.initial_block
             for var in function.variables_root:
                 with debug_inherit(name=var):
-                    handle = handle_block.graph.apply(basics.make_handle, Constant(Placeholder()))
+                    handle = handle_block.graph.apply(
+                        basics.make_handle, Constant(Placeholder())
+                    )
                 namespace[var] = handle
                 # Prepend the make_handle to the seq chain
                 handle_block.first_apply.add_edge(SEQ, handle)

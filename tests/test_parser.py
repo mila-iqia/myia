@@ -2069,8 +2069,8 @@ graph g() {
 
 @pytest.mark.xfail()
 def test_cursed_function():
-    def f(b):
-        a = 0
+    def f(b):  # pragma: no cover
+        a = 0  # noqa: F841
 
         def g(b):
             def h():

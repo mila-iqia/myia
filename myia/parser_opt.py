@@ -68,15 +68,11 @@ def remove_useless_universe_getitem(g: Graph):
                 m_seq = {
                     n_setitem: n_setitem.seq,
                 }
-                graph.replace(
-                    {}, m_seq, recursive=True
-                )
+                graph.replace({}, m_seq, recursive=True)
                 m_seq = {
                     n_make_handle: n_make_handle.seq,
                 }
-                graph.replace(
-                    {}, m_seq, recursive=True
-                )
+                graph.replace({}, m_seq, recursive=True)
 
         # Optimize all other closures.
         todo_graphs.extend(
