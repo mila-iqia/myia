@@ -51,15 +51,14 @@ from myia.basics import global_universe_setitem
 from myia.basics import global_universe_getitem
 
 def f():
-  _1 = type(0)
-  a = make_handle(_1)
-  _2 = global_universe_setitem(a, 0)
+  a = make_handle(None)
+  _1 = global_universe_setitem(a, 0)
 
   def g():
-    _3 = global_universe_setitem(a, 1)
+    _2 = global_universe_setitem(a, 1)
     return None
 
-  _4 = g()
+  _3 = g()
   return global_universe_getitem(a)
 """
     )
