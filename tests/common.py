@@ -1,6 +1,8 @@
 import ast
 import inspect
 from ast import NodeTransformer
+from contextlib import contextmanager
+from itertools import count
 from textwrap import dedent
 
 from _pytest.assertion.rewrite import AssertionRewriter
@@ -70,3 +72,13 @@ def A(*args):
 
 def Un(*opts):
     return data.AbstractUnion([A(opt) for opt in opts], tracks={})
+
+
+@contextmanager
+def predictable_placeholders():
+    old_id = data._id
+    data._id = count(1)
+    try:
+        yield
+    finally:
+        data._id = old_id

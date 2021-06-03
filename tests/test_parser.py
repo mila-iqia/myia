@@ -5,6 +5,8 @@ from myia.parser import MyiaSyntaxError, parse
 from myia.parser_opt import apply_parser_opts
 from myia.utils.info import enable_debug
 
+from .common import predictable_placeholders
+
 
 def test_same():
     def f():  # pragma: no cover
@@ -118,7 +120,7 @@ def test_nonlocal():
         g()
         return x
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f), allow_cycles=True)
             == """graph f() {
@@ -1893,11 +1895,11 @@ def test_branch_defined():
             a = 2
         return g()
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f))
             == """graph f(b) {
-  a = myia.basics.make_handle(??5)
+  a = myia.basics.make_handle(??1)
   #1 = _operator.truth(b)
   #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
   #3 = #2(g)
@@ -1940,11 +1942,11 @@ def test_branch_defined2():
             a = x + y
         return g()
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f))
             == """graph f(b, x, y) {
-  a = myia.basics.make_handle(??6)
+  a = myia.basics.make_handle(??1)
   #1 = _operator.truth(b)
   #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
   #3 = #2(x, y, g)
@@ -1995,11 +1997,11 @@ def test_branch_defined3():
                 a = 0
         return g()
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f))
             == """graph f(b, c) {
-  a = myia.basics.make_handle(??7)
+  a = myia.basics.make_handle(??1)
   #1 = _operator.truth(b)
   #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
   #3 = #2(c, g)
