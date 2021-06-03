@@ -130,6 +130,11 @@ class _Jump(NamedTuple):
     done: set
 
 
+def is_cond(pred):
+    """Returns True if the predecessor is a conditional jump."""
+    return isinstance(pred, _CondJump)
+
+
 class Block:
     """This is used to represent a basic block in a python function."""
 
@@ -468,6 +473,14 @@ class Parser:
         if val is not None:
             return val
 
+        if block is block.function.initial_block:
+            # This can happen if a variable is defined in a branch and
+            # referred to in the other
+            # See tests/test_parser.py::test_cursed_function2 for an example.
+            raise UnboundLocalError(
+                f"local variable '{phi}' referrenced before assignment"
+            )
+
         # Add an argument for the value of the phi
         block.phis[phi] = block.graph.add_parameter("phi_" + phi)
 
@@ -481,7 +494,7 @@ class Parser:
             if phi not in pred.done:
                 pred.jump.append_input(val)
                 pred.done.add(phi)
-            if isinstance(pred, _CondJump):
+            if is_cond(pred):
                 if pred.true.phis.get(phi, None) is None:
                     p = pred.true.graph.add_parameter("phi_" + phi)
                     pred.true.phis[phi] = p

@@ -2072,8 +2072,6 @@ graph g() {
 @pytest.mark.xfail()
 def test_cursed_function():
     def f(b):  # pragma: no cover
-        a = 0  # noqa: F841
-
         def g(b):
             def h():
                 return a
@@ -2084,41 +2082,17 @@ def test_cursed_function():
 
         return g(b)
 
-    with enable_debug():
-        assert (
-            str_graph(parse(f))
-            == """graph f(b) {
-  #1 = g(b)
-  return #1
-}
+    with pytest.raises(NameError):
+        parse(f)
 
-graph g(b~2) {
-  a = myia.basics.make_handle(??1)
-  #2 = _operator.truth(b~2)
-  #3 = myia.basics.user_switch(#2, g:if_true, g:if_false)
-  #4 = #3(h)
-  return #4
-}
 
-graph g:if_false(phi_h) {
-  #5 = g:if_after(phi_h)
-  return #5
-}
+def test_cursed_function2():
+    def f(b):  # pragma: no cover
+        if b:
+            a = 1
+        else:
+            return a
+        return 0
 
-graph g:if_after(phi_h~2) {
-  #6 = phi_h~2()
-  return #6
-}
-
-graph g:if_true(phi_h~3) {
-  #7 = myia.basics.global_universe_setitem(a, 1)
-  #8 = g:if_after(phi_h~3)
-  return #8
-}
-
-graph h() {
-  #9 = myia.basics.global_universe_getitem(a)
-  return #9
-}
-"""
-        )
+    with pytest.raises(UnboundLocalError):
+        parse(f)
