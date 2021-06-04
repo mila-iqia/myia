@@ -329,9 +329,6 @@ class Parser:
         self.analyze(functions)
         self.resolve(functions)
 
-        # Check for no return
-        # This does a dfs and finds graphs with None for return_
-
         return main_block.graph
 
     def all_functions(self, main_function):
@@ -392,19 +389,48 @@ class Parser:
                         block.phis[var] = None
                         function.variables_local_closure.add(var)
 
+            # Figure out the globals and mark them for each function
+            entry = functions[0]
+            assert entry.parent is None
+            globals = entry.variables_free
+            entry.variables_global |= globals
+            entry.variables_free = set()
+            errs = function.variables_nonlocal & globals
+            for err in errs:
+                # This should never show up in practice
+                # since python will error out
+                raise SyntaxError(
+                    f"no binding for variable '{err}' found"
+                )  # pragma: no cover
+
+            for function in functions[1:]:
+                # This will include globals that aren't used in the function,
+                # but it only affect name resolution.
+                function.variables_global |= function.variables_free & globals
+                function.variables_free -= globals
+                errs = function.variables_nonlocal & globals
+                for err in errs:
+                    # This should never show up in practice
+                    # since python will error out
+                    raise SyntaxError(
+                        f"no binding for variable '{err}' found"
+                    )  # pragma: no cover
+
     def resolve_read(
         self, repl, repl_seq, ld, function, block, local_namespace
     ):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
         st = ld.edges["prevwrite"].node if "prevwrite" in ld.edges else None
-        if var in (function.variables_root | function.variables_free):
-            if var not in local_namespace:
-                n = ld.graph.apply(basics.resolve, self.global_namespace, var)
-            else:
-                n = ld.graph.apply(
-                    basics.global_universe_getitem, local_namespace[var]
-                )
+        if var in function.variables_global:
+            n = ld.graph.apply(basics.resolve, self.global_namespace, var)
+            if SEQ in ld.edges:
+                n.edges[SEQ] = ld.edges[SEQ]
+            repl[ld] = n
+        elif var in (function.variables_root | function.variables_free):
+            n = ld.graph.apply(
+                basics.global_universe_getitem, local_namespace[var]
+            )
             if SEQ in ld.edges:
                 n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
@@ -418,11 +444,6 @@ class Parser:
                 repl_seq[ld] = ld.edges[SEQ].node
             else:
                 repl_seq[ld] = None
-        elif var in function.variables_global:
-            n = ld.graph.apply(basics.resolve, self.global_namespace, var)
-            if SEQ in ld.edges:
-                n.edges[SEQ] = ld.edges[SEQ]
-            repl[ld] = n
         elif var in function.variables_local:
             assert st is not None
             repl[ld] = st.edges[1].node
@@ -511,15 +532,6 @@ class Parser:
         """
         namespace = {}
         for function in functions:
-
-            errs = function.variables_nonlocal - namespace.keys()
-            for err in errs:
-                # This should never show up in practice
-                # since python will error out
-                raise SyntaxError(
-                    f"no binding for variable '{err}' found"
-                )  # pragma: no cover
-
             # We create all the handles in the initial block of the function
             # to avoid closure resolution issues
             handle_block = function.initial_block
