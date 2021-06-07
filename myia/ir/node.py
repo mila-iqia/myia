@@ -22,6 +22,7 @@ class Graph:
         self.varargs = False
         self.kwargs = False
         self.defaults = {}
+        self.posonly = 0
         self.kwonly = 0
         self.debug = make_debug(obj=self)
 

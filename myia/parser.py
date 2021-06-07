@@ -583,7 +583,7 @@ class Parser:
 
         This can be used for any argument list.
         """
-        pargs = args.args
+        pargs = args.posonlyargs + args.args
         nondefaults = [None] * (len(pargs) - len(args.defaults))
         defaults = nondefaults + args.defaults
 
@@ -593,9 +593,6 @@ class Parser:
 
         defaults_name = []
         defaults_list = []
-
-        # We don't handle this for now.
-        assert args.posonlyargs == []
 
         for arg, dflt in zip(pargs + kwargs, defaults + kwdefaults):
             with debug_inherit(name=arg.arg, location=self.make_location(arg)):
@@ -642,6 +639,7 @@ class Parser:
         function_block.graph.varargs = vararg_node
         function_block.graph.kwargs = kwarg_node
         function_block.graph.defaults = dict(zip(defaults_name, defaults_list))
+        function_block.graph.posonly = len(args.posonlyargs)
         function_block.graph.kwonly = len(args.kwonlyargs)
 
     def _create_function(self, block, node):
