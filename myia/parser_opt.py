@@ -84,3 +84,9 @@ def remove_useless_universe_getitem(g: Graph):
 
 
 parser_opts = [remove_useless_universe_getitem]
+
+
+def apply_parser_opts(g: Graph):
+    """Apply all parser optimizations and return graph."""
+    remove_useless_universe_getitem(g)
+    return g
