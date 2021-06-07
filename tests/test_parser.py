@@ -6,6 +6,22 @@ from myia.parser_opt import apply_parser_opts
 from myia.utils.info import enable_debug
 
 
+def test_posonly_args():
+    def f1(a, b, c, d, e):  # pragma: no cover
+        pass
+
+    g1 = parse(f1)
+    assert len(g1.parameters) == 5
+    assert g1.posonly == 0
+
+    def f2(a, b, /, c, d, e):  # pragma: no cover
+        pass
+
+    g2 = parse(f2)
+    assert len(g2.parameters) == 5
+    assert g2.posonly == 2
+
+
 def test_same():
     def f():  # pragma: no cover
         return 1
