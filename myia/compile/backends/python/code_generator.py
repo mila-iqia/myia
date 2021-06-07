@@ -116,7 +116,41 @@ class CodeGenerator:
             [function header code: str, function body code: list]
         """
         graph = directed.data
-        header = f"def {self.label(graph)}({', '.join(self.label(p) for p in graph.parameters)}):"
+
+        # Generate graph label before anything else, to make sure
+        # graph gets the smallest default label number if necessary.
+        graph_label = self.label(graph)
+
+        # Generate function arguments list.
+        nb_var_params = bool(graph.varargs) + bool(graph.kwargs)
+        required_params = graph.parameters[
+            : (len(graph.parameters) - nb_var_params)
+        ]
+        posonly = required_params[: graph.posonly]
+        args = required_params[
+            graph.posonly : (len(required_params) - graph.kwonly)
+        ]
+        kwonly = required_params[(len(required_params) - graph.kwonly) :]
+        param_strings = []
+        # Positional arguments.
+        param_strings.extend(self.label(p) for p in posonly)
+        if posonly:
+            param_strings.append("/")
+        # Arguments.
+        param_strings.extend(self.label(p) for p in args)
+        # "*" or "*args"
+        if graph.varargs:
+            param_strings.append(f"*{self.label(graph.varargs)}")
+        elif kwonly:
+            param_strings.append("*")
+        # Keyword-only arguments.
+        param_strings.extend(self.label(p) for p in kwonly)
+        # "**kwargs"
+        if graph.kwargs:
+            param_strings.append(f"**{self.label(graph.kwargs)}")
+
+        # Generate function header with correct arguments list.
+        header = f"def {graph_label}({', '.join(param_strings)}):"
         # Register nonlocal variables.
         code = [
             f"nonlocal {self.label(outer_variable)}"

@@ -3,6 +3,8 @@ import math
 import operator
 import sys
 
+import pytest
+
 from myia.compile.backends.python.python import compile_graph
 from myia.parser import parse
 from myia.utils.info import enable_debug
@@ -682,3 +684,60 @@ def f(x):
 """
     )
     assert fn(2) == 20
+
+
+def test_varargs_kwargs():
+    # Test function header code with complex parameter list.
+    # We expect parameter list in generated function code to be
+    # the same as in original function.
+
+    def f(a, b, *args, c, d, **kwargs):
+        return {"a": a, "b": b, "args": args, "c": c, "d": d, "kwargs": kwargs}
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(a, b, *args, c, d, **kwargs):
+  return {'a': a, 'b': b, 'args': args, 'c': c, 'd': d, 'kwargs': kwargs}
+"""
+    )
+    assert fn(1, 2, 3, 4, 5, d=9, c=11, x=33) == {
+        "a": 1,
+        "b": 2,
+        "args": (3, 4, 5),
+        "c": 11,
+        "d": 9,
+        "kwargs": {"x": 33},
+    }
+
+
+def test_posonly_args():
+    def f(a, b, c, /, d, e):
+        return a + b + c, d - e
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(a, b, c, /, d, e):
+  _1 = a + b
+  _2 = _1 + c
+  _3 = d - e
+  return (_2, _3)
+"""
+    )
+    assert fn(1, 2, 3, e=-1, d=-2) == (6, -1)
+
+
+def test_kwonly_args():
+    def f(a, b, *, c, d):
+        return a + b, c + 10 * d
+
+    fn, output = parse_and_compile(f)
+
+    # Fn call should fail if we don't pass keyword arguments.
+    with pytest.raises(
+        TypeError, match="takes 2 positional arguments but 4 were given"
+    ):
+        fn(2, 3, 4, 5)
+
+    assert fn(2, 3, d=5, c=4) == (5, 54)
