@@ -9,7 +9,6 @@ from typing import NamedTuple
 from . import basics
 from .ir import Apply, Constant, Graph, Parameter
 from .ir.node import SEQ
-from .parser_opt import parser_opts
 from .utils import ModuleNamespace, Named
 from .utils.info import about, debug_inherit, get_debug
 
@@ -109,9 +108,6 @@ def parse(func):
     if name is not None:
         graph.add_debug(name=name)
     _parse_cache[func] = graph
-
-    for post_opt in parser_opts:
-        post_opt(graph)
 
     return graph
 

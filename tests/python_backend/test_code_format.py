@@ -5,15 +5,18 @@ import sys
 
 from myia.compile.backends.python.python import compile_graph
 from myia.parser import parse
+from myia.parser_opt import apply_parser_opts
 from myia.utils.info import enable_debug
 
 
-def parse_and_compile(function, debug=True, optimize=False):
+def parse_and_compile(function, debug=True, parser_opt=False, optimize=False):
     if debug:
         with enable_debug():
             graph = parse(function)
     else:
         graph = parse(function)
+    if parser_opt:
+        graph = apply_parser_opts(graph)
     output = io.StringIO()
     fn = compile_graph(graph, debug=output, optimize=optimize)
     output = output.getvalue()
@@ -626,6 +629,38 @@ def test_universe_on_string():
     fn, output = parse_and_compile(f)
     assert (
         output
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
+
+def f():
+  _1 = type('hello')
+  x = make_handle(_1)
+  _2 = global_universe_setitem(x, 'hello')
+
+  def g():
+    return global_universe_getitem(x)
+
+  return g()
+"""
+    )
+    assert fn() == "hello"
+
+
+def test_universe_on_string_parser_opt():
+    # NB: Parser opt is enough to remove universe usages. No need of backend opt.
+
+    def f():
+        x = "hello"
+
+        def g():
+            return x
+
+        return g()
+
+    fn, output = parse_and_compile(f, parser_opt=True)
+    assert (
+        output
         == """def f():
   def g():
     return 'hello'
@@ -648,6 +683,48 @@ def test_no_return():
         z = g(0)  # noqa: F841
 
     fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """from myia.basics import make_handle
+from myia.basics import global_universe_setitem
+from myia.basics import global_universe_getitem
+
+def f(x):
+  _1 = type(x)
+  _x_2 = make_handle(_1)
+  _2 = global_universe_setitem(_x_2, x)
+  _3 = global_universe_getitem(_x_2)
+  _4 = 2 * _3
+  _5 = type(_4)
+  y = make_handle(_5)
+  _6 = global_universe_setitem(y, _4)
+
+  def g(i):
+    _7 = global_universe_getitem(_x_2)
+    _8 = i + _7
+    _9 = global_universe_getitem(y)
+    j = _8 + _9
+    return None
+
+  z = g(0)
+  return None
+"""
+    )
+    assert fn(1) is None
+
+
+def test_no_return_parser_opt():
+    # NB: Parser opt is enough to remove universe usages. No need of backend opt.
+
+    def f(x):
+        y = 2 * x
+
+        def g(i):
+            j = i + x + y  # noqa: F841
+
+        z = g(0)  # noqa: F841
+
+    fn, output = parse_and_compile(f, parser_opt=True)
     assert (
         output
         == """def f(x):
