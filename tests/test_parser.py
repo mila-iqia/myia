@@ -5,22 +5,6 @@ from myia.parser import MyiaSyntaxError, parse
 from myia.utils.info import enable_debug
 
 
-def test_posonly_args():
-    def f1(a, b, c, d, e):  # pragma: no cover
-        pass
-
-    g1 = parse(f1)
-    assert len(g1.parameters) == 5
-    assert g1.posonly == 0
-
-    def f2(a, b, /, c, d, e):  # pragma: no cover
-        pass
-
-    g2 = parse(f2)
-    assert len(g2.parameters) == 5
-    assert g2.posonly == 2
-
-
 def test_same():
     def f():  # pragma: no cover
         return 1
@@ -426,6 +410,15 @@ graph g(a, b) {
 }
 """
         )
+
+
+def test_def_posonly():
+    def f(a, b, /, c, d, e):  # pragma: no cover
+        pass
+
+    g = parse(f)
+    assert len(g.parameters) == 5
+    assert g.posonly == 2
 
 
 def test_getattr():
