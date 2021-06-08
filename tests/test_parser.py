@@ -223,22 +223,21 @@ def test_self_recursion():
 
         return g()
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = type(g)
-  g~2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(g~2, g)
-  #3 = myia.basics.global_universe_getitem(g~2)
-  #4 = #3()
-  return #4
+  g = myia.basics.make_handle(??1)
+  #1 = myia.basics.global_universe_setitem(g, g~2)
+  #2 = myia.basics.global_universe_getitem(g)
+  #3 = #2()
+  return #3
 }
 
-graph g() {
-  #5 = myia.basics.global_universe_getitem(g~2)
-  #6 = #5()
-  return #6
+graph g~2() {
+  #4 = myia.basics.global_universe_getitem(g)
+  #5 = #4()
+  return #5
 }
 """
         )
@@ -276,27 +275,25 @@ def test_no_return():
 
         z = g(0)  # noqa: F841
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  #1 = type(x)
-  x~2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x~2, x)
-  #3 = myia.basics.global_universe_getitem(x~2)
-  #4 = _operator.mul(2, #3)
-  #5 = type(#4)
-  y = myia.basics.make_handle(#5)
-  #6 = myia.basics.global_universe_setitem(y, #4)
+  y = myia.basics.make_handle(??2)
+  x~2 = myia.basics.make_handle(??1)
+  #1 = myia.basics.global_universe_setitem(x~2, x)
+  #2 = myia.basics.global_universe_getitem(x~2)
+  #3 = _operator.mul(2, #2)
+  #4 = myia.basics.global_universe_setitem(y, #3)
   z = g(0)
   return None
 }
 
 graph g(i) {
-  #7 = myia.basics.global_universe_getitem(x~2)
-  #8 = _operator.add(i, #7)
-  #9 = myia.basics.global_universe_getitem(y)
-  j = _operator.add(#8, #9)
+  #5 = myia.basics.global_universe_getitem(x~2)
+  #6 = _operator.add(i, #5)
+  #7 = myia.basics.global_universe_getitem(y)
+  j = _operator.add(#6, #7)
   return None
 }
 """

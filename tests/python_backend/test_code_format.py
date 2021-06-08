@@ -635,9 +635,8 @@ from myia.basics import global_universe_setitem
 from myia.basics import global_universe_getitem
 
 def f():
-  _1 = type('hello')
-  x = make_handle(_1)
-  _2 = global_universe_setitem(x, 'hello')
+  x = make_handle(None)
+  _1 = global_universe_setitem(x, 'hello')
 
   def g():
     return global_universe_getitem(x)
@@ -691,20 +690,18 @@ from myia.basics import global_universe_setitem
 from myia.basics import global_universe_getitem
 
 def f(x):
-  _1 = type(x)
-  _x_2 = make_handle(_1)
-  _2 = global_universe_setitem(_x_2, x)
-  _3 = global_universe_getitem(_x_2)
-  _4 = 2 * _3
-  _5 = type(_4)
-  y = make_handle(_5)
-  _6 = global_universe_setitem(y, _4)
+  y = make_handle(None)
+  _x_2 = make_handle(None)
+  _1 = global_universe_setitem(_x_2, x)
+  _2 = global_universe_getitem(_x_2)
+  _3 = 2 * _2
+  _4 = global_universe_setitem(y, _3)
 
   def g(i):
-    _7 = global_universe_getitem(_x_2)
-    _8 = i + _7
-    _9 = global_universe_getitem(y)
-    j = _8 + _9
+    _5 = global_universe_getitem(_x_2)
+    _6 = i + _5
+    _7 = global_universe_getitem(y)
+    j = _6 + _7
     return None
 
   z = g(0)

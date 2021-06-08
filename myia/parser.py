@@ -535,7 +535,7 @@ class Parser:
             # We create all the handles in the initial block of the function
             # to avoid closure resolution issues
             handle_block = function.initial_block
-            for var in function.variables_root:
+            for var in sorted(function.variables_root):
                 with debug_inherit(name=var):
                     handle = handle_block.graph.apply(
                         basics.make_handle, Constant(Placeholder())
