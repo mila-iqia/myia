@@ -140,6 +140,16 @@ graph g() {
 """
         )
 
+@pytest.mark.xfail
+def test_root_read_before_write():
+    def f():
+        def g(x):
+            return x + y
+        g(1)
+        y = 2
+
+    with pytest.raises(NameError):
+        parse(f)
 
 def test_entry_defaults():
     def f(x=0):  # pragma: no cover
