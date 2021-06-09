@@ -1569,7 +1569,7 @@ graph f:while:body(phi_x~4) {
         )
 
 
-class _ContestExample:
+class _ContextExample:
     def __enter__(self):
         print("Enter")
 
@@ -1701,7 +1701,7 @@ def test_with_statement():
     # ast.With
     # ast.withitem
     def f():  # pragma: no cover
-        with _ContestExample():
+        with _ContextExample():
             return 0
 
     parse(f)
@@ -1849,18 +1849,6 @@ def test_yield_from():
             yield from range(10)
 
         return list(g())
-
-    parse(f)
-
-
-@pytest.mark.xfail(
-    strict=True, raises=NotImplementedError, reason="starred assignement"
-)
-def test_starred():
-    # ast.Starred
-    def f():  # pragma: no cover
-        a, *b = range(10)
-        return a, b
 
     parse(f)
 
