@@ -1,5 +1,3 @@
-import ast
-
 import pytest
 
 from myia.ir.print import str_graph
@@ -1571,204 +1569,327 @@ graph f:while:body(phi_x~4) {
         )
 
 
-class ContestExample:
+class _ContestExample:
     def __enter__(self):
-        print('Enter')
+        print("Enter")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        print('Exit')
+        print("Exit")
 
 
-class AsyncContextExample:
+class _AsyncContextExample:
     async def __aenter__(self):
-        print('Async enter')
+        print("Async enter")
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        print('Async exit')
+        print("Async exit")
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Import not supported")
-def test_ast_Import():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="Import not supported"
+)
+def test_import():
+    # ast.Import
+    def f():  # pragma: no cover
         import operator
+
         return operator.add(1, 2)
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ImportFrom not supported")
-def test_ast_ImportFrom():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="ImportFrom not supported"
+)
+def test_import_from():
+    # ast.ImportFrom
+    def f():  # pragma: no cover
         from operator import add
+
         return add(1, 2)
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ImportFrom not supported")
-def test_ast_alias():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="ImportFrom not supported"
+)
+def test_import_as():
+    # ast.alias
+    def f():  # pragma: no cover
         from operator import add as addition
+
         return addition(1, 2)
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="AugAssign not supported")
-def test_ast_AugAssign():
-    def f(x):
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="AugAssign not supported"
+)
+def test_augmented_assignment():
+    # ast.AugAssign
+    # ast.Store as name ctx
+    def f(x):  # pragma: no cover
         a = x
         a += 2
         return a
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ClassDef not supported")
-def test_ast_ClassDef():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="ClassDef not supported"
+)
+def test_class_def():
+    # ast.ClassDef
+    def f():  # pragma: no cover
         class A:
             pass
+
         return A()
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Delete not supported")
-def test_ast_Delete():
-    def f(a, b):
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="Delete not supported"
+)
+def test_del():
+    # ast.Delete
+    # ast.Del as name ctx
+    def f(a, b):  # pragma: no cover
         del a
         return b
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Raise not supported")
-def test_ast_Raise():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="Raise not supported"
+)
+def test_raise():
+    # ast.Raise
+    def f():  # pragma: no cover
         raise ValueError()
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Try not supported")
-def test_ast_Try():
-    def f(x):
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="Try not supported"
+)
+def test_try_block():
+    # ast.Try
+    # ast.ExceptHandler
+    def f(x):  # pragma: no cover
         try:
-           if x < 0:
-               raise ValueError()
+            if x < 0:
+                raise ValueError()
         except ValueError:
             pass
+        finally:
+            pass
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="With not supported")
-def test_ast_With():
-    def f():
-        with ContestExample():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="With not supported"
+)
+def test_with_statement():
+    # ast.With
+    # ast.withitem
+    def f():  # pragma: no cover
+        with _ContestExample():
             return 0
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
-def test_ast_AsyncFunctionDef():
-    async def f():
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Parser expected FunctionDef, not AsyncFunctionDef",
+)
+def test_async_function():
+    # ast.AsyncFunctionDef
+    async def f():  # pragma: no cover
         pass
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
-def test_ast_Await():
-    async def f():
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Parser expected FunctionDef, not AsyncFunctionDef",
+)
+def test_async_await():
+    # ast.Await
+    async def f():  # pragma: no cover
         async def g():
             pass
+
         await g()
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
-def test_ast_AsyncFor():
-    async def f():
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Parser expected FunctionDef, not AsyncFunctionDef",
+)
+def test_async_for():
+    # ast.AsyncFor
+    async def f():  # pragma: no cover
         async def g():
             yield 0
             yield 1
+
         async for x in g():
             pass
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
-def test_ast_AsyncWith():
-    async def f():
-        async with AsyncContextExample():
+@pytest.mark.xfail(
+    strict=True,
+    raises=AssertionError,
+    reason="Parser expected FunctionDef, not AsyncFunctionDef",
+)
+def test_async_with():
+    # ast.AsyncWith
+    async def f():  # pragma: no cover
+        async with _AsyncContextExample():
             pass
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="DictComp not supported")
-def test_ast_DictComp():
-    def f():
-        return {i : 2 * i for i in range(10)}
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="DictComp not supported"
+)
+def test_dict_comprehension():
+    # ast.DictComp
+    def f():  # pragma: no cover
+        return {i: 2 * i for i in range(10)}
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="GeneratorExp not supported")
-def test_ast_GeneratorExp():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="GeneratorExp not supported"
+)
+def test_generator_expression():
+    # ast.GeneratorExp
+    # ast.comprehension (used in all comprehensions)
+    def f():  # pragma: no cover
         return list(2 * i for i in range(10))
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ListComp not supported")
-def test_ast_ListComp():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="ListComp not supported"
+)
+def test_list_comprehension():
+    # ast.ListComp
+    def f():  # pragma: no cover
         return [2 * i for i in range(10)]
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="SetComp not supported")
-def test_ast_SetComp():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="SetComp not supported"
+)
+def test_set_comprehension():
+    # ast.SetComp
+    def f():  # pragma: no cover
         return {2 * i for i in range(10)}
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Set not supported")
-def test_ast_Set():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="Set not supported"
+)
+def test_set():
+    # ast.Set
+    def f():  # pragma: no cover
         return {1, 2}
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Yield not supported")
-def test_ast_Yield():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="Yield not supported"
+)
+def test_yield():
+    # ast.Yield
+    def f():  # pragma: no cover
         def g():
             yield 0
             yield 1
+
         return list(g())
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="YieldFrom not supported")
-def test_ast_YieldFrom():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="YieldFrom not supported"
+)
+def test_yield_from():
+    # ast.YieldFrom
+    def f():  # pragma: no cover
         def g():
             yield from range(10)
+
         return list(g())
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=NotImplementedError, reason="starred assignement")
-def test_ast_Starred():
-    def f():
+@pytest.mark.xfail(
+    strict=True, raises=NotImplementedError, reason="starred assignement"
+)
+def test_starred():
+    # ast.Starred
+    def f():  # pragma: no cover
         a, *b = range(10)
         return a, b
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="NameExpr not supported")
-def test_ast_NameExpr():
-    def f():
-        (a := 2)
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="NameExpr not supported"
+)
+def test_assignment_expression():
+    # ast.NamedExpr
+    def f(x):  # pragma: no cover
+        if (a := 2) != x:
+            return a
+
     parse(f)
 
 
-@pytest.mark.xfail(raises=MyiaSyntaxError, reason="JoinedStr not supported")
-def test_ast_JoinedStr_FormattedValue():
-    def f(x):
+@pytest.mark.xfail(
+    strict=True, raises=MyiaSyntaxError, reason="JoinedStr not supported"
+)
+def test_formatted_string():
+    # ast.JoinedStr
+    # ast.FormattedValue
+    def f(x):  # pragma: no cover
         return f"value is {x}"
+
     parse(f)
+
+
+# NB: Are these nodes still used ?
+# ast.AugLoad
+# ast.AugStore
+# ast.Param (Python 2 only?)
