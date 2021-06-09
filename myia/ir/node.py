@@ -1,5 +1,7 @@
 """Graph representation."""
 
+import weakref
+
 from myia import basics
 from myia.utils import Named, myia_hrepr_resources
 from myia.utils.info import clone_debug, make_debug
@@ -282,13 +284,15 @@ class Edge:
     Attributes:
       label: The label for the link, can be any object.
       node: The target node.
+      user: The node that uses this Edge.
     """
 
-    __slots__ = ("label", "node")
+    __slots__ = ("label", "node", "_user")
 
     def __init__(self, label, node):
         self.label = label
         self.node = node
+        self._user = None
 
     def clone(self, g, objmap):
         """Make a copy, in the context of a graph clone.
@@ -299,11 +303,22 @@ class Edge:
         """
         return Edge(self.label, self.node.clone(g, objmap))
 
+    @property
+    def user(self):
+        if self._user:
+            return self._user()
+        return None
 
-def _edgemap(edges):
+    @user.setter
+    def user(self, node):
+        self._user = weakref.ref(node)
+
+
+def _edgemap(edges, self):
     res = {}
     for e in edges:
         assert e.label not in res
+        e.user = self
         res[e.label] = e
 
     return res
@@ -324,7 +339,7 @@ class Apply(Node):
     def __init__(self, graph, *edges):
         super().__init__()
         self.graph = graph
-        self.edges = _edgemap(edges)
+        self.edges = _edgemap(edges, self)
 
     def is_apply(self, value=None):
         """See `Node.is_apply`."""
@@ -338,6 +353,7 @@ class Apply(Node):
         """Add an incoming edge to this node."""
         assert label not in self.edges
         e = Edge(label, node)
+        e.user = self
         self.edges[label] = e
 
     def append_input(self, node):
@@ -389,7 +405,7 @@ class Apply(Node):
             return self
         res = Apply(objmap[g])
         objmap[self] = res
-        res.edges = _edgemap(e.clone(g, objmap) for e in self.edges.values())
+        res.edges = _edgemap((e.clone(g, objmap) for e in self.edges.values()), res)
         res._copy_fields(self, objmap)
         return res
 
