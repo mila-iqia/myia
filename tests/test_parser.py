@@ -1,3 +1,5 @@
+import ast
+
 import pytest
 
 from myia.ir.print import str_graph
@@ -1567,3 +1569,206 @@ graph f:while:body(phi_x~4) {
 }
 """
         )
+
+
+class ContestExample:
+    def __enter__(self):
+        print('Enter')
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print('Exit')
+
+
+class AsyncContextExample:
+    async def __aenter__(self):
+        print('Async enter')
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        print('Async exit')
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Import not supported")
+def test_ast_Import():
+    def f():
+        import operator
+        return operator.add(1, 2)
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ImportFrom not supported")
+def test_ast_ImportFrom():
+    def f():
+        from operator import add
+        return add(1, 2)
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ImportFrom not supported")
+def test_ast_alias():
+    def f():
+        from operator import add as addition
+        return addition(1, 2)
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="AugAssign not supported")
+def test_ast_AugAssign():
+    def f(x):
+        a = x
+        a += 2
+        return a
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ClassDef not supported")
+def test_ast_ClassDef():
+    def f():
+        class A:
+            pass
+        return A()
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Delete not supported")
+def test_ast_Delete():
+    def f(a, b):
+        del a
+        return b
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Raise not supported")
+def test_ast_Raise():
+    def f():
+        raise ValueError()
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Try not supported")
+def test_ast_Try():
+    def f(x):
+        try:
+           if x < 0:
+               raise ValueError()
+        except ValueError:
+            pass
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="With not supported")
+def test_ast_With():
+    def f():
+        with ContestExample():
+            return 0
+    parse(f)
+
+
+@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
+def test_ast_AsyncFunctionDef():
+    async def f():
+        pass
+    parse(f)
+
+
+@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
+def test_ast_Await():
+    async def f():
+        async def g():
+            pass
+        await g()
+    parse(f)
+
+
+@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
+def test_ast_AsyncFor():
+    async def f():
+        async def g():
+            yield 0
+            yield 1
+        async for x in g():
+            pass
+    parse(f)
+
+
+@pytest.mark.xfail(raises=AssertionError, reason="Parser expected FunctionDef, not AsyncFunctionDef")
+def test_ast_AsyncWith():
+    async def f():
+        async with AsyncContextExample():
+            pass
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="DictComp not supported")
+def test_ast_DictComp():
+    def f():
+        return {i : 2 * i for i in range(10)}
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="GeneratorExp not supported")
+def test_ast_GeneratorExp():
+    def f():
+        return list(2 * i for i in range(10))
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="ListComp not supported")
+def test_ast_ListComp():
+    def f():
+        return [2 * i for i in range(10)]
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="SetComp not supported")
+def test_ast_SetComp():
+    def f():
+        return {2 * i for i in range(10)}
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Set not supported")
+def test_ast_Set():
+    def f():
+        return {1, 2}
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="Yield not supported")
+def test_ast_Yield():
+    def f():
+        def g():
+            yield 0
+            yield 1
+        return list(g())
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="YieldFrom not supported")
+def test_ast_YieldFrom():
+    def f():
+        def g():
+            yield from range(10)
+        return list(g())
+    parse(f)
+
+
+@pytest.mark.xfail(raises=NotImplementedError, reason="starred assignement")
+def test_ast_Starred():
+    def f():
+        a, *b = range(10)
+        return a, b
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="NameExpr not supported")
+def test_ast_NameExpr():
+    def f():
+        (a := 2)
+    parse(f)
+
+
+@pytest.mark.xfail(raises=MyiaSyntaxError, reason="JoinedStr not supported")
+def test_ast_JoinedStr_FormattedValue():
+    def f(x):
+        return f"value is {x}"
+    parse(f)
