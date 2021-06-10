@@ -102,13 +102,6 @@ class Graph:
         res.debug = clone_debug(self.debug, objmap)
         return res
 
-    def has_ancestor(self, ancestor):
-        """Return True if graph has given ancestor."""
-        assert ancestor
-        return self.parent and (
-            self.parent is ancestor or self.parent.has_ancestor(ancestor)
-        )
-
     def replace_node(self, node, lbl, repl, *, recursive=True):
         """Replace a node by another in this graph.
 
@@ -289,7 +282,6 @@ class Edge:
     def user(self):
         if self._user:
             return self._user()
-        return None
 
     @user.setter
     def user(self, node):
