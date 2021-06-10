@@ -109,29 +109,6 @@ class Graph:
             self.parent is ancestor or self.parent.has_ancestor(ancestor)
         )
 
-    def replace(self, mapping, mapping_seq={}, recursive=True):
-        """Replace nodes in the graph.
-
-        This will recursively replace `node` with `mapping[node]` in
-        the graph if `node` is in `mapping`.
-
-        If `node` comes from a sequence edge, it will first look in
-        `mapping_seq` for a replacement.
-
-        If `recursive` is True, it will also replace nodes in the
-        children of this graph.
-
-        A node can be in either mapping or mapping_seq or both.
-        """
-        for node, repl in mapping_seq.items():
-            if repl is None:
-                self.delete_seq(node)
-            else:
-                self.replace_node(node, SEQ, repl, recursive=recursive)
-
-        for node, repl in mapping.items():
-            self.replace_node(node, None, repl, recursive=recursive)
-
     def replace_node(self, node, lbl, repl, *, recursive=True):
         """Replace a node by another in this graph.
 

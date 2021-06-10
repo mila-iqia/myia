@@ -1,4 +1,4 @@
-from myia.ir.graph_utils import get_node_users, toposort
+from myia.ir.graph_utils import toposort
 from myia.ir.print import NodeLabeler
 from myia.parser import parse
 from myia.utils.info import enable_debug
@@ -58,17 +58,3 @@ function myia.basics.return_
             for inp in n.inputs:
                 assert inp in seen
         seen.add(n)
-
-
-def test_node_users_factorial():
-    nodecache = NodeLabeler()
-    g = parse_function(factorial)
-    (param_n,) = g.parameters
-    # Parameter n should be used twice: to test if n < 2, and passed to result of user_switch.
-    assert (
-        _str_list_nodes(nodecache, get_node_users(param_n))
-        == """
-#1 = #2(n)
-#3 = _operator.lt(n, 2)
-    """.strip()
-    )

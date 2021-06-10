@@ -38,35 +38,3 @@ def toposort(graph: Graph, reverse=False):
     if not reverse:
         output.reverse()
     return output
-
-
-def get_node_users(node, graph=None, recursive=True):
-    """Get all apply nodes that use given node as function or inputs.
-
-    :param node: node to search users
-    :param graph: graph where to search users.
-        If None, use node graph (node must not be a constant)
-    :param recursive: if True, recursively look for users in graph closures
-    :return: list of node users
-    """
-    if graph is None:
-        assert (
-            not node.is_constant()
-        ), "A graph must be specified to find constant node users."
-        graph = node.graph
-    users = []
-    seen_graphs = set()
-    todo_graphs = deque([graph])
-    while todo_graphs:
-        g = todo_graphs.popleft()
-        if g not in seen_graphs:
-            seen_graphs.add(g)
-            # Iterate nodes in raw order to speed-up execution
-            for candidate in toposort(g, reverse=True):
-                if isinstance(candidate, Apply) and (
-                    node is candidate.fn or node in candidate.inputs
-                ):
-                    users.append(candidate)
-                elif recursive and candidate.is_constant_graph():
-                    todo_graphs.append(candidate.value)
-    return users
