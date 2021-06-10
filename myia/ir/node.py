@@ -270,6 +270,7 @@ class Edge:
 
     @property
     def node(self):
+        """The target node."""
         return self._node
 
     @node.setter
@@ -280,6 +281,7 @@ class Edge:
 
     @property
     def user(self):
+        """Returns the node that has this edge in its edges."""
         if self._user:
             return self._user()
 
