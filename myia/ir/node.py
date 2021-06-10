@@ -123,46 +123,39 @@ class Graph:
 
         A node can be in either mapping or mapping_seq or both.
         """
-        self._replace(mapping, mapping_seq, recursive, self, set())
+        for node, repl in mapping_seq.items():
+            if repl is None:
+                self.delete_seq(node)
+            else:
+                self.replace_node(node, SEQ, repl, recursive=recursive)
 
-    def _replace(
-        self, mapping, mapping_seq, recursive, root_graph, seen_graphs
-    ):
-        if self in seen_graphs:
-            return
-        seen_graphs.add(self)
-        todo = [self.return_]
-        seen = set()
-        while todo:
-            node = todo.pop()
-            if node in seen:
-                continue
-            seen.add(node)
-            for edge in list(node.edges.values()):
-                if edge.label is SEQ and edge.node in mapping_seq:
-                    repl = mapping_seq[edge.node]
-                    if repl is None:
-                        edge.node = None
-                        del node.edges[SEQ]
-                    else:
-                        edge.node = mapping_seq[edge.node]
-                elif edge.node in mapping:
-                    edge.node = mapping[edge.node]
-                if edge.node:
-                    if edge.node.is_apply():
-                        todo.append(edge.node)
-                    elif (
-                        recursive
-                        and edge.node.is_constant_graph()
-                        and edge.node.value.has_ancestor(root_graph)
-                    ):
-                        edge.node.value._replace(
-                            mapping,
-                            mapping_seq,
-                            recursive,
-                            root_graph,
-                            seen_graphs,
-                        )
+        for node, repl in mapping.items():
+            self.replace_node(node, None, repl, recursive=recursive)
+
+    def replace_node(self, node, lbl, repl, *, recursive=True):
+        """Replace a node by another in this graph.
+
+        This will replace every use of `node` with label `lbl` in this
+        graph (and subgraphs if `recursive` is `True`) by `repl`.
+
+        If `lbl` is None then this will replace all uses.
+        """
+        for use in list(node.users):
+            if recursive or use.user.graph is self:
+                if lbl is None or use.label == lbl:
+                    use.node = repl
+
+    def delete_seq(self, node):
+        """Remove a node from all sequence chains."""
+        fwd = node.edges.get(SEQ, None)
+        if fwd is not None:
+            fwd = fwd.node
+        for use in list(node.users):
+            if use.label is SEQ:
+                if fwd is None:
+                    del use.user.edges[SEQ]
+                else:
+                    use.node = fwd
 
     def add_debug(self, **kwargs):
         """Add debug information.
@@ -218,11 +211,12 @@ class Node:
       annotation: Defined type for this node, optional
     """
 
-    __slots__ = ("abstract", "annotation", "debug", "__weakref__")
+    __slots__ = ("abstract", "annotation", "users", "debug", "__weakref__")
 
     def __init__(self):
         self.abstract = None
         self.annotation = None
+        self.users = weakref.WeakSet()
         self.debug = make_debug(obj=self)
 
     def is_apply(self, value=None):
@@ -287,11 +281,12 @@ class Edge:
       user: The node that uses this Edge.
     """
 
-    __slots__ = ("label", "node", "_user")
+    __slots__ = ("label", "_node", "_user", "__weakref__")
 
     def __init__(self, label, node):
         self.label = label
-        self.node = node
+        self._node = node
+        self._node.users.add(self)
         self._user = None
 
     def clone(self, g, objmap):
@@ -302,6 +297,16 @@ class Edge:
           objmap: Map of cloned objets
         """
         return Edge(self.label, self.node.clone(g, objmap))
+
+    @property
+    def node(self):
+        return self._node
+
+    @node.setter
+    def node(self, node):
+        self._node.users.remove(self)
+        self._node = node
+        self._node.users.add(self)
 
     @property
     def user(self):
@@ -405,7 +410,9 @@ class Apply(Node):
             return self
         res = Apply(objmap[g])
         objmap[self] = res
-        res.edges = _edgemap((e.clone(g, objmap) for e in self.edges.values()), res)
+        res.edges = _edgemap(
+            (e.clone(g, objmap) for e in self.edges.values()), res
+        )
         res._copy_fields(self, objmap)
         return res
 

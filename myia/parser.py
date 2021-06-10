@@ -416,48 +416,42 @@ class Parser:
                         f"no binding for variable '{err}' found"
                     )  # pragma: no cover
 
-    def resolve_read(
-        self, repl, repl_seq, ld, function, block, local_namespace
-    ):
+
+    def resolve_read(self, ld, function, block, local_namespace):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
         st = ld.edges["prevwrite"].node if "prevwrite" in ld.edges else None
-        if var in function.variables_global:
+        if var in (function.variables_root | function.variables_free):
+            if var not in local_namespace:
+                n = ld.graph.apply(basics.resolve, self.global_namespace, var)
+            else:
+                n = ld.graph.apply(
+                    basics.global_universe_getitem, local_namespace[var]
+                )
+            if SEQ in ld.edges:
+                n.add_edge(SEQ, ld.edges[SEQ].node)
+            ld.graph.replace_node(ld, None, n)
+        elif var in function.variables_local_closure:
+            ld.graph.delete_seq(ld)
+            if st is None:
+                ld.graph.replace_node(ld, None, local_namespace[var])
+            else:
+                ld.graph.replace_node(ld, None, st.edges[1].node)
+        elif var in function.variables_global:
             n = ld.graph.apply(basics.resolve, self.global_namespace, var)
             if SEQ in ld.edges:
-                n.edges[SEQ] = ld.edges[SEQ]
-            repl[ld] = n
-        elif var in (function.variables_root | function.variables_free):
-            n = ld.graph.apply(
-                basics.global_universe_getitem, local_namespace[var]
-            )
-            if SEQ in ld.edges:
-                n.edges[SEQ] = ld.edges[SEQ]
-            repl[ld] = n
-        elif var in function.variables_local_closure:
-            if st is None:
-                repl[ld] = local_namespace[var]
-            else:
-                assert st is not None
-                repl[ld] = st.edges[1].node
-            if SEQ in ld.edges:
-                repl_seq[ld] = ld.edges[SEQ].node
-            else:
-                repl_seq[ld] = None
+                n.add_edge(SEQ, ld.edges[SEQ].node)
+            ld.graph.replace_node(ld, None, n)
         elif var in function.variables_local:
             assert st is not None
-            repl[ld] = st.edges[1].node
-            # There should always be at least one store before this load
-            assert SEQ in ld.edges
-            repl_seq[ld] = ld.edges[SEQ].node
+            ld.graph.delete_seq(ld)
+            ld.graph.replace_node(ld, None, st.edges[1].node)
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"
             )  # pragma: no cover
 
-    def resolve_write(
-        self, repl, repl_seq, st, function, block, local_namespace
-    ):
+    def resolve_write(self, st, function, block, local_namespace):
         """Resolve a 'store' operation with pre-collected information."""
         var = st.edges[0].node.value
         value = st.edges[1].node
@@ -466,17 +460,14 @@ class Parser:
                 basics.global_universe_setitem, local_namespace[var], value
             )
             if SEQ in st.edges:
-                n.edges[SEQ] = st.edges[SEQ]
-            repl[st] = n
+                n.add_edge(SEQ, st.edges[SEQ].node)
+            st.graph.replace_node(st, None, n)
         elif var in function.variables_global:
             raise NotImplementedError("attempt to write to a global variable")
         elif var in function.variables_local:
             if get_debug():
                 st.edges[1].node.debug.name = st.edges[0].node.value
-            if SEQ in st.edges:
-                repl_seq[st] = st.edges[SEQ].node
-            else:
-                repl_seq[st] = None
+            st.graph.delete_seq(st)
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"
@@ -557,8 +548,6 @@ class Parser:
             for block in function.blocks:
                 if not block.used:
                     continue
-                repl = {}
-                repl_seq = {}
                 local_namespace = namespace.copy()
                 local_namespace.update(block.phis)
 
@@ -566,8 +555,6 @@ class Parser:
                 for var, items in block.variables_read.items():
                     for item in items:
                         self.resolve_read(
-                            repl,
-                            repl_seq,
                             item,
                             function,
                             block,
@@ -578,35 +565,11 @@ class Parser:
                 for var, items in block.variables_written.items():
                     for item in items:
                         self.resolve_write(
-                            repl,
-                            repl_seq,
                             item,
                             function,
                             block,
                             local_namespace,
                         )
-
-                # make sure to "bake in" top level chain replacements
-                # replacements inside the subgraphs are handled by replace
-                for k in list(repl_seq):
-                    n = repl_seq[k]
-                    while n in repl_seq or n in repl:
-                        if n in repl_seq:
-                            n = repl_seq[n]
-                        else:
-                            n = repl[n]
-                    repl_seq[k] = n
-
-                for k in list(repl):
-                    n = repl[k]
-                    while n in repl:  # pragma: no cover
-                        assert (
-                            False
-                        ), "Please report the code that triggered this"
-                        n = repl[n]
-                    repl[k] = n
-
-                block.graph.replace(repl, repl_seq)
 
     def _process_args(self, block, function_block, args):
         """Process argument definition.
