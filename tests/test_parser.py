@@ -5,6 +5,8 @@ from myia.parser import MyiaSyntaxError, parse
 from myia.parser_opt import apply_parser_opts
 from myia.utils.info import enable_debug
 
+from .common import predictable_placeholders
+
 
 def test_same():
     def f():  # pragma: no cover
@@ -118,26 +120,38 @@ def test_nonlocal():
         g()
         return x
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f), allow_cycles=True)
             == """graph f() {
-  #1 = type(1)
-  x = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x, 1)
-  #3 = g()
-  #4 = myia.basics.global_universe_getitem(x)
-  return #4
+  x = myia.basics.make_handle(??1)
+  #1 = myia.basics.global_universe_setitem(x, 1)
+  #2 = g()
+  #3 = myia.basics.global_universe_getitem(x)
+  return #3
 }
 
 graph g() {
-  #5 = myia.basics.global_universe_getitem(x)
-  #6 = _operator.add(#5, 1)
-  #7 = myia.basics.global_universe_setitem(x, #6)
+  #4 = myia.basics.global_universe_getitem(x)
+  #5 = _operator.add(#4, 1)
+  #6 = myia.basics.global_universe_setitem(x, #5)
   return None
 }
 """
         )
+
+
+@pytest.mark.xfail
+def test_root_read_before_write():
+    def f():
+        def g(x):
+            return x + y
+
+        g(1)
+        y = 2
+
+    with pytest.raises(NameError):
+        parse(f)
 
 
 def test_entry_defaults():
@@ -209,22 +223,21 @@ def test_self_recursion():
 
         return g()
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = type(g)
-  g~2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(g~2, g)
-  #3 = myia.basics.global_universe_getitem(g~2)
-  #4 = #3()
-  return #4
+  g = myia.basics.make_handle(??1)
+  #1 = myia.basics.global_universe_setitem(g, g~2)
+  #2 = myia.basics.global_universe_getitem(g)
+  #3 = #2()
+  return #3
 }
 
-graph g() {
-  #5 = myia.basics.global_universe_getitem(g~2)
-  #6 = #5()
-  return #6
+graph g~2() {
+  #4 = myia.basics.global_universe_getitem(g)
+  #5 = #4()
+  return #5
 }
 """
         )
@@ -262,27 +275,25 @@ def test_no_return():
 
         z = g(0)  # noqa: F841
 
-    with enable_debug():
+    with enable_debug(), predictable_placeholders():
         assert (
             str_graph(parse(f))
             == """graph f(x) {
-  #1 = type(x)
-  x~2 = myia.basics.make_handle(#1)
-  #2 = myia.basics.global_universe_setitem(x~2, x)
-  #3 = myia.basics.global_universe_getitem(x~2)
-  #4 = _operator.mul(2, #3)
-  #5 = type(#4)
-  y = myia.basics.make_handle(#5)
-  #6 = myia.basics.global_universe_setitem(y, #4)
+  y = myia.basics.make_handle(??2)
+  x~2 = myia.basics.make_handle(??1)
+  #1 = myia.basics.global_universe_setitem(x~2, x)
+  #2 = myia.basics.global_universe_getitem(x~2)
+  #3 = _operator.mul(2, #2)
+  #4 = myia.basics.global_universe_setitem(y, #3)
   z = g(0)
   return None
 }
 
 graph g(i) {
-  #7 = myia.basics.global_universe_getitem(x~2)
-  #8 = _operator.add(i, #7)
-  #9 = myia.basics.global_universe_getitem(y)
-  j = _operator.add(#8, #9)
+  #5 = myia.basics.global_universe_getitem(x~2)
+  #6 = _operator.add(i, #5)
+  #7 = myia.basics.global_universe_getitem(y)
+  j = _operator.add(#6, #7)
   return None
 }
 """
@@ -1881,3 +1892,217 @@ def test_formatted_string():
 # ast.AugLoad
 # ast.AugStore
 # ast.Param (Python 2 only?)
+
+
+def test_branch_defined():
+    def f(b):  # pragma: no cover
+        def g():
+            return a
+
+        if b:
+            a = 1
+        else:
+            a = 2
+        return g()
+
+    with enable_debug(), predictable_placeholders():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b) {
+  a = myia.basics.make_handle(??1)
+  #1 = _operator.truth(b)
+  #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
+  #3 = #2(g)
+  return #3
+}
+
+graph f:if_false(phi_g) {
+  #4 = myia.basics.global_universe_setitem(a, 2)
+  #5 = f:if_after(phi_g)
+  return #5
+}
+
+graph f:if_after(phi_g~2) {
+  #6 = phi_g~2()
+  return #6
+}
+
+graph f:if_true(phi_g~3) {
+  #7 = myia.basics.global_universe_setitem(a, 1)
+  #8 = f:if_after(phi_g~3)
+  return #8
+}
+
+graph g() {
+  #9 = myia.basics.global_universe_getitem(a)
+  return #9
+}
+"""
+        )
+
+
+def test_branch_defined2():
+    def f(b, x, y):  # pragma: no cover
+        def g():
+            return a
+
+        if b:
+            a = x - y
+        else:
+            a = x + y
+        return g()
+
+    with enable_debug(), predictable_placeholders():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b, x, y) {
+  a = myia.basics.make_handle(??1)
+  #1 = _operator.truth(b)
+  #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
+  #3 = #2(x, y, g)
+  return #3
+}
+
+graph f:if_false(phi_x, phi_y, phi_g) {
+  #4 = _operator.add(phi_x, phi_y)
+  #5 = myia.basics.global_universe_setitem(a, #4)
+  #6 = f:if_after(phi_g)
+  return #6
+}
+
+graph f:if_after(phi_g~2) {
+  #7 = phi_g~2()
+  return #7
+}
+
+graph f:if_true(phi_x~2, phi_y~2, phi_g~3) {
+  #8 = _operator.sub(phi_x~2, phi_y~2)
+  #9 = myia.basics.global_universe_setitem(a, #8)
+  #10 = f:if_after(phi_g~3)
+  return #10
+}
+
+graph g() {
+  #11 = myia.basics.global_universe_getitem(a)
+  return #11
+}
+"""
+        )
+
+
+def test_branch_defined3():
+    def f(b, c):  # pragma: no cover
+        def g():
+            return a
+
+        if b:
+            if c:
+                a = 2
+            else:
+                a = 3
+        else:
+            if c:
+                a = 1
+            else:
+                a = 0
+        return g()
+
+    with enable_debug(), predictable_placeholders():
+        assert (
+            str_graph(parse(f))
+            == """graph f(b, c) {
+  a = myia.basics.make_handle(??1)
+  #1 = _operator.truth(b)
+  #2 = myia.basics.user_switch(#1, f:if_true, f:if_false)
+  #3 = #2(c, g)
+  return #3
+}
+
+graph f:if_false(phi_c, phi_g) {
+  #4 = _operator.truth(phi_c)
+  #5 = myia.basics.user_switch(#4, f:if_false:if_true, f:if_false:if_false)
+  #6 = #5(phi_g)
+  return #6
+}
+
+graph f:if_false:if_false(phi_g~2) {
+  #7 = myia.basics.global_universe_setitem(a, 0)
+  #8 = f:if_false:if_after(phi_g~2)
+  return #8
+}
+
+graph f:if_false:if_after(phi_g~3) {
+  #9 = f:if_after(phi_g~3)
+  return #9
+}
+
+graph f:if_after(phi_g~4) {
+  #10 = phi_g~4()
+  return #10
+}
+
+graph f:if_false:if_true(phi_g~5) {
+  #11 = myia.basics.global_universe_setitem(a, 1)
+  #12 = f:if_false:if_after(phi_g~5)
+  return #12
+}
+
+graph f:if_true(phi_c~2, phi_g~6) {
+  #13 = _operator.truth(phi_c~2)
+  #14 = myia.basics.user_switch(#13, f:if_true:if_true, f:if_true:if_false)
+  #15 = #14(phi_g~6)
+  return #15
+}
+
+graph f:if_true:if_false(phi_g~7) {
+  #16 = myia.basics.global_universe_setitem(a, 3)
+  #17 = f:if_true:if_after(phi_g~7)
+  return #17
+}
+
+graph f:if_true:if_after(phi_g~8) {
+  #18 = f:if_after(phi_g~8)
+  return #18
+}
+
+graph f:if_true:if_true(phi_g~9) {
+  #19 = myia.basics.global_universe_setitem(a, 2)
+  #20 = f:if_true:if_after(phi_g~9)
+  return #20
+}
+
+graph g() {
+  #21 = myia.basics.global_universe_getitem(a)
+  return #21
+}
+"""
+        )
+
+
+@pytest.mark.xfail()
+def test_cursed_function():
+    def f(b):  # pragma: no cover
+        def g(b):
+            def h():
+                return a
+
+            if b:
+                a = 1
+            return h()
+
+        return g(b)
+
+    with pytest.raises(NameError):
+        parse(f)
+
+
+def test_cursed_function2():
+    def f(b):  # pragma: no cover
+        if b:
+            a = 1
+        else:
+            return a
+        return 0
+
+    with pytest.raises(UnboundLocalError):
+        parse(f)

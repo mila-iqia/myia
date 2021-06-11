@@ -16,7 +16,6 @@ from myia.utils import Named
 from myia.utils.directed_graph import DirectedGraph
 
 ASSIGN = Named("ASSIGN")
-TYPEOF = type
 MAKE_HANDLE = basics.make_handle
 UNIVERSE_SETITEM = basics.global_universe_setitem
 UNIVERSE_GETITEM = basics.global_universe_getitem
@@ -61,13 +60,7 @@ class Optimizer:
 
     def _optimize_universe_setitem(self, dg: DirectedGraph):
         """Optimize `universe_setitem` nodes for given directed graph."""
-        nodes = self._collect_apply_nodes(
-            dg, TYPEOF, MAKE_HANDLE, UNIVERSE_SETITEM
-        )
-
-        # Skip all `typeof` nodes.
-        for n_typeof in nodes[TYPEOF]:
-            self.skip.setdefault(dg.data, set()).add(n_typeof)
+        nodes = self._collect_apply_nodes(dg, MAKE_HANDLE, UNIVERSE_SETITEM)
 
         # SKip all `make_handle` nodes.
         for n_make_handle in nodes[MAKE_HANDLE]:

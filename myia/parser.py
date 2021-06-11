@@ -7,6 +7,7 @@ import textwrap
 from typing import NamedTuple
 
 from . import basics
+from .abstract.data import Placeholder
 from .ir import Apply, Constant, Graph, Parameter
 from .ir.node import SEQ
 from .utils import ModuleNamespace, Named
@@ -129,6 +130,11 @@ class _Jump(NamedTuple):
     done: set
 
 
+def is_cond(pred):
+    """Returns True if the predecessor is a conditional jump."""
+    return isinstance(pred, _CondJump)
+
+
 class Block:
     """This is used to represent a basic block in a python function."""
 
@@ -143,6 +149,7 @@ class Block:
         self.preds = []
         self.phis = dict()
 
+        self.first_apply = None
         self.last_apply = None
 
         self.variables_written = {}
@@ -163,7 +170,8 @@ class Block:
         """
         ld = self.apply(LOAD, varnum)
         st = self.variables_written.get(varnum, [None])[-1]
-        ld.add_edge("prevwrite", st)
+        if st is not None:
+            ld.add_edge("prevwrite", st)
         self.variables_read.setdefault(varnum, []).append(ld)
         if varnum not in self.function.variables_local:
             self.function.variables_free.add(varnum)
@@ -178,14 +186,14 @@ class Block:
         st = self.apply(STORE, varnum, node)
         self.variables_written.setdefault(varnum, []).append(st)
         self.function.variables_local.add(varnum)
-        self.function.variables_first_write.setdefault(varnum, st)
 
     def link_seq(self, node):
         """Append a node in the sequence chain."""
         if self.last_apply is not None:
             node.add_edge(SEQ, self.last_apply)
+        if self.first_apply is None:
+            self.first_apply = node
         self.last_apply = node
-        return node
 
     def cond(self, cond, true, false):
         """End the block with a conditional jump to one of two blocks."""
@@ -249,7 +257,6 @@ class Function:
         self.variables_local = set()
 
         self.variables_nonlocal = set()
-        self.variables_first_write = dict()
 
     def new_block(self, parent):
         """Create a new block in this function.
@@ -322,9 +329,6 @@ class Parser:
         self.analyze(functions)
         self.resolve(functions)
 
-        # Check for no return
-        # This does a dfs and finds graphs with None for return_
-
         return main_block.graph
 
     def all_functions(self, main_function):
@@ -380,24 +384,53 @@ class Parser:
                 for var, reads in block.variables_read.items():
                     if (
                         var in function.variables_local
-                        and reads[0].edges["prevwrite"].node is None
+                        and "prevwrite" not in reads[0].edges
                     ):
                         block.phis[var] = None
                         function.variables_local_closure.add(var)
+
+            # Figure out the globals and mark them for each function
+            entry = functions[0]
+            assert entry.parent is None
+            globals = entry.variables_free
+            entry.variables_global |= globals
+            entry.variables_free = set()
+            errs = function.variables_nonlocal & globals
+            for err in errs:
+                # This should never show up in practice
+                # since python will error out
+                raise SyntaxError(
+                    f"no binding for variable '{err}' found"
+                )  # pragma: no cover
+
+            for function in functions[1:]:
+                # This will include globals that aren't used in the function,
+                # but it only affect name resolution.
+                function.variables_global |= function.variables_free & globals
+                function.variables_free -= globals
+                errs = function.variables_nonlocal & globals
+                for err in errs:
+                    # This should never show up in practice
+                    # since python will error out
+                    raise SyntaxError(
+                        f"no binding for variable '{err}' found"
+                    )  # pragma: no cover
 
     def resolve_read(
         self, repl, repl_seq, ld, function, block, local_namespace
     ):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
-        st = ld.edges["prevwrite"].node
-        if var in (function.variables_root | function.variables_free):
-            if var not in local_namespace:
-                n = ld.graph.apply(basics.resolve, self.global_namespace, var)
-            else:
-                n = ld.graph.apply(
-                    basics.global_universe_getitem, local_namespace[var]
-                )
+        st = ld.edges["prevwrite"].node if "prevwrite" in ld.edges else None
+        if var in function.variables_global:
+            n = ld.graph.apply(basics.resolve, self.global_namespace, var)
+            if SEQ in ld.edges:
+                n.edges[SEQ] = ld.edges[SEQ]
+            repl[ld] = n
+        elif var in (function.variables_root | function.variables_free):
+            n = ld.graph.apply(
+                basics.global_universe_getitem, local_namespace[var]
+            )
             if SEQ in ld.edges:
                 n.edges[SEQ] = ld.edges[SEQ]
             repl[ld] = n
@@ -405,19 +438,14 @@ class Parser:
             if st is None:
                 repl[ld] = local_namespace[var]
             else:
-                assert st.is_apply()
+                assert st is not None
                 repl[ld] = st.edges[1].node
             if SEQ in ld.edges:
                 repl_seq[ld] = ld.edges[SEQ].node
             else:
                 repl_seq[ld] = None
-        elif var in function.variables_global:
-            n = ld.graph.apply(basics.resolve, self.global_namespace, var)
-            if SEQ in ld.edges:
-                n.edges[SEQ] = ld.edges[SEQ]
-            repl[ld] = n
         elif var in function.variables_local:
-            assert st.is_apply()
+            assert st is not None
             repl[ld] = st.edges[1].node
             # There should always be at least one store before this load
             assert SEQ in ld.edges
@@ -466,6 +494,14 @@ class Parser:
         if val is not None:
             return val
 
+        if block is block.function.initial_block:
+            # This can happen if a variable is defined in a branch and
+            # referred to in the other
+            # See tests/test_parser.py::test_cursed_function2 for an example.
+            raise UnboundLocalError(
+                f"local variable '{phi}' referrenced before assignment"
+            )
+
         # Add an argument for the value of the phi
         block.phis[phi] = block.graph.add_parameter("phi_" + phi)
 
@@ -479,7 +515,7 @@ class Parser:
             if phi not in pred.done:
                 pred.jump.append_input(val)
                 pred.done.add(phi)
-            if isinstance(pred, _CondJump):
+            if is_cond(pred):
                 if pred.true.phis.get(phi, None) is None:
                     p = pred.true.graph.add_parameter("phi_" + phi)
                     pred.true.phis[phi] = p
@@ -496,20 +532,18 @@ class Parser:
         """
         namespace = {}
         for function in functions:
-
-            errs = function.variables_nonlocal - namespace.keys()
-            for err in errs:
-                # This should never show up in practice
-                # since python will error out
-                raise SyntaxError(
-                    f"no binding for variable '{err}' found"
-                )  # pragma: no cover
-
-            for var in function.variables_root:
-                st = function.variables_first_write[var]
-                t = st.graph.apply(type, st.edges[1].node)
-                with debug_inherit(name=st.edges[0].node.value):
-                    namespace[var] = st.graph.apply(basics.make_handle, t)
+            # We create all the handles in the initial block of the function
+            # to avoid closure resolution issues
+            handle_block = function.initial_block
+            for var in sorted(function.variables_root):
+                with debug_inherit(name=var):
+                    handle = handle_block.graph.apply(
+                        basics.make_handle, Constant(Placeholder())
+                    )
+                namespace[var] = handle
+                # Prepend the make_handle to the seq chain
+                handle_block.first_apply.add_edge(SEQ, handle)
+                handle_block.first_apply = handle
 
             for block in function.blocks:
                 if not block.used:

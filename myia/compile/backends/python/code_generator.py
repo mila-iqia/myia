@@ -8,6 +8,7 @@ from collections import Counter
 from ovld.core import _Ovld
 
 from myia import basics
+from myia.abstract.data import Placeholder
 from myia.compile.backends.python.optimizer import ASSIGN
 from myia.ir import Constant, NodeLabeler
 from myia.utils.directed_graph import DirectedGraph
@@ -31,6 +32,8 @@ class PythonGenLabeler(NodeLabeler):
     def describe_object(self, node):
         """Describe an object by value."""
         if isinstance(node, Constant) and not node.is_constant_graph():
+            if isinstance(node.value, Placeholder):
+                return "None"
             return str(node.value)
 
 
