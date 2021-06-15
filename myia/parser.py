@@ -420,13 +420,16 @@ class Parser:
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
         st = ld.edges["prevwrite"].node if "prevwrite" in ld.edges else None
-        if var in (function.variables_root | function.variables_free):
-            if var not in local_namespace:
-                n = ld.graph.apply(basics.resolve, self.global_namespace, var)
-            else:
-                n = ld.graph.apply(
-                    basics.global_universe_getitem, local_namespace[var]
-                )
+        if var in function.variables_global:
+            n = ld.graph.apply(basics.resolve, self.global_namespace, var)
+            if SEQ in ld.edges:
+                n.add_edge(SEQ, ld.edges[SEQ].node)
+                del ld.edges[SEQ]
+            ld.graph.replace_node(ld, None, n)
+        elif var in (function.variables_root | function.variables_free):
+            n = ld.graph.apply(
+                basics.global_universe_getitem, local_namespace[var]
+            )
             if SEQ in ld.edges:
                 n.add_edge(SEQ, ld.edges[SEQ].node)
                 del ld.edges[SEQ]
@@ -437,12 +440,6 @@ class Parser:
                 ld.graph.replace_node(ld, None, local_namespace[var])
             else:
                 ld.graph.replace_node(ld, None, st.edges[1].node)
-        elif var in function.variables_global:
-            n = ld.graph.apply(basics.resolve, self.global_namespace, var)
-            if SEQ in ld.edges:
-                n.add_edge(SEQ, ld.edges[SEQ].node)
-                del ld.edges[SEQ]
-            ld.graph.replace_node(ld, None, n)
         elif var in function.variables_local:
             assert st is not None
             ld.graph.delete_seq(ld)
