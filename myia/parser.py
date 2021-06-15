@@ -416,7 +416,6 @@ class Parser:
                         f"no binding for variable '{err}' found"
                     )  # pragma: no cover
 
-
     def resolve_read(self, ld, function, block, local_namespace):
         """Resolve a 'load' operation with pre-collected information."""
         var = ld.edges[0].node.value
@@ -430,6 +429,7 @@ class Parser:
                 )
             if SEQ in ld.edges:
                 n.add_edge(SEQ, ld.edges[SEQ].node)
+                del ld.edges[SEQ]
             ld.graph.replace_node(ld, None, n)
         elif var in function.variables_local_closure:
             ld.graph.delete_seq(ld)
@@ -441,6 +441,7 @@ class Parser:
             n = ld.graph.apply(basics.resolve, self.global_namespace, var)
             if SEQ in ld.edges:
                 n.add_edge(SEQ, ld.edges[SEQ].node)
+                del ld.edges[SEQ]
             ld.graph.replace_node(ld, None, n)
         elif var in function.variables_local:
             assert st is not None
@@ -461,6 +462,7 @@ class Parser:
             )
             if SEQ in st.edges:
                 n.add_edge(SEQ, st.edges[SEQ].node)
+                del st.edges[SEQ]
             st.graph.replace_node(st, None, n)
         elif var in function.variables_global:
             raise NotImplementedError("attempt to write to a global variable")

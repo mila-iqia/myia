@@ -7,7 +7,7 @@ from myia.basics import (
     make_handle,
 )
 from myia.ir.graph_utils import toposort
-from myia.ir.node import Graph
+from myia.ir.node import SEQ, Graph
 
 
 def remove_useless_universe_getitem(g: Graph):
@@ -36,6 +36,8 @@ def remove_useless_universe_getitem(g: Graph):
             nodes_getitem = []
             for use in n_make_handle.users:
                 user = use.user
+                if use.label is SEQ:
+                    continue
                 if user.is_apply(global_universe_setitem):
                     nodes_setitem.append(user)
                 else:
