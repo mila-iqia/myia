@@ -290,11 +290,11 @@ class Edge:
         self._user = weakref.ref(node)
 
 
-def _edgemap(edges, self):
+def _edgemap(edges, node):
     res = {}
     for e in edges:
         assert e.label not in res
-        e.user = self
+        e.user = node
         res[e.label] = e
 
     return res
