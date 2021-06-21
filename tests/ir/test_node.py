@@ -150,9 +150,8 @@ def test_graph_replace():
     a3.add_edge(SEQ, a2)
     g.output = a3
 
-    r = {a: p}
-    r_s = {a: None}
-    g.replace(r, r_s)
+    g.delete_seq(a)
+    g.replace_node(a, None, p)
 
     assert SEQ not in g.output.edges[SEQ].node.edges
     assert g.output.edges[1].node is p
@@ -171,9 +170,8 @@ def test_graph_replace2():
 
     b = g.apply("make_int", p)
 
-    r = {a: b}
-    r_s = {a2: b}
-    g.replace(r, r_s)
+    g.replace_node(a2, SEQ, b)
+    g.replace_node(a, None, b)
 
     assert g.output.edges[SEQ].node is b
     assert g.output.edges[1].node is b
@@ -189,9 +187,8 @@ def test_graph_replace3():
     g.output = g.apply(g2)
     g.output.add_edge(SEQ, a)
 
-    r = {a: p}
-    r_s = {a: None}
-    g.replace(r, r_s)
+    g.delete_seq(a)
+    g.replace_node(a, None, p)
 
     assert g.output.fn.value.output.edges[1].node is p
 

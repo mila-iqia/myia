@@ -1,5 +1,7 @@
 """Graph representation."""
 
+import weakref
+
 from myia import basics
 from myia.utils import Named, myia_hrepr_resources
 from myia.utils.info import clone_debug, make_debug
@@ -100,67 +102,30 @@ class Graph:
         res.debug = clone_debug(self.debug, objmap)
         return res
 
-    def has_ancestor(self, ancestor):
-        """Return True if graph has given ancestor."""
-        assert ancestor
-        return self.parent and (
-            self.parent is ancestor or self.parent.has_ancestor(ancestor)
-        )
+    def replace_node(self, node, lbl, repl, *, recursive=True):
+        """Replace a node by another in this graph.
 
-    def replace(self, mapping, mapping_seq={}, recursive=True):
-        """Replace nodes in the graph.
+        This will replace every use of `node` with label `lbl` in this
+        graph (and subgraphs if `recursive` is `True`) by `repl`.
 
-        This will recursively replace `node` with `mapping[node]` in
-        the graph if `node` is in `mapping`.
-
-        If `node` comes from a sequence edge, it will first look in
-        `mapping_seq` for a replacement.
-
-        If `recursive` is True, it will also replace nodes in the
-        children of this graph.
-
-        A node can be in either mapping or mapping_seq or both.
+        If `lbl` is None then this will replace all uses.
         """
-        self._replace(mapping, mapping_seq, recursive, self, set())
+        for use in list(node.users):
+            if recursive or use.user.graph is self:
+                if lbl is None or use.label == lbl:
+                    use.node = repl
 
-    def _replace(
-        self, mapping, mapping_seq, recursive, root_graph, seen_graphs
-    ):
-        if self in seen_graphs:
-            return
-        seen_graphs.add(self)
-        todo = [self.return_]
-        seen = set()
-        while todo:
-            node = todo.pop()
-            if node in seen:
-                continue
-            seen.add(node)
-            for edge in list(node.edges.values()):
-                if edge.label is SEQ and edge.node in mapping_seq:
-                    repl = mapping_seq[edge.node]
-                    if repl is None:
-                        edge.node = None
-                        del node.edges[SEQ]
-                    else:
-                        edge.node = mapping_seq[edge.node]
-                elif edge.node in mapping:
-                    edge.node = mapping[edge.node]
-                if edge.node:
-                    if edge.node.is_apply():
-                        todo.append(edge.node)
-                    elif (
-                        recursive
-                        and edge.node.is_constant_graph()
-                        and edge.node.value.has_ancestor(root_graph)
-                    ):
-                        edge.node.value._replace(
-                            mapping,
-                            mapping_seq,
-                            recursive,
-                            root_graph,
-                            seen_graphs,
-                        )
+    def delete_seq(self, node):
+        """Remove a node from all sequence chains."""
+        fwd = node.edges.get(SEQ, None)
+        if fwd is not None:
+            fwd = fwd.node
+        for use in list(node.users):
+            if use.label is SEQ:
+                if fwd is None:
+                    del use.user.edges[SEQ]
+                else:
+                    use.node = fwd
 
     def add_debug(self, **kwargs):
         """Add debug information.
@@ -216,11 +181,12 @@ class Node:
       annotation: Defined type for this node, optional
     """
 
-    __slots__ = ("abstract", "annotation", "debug", "__weakref__")
+    __slots__ = ("abstract", "annotation", "users", "debug", "__weakref__")
 
     def __init__(self):
         self.abstract = None
         self.annotation = None
+        self.users = weakref.WeakSet()
         self.debug = make_debug(obj=self)
 
     def is_apply(self, value=None):
@@ -282,13 +248,16 @@ class Edge:
     Attributes:
       label: The label for the link, can be any object.
       node: The target node.
+      user: The node that uses this Edge.
     """
 
-    __slots__ = ("label", "node")
+    __slots__ = ("label", "_node", "_user", "__weakref__")
 
     def __init__(self, label, node):
         self.label = label
-        self.node = node
+        self._node = node
+        self._node.users.add(self)
+        self._user = None
 
     def clone(self, g, objmap):
         """Make a copy, in the context of a graph clone.
@@ -299,11 +268,33 @@ class Edge:
         """
         return Edge(self.label, self.node.clone(g, objmap))
 
+    @property
+    def node(self):
+        """The target node."""
+        return self._node
 
-def _edgemap(edges):
+    @node.setter
+    def node(self, node):
+        self._node.users.remove(self)
+        self._node = node
+        self._node.users.add(self)
+
+    @property
+    def user(self):
+        """Returns the node that has this edge in its edges."""
+        if self._user:
+            return self._user()
+
+    @user.setter
+    def user(self, node):
+        self._user = weakref.ref(node)
+
+
+def _edgemap(edges, node):
     res = {}
     for e in edges:
         assert e.label not in res
+        e.user = node
         res[e.label] = e
 
     return res
@@ -324,7 +315,7 @@ class Apply(Node):
     def __init__(self, graph, *edges):
         super().__init__()
         self.graph = graph
-        self.edges = _edgemap(edges)
+        self.edges = _edgemap(edges, self)
 
     def is_apply(self, value=None):
         """See `Node.is_apply`."""
@@ -338,6 +329,7 @@ class Apply(Node):
         """Add an incoming edge to this node."""
         assert label not in self.edges
         e = Edge(label, node)
+        e.user = self
         self.edges[label] = e
 
     def append_input(self, node):
@@ -355,12 +347,6 @@ class Apply(Node):
     def fn(self):
         """The function that this Apply calls."""
         return self.edges[FN].node
-
-    @property
-    def seq(self):
-        """The previous element in the sequence chain (or None)."""
-        val = self.edges.get(SEQ, None)
-        return val if val is None else val.node
 
     @property
     def inputs(self):
@@ -389,7 +375,9 @@ class Apply(Node):
             return self
         res = Apply(objmap[g])
         objmap[self] = res
-        res.edges = _edgemap(e.clone(g, objmap) for e in self.edges.values())
+        res.edges = _edgemap(
+            (e.clone(g, objmap) for e in self.edges.values()), res
+        )
         res._copy_fields(self, objmap)
         return res
 
