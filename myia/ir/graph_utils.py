@@ -8,10 +8,14 @@ from myia.utils.directed_graph import DirectedGraph
 def toposort(graph: Graph, reverse=False):
     """Return graph nodes in execution order.
 
-    :param graph: myia graph
-    :param reverse: if True, return nodes in raw topological order, from user to used nodes
-    :return: graph nodes in topological order (from user to used nodes)
-        or execution order (from used to user order) if reverse is True
+    Arguments:
+        graph: myia graph
+        reverse: if True, return nodes in raw topological order,
+            from user to used nodes
+
+    Returns:
+        list: graph nodes in topological order (from user to used nodes)
+            or execution order (from used to user order) if reverse is True
     """
     # Use directed graph to get topological order.
     # This helps to not depend on SEQ edges.

@@ -40,8 +40,9 @@ class GraphToDirected(_GraphConverter):
     def __init__(self, graph, parent: _GraphConverter):
         """Initialize.
 
-        :param graph: myia graph
-        :param parent: parent converted
+        Arguments:
+            graph: myia graph
+            parent: parent converted
         """
         self.parent = parent
         self.graph = graph
@@ -54,8 +55,9 @@ class GraphToDirected(_GraphConverter):
         Create link in current directed graph if used graph is a closure of current function.
         Otherwise, ask parent to link current function to used graph.
 
-        :param user: user node
-        :param used_graph: used graph
+        Arguments:
+            user: user node
+            used_graph: used graph
         """
         if user is used_graph:
             # Do not link a graph to itself.
@@ -157,8 +159,12 @@ class GraphToModule(_GraphConverter):
     def generate_directed_graphs(self, g):
         """Collect and convert all graphs to directed graphs.
 
-        :param g: myia graph to compile.
-        :return: list of directed graphs, including given graph and all related module graphs.
+        Arguments:
+            g: myia graph to compile.
+
+        Returns:
+            list: list of directed graphs, including given graph
+                and all related module graphs.
         """
         self.todo_graphs.append(g)
         seen_graphs = set()
@@ -179,12 +185,14 @@ class PythonBackend:
     def __init__(self, debug=False, pdb=False, optimize=True):
         """Initialize.
 
-        :param debug: if False or None, do nothing.
-            If True, print generated code in stdout.
-            Otherwise, should be an output stream (e.g. stdout or a StringIO)
-            and generated code will be written into given stream.
-        :param pdb: if True, compiled function will be run in a pdb instance
-        :param optimize: if True, apply Python compilation optimizer before generating the code.
+        Arguments:
+            debug: if False or None, do nothing.
+                If True, print generated code in stdout.
+                Otherwise, should be an output stream (e.g. stdout or StringIO)
+                and generated code will be written into given stream.
+            pdb: if True, compiled function will be run in a pdb instance
+            optimize: if True, apply Python compilation optimizer
+                before generating the code.
         """
         if debug:
             debug = sys.stdout if debug is True else debug
@@ -218,9 +226,12 @@ class PythonBackend:
     def generate_static_import(cls, value, import_name):
         """Generate a static import string if possible.
 
-        :param value: value to import in static import
-        :param import_name: name to import value (`value as name`)
-        :return: static import if possible, else None
+        Arguments:
+            value: value to import in static import
+            import_name: name to import value (`value as name`)
+
+        Returns:
+            str: static import if possible, else None
         """
         if isinstance(value, ModuleType):
             package = value.__package__
@@ -247,8 +258,11 @@ class PythonBackend:
     def compile(self, graph):
         """Compile given graph.
 
-        :param graph: myia graph to compile
-        :return: executable
+        Arguments:
+            graph: myia graph to compile
+
+        Returns:
+            object: executable
         """
         code = []
         directed_graphs = GraphToModule().generate_directed_graphs(graph)
@@ -295,8 +309,11 @@ class PythonBackend:
 def compile_graph(graph, **options):
     """Helper function to quickly compile a myia graph.
 
-    :param graph: myia graph
-    :param options: Python backend options
-    :return: callable (compiled function)
+    Arguments:
+        graph: myia graph
+        options: Python backend options
+
+    Returns:
+        object: callable (compiled function)
     """
     return PythonBackend(**options).compile(graph)

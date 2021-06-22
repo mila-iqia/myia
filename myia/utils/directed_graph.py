@@ -20,7 +20,8 @@ class DirectedGraph:
     def __init__(self, data=None):
         """Initialize.
 
-        :param data: optional value associated to graph (e.g. a myia graph)
+        Arguments:
+            data: optional value associated to graph (e.g. a myia graph)
         """
         self.data = data
         self.uses = {}
@@ -33,9 +34,13 @@ class DirectedGraph:
     def add_arrow(self, a, b):
         """Add arrow a -> b to graph.
 
-        :param a: input value
-        :param b: output value
-        :return: True if arrow was added, False if arrow already exists in directed graph
+        Arguments:
+            a: input value
+            b: output value
+
+        Returns:
+            bool: True if arrow was added,
+                False if arrow already exists in directed graph
         """
         # Do not add an arrow twice.
         if self.has_arrow(a, b):
@@ -62,9 +67,12 @@ class DirectedGraph:
     def pop(self, user):
         """Remove given value. Value to remove should be unused.
 
-        :param user: value to remove
-        :return: list of values used by removed value
-            (list of `output` for all arrows `user -> output`)
+        Arguments:
+            user: value to remove
+
+        Returns:
+            list: list of values used by removed value
+                (list of `output` for all arrows `user -> output`)
         """
         assert user not in self.used_by
         related = self.uses.pop(user, ())
@@ -77,7 +85,7 @@ class DirectedGraph:
     def visit(self):
         """Visit directed graph from user to used values.
 
-        :return: generator: sequence of graph values in visited order.
+        Generate a sequence of graph values in visited order.
         """
         # Use a copy to visit graph, so that current graph is not modified.
         cp = self._copy()
