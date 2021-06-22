@@ -65,8 +65,8 @@ class Graph:
         """Create an Apply node.
 
         Arguments:
-          fn: The function to call.
-          inputs: The function inputs, if any.
+            fn: The function to call.
+            inputs: The function inputs, if any.
         """
         edges = [
             Edge(p, i if isinstance(i, Node) else self.constant(i))
@@ -263,8 +263,8 @@ class Edge:
         """Make a copy, in the context of a graph clone.
 
         Arguments:
-          g: The graph that is cloned.
-          objmap: Map of cloned objets
+            g: The graph that is cloned.
+            objmap: Map of cloned objets
         """
         return Edge(self.label, self.node.clone(g, objmap))
 
@@ -366,8 +366,8 @@ class Apply(Node):
         """Copy a node in the context of a graph clone.
 
         Arguments:
-          g: The graph that is cloned.
-          objmap: Cloned object map.
+            g: The graph that is cloned.
+            objmap: Cloned object map.
         """
         if self in objmap:
             return objmap[self]
@@ -408,8 +408,8 @@ class Parameter(Node):
         """Copy a node in the context of a graph clone.
 
         Arguments:
-          g: The graph that is cloned.
-          objmap: Cloned object map.
+            g: The graph that is cloned.
+            objmap: Cloned object map.
         """
         if self in objmap:
             return objmap[self]
@@ -448,8 +448,8 @@ class Constant(Node):
         """Copy a node in the context of a graph clone.
 
         Arguments:
-          g: The graph that is cloned.
-          objmap: Cloned object map.
+            g: The graph that is cloned.
+            objmap: Cloned object map.
         """
         if self in objmap:
             return objmap[self]

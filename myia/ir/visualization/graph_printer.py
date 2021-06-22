@@ -179,8 +179,10 @@ class GraphPrinter:
             A tuple:
             - list of myia graphs
             - list of myia nodes
-            - list of edges. Each edge is a tuple (source element, edge label, target element).
-              Element may be a graph or a node. Edge label is label field from myia Edge object.
+            - list of edges.
+              Each edge is a tuple (src element, edge label, tgt element).
+              Element may be a graph or a node.
+              Edge label is label field from myia Edge object.
         """
         all_graphs = []
         all_nodes = []

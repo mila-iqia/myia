@@ -45,22 +45,25 @@ class CodeGenerator:
 
         Optional dictionaries can be passed to control code generation.
 
-        :param skip: nodes to skip
-            Dictionary mapping a myia graph to a sequence of myia nodes to skip.
-            If found, these nodes won't be converted to code lines.
-        :param nonlocals: non-local variables
-            Dictionary mapping a myia graph to a sequence of non-local myia nodes.
-            Nodes in `nonlocals` will be marked with `nonlocal` keyword at the top
-            of closure code.
-        :param replace: nodes to replace
-            Dictionary mapping a myia node to a myia replacement node.
-            During code generation, node will be replaced eeverywhere it appears, ie.,
-            for its code line and inside any apply node that uses it.
-        :param rename: nodes to rename
-            Dictionary mapping a myia node to a label-provider myia node
-            Node label will be label of associated node in this dictionary.
-            Node label will be replaced everywhere the node appears, ie.,
-            in its code line (`label` = `expr`) and inside any apply noe that uses it.
+        Arguments:
+            skip: nodes to skip
+                Dict mapping a myia graph to a sequence of myia nodes to skip.
+                If found, these nodes won't be converted to code lines.
+            nonlocals: non-local variables
+                Dict mapping a myia graph to a sequence of non-local myia nodes.
+                Nodes in `nonlocals` will be marked with `nonlocal` keyword
+                at the top of closure code.
+            replace: nodes to replace
+                Dictionary mapping a myia node to a myia replacement node.
+                During code generation, node will be replaced everywhere
+                it appears, ie., for its code line and inside any apply node
+                that uses it.
+            rename: nodes to rename
+                Dictionary mapping a myia node to a label-provider myia node
+                Node label will be label of associated node in this dictionary.
+                Node label will be replaced everywhere the node appears, ie.,
+                in its code line (`label` = `expr`) and inside any apply node
+                that uses it.
         """
         self.skip = skip or {}
         self.nonlocals = nonlocals or {}
@@ -114,9 +117,12 @@ class CodeGenerator:
     def directed_graph_to_code(self, directed: DirectedGraph):
         """Convert directed graph to a function code.
 
-        :param directed: directed graph to convert
-        :return: a nested list with two values:
-            [function header code: str, function body code: list]
+        Arguments:
+            directed: directed graph to convert
+
+        Returns:
+            list: a nested list with two values:
+                [function header code: str, function body code: list]
         """
         graph = directed.data
 
@@ -266,10 +272,13 @@ class CodeGenerator:
     def _register_global(self, name, value):
         """Register global symbol for compiled code.
 
-        :param name: name to register
-        :param value: value to register
-        :return: name used to register value. May be different
-            from given name if given name was already used.
+        Arguments:
+            name: name to register
+            value: value to register
+
+        Returns:
+            str: name used to register value. May be different
+                from given name if given name was already used.
         """
         # If name is a builtin, no need to register.
         if getattr(builtins, name, None) is value:

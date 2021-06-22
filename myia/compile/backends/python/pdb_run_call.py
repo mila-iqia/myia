@@ -11,10 +11,11 @@ class PdbRunCall:
     def __init__(self, code, name, symbols):
         """Initialize.
 
-        :param code: code to compile
-        :param name: name of function to run
-        :param external_symbols: external symbols needed to execute the code.
-            Dictionary mapping name to symbol
+        Arguments:
+            code: code to compile
+            name: name of function to run
+            symbols: external symbols needed to execute the code.
+                Dictionary mapping name to symbol
         """
         self.code = code
         self.name = name

@@ -29,9 +29,9 @@ def str_graph(g, allow_cycles=False, recursive=True):
     """Return a textual representation of a graph.
 
     Arguments:
-       g: The graph to print
-       allow_cycles: Useful for debugging broken graphs that contain cycles
-       recursive: Also print subgraphs.
+         g: The graph to print
+         allow_cycles: Useful for debugging broken graphs that contain cycles
+         recursive: Also print subgraphs.
     """
     nodecache = NodeLabeler()
     buf = io.StringIO()

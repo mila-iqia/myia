@@ -33,8 +33,12 @@ class Optimizer:
     def optimize(self, directed_graphs):
         """Optimize directed graphs.
 
-        :param directed_graphs: list of directed graphs to compile.
-        :return: patch: a map of dictionaries to pass to code generator to apply optimization during code generator.
+        Arguments:
+            directed_graphs: list of directed graphs to compile.
+
+        Returns:
+            dict: a map of dictionaries to pass to code generator to apply
+                optimization during code generator.
         """
         # Recursively optimize directed graphs.
         todo = deque(directed_graphs)
@@ -97,10 +101,14 @@ class Optimizer:
     ):
         """Collect apply nodes whose function is a constant in given values.
 
-        :param directed_graph: DirectGraph to visit to collect nodes
-        :param function_values: function values to collect
-        :return: a dictionary mapping each given function value to a set of apply nodes.
-            Set may be empty if no apply node was found for associated function value.
+        Arguments:
+            directed_graph: DirectGraph to visit to collect nodes
+            function_values: function values to collect
+
+        Returns:
+            dict: a dictionary mapping each given function value to a set of
+                apply nodes. Set may be empty if no apply node was found for
+                associated function value.
         """
         nodes = {fn_value: set() for fn_value in function_values}
         for element in directed_graph.vertices():
