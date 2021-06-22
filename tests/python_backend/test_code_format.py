@@ -903,3 +903,28 @@ def test_assignment_expression3():
     )
     assert f(3) == fn(3) == 60
     assert f(5) == fn(5) == 100
+
+
+def test_assignment_expression4():
+    def f(x, y):  # pragma: no cover
+        def g(a, b, c):
+            return a + b + c
+
+        return g(x, x := y, y), g(x, y := 2 * y + 1, y)
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(x, y):
+  def g(a, b, c):
+    _1 = a + b
+    return _1 + c
+
+  _2 = g(x, y, y)
+  _3 = 2 * y
+  _y_2 = _3 + 1
+  _4 = g(y, _y_2, _y_2)
+  return (_2, _4)
+"""
+    )
+    assert f(1, 2) == fn(1, 2) == (5, 12)
