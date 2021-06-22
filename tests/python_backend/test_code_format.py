@@ -814,3 +814,92 @@ def test_kwonly_args():
         fn(2, 3, 4, 5)
 
     assert fn(2, 3, d=5, c=4) == (5, 54)
+
+
+def test_assignment_expression():
+    def f(x):
+        if (ret := 2 * x) > 10:
+            return ret
+        return -1
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(x):
+  ret = 2 * x
+  _1 = ret > 10
+
+  def if_after_f():
+    return -1
+
+  _2 = bool(_1)
+
+  def if_false_f(phi_ret):
+    return if_after_f()
+
+  def if_true_f(_phi_ret_2):
+    return _phi_ret_2
+
+  _3 = if_true_f if _2 else if_false_f
+  return _3(ret)
+"""
+    )
+    assert fn(5) == -1
+    assert fn(6) == 12
+
+
+def test_assignment_expression2():
+    def f(x):
+        a = x - 1
+        (y := 2 * x)
+        return y + a
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(x):
+  a = x - 1
+  y = 2 * x
+  return y + a
+"""
+    )
+    assert fn(3) == 8
+
+
+def test_assignment_expression3():
+    def f(x):
+        ret = 0
+        i = 0
+        while (a := 2 * i) < 10:
+            ret = ret + a
+            i = i + 1
+        return x * ret
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(x):
+  def while_f(phi_i, phi_ret, phi_x):
+    a = 2 * phi_i
+
+    def while_after_f(_phi_x_2, _phi_ret_2):
+      return _phi_x_2 * _phi_ret_2
+
+    _1 = a < 10
+
+    def else_while_f(_phi_ret_3, phi_a, _phi_i_2, _phi_x_3):
+      return while_after_f(_phi_x_3, _phi_ret_3)
+
+    def body_while_f(_phi_ret_4, _phi_a_2, _phi_i_3, _phi_x_4):
+      ret = _phi_ret_4 + _phi_a_2
+      i = _phi_i_3 + 1
+      return while_f(i, ret, _phi_x_4)
+
+    _2 = body_while_f if _1 else else_while_f
+    return _2(phi_ret, a, phi_i, phi_x)
+
+  return while_f(0, 0, x)
+"""
+    )
+    assert f(3) == fn(3) == 60
+    assert f(5) == fn(5) == 100

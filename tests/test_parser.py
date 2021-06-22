@@ -1864,16 +1864,39 @@ def test_yield_from():
     parse(f)
 
 
-@pytest.mark.xfail(
-    strict=True, raises=MyiaSyntaxError, reason="NameExpr not supported"
-)
 def test_assignment_expression():
     # ast.NamedExpr
     def f(x):  # pragma: no cover
-        if (a := 2) != x:
+        if (a := 2 * x) != x + 2:
             return a
 
-    parse(f)
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(x) {
+  a = _operator.mul(2, x)
+  #1 = _operator.add(x, 2)
+  #2 = _operator.ne(a, #1)
+  #3 = _operator.truth(#2)
+  #4 = myia.basics.user_switch(#3, f:if_true, f:if_false)
+  #5 = #4(a)
+  return #5
+}
+
+graph f:if_false(phi_a) {
+  #6 = f:if_after()
+  return #6
+}
+
+graph f:if_after() {
+  return None
+}
+
+graph f:if_true(phi_a~2) {
+  return phi_a~2
+}
+"""
+        )
 
 
 @pytest.mark.xfail(
