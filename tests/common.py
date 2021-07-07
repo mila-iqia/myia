@@ -6,10 +6,8 @@ from itertools import count
 from textwrap import dedent
 
 from _pytest.assertion.rewrite import AssertionRewriter
-from ovld import ovld
 
 from myia.abstract import data
-from myia.abstract.to_abstract import precise_abstract
 
 
 class AssertTransformer(NodeTransformer):
@@ -50,28 +48,6 @@ def one_test_per_assert(fn):
     glb = fn.__globals__
     exec(new_fn, glb, glb)
     return None
-
-
-@precise_abstract.variant
-def _to_abstract(self, x: type):
-    return data.AbstractAtom({"interface": x})
-
-
-@ovld
-def _to_abstract(self, x: (data.GenericBase, data.AbstractValue)):  # noqa: F811
-    return x
-
-
-def A(*args):
-    if len(args) == 1:
-        arg = args[0]
-    else:
-        arg = args
-    return _to_abstract(arg)
-
-
-def Un(*opts):
-    return data.AbstractUnion([A(opt) for opt in opts], tracks={})
 
 
 @contextmanager

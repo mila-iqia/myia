@@ -112,6 +112,8 @@ class Replace:
 class InferenceEngine:
     def __init__(self):
         self.replacements = defaultdict(dict)
+        # Make sure None entry is present.
+        self.replacements[None] = {}
 
     def __call__(self, node, unif):
         if repl := self.replacements.get((None, None, node), None):
