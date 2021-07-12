@@ -85,9 +85,11 @@ class Tracks:
 
     def get_track(self, name):
         """Return the Track for the given track name."""
-        if name not in self._tracks:
-            self._tracks[name] = self.track_handlers[name].default()
-        return self._tracks[name]
+        return (
+            self._tracks[name]
+            if name in self._tracks
+            else self.track_handlers[name].default()
+        )
 
     def items(self):
         """Return the track_name: Track mapping."""
