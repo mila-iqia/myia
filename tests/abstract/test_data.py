@@ -82,6 +82,16 @@ def test_Placeholder():
     assert p1 != p2
 
 
+def test_cache():
+    i = data.AbstractAtom({"interface": int})
+    assert str(i) == "*int()"
+
+    print(i.tracks.value)
+
+    j = data.AbstractAtom({"interface": int})
+    assert str(j) == "*int()"
+
+
 def test_repr():
     i = data.AbstractAtom({"interface": int})
     assert str(i) == "*int()"
