@@ -53,6 +53,11 @@ def test_make_list():
     assert basics.make_list(1, 2, 3) == [1, 2, 3]
 
 
+def test_make_set():
+    assert basics.make_set() == set()
+    assert basics.make_set(1, 2, 1, 1, 3) == {1, 2, 3}
+
+
 def test_make_dict():
     assert basics.make_dict() == {}
     assert basics.make_dict("a", 1, "b", 2) == {"a": 1, "b": 2}
