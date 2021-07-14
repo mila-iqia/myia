@@ -110,6 +110,7 @@ class CodeGenerator:
             basics.make_tuple: self._str_make_tuple,
             basics.make_list: self._str_make_list,
             basics.make_dict: self._str_make_dict,
+            basics.make_set: self._str_make_set,
             basics.apply: self._str_apply,
             getattr: self._str_getattr,
         }
@@ -309,6 +310,10 @@ class CodeGenerator:
     def _str_make_list(self, *inputs):
         """Formatter for apply `make_list`."""
         return f"[{', '.join(self._rvalue(inp) for inp in inputs)}]"
+
+    def _str_make_set(self, *inputs):
+        """Formatter for apply `make_set`."""
+        return "{" + (", ".join(self._rvalue(inp) for inp in inputs)) + "}"
 
     def _str_make_dict(self, *inputs):
         """Formatter for apply `make_dict`."""

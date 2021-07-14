@@ -853,6 +853,10 @@ class Parser:
         elts = [self.process_node(block, e) for e in node.elts]
         return block.apply(basics.make_list, *elts)
 
+    def _process_Set(self, block, node):
+        elts = [self.process_node(block, e) for e in node.elts]
+        return block.apply(basics.make_set, *elts)
+
     def _process_Name(self, block, node):
         assert isinstance(node.ctx, ast.Load)
         return block.read(node.id)
