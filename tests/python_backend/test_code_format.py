@@ -952,3 +952,29 @@ def test_assignment_expression4():
 """
     )
     assert f(1, 2) == fn(1, 2) == (5, 12)
+
+
+def test_augmented_assignment():
+    def f(x):  # pragma: no cover
+        a = x
+        a += 1
+        a -= 2
+        a *= 3
+        a /= 4
+        a //= 5
+        a %= 6
+        return a
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f(a):
+  _a_2 = a + 1
+  _a_3 = _a_2 - 2
+  _a_4 = _a_3 * 3
+  _a_5 = _a_4 / 4
+  _a_6 = _a_5 // 5
+  return _a_6 % 6
+"""
+    )
+    assert f(61) == fn(61) == 3.0

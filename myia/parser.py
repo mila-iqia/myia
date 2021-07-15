@@ -958,6 +958,20 @@ class Parser:
 
         return block
 
+    def _process_AugAssign(self, block, node: ast.AugAssign):
+        # Replace `a {op}= b` with `a = a {op} b`
+        self._assign(
+            block,
+            node.target,
+            None,
+            block.apply(
+                ast_map[type(node.op)],
+                block.read(node.target.id),
+                self.process_node(block, node.value),
+            ),
+        )
+        return block
+
     def _process_NamedExpr(self, block, node: ast.NamedExpr):
         val = self.process_node(block, node.value)
         self._assign(block, node.target, None, val)
