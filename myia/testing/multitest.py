@@ -77,12 +77,15 @@ def infer(*args, result=None):
             with enable_debug():
                 graph = parse(fn)
 
-            if isinstance(result, AbstractValue):
-                _, ret_type = infer_graph(graph, args)
-                assert ret_type is result, f"Expected {result}, got {ret_type}"
-            else:
-                with pytest.raises(exc_type, match=exc_match):
-                    infer_graph(graph, args)
+                if isinstance(result, AbstractValue):
+                    ret_graph = infer_graph(graph, args)
+                    ret_type = ret_graph.return_.abstract
+                    assert (
+                        ret_type is result
+                    ), f"Expected {result}, got {ret_type}"
+                else:
+                    with pytest.raises(exc_type, match=exc_match):
+                        infer_graph(graph, args)
 
         return wrapper
 

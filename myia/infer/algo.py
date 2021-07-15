@@ -254,7 +254,7 @@ class Inferrer:
             node.abstract, U = autils.unify(result, node.abstract, U=self.unif)
 
             # Declare the node's type
-            self.scheduler.satisfy(node, stop.value)
+            self.scheduler.satisfy(node, node.abstract)
 
     def run(self, start):
         """Run inference, starting from the start node."""
@@ -269,8 +269,10 @@ class Inferrer:
             self.step(node, inferrer, remap, unif, value)
 
         # The result for start will be in start.abstract
-        assert not isinstance(start.abstract, data.Placeholder)
-        return start.abstract
+        result = self.unif.canon.get(start.abstract, start.abstract)
+        start.abstract = result
+        assert not isinstance(result, data.Placeholder)
+        return result
 
 
 def infer(engine, node):

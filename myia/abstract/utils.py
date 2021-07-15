@@ -138,6 +138,7 @@ class Unificator:
 
         eqv.add(merged)
         for entry in eqv:
+            self.eqv[entry] = eqv
             self.canon[entry] = merged
 
         return merged

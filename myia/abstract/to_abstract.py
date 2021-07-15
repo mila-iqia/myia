@@ -1,4 +1,5 @@
 """Functions to convert data to an abstract data type."""
+from typing import Union
 
 from ovld import ovld
 
@@ -30,7 +31,7 @@ def to_abstract(self, t: type):  # noqa: F811
 
 
 @to_abstract.variant
-def precise_abstract(self, x: (int, bool)):
+def precise_abstract(self, x: Union[int, bool]):
     """Convert data to an AbstractValue.
 
     Unlike to_abstract this keeps values in the type for ints and bools.
