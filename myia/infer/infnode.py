@@ -1,62 +1,65 @@
-import operator
+"""Implementation of type inference on Myia graphs."""
+
 import types
 from collections import defaultdict
 from dataclasses import dataclass
 
-from .. import basics
 from ..abstract import data, utils as autils
 from ..abstract.to_abstract import to_abstract, type_to_abstract
 from ..ir import Constant, Graph
 from ..parser import parse
 from ..utils.info import enable_debug
-from ..utils.misc import ModuleNamespace
 from .algo import Require, RequireAll, Unify, infer
 
-X = data.Generic("x")
+inferrers = {}
 
 
 @dataclass(frozen=True)
 class InferenceFunction:
+    """Encapsulates a function to use for inference."""
+
     fn: types.FunctionType
 
 
 def inference_function(fn):
+    """Create an abstract type with the given function as its interface.
+
+    Arguments:
+        fn: A generator function that performs inference from a node. The
+            function should take a list of arg nodes, and a Unificator.
+    """
     return data.AbstractAtom({"interface": InferenceFunction(fn)})
 
 
 class SpecializedGraph:
+    """Represents a graph specialized on a set of input types.
+
+    Arguments:
+        base_graph: The canonical graph.
+    """
+
     def __init__(self, base_graph):
         self.base_graph = base_graph
         self.graph = None
 
     def commit(self, sig):
+        """Commit a specialization to the given input type signature.
+
+        A SpecializedGraph can only be committed for a single signature.
+        Using the same SpecializedGraph with multiple signatures is an
+        error.
+
+        Arguments:
+            sig: Input type signature.
+        """
         graph = self.base_graph.specialize(sig)
         if self.graph is None:
             self.graph = graph
-        elif self.graph is not graph:
-            raise TypeError()
-
-
-def resolve(args, unif):
-    ns, name = args
-    assert ns.is_constant(ModuleNamespace)
-    assert name.is_constant(str)
-    resolved = ns.value[name.value]
-    ct = Constant(resolved)
-    yield Replace(ct)
-    res = yield Require(ct)
-    return res
-
-
-def user_switch(args, unif):
-    cond, ift, iff = args
-    _ = yield Require(cond)  # TODO: check bool
-    ift_t = yield Require(ift)
-    iff_t = yield Require(iff)
-    return data.AbstractUnion([ift_t, iff_t], tracks={})
+        assert self.graph is graph
 
 
 def signature(*arg_types, ret):
+    """Create an inference function from a type signature."""
     arg_types = [
         type_to_abstract(argt) if isinstance(argt, type) else argt
         for argt in arg_types
@@ -75,49 +78,27 @@ def signature(*arg_types, ret):
     return inference_function(_infer)
 
 
-class Handler:
-    pass
-
-
-inferrers = {
-    operator.mul: signature(X, X, ret=X),
-    operator.add: signature(X, X, ret=X),
-    operator.sub: signature(X, X, ret=X),
-    operator.neg: signature(X, ret=X),
-    operator.le: signature(X, X, ret=bool),
-    operator.truth: signature(X, ret=bool),
-    basics.return_: signature(X, ret=X),
-    basics.resolve: inference_function(resolve),
-    basics.user_switch: inference_function(user_switch),
-    type: signature(
-        X,
-        ret=data.AbstractStructure([X], tracks={"interface": type}),
-    ),
-    basics.make_handle: signature(
-        data.AbstractStructure([X], tracks={"interface": type}),
-        ret=data.AbstractStructure([X], tracks={"interface": Handler}),
-    ),
-    basics.global_universe_getitem: signature(
-        data.AbstractStructure([X], tracks={"interface": Handler}),
-        ret=X,
-    ),
-}
-
-
 class Replace:
+    """Declares that the current node should be replaced by a new node."""
+
     def __init__(self, new_node):
         self.new_node = new_node
 
 
 class InferenceEngine:
-    def __init__(self):
+    """Inferrer for graph nodes."""
+
+    def __init__(self, inferrers):
+        self.inferrers = inferrers
         self.replacements = defaultdict(dict)
         # Make sure None entry is present.
         self.replacements[None] = {}
 
     def __call__(self, node, unif):
-        if repl := self.replacements.get((None, None, node), None):
-            return (yield Require(repl))
+        """Infer the type of a node."""
+        # TODO: Not sure if needed
+        # if repl := self.replacements.get((None, None, node), None):
+        #     return (yield Require(repl))
 
         assert node is not None
         assert not isinstance(node, (data.AbstractValue, data.GenericBase))
@@ -127,8 +108,8 @@ class InferenceEngine:
             self.replacements[None][None, None, node] = Constant(spc)
             return inference_function(spc)
 
-        elif node.is_constant() and node.value in inferrers:
-            return inferrers[node.value]
+        elif node.is_constant() and node.value in self.inferrers:
+            return self.inferrers[node.value]
 
         elif node.is_constant(types.FunctionType):
             with enable_debug():
@@ -137,9 +118,18 @@ class InferenceEngine:
             self.replacements[None][None, None, node] = ct
             return inference_function(spc)
 
+        elif node.is_constant(
+            (
+                types.BuiltinFunctionType,
+                types.MethodWrapperType,
+                types.WrapperDescriptorType,
+            )
+        ):
+            raise TypeError(f"No inferrer for {node.value}")
+
         elif node.is_constant():
             value = node.value
-            assert value not in inferrers
+            assert value not in self.inferrers
             return to_abstract(value)
 
         else:
@@ -163,22 +153,22 @@ class InferenceEngine:
                     return res
                 else:
                     res = inf(node.inputs, unif)
-                    if isinstance(res, types.GeneratorType):
-                        curr = None
-                        try:
-                            while True:
-                                instruction = res.send(curr)
-                                if isinstance(instruction, Replace):
-                                    self.replacements[node.graph][
-                                        None, None, node
-                                    ] = instruction.new_node
-                                    curr = None
-                                else:
-                                    curr = yield instruction
-                        except StopIteration as stop:
-                            return stop.value
-                    else:
-                        return res
+                    # TODO: Return res if not generator, if we create
+                    # inferrers that are not generators
+                    assert isinstance(res, types.GeneratorType)
+                    curr = None
+                    try:
+                        while True:
+                            instruction = res.send(curr)
+                            if isinstance(instruction, Replace):
+                                self.replacements[node.graph][
+                                    None, None, node
+                                ] = instruction.new_node
+                                curr = None
+                            else:
+                                curr = yield instruction
+                    except StopIteration as stop:
+                        return stop.value
 
             elif isinstance(fn, data.AbstractUnion):
 
@@ -198,14 +188,24 @@ class InferenceEngine:
 
 
 def infer_graph(graph, input_types):
-    eng = InferenceEngine()
+    """Run type inference on a graph given a list of input types.
+
+    Arguments:
+        graph: The graph to infer through.
+        input_types: A tuple of input types.
+
+    Returns:
+        A new, specialized graph. The return type is in g.return_.abstract
+    """
+
+    eng = InferenceEngine(inferrers)
     g = graph.specialize(input_types)
     eng.replacements[g] = {}
-    res = infer(eng, g.return_)
+    infer(eng, g.return_)
 
     for gx, repl in eng.replacements.items():
         if gx is not None:
-            repl = repl | eng.replacements[None]
+            repl = {**repl, **eng.replacements[None]}
             for a, b in repl.items():
                 origin, lbl, to_replace = a
                 assert origin is None
@@ -214,4 +214,4 @@ def infer_graph(graph, input_types):
                     b = Constant(b.value.graph)
                 gx.replace_node(to_replace, None, b)
 
-    return g, res
+    return g

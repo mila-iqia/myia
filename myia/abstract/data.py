@@ -187,8 +187,11 @@ class AbstractValue(Interned, PossiblyRecursive, Cachable):
     __hrepr_resources__ = myia_hrepr_resources
 
     def __hrepr_short__(self, H, hrepr):
+        name = getattr(
+            self.tracks.interface, "__name__", str(self.tracks.interface)
+        )
         return H.instance["myia-abstract"](
-            type=f"*{self.tracks.interface.__name__}",
+            type=f"*{name}",
             short=True,
         )
 
