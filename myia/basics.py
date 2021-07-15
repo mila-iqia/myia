@@ -98,6 +98,11 @@ def make_list(*args):
     return list(args)
 
 
+def make_set(*args):
+    """Make a set."""
+    return set(args)
+
+
 def make_dict(*args):
     """Make a dict."""
     res = {}

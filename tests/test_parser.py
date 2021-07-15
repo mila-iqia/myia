@@ -1824,15 +1824,20 @@ def test_set_comprehension():
     parse(f)
 
 
-@pytest.mark.xfail(
-    strict=True, raises=MyiaSyntaxError, reason="Set not supported"
-)
 def test_set():
     # ast.Set
     def f():  # pragma: no cover
-        return {1, 2}
+        return {1, 2, 1, 1, 3}
 
-    parse(f)
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  #1 = myia.basics.make_set(1, 2, 1, 1, 3)
+  return #1
+}
+"""
+        )
 
 
 @pytest.mark.xfail(

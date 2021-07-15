@@ -554,6 +554,30 @@ def f():
     assert fn()[4] == "a string"
 
 
+def test_set():
+    def f():
+        a = {1, 2, 1, 1}
+        b = set(a)
+        c = set([1, 2, 3])
+        return a, b, c
+
+    fn, output = parse_and_compile(f)
+    assert (
+        output
+        == """def f():
+  a = {1, 2, 1, 1}
+  b = set(a)
+  _1 = [1, 2, 3]
+  c = set(_1)
+  return (a, b, c)
+"""
+    )
+    a, b, c = fn()
+    assert a == {1, 2}
+    assert b == {1, 2}
+    assert c == {1, 2, 3}
+
+
 def test_print():
     def f(x):
         print("X is", x)
