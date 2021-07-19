@@ -89,6 +89,7 @@ class CodeGenerator:
             operator.le: "{} <= {}",
             operator.lshift: "{} << {}",
             operator.lt: "{} < {}",
+            operator.matmul: "{} @ {}",
             operator.mod: "{} % {}",
             operator.mul: "{} * {}",
             operator.ne: "{} != {}",

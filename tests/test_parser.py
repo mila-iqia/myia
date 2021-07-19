@@ -1635,18 +1635,33 @@ def test_import_as():
     parse(f)
 
 
-@pytest.mark.xfail(
-    strict=True, raises=MyiaSyntaxError, reason="AugAssign not supported"
-)
 def test_augmented_assignment():
     # ast.AugAssign
     # ast.Store as name ctx
     def f(x):  # pragma: no cover
         a = x
-        a += 2
+        a += 1
+        a -= 2
+        a *= 3
+        a /= 4
+        a //= 5
+        a %= 6
         return a
 
-    parse(f)
+    with enable_debug():
+        assert (
+            str_graph(parse(f))
+            == """graph f(a) {
+  a~2 = _operator.iadd(a, 1)
+  a~3 = _operator.isub(a~2, 2)
+  a~4 = _operator.imul(a~3, 3)
+  a~5 = _operator.itruediv(a~4, 4)
+  a~6 = _operator.ifloordiv(a~5, 5)
+  a~7 = _operator.imod(a~6, 6)
+  return a~7
+}
+"""
+        )
 
 
 @pytest.mark.xfail(
