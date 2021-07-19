@@ -297,7 +297,6 @@ class Parser:
         self.line_offset -= 1
         self.filename = inspect.getfile(function)
         self.global_namespace = ModuleNamespace(function.__module__)
-        self.finalizers = {}
 
     def _eval_ast_node(self, node):
         text = ast.get_source_segment(self.src, node)
@@ -947,9 +946,19 @@ class Parser:
             raise NotImplementedError(targ)
 
     def _process_AnnAssign(self, block, node):
-        val = self.process_node(block, node.value)
-        val.annotation = self._eval_ast_node(node.annotation)
-        self._assign(block, node.target, None, val)
+        # Can only annotate single names
+        if not isinstance(node.target, ast.Name):
+            raise SyntaxError(
+                "only single target (not tuple) can be annotated"
+            )  # pragma: no cover
+        if node.value is not None:
+            val = self.process_node(block, node.value)
+            val.annotation = self._eval_ast_node(node.annotation)
+            block.write(node.target.id, val)
+        else:
+            # XXX: this discards the type annotation
+            block.function.variables_local.add(node.target.id)
+
         return block
 
     def _process_Assert(self, block, node):

@@ -1052,6 +1052,35 @@ def test_ann_assign():
     )
 
 
+def test_ann_assign_empty():
+    def f():
+        b: int
+
+        def g():
+            nonlocal b
+            b = 10
+
+        g()
+        return b
+
+    with enable_debug(), predictable_placeholders():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  b = myia.basics.make_handle(??1)
+  #1 = g()
+  #2 = myia.basics.global_universe_getitem(b)
+  return #2
+}
+
+graph g() {
+  #3 = myia.basics.global_universe_setitem(b, 10)
+  return None
+}
+"""
+        )
+
+
 def test_assert():
     def f(a):  # pragma: no cover
         assert a == 1, "not 1"
