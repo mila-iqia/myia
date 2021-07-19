@@ -968,13 +968,20 @@ def test_augmented_assignment():
     fn, output = parse_and_compile(f)
     assert (
         output
-        == """def f(a):
-  _a_2 = a + 1
-  _a_3 = _a_2 - 2
-  _a_4 = _a_3 * 3
-  _a_5 = _a_4 / 4
-  _a_6 = _a_5 // 5
-  return _a_6 % 6
+        == """from _operator import iadd
+from _operator import isub
+from _operator import imul
+from _operator import itruediv
+from _operator import ifloordiv
+from _operator import imod
+
+def f(a):
+  _a_2 = iadd(a, 1)
+  _a_3 = isub(_a_2, 2)
+  _a_4 = imul(_a_3, 3)
+  _a_5 = itruediv(_a_4, 4)
+  _a_6 = ifloordiv(_a_5, 5)
+  return imod(_a_6, 6)
 """
     )
     assert f(61) == fn(61) == 3.0
