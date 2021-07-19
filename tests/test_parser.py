@@ -1652,12 +1652,12 @@ def test_augmented_assignment():
         assert (
             str_graph(parse(f))
             == """graph f(a) {
-  a~2 = _operator.add(a, 1)
-  a~3 = _operator.sub(a~2, 2)
-  a~4 = _operator.mul(a~3, 3)
-  a~5 = _operator.truediv(a~4, 4)
-  a~6 = _operator.floordiv(a~5, 5)
-  a~7 = _operator.mod(a~6, 6)
+  a~2 = _operator.iadd(a, 1)
+  a~3 = _operator.isub(a~2, 2)
+  a~4 = _operator.imul(a~3, 3)
+  a~5 = _operator.itruediv(a~4, 4)
+  a~6 = _operator.ifloordiv(a~5, 5)
+  a~7 = _operator.imod(a~6, 6)
   return a~7
 }
 """

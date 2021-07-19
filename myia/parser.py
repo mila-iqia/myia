@@ -74,6 +74,21 @@ ast_map = {
     # ast.NotIn: # Not available in operator, special handling below
 }
 
+ast_inplace_map = {
+    ast.Add: operator.iadd,
+    ast.Sub: operator.isub,
+    ast.Mult: operator.imul,
+    ast.Div: operator.itruediv,
+    ast.FloorDiv: operator.ifloordiv,
+    ast.Mod: operator.imod,
+    ast.Pow: operator.ipow,
+    ast.MatMult: operator.imatmul,
+    ast.LShift: operator.ilshift,
+    ast.RShift: operator.irshift,
+    ast.BitAnd: operator.iand,
+    ast.BitOr: operator.ior,
+    ast.BitXor: operator.ixor,
+}
 
 _parse_cache = {}
 
@@ -959,13 +974,13 @@ class Parser:
         return block
 
     def _process_AugAssign(self, block, node: ast.AugAssign):
-        # Replace `a {op}= b` with `a = a {op} b`
+        # Replace `a {op}= b` with `a = operator.i{op}(a, b)`
         self._assign(
             block,
             node.target,
             None,
             block.apply(
-                ast_map[type(node.op)],
+                ast_inplace_map[type(node.op)],
                 block.read(node.target.id),
                 self.process_node(block, node.value),
             ),
