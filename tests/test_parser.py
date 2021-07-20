@@ -1876,8 +1876,6 @@ def test_dict_comprehension():
     strict=True, raises=MyiaSyntaxError, reason="GeneratorExp not supported"
 )
 def test_generator_expression():
-    # ast.GeneratorExp
-    # ast.comprehension (used in all comprehensions)
     def f():  # pragma: no cover
         return list(2 * i for i in range(10))
 
@@ -1952,7 +1950,6 @@ def test_yield_from():
 
 
 def test_assignment_expression():
-    # ast.NamedExpr
     def f(x):  # pragma: no cover
         if (a := 2 * x) != x + 2:
             return a

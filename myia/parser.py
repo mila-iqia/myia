@@ -876,6 +876,11 @@ class Parser:
         assert isinstance(node.ctx, ast.Load)
         return block.read(node.id)
 
+    def _process_NamedExpr(self, block, node: ast.NamedExpr):
+        val = self.process_node(block, node.value)
+        self._assign(block, node.target, None, val)
+        return block.read(node.target.id)
+
     def _process_Slice(self, block, node):
         if node.lower is None:
             lower = Constant(None)
@@ -996,11 +1001,6 @@ class Parser:
             ),
         )
         return block
-
-    def _process_NamedExpr(self, block, node: ast.NamedExpr):
-        val = self.process_node(block, node.value)
-        self._assign(block, node.target, None, val)
-        return block.read(node.target.id)
 
     def _process_Break(self, block, node):
         if len(block.function.break_target) == 0:
