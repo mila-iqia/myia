@@ -455,7 +455,8 @@ class Parser:
             else:
                 ld.graph.replace_node(ld, None, st.edges[1].node)
         elif var in function.variables_local:
-            assert st is not None
+            if st is None:
+                raise UnboundLocalError(f"local variable '{var}' referenced before assignment")
             ld.graph.delete_seq(ld)
             ld.graph.replace_node(ld, None, st.edges[1].node)
         else:

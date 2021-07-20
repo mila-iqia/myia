@@ -1081,6 +1081,44 @@ graph g() {
         )
 
 
+def test_ann_assign_empty2():
+    def f():
+        b: int
+        a = b + 1
+        def g():
+            nonlocal b
+            b = 10
+        g()
+        return a
+
+    with enable_debug(), predictable_placeholders():
+        assert (
+            str_graph(parse(f))
+            == """graph f() {
+  b = myia.basics.make_handle(??1)
+  #1 = myia.basics.global_universe_getitem(b)
+  a = _operator.add(#1, 1)
+  #2 = g()
+  return a
+}
+
+graph g() {
+  #3 = myia.basics.global_universe_setitem(b, 10)
+  return None
+}
+"""
+        )
+
+
+def test_ann_assign_empty_error():
+    def f():
+        b: int
+        return b + 1
+
+    with pytest.raises(UnboundLocalError):
+        parse(f)
+
+
 def test_assert():
     def f(a):  # pragma: no cover
         assert a == 1, "not 1"
