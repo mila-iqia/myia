@@ -1,8 +1,107 @@
 """Utility functions for myia graph."""
 from collections import deque
+from typing import Any, Callable, Iterable, Set, TypeVar
 
-from myia.ir.node import Apply, Graph
+from ovld import ovld
+
+from myia.ir.node import Apply, Graph, Node
 from myia.utils.directed_graph import DirectedGraph
+
+FOLLOW = "follow"
+NOFOLLOW = "nofollow"
+EXCLUDE = "exclude"
+
+
+T = TypeVar("T")
+
+
+def always_include(node: Any) -> str:
+    """Include a node in the search unconditionally."""
+    return FOLLOW
+
+
+def dfs(
+    root: T,
+    succ: Callable[[T], Iterable[T]],
+    include: Callable[[T], str] = always_include,
+) -> Iterable[T]:
+    """Perform a depth-first search.
+
+    Arguments:
+        root: The node to start from.
+        succ: A function that returns a node's successors.
+        include: A function that returns whether to include a node
+            in the search.
+            * Return 'follow' to include the node and follow its edges.
+            * Return 'nofollow' to include the node but not follow its edges.
+            * Return 'exclude' to not include the node, nor follow its edges.
+    """
+    seen: Set[T] = set()
+    to_visit = [root]
+    while to_visit:
+        node = to_visit.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        incl = include(node)
+        if incl == FOLLOW:
+            yield node
+            to_visit += succ(node)
+        elif incl == NOFOLLOW:
+            yield node
+        elif incl == EXCLUDE:
+            pass
+        else:
+            raise ValueError(
+                "include(node) must return one of: "
+                '"follow", "nofollow", "exclude"'
+            )
+
+
+@ovld
+def incoming(_: Node):
+    return []
+
+
+@ovld
+def incoming(node: Apply):  # noqa: F811
+    return [e.node for e in node.edges.values()]
+
+
+@ovld
+def incoming(g: Graph):  # noqa: F811
+    return [g.return_, *g.parameters] if g.return_ else []
+
+
+def succ_deep(node: Node) -> Iterable[Node]:
+    """Follow node.incoming and graph references.
+
+    A node's successors are its edges set, or the return node of a graph
+    when a graph Constant is encountered.
+    """
+    if node.is_constant_graph():
+        return incoming(node.value)
+    else:
+        return incoming(node)
+
+
+def succ_deeper(node: Node) -> Iterable[Node]:
+    """Follow edges and graph references.
+
+    Unlike `succ_deep` this visits all encountered graphs thoroughly, including
+    those found through free variables.
+    """
+    if node.is_constant_graph():
+        return incoming(node.value)
+    elif getattr(node, "graph", None):
+        return [*incoming(node), *incoming(node.graph)]
+    else:
+        return incoming(node)
+
+
+def succ_incoming(node: Node) -> Iterable[Node]:
+    """Follow edges."""
+    return incoming(node)
 
 
 def toposort(graph: Graph, reverse=False):
