@@ -9,7 +9,7 @@ from ..ir import Constant, Graph
 from ..ir.graph_utils import dfs, succ_deeper
 from ..parser import parse
 from ..utils.info import enable_debug
-from .algo import Require, RequireAll, Unify, infer
+from .algo import Inferrer, Require, RequireAll, Unify
 
 inferrers = {}
 
@@ -191,10 +191,18 @@ def infer_graph(graph, input_types):
 
     eng = InferenceEngine(inferrers)
     g = graph.specialize(input_types)
-    infer(eng, g.return_)
+    inf = Inferrer(eng)
+    inf.run(g.return_)
 
     for node in dfs(g.return_, succ=succ_deeper):
         if node.is_constant(SpecializedGraph):
             node.replace(Constant(node.value.graph))
+
+        a = node.abstract
+        if a is None:
+            assert node.is_constant()
+        else:
+            node.abstract = autils.reify(a, unif=inf.unif.canon)
+        assert not autils.get_generics(node.abstract)
 
     return g
