@@ -111,6 +111,15 @@ def make_dict(*args):
     return res
 
 
+def partial(fn, *args):
+    """Partial application of a function."""
+
+    def wrapped(*args2):
+        return fn(*args, *args2)
+
+    return wrapped
+
+
 def switch(cond, if_true, if_false):
     """Return if_true if cond is True, else return if_false."""
     return if_true if cond else if_false
