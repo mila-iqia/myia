@@ -1,6 +1,20 @@
-from myia.ir.graph_utils import toposort
+import operator as opr
+
+import pytest
+
+from myia.ir.graph_utils import (
+    EXCLUDE,
+    FOLLOW,
+    NOFOLLOW,
+    dfs,
+    succ_deep,
+    succ_deeper,
+    succ_incoming,
+    toposort,
+)
 from myia.ir.print import NodeLabeler
 from myia.parser import parse
+from myia.testing.common import build_graph
 from myia.utils.info import enable_debug
 
 
@@ -25,6 +39,79 @@ def _str_list_nodes(nodecache, nodes):
 
 def factorial(n):
     return 1 if n < 2 else n * factorial(n - 1)
+
+
+def _succ(x):
+    return reversed(x) if isinstance(x, tuple) else ()
+
+
+def test_dfs():
+    a = (1, 2)
+    b = (3, 4, 5)
+    c = (b, 6)
+    d = (a, c)
+
+    order = list(dfs(d, _succ))
+
+    assert order == [d, a, 1, 2, c, b, 3, 4, 5, 6]
+
+
+def test_dfs_complex_policy():
+    a = (1, 2)
+    b = (3, 4, 5)
+    c = (b, 6)
+    d = (a, c)
+
+    def inc(n):
+        if n is a:
+            return EXCLUDE
+        elif n is b:
+            return NOFOLLOW
+        else:
+            return FOLLOW
+
+    order = list(dfs(d, _succ, include=inc))
+
+    assert order == [d, c, b, 6]
+
+
+def test_dfs_bad_include():
+    a = (1, 2)
+    b = (3, 4, 5)
+    c = (b, 6)
+    d = (a, c)
+
+    def inc(n):
+        return None
+
+    with pytest.raises(ValueError):
+        list(dfs(d, _succ, inc))
+
+
+def test_dfs_dups():
+    a = (1, 2, 2)
+    b = (3, 4, 5, 2)
+    c = (b, 6)
+    d = (a, a, c)
+
+    order = list(dfs(d, _succ))
+
+    assert order == [d, a, 1, 2, c, b, 3, 4, 5, 6]
+
+
+def test_succ():
+    g1, nodeset1 = build_graph((opr.add, 1, (opr.sub, 2, "x")), params="x")
+    g2, nodeset2 = build_graph((g1, 8, "y"), params="y")
+    g3, nodeset3 = build_graph((g1, 9, "a"), params="abc")
+
+    assert set(dfs(g1.return_, succ=succ_incoming)) == nodeset1
+    assert set(dfs(g2.return_, succ=succ_incoming)) == nodeset2
+
+    assert set(dfs(g1.return_, succ=succ_deep)) == nodeset1
+    assert set(dfs(g2.return_, succ=succ_deep)) == nodeset1 | nodeset2
+
+    assert set(dfs(g2.output, succ=succ_deeper)) == nodeset1 | nodeset2
+    assert set(dfs(g3.return_, succ=succ_deeper)) == nodeset1 | nodeset3
 
 
 def test_toposort_factorial():
