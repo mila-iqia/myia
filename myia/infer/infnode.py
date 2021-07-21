@@ -5,13 +5,21 @@ from dataclasses import dataclass
 
 from ..abstract import data, utils as autils
 from ..abstract.to_abstract import to_abstract, type_to_abstract
-from ..ir import Constant, Graph
+from ..ir import Constant, Graph, Node
 from ..ir.graph_utils import dfs, succ_deeper
 from ..parser import parse
 from ..utils.info import enable_debug
 from .algo import Inferrer, Require, RequireAll, Unify
 
 inferrers = {}
+
+
+class Virtual(Node):
+    """Node that only has an abstract field."""
+
+    def __init__(self, abs):
+        super().__init__()
+        self.abstract = abs
 
 
 @dataclass(frozen=True)
@@ -28,7 +36,7 @@ def inference_function(fn):
         fn: A generator function that performs inference from a node. The
             function should take a list of arg nodes, and a Unificator.
     """
-    return data.AbstractAtom({"interface": InferenceFunction(fn)})
+    return data.AbstractStructure((), {"interface": InferenceFunction(fn)})
 
 
 class SpecializedGraph:
@@ -71,6 +79,7 @@ def signature(*arg_types, ret):
         inp_types = []
         for inp in args:
             inp_types.append((yield Require(inp)))
+        assert len(inp_types) == len(arg_types)
         for inp_type, expected_type in zip(inp_types, arg_types):
             autils.unify(expected_type, inp_type, U=unif)
         return autils.reify(return_type, unif=unif.canon)
@@ -138,14 +147,16 @@ class InferenceEngine:
             #     return autils.reify(fn.out, unif=unif.canon)
 
             if isinstance(fn.tracks.interface, InferenceFunction):
+                partial_types = fn.elements
                 inf = fn.tracks.interface.fn
                 if isinstance(inf, SpecializedGraph):
                     arg_types = yield RequireAll(*node.inputs)
-                    inf.commit(arg_types)
+                    inf.commit((*partial_types, *arg_types))
                     res = yield Require(inf.graph.return_)
                     return res
                 else:
-                    res = inf(node, node.inputs, unif)
+                    partial_args = [Virtual(a) for a in partial_types]
+                    res = inf(node, [*partial_args, *node.inputs], unif)
                     # TODO: Return res if not generator, if we create
                     # inferrers that are not generators
                     assert isinstance(res, types.GeneratorType)

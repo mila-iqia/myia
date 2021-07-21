@@ -1,13 +1,14 @@
 """Inferrers for basic functions and the standard library."""
 
 import operator
+import types
 
 from .. import basics
 from ..abstract import data
 from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
-from .algo import Require
+from .algo import Require, RequireAll
 from .infnode import Replace, inference_function, signature
 
 
@@ -32,6 +33,17 @@ def user_switch(node, args, unif):
     return data.AbstractUnion([ift_t, iff_t], tracks={})
 
 
+def partial_inferrer(node, args, unif):
+    """Inferrer for the a partial application."""
+    fn, *args = args
+    fn_type = yield Require(fn)
+    arg_types = yield RequireAll(*args)
+    return data.AbstractStructure(
+        (*fn_type.elements, *arg_types),
+        tracks={"interface": fn_type.tracks.interface},
+    )
+
+
 def getattr_inferrer(node, args, unif):
     """Inferrer for the getattr function."""
     obj_node, key_node = args
@@ -39,9 +51,14 @@ def getattr_inferrer(node, args, unif):
     obj = yield Require(obj_node)
     key = key_node.value
     result = getattr(obj.tracks.interface, key)
-    ct = Constant(result)
-    yield Replace(ct)
-    res = yield Require(ct)
+    if isinstance(result, (types.MethodType, types.WrapperDescriptorType)):
+        ct = Constant(result)
+        new_node = node.graph.apply(basics.partial, ct, obj_node)
+    else:
+        raise AssertionError("getattr can currently only be used for methods")
+        # new_node = Constant(result)
+    yield Replace(new_node)
+    res = yield Require(new_node)
     return res
 
 
@@ -76,5 +93,6 @@ def add_standard_inferrers(inferrers):
                 data.AbstractStructure([X], tracks={"interface": Handle}),
                 ret=X,
             ),
+            basics.partial: inference_function(partial_inferrer),
         }
     )

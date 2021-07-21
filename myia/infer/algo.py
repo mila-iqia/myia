@@ -34,7 +34,6 @@ class Scheduler:
 
     def require(self, request):
         """Register a request."""
-        assert request.nodes
         for node in request.nodes:
             if node in self.satisfied:
                 self._satisfy_request(request, node, self.satisfied[node])

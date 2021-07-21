@@ -158,7 +158,7 @@ def abstract_collect(self, x, **kwargs):
 
 @ovld
 def abstract_collect(self, x: data.Tracks, **kwargs):  # noqa: F811
-    return reduce(operator.or_, [self(v, **kwargs) for v in x.values()])
+    return reduce(operator.or_, [self(v, **kwargs) for v in x.values()], set())
 
 
 @ovld
@@ -171,6 +171,7 @@ def abstract_collect(self, xs: data.AbstractStructure, **kwargs):  # noqa: F811
     return self(xs.tracks, **kwargs) | reduce(
         operator.or_,
         [self(x, **kwargs) for x in xs.elements],
+        set(),
     )
 
 

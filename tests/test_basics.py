@@ -43,6 +43,13 @@ def test_apply():
     assert basics.apply(f, (1,), {"y": 2}, {"z": 3}) == (1, 2, 3)
 
 
+def test_partial():
+    def add(x, y):
+        return x + y
+
+    assert basics.partial(add, 4)(5) == 9
+
+
 def test_make_tuple():
     assert basics.make_tuple() == ()
     assert basics.make_tuple(1, 2, 3) == (1, 2, 3)
