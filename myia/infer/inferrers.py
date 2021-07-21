@@ -11,9 +11,9 @@ from .algo import Require
 from .infnode import Replace, inference_function, signature
 
 
-def resolve(args, unif):
+def resolve(node, unif):
     """Inferrer for the resolve basic function."""
-    ns, name = args
+    ns, name = node.inputs
     assert ns.is_constant(ModuleNamespace)
     assert name.is_constant(str)
     resolved = ns.value[name.value]
@@ -23,18 +23,18 @@ def resolve(args, unif):
     return res
 
 
-def user_switch(args, unif):
+def user_switch(node, unif):
     """Inferrer for the user_switch basic function."""
-    cond, ift, iff = args
+    cond, ift, iff = node.inputs
     _ = yield Require(cond)  # TODO: check bool
     ift_t = yield Require(ift)
     iff_t = yield Require(iff)
     return data.AbstractUnion([ift_t, iff_t], tracks={})
 
 
-def getattr_inferrer(args, unif):
+def getattr_inferrer(node, unif):
     """Inferrer for the getattr function."""
-    obj_node, key_node = args
+    obj_node, key_node = node.inputs
     assert key_node.is_constant(str)
     obj = yield Require(obj_node)
     key = key_node.value

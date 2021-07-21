@@ -67,9 +67,9 @@ def signature(*arg_types, ret):
 
     return_type = type_to_abstract(ret) if isinstance(ret, type) else ret
 
-    def _infer(inputs, unif):
+    def _infer(node, unif):
         inp_types = []
-        for inp in inputs:
+        for inp in node.inputs:
             inp_types.append((yield Require(inp)))
         for inp_type, expected_type in zip(inp_types, arg_types):
             autils.unify(expected_type, inp_type, U=unif)
@@ -145,7 +145,7 @@ class InferenceEngine:
                     res = yield Require(inf.graph.return_)
                     return res
                 else:
-                    res = inf(node.inputs, unif)
+                    res = inf(node, unif)
                     # TODO: Return res if not generator, if we create
                     # inferrers that are not generators
                     assert isinstance(res, types.GeneratorType)
