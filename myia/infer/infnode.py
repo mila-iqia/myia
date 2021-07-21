@@ -1,12 +1,12 @@
 """Implementation of type inference on Myia graphs."""
 
 import types
-from collections import defaultdict
 from dataclasses import dataclass
 
 from ..abstract import data, utils as autils
 from ..abstract.to_abstract import to_abstract, type_to_abstract
 from ..ir import Constant, Graph
+from ..ir.graph_utils import dfs, succ_deeper
 from ..parser import parse
 from ..utils.info import enable_debug
 from .algo import Require, RequireAll, Unify, infer
@@ -90,22 +90,15 @@ class InferenceEngine:
 
     def __init__(self, inferrers):
         self.inferrers = inferrers
-        self.replacements = defaultdict(dict)
-        # Make sure None entry is present.
-        self.replacements[None] = {}
 
     def __call__(self, node, unif):
         """Infer the type of a node."""
-        # TODO: Not sure if needed
-        # if repl := self.replacements.get((None, None, node), None):
-        #     return (yield Require(repl))
-
         assert node is not None
         assert not isinstance(node, (data.AbstractValue, data.GenericBase))
 
         if node.is_constant(Graph):
             spc = SpecializedGraph(node.value)
-            self.replacements[None][None, None, node] = Constant(spc)
+            node.replace(Constant(spc))
             return inference_function(spc)
 
         elif node.is_constant() and node.value in self.inferrers:
@@ -115,7 +108,7 @@ class InferenceEngine:
             with enable_debug():
                 spc = SpecializedGraph(parse(node.value))
                 ct = Constant(spc)
-            self.replacements[None][None, None, node] = ct
+            node.replace(ct)
             return inference_function(spc)
 
         elif node.is_constant(
@@ -161,9 +154,7 @@ class InferenceEngine:
                         while True:
                             instruction = res.send(curr)
                             if isinstance(instruction, Replace):
-                                self.replacements[node.graph][
-                                    None, None, node
-                                ] = instruction.new_node
+                                node.replace(instruction.new_node)
                                 curr = None
                             else:
                                 curr = yield instruction
@@ -200,18 +191,10 @@ def infer_graph(graph, input_types):
 
     eng = InferenceEngine(inferrers)
     g = graph.specialize(input_types)
-    eng.replacements[g] = {}
     infer(eng, g.return_)
 
-    for gx, repl in eng.replacements.items():
-        if gx is not None:
-            repl = {**repl, **eng.replacements[None]}
-            for a, b in repl.items():
-                origin, lbl, to_replace = a
-                assert origin is None
-                assert lbl is None
-                if b.is_constant(SpecializedGraph):
-                    b = Constant(b.value.graph)
-                gx.replace_node(to_replace, None, b)
+    for node in dfs(g.return_, succ=succ_deeper):
+        if node.is_constant(SpecializedGraph):
+            node.replace(Constant(node.value.graph))
 
     return g

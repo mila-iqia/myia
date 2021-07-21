@@ -54,7 +54,7 @@ def remove_useless_universe_getitem(g: Graph):
                 # Replace universe_getitem nodes with associated value.
                 for n_getitem in nodes_getitem:
                     graph.delete_seq(n_getitem)
-                    graph.replace_node(n_getitem, None, n_value)
+                    n_getitem.replace(n_value)
                 graph.delete_seq(n_setitem)
                 graph.delete_seq(n_make_handle)
         # Optimize all other closures.

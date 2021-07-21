@@ -114,19 +114,6 @@ class Graph:
             self.specializations[sig] = cl
         return self.specializations[sig]
 
-    def replace_node(self, node, lbl, repl, *, recursive=True):
-        """Replace a node by another in this graph.
-
-        This will replace every use of `node` with label `lbl` in this
-        graph (and subgraphs if `recursive` is `True`) by `repl`.
-
-        If `lbl` is None then this will replace all uses.
-        """
-        for use in list(node.users):
-            if recursive or use.user.graph is self:
-                if lbl is None or use.label == lbl:
-                    use.node = repl
-
     def delete_seq(self, node):
         """Remove a node from all sequence chains."""
         fwd = node.edges.get(SEQ, None)
@@ -230,6 +217,15 @@ class Node:
         if self.debug is not None:
             for k, v in kwargs.items():
                 setattr(self.debug, k, v)
+
+    def replace(self, repl, lbl=None):
+        """Replace this node by another."""
+        if self.is_apply() and repl.is_constant():
+            self.graph.delete_seq(self)
+
+        for use in list(self.users):
+            if lbl is None or use.label == lbl:
+                use.node = repl
 
     def _copy_fields(self, old, objmap):
         self.abstract = old.abstract
