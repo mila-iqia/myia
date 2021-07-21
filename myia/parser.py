@@ -440,7 +440,7 @@ class Parser:
             if SEQ in ld.edges:
                 n.add_edge(SEQ, ld.edges[SEQ].node)
                 del ld.edges[SEQ]
-            ld.graph.replace_node(ld, None, n)
+            ld.replace(n)
         elif var in (function.variables_root | function.variables_free):
             n = ld.graph.apply(
                 basics.global_universe_getitem, local_namespace[var]
@@ -448,17 +448,17 @@ class Parser:
             if SEQ in ld.edges:
                 n.add_edge(SEQ, ld.edges[SEQ].node)
                 del ld.edges[SEQ]
-            ld.graph.replace_node(ld, None, n)
+            ld.replace(n)
         elif var in function.variables_local_closure:
             ld.graph.delete_seq(ld)
             if st is None:
-                ld.graph.replace_node(ld, None, local_namespace[var])
+                ld.replace(local_namespace[var])
             else:
-                ld.graph.replace_node(ld, None, st.edges[1].node)
+                ld.replace(st.edges[1].node)
         elif var in function.variables_local:
             assert st is not None
             ld.graph.delete_seq(ld)
-            ld.graph.replace_node(ld, None, st.edges[1].node)
+            ld.replace(st.edges[1].node)
         else:
             raise AssertionError(
                 f"unclassified variable '{var}'"
@@ -475,7 +475,7 @@ class Parser:
             if SEQ in st.edges:
                 n.add_edge(SEQ, st.edges[SEQ].node)
                 del st.edges[SEQ]
-            st.graph.replace_node(st, None, n)
+            st.replace(n)
         elif var in function.variables_global:
             raise NotImplementedError("attempt to write to a global variable")
         elif var in function.variables_local:
