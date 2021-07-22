@@ -9,6 +9,33 @@ from ..utils.misc import Named
 NOT_DONE = Named("NOT_DONE")
 
 
+class InferenceTask:
+    """Represents an inference task.
+
+    Arguments:
+        node: The node being inferred.
+        engine: The inference engine to use.
+
+    Attributes:
+        node: The node being inferred.
+        inferrer: The (already started) generator handling this node.
+        remap: A map from Generic/Placeholder instances to CanonGeneric
+            instances.
+        unif: The Unificator for this task.
+    """
+
+    def __init__(self, node, engine):
+        self.node = node
+        self.node.abstract = data.Placeholder()
+
+        self.unif = autils.Unificator()
+
+        # The inferrer is a generator and must receive the value None
+        # at the beginning (because of Python's generator protocol)
+        self.inferrer = engine(node, self.unif)
+        self.remap = {}
+
+
 class Scheduler:
     """Schedules the next step in the inference.
 
@@ -179,31 +206,23 @@ class Inferrer:
         """
         existing = node.abstract
         if existing is None:
-            node.abstract = data.Placeholder()
-            unif = autils.Unificator()
-            # The inferrer is a generator and must receive the value None
-            # at the beginning (because of Python's generator protocol)
             self.step(
-                node=node,
-                inferrer=self.engine(node, unif),
-                remap={},
-                unif=unif,
+                task=InferenceTask(node=node, engine=self.engine),
                 value=None,
             )
         else:
             self.scheduler.satisfy(node, existing)
 
-    def step(self, node, inferrer, remap, unif, value):
+    def step(self, task, value):
         """Perform an inference step.
 
         Arguments:
-            node: The node being inferred.
-            inferrer: The (already started) generator handling this node.
-            remap: A map from Generic/Placeholder instances to CanonGeneric
-                instances.
-            unif: The Unificator for this step.
+            task: The InferenceTask.
             value: The value to give to the inferrer to continue.
         """
+        node = task.node
+        inferrer = task.inferrer
+
         if inferrer.gi_frame is None:
             # This inferrer has ended.
             return
@@ -217,16 +236,18 @@ class Inferrer:
             # to (canon1, canon2) so that the inferrer can easily cache results.
             # We will later reverse the mapping to unify on the real placeholders.
             if isinstance(value, tuple):
-                value = tuple(autils.canonical(x, mapping=remap) for x in value)
+                value = tuple(
+                    autils.canonical(x, mapping=task.remap) for x in value
+                )
             else:
-                value = autils.canonical(value, mapping=remap)
+                value = autils.canonical(value, mapping=task.remap)
 
             # If the inferrer is not done it will yield an additional request
             request = inferrer.send(value)
 
             # Fill in extra attributes in the request
             request.unif = self.unif
-            request.payload = (node, inferrer, remap, unif)
+            request.payload = task
 
             # All requested nodes are scheduled
             for rnode in request.nodes:
@@ -241,12 +262,12 @@ class Inferrer:
             assert stop.value is not None
             # We need to undo the renaming we performed in order to recover the
             # actual placeholders.
-            result = autils.uncanonical(stop.value, mapping=remap)
+            result = autils.uncanonical(stop.value, mapping=task.remap)
 
             # Unify with the local unificator
-            for k, v in remap.items():
-                autils.unify(k, v, U=unif)
-            autils.unify(result, node.abstract, U=unif)
+            for k, v in task.remap.items():
+                autils.unify(k, v, U=task.unif)
+            autils.unify(result, node.abstract, U=task.unif)
 
             # We then unify the current node's placeholder (in node.abstract)
             # with the result and set node.abstract to that.
@@ -260,12 +281,12 @@ class Inferrer:
         self.bootstrap(start)
         while True:
             try:
-                (node, inferrer, remap, unif), value = self.scheduler.next()
+                task, value = self.scheduler.next()
             except IndexError:
                 # Nothing more to do
                 break
 
-            self.step(node, inferrer, remap, unif, value)
+            self.step(task, value)
 
         # The result for start will be in start.abstract
         result = self.unif.canon.get(start.abstract, start.abstract)
