@@ -5,7 +5,7 @@ from myia.operations import (
     universe_setitem,
 )
 from myia.testing.common import H, f64, i64
-from myia.testing.multitest import infer, mt, run_debug
+from myia.testing.multitest import infer, mt
 from myia.utils import HandleInstance, InferenceError, new_universe
 from myia.xtype import EnvType, UniverseType
 
@@ -46,7 +46,6 @@ def _test_universe_chk(args, U):
 @mt(
     infer(UniverseType, H(i64), i64, i64, result=UniverseType),
     infer(UniverseType, H(i64), f64, f64, result=InferenceError),
-    run_debug(new_universe, HandleInstance(2), 3, 4, result=_test_universe_chk),
 )
 def test_universe(U, h, x, y):
     init = universe_getitem(U, h)

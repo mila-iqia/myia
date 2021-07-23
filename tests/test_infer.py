@@ -86,7 +86,7 @@ from myia.testing.common import (
     mysum,
     to_abstract_test,
 )
-from myia.testing.multitest import infer as mt_infer, mt, run_debug
+from myia.testing.multitest import infer as mt_infer, mt
 from myia.utils import InferenceError, MyiaTypeError, newenv
 from myia.xtype import (
     Array,
@@ -1094,8 +1094,6 @@ def test_union(x):
 
 @mt(
     infer_standard(U(i64, (i64, i64)), result=i64),
-    run_debug(31, result=31, abstract=(U(i64, (i64, i64)),)),
-    run_debug(-9, result=-1, abstract=(U(i64, (i64, i64)),)),
 )
 def test_union_2(x):
     if hastype(x, i64) and x > 0:
