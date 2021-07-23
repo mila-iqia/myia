@@ -1,12 +1,13 @@
-from myia.operations import (
+from myia.basics import (
     make_handle,
-    typeof,
-    universe_getitem,
-    universe_setitem,
+    global_universe_getitem as universe_getitem,
+    global_universe_setitem as universe_setitem,
+    Handle as HandleInstance,
 )
+from myia.abstract.map import MapError as InferenceError
 from myia.testing.common import H, f64, i64
 from myia.testing.multitest import infer, mt
-from myia.utils import HandleInstance, InferenceError, new_universe
+from myia.utils import new_universe
 from myia.xtype import EnvType, UniverseType
 
 

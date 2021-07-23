@@ -85,10 +85,6 @@ from myia.testing.common import (
     ai64_of,
     mysum,
     to_abstract_test,
-)
-from myia.testing.multitest import infer as mt_infer, mt
-from myia.utils import InferenceError, MyiaTypeError, newenv
-from myia.xtype import (
     Array,
     EnvType as Env,
     External,
@@ -104,7 +100,10 @@ from myia.xtype import (
     i64,
     u64,
 )
-
+from myia.testing.multitest import infer as mt_infer, mt
+from myia.utils import newenv
+from myia.abstract.map import MapError as InferenceError
+from myia.abstract.map import MapError as MyiaTypeError
 ai64 = Array[i64]
 af64 = Array[f64]
 

@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 
 from myia.testing.common import (
@@ -11,10 +9,10 @@ from myia.testing.common import (
     ai32_of,
     ai64_of,
     au64_of,
+    Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
 )
 from myia.testing.multitest import infer, mt
-from myia.utils.errors import MyiaTypeError
-from myia.xtype import Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
+from myia.abstract.map import MapError as MyiaTypeError
 
 
 def Shp(*values):

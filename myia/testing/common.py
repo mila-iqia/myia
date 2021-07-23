@@ -62,3 +62,25 @@ def build_graph(descr, params=[]):
     nodeset.add(g.return_)
     nodeset.add(g.return_.fn)
     return g, nodeset
+
+
+def Ty(typedesc):pass
+def H(typedesc):pass
+def af16_of(*shape):pass
+def af32_of(*shape):pass
+def af64_of(*shape):pass
+def ai16_of(*shape):pass
+def ai32_of(*shape):pass
+def ai64_of(*shape):pass
+def au64_of(*shape):pass
+Bool = None
+Nil = None
+f16 = None
+f32 = None
+f64 = None
+i8 = None
+i16 = None
+i32 = None
+i64 = None
+u32 = None
+u64 = None
