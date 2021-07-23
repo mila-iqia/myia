@@ -2,20 +2,15 @@ import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import List, Tuple
+from ovld import ovld
 
 import numpy as np
 
-from myia.abstract import (
-    ANYTHING,
-    CONTEXTLESS,
-    Contextless,
-    UniformPrimitiveInferrer,
-)
-from myia.ir import Graph, MetaGraph, MultitypeGraph
-from myia.operations import (
+from myia.abstract.data import ANYTHING
+from myia.testing import master_placeholders as P
+from myia.testing.master_placeholders import (
     J,
     Jinv,
-    Operation,
     array_cast,
     array_map,
     array_reduce,
@@ -39,7 +34,6 @@ from myia.operations import (
     nil_eq,
     nil_ne,
     partial as myia_partial,
-    primitives as P,
     reshape,
     scalar_add,
     scalar_cast,
@@ -57,8 +51,6 @@ from myia.operations import (
     user_switch,
     zeros_like,
 )
-from myia.operations.utils import InferencePrimitive
-from myia.pipeline import scalar_pipeline, standard_pipeline, steps
 from myia.testing.common import (
     AN,
     JT,
@@ -99,9 +91,9 @@ from myia.testing.common import (
     i32,
     i64,
     u64,
+    newenv,
 )
 from myia.testing.multitest import infer as mt_infer, mt
-from myia.utils import newenv
 from myia.abstract.map import MapError as InferenceError
 from myia.abstract.map import MapError as MyiaTypeError
 ai64 = Array[i64]
@@ -116,34 +108,16 @@ af64 = Array[f64]
 abstract_inferrer_cons_test = {}
 
 
-def _test_op(fn):
-    prim = InferencePrimitive(fn.__name__)
-    xinf = UniformPrimitiveInferrer.partial(prim=prim, impl=fn)
-    prim.set_defaults({"inferrer_constructor": xinf})
-    return prim
-
-
-@_test_op
 def _tern(x: Number, y: Number, z: Number) -> Number:
     return x + y + z
 
 
-@_test_op
 def _to_i64(x: Number) -> Int[64]:
     return int(x)
 
 
-infer_pipeline = scalar_pipeline.with_steps(
-    steps.step_parse, steps.step_infer
-).configure(preresolve=False)
-
-infer_pipeline_std = standard_pipeline.with_steps(
-    steps.step_parse, steps.step_infer
-).configure(preresolve=False)
-
-
-infer_standard = mt_infer.configure(pipeline=infer_pipeline_std)
-infer_scalar = mt_infer.configure(pipeline=infer_pipeline)
+infer_standard = mt_infer
+infer_scalar = mt_infer
 
 
 type_signature_arith_bin = [
@@ -152,13 +126,6 @@ type_signature_arith_bin = [
     infer_scalar(i64, f64, result=InferenceError),
     infer_scalar(B, B, result=InferenceError),
 ]
-
-
-def test_contextless():
-    C = CONTEXTLESS
-    assert Contextless.empty() is C
-    assert C.filter(Graph()) is C
-    assert C.add(Graph(), []) is C
 
 
 @mt(infer_scalar(i64, result=i64), infer_scalar(89, result=89))
@@ -1063,7 +1030,7 @@ def test_isinstance(x):
                 return f(x[0]) + f(x[1:])
         elif isinstance(x, list):
             if x:
-                return f(x.head) + f(x.tail)
+                return f(x[0]) + f(x[-1])
             else:
                 return 0
         elif isinstance(x, Point):
@@ -1748,16 +1715,13 @@ def test_multitype(x, y, z):
     return mysum(x) * mysum(x, y) * mysum(x, y, z)
 
 
-mystery = MultitypeGraph("mystery")
-
-
-@mystery.register(ai64, ai64)
-def _mystery1(x, y):
+@ovld
+def mystery(x: ai64, y: ai64):
     return x @ y
 
 
-@mystery.register(af64, af64)
-def _mystery2(x, y):
+@ovld
+def mystery(x: af64, y: af64):
     return array_map(scalar_add, x, y)
 
 
@@ -1770,86 +1734,6 @@ def _mystery2(x, y):
 )
 def test_multitype_2(x, y):
     return mystery(x, y)
-
-
-class _BadMG(MetaGraph):
-    def generate_graph(self, sig):
-        return None
-
-
-_bmg = _BadMG("badmg")
-
-
-@infer_scalar(i64, result=InferenceError)
-def test_bad_metagraph(x):
-    return _bmg(x)
-
-
-# TODO: add back
-# def test_forced_type():
-
-#     @pipeline_function
-#     def mod(self, graph):
-#         # Force the inferred tyoe of the output to be f64
-#         graph.output.inferred['type'] = f64
-#         return graph
-
-#     def fn(x, y):
-#         return x + y
-
-#     pip = infer_pipeline.insert_before('infer', mod=mod)
-
-#     for argspec in [[{'type': i64}, {'type': i64}],
-#                     [{'type': i64}, {'type': f64}]]:
-
-#         results = pip(input=fn, argspec=argspec)
-#         rval = results['outspec']
-
-#         assert rval['type'] == f64
-
-
-# def test_forced_function_type():
-
-#     @pipeline_function
-#     def mod(self, graph):
-#         # Force the inferred tyoe of scalar_add to be (i64,i64)->f64
-#         scalar_add = graph.output.inputs[0]
-#         scalar_add.inferred['type'] = F[[i64, i64], f64]
-#         return graph
-
-#     def fn(x, y):
-#         return x + y
-
-#     pip = infer_pipeline.insert_before('infer', mod=mod)
-
-#     # Test correct
-
-#     results = pip(
-#         input=fn,
-#         argspec=[{'type': i64}, {'type': i64}]
-#     )
-#     rval = results['outspec']
-
-#     assert rval['type'] == f64
-
-#     # Test mismatch
-
-#     with pytest.raises(InferenceError):
-#         results = pip(
-#             input=fn,
-#             argspec=[{'type': i64}, {'type': f64}]
-#         )
-
-#     # Test narg mismatch
-
-#     def fn2(x):
-#         return fn(x)
-
-#     with pytest.raises(InferenceError):
-#         results = pip(
-#             input=fn2,
-#             argspec=[{'type': i64}]
-#         )
 
 
 ###########################
@@ -2427,11 +2311,3 @@ def test_string_ne(s):
 @mt(infer_standard("hey", result="hey"), infer_standard(String, result=String))
 def test_string_return(s):
     return s
-
-
-bad_op = Operation("bad_op")
-
-
-@infer_standard(i64, result=InferenceError)
-def test_bad_operation(x):
-    return bad_op(x)

@@ -66,13 +66,13 @@ def build_graph(descr, params=[]):
 
 def Ty(typedesc):pass
 def H(typedesc):pass
-def af16_of(*shape):pass
-def af32_of(*shape):pass
-def af64_of(*shape):pass
-def ai16_of(*shape):pass
-def ai32_of(*shape):pass
-def ai64_of(*shape):pass
-def au64_of(*shape):pass
+def af16_of(*shape, value=None):pass
+def af32_of(*shape, value=None):pass
+def af64_of(*shape, value=None):pass
+def ai16_of(*shape, value=None):pass
+def ai32_of(*shape, value=None):pass
+def ai64_of(*shape, value=None):pass
+def au64_of(*shape, value=None):pass
 Bool = None
 Nil = None
 f16 = None
@@ -84,3 +84,31 @@ i32 = None
 i64 = None
 u32 = None
 u64 = None
+
+
+B = Bool
+
+newenv = None
+AN = None
+JT = None  # AbstractJTagged
+TU = None  # AbstractTaggedUnion
+Bot = None  # AbstractBottom
+D = None  # symbolic dict
+EmptyTuple = None
+Ex = None
+Point = None
+Point3D = None
+S = None
+Shp = None
+Thing = None
+Thing_f = None
+Thing_ftup = None
+U = None
+mysum = None
+to_abstract_test = None
+Array = None
+EnvType = None
+External = None
+Int = None
+Number = None
+String = None
