@@ -188,6 +188,10 @@ class InferenceEngine:
                 ]
                 return (yield Unify(*optnodes))
 
+            elif isinstance(fn, data.AbstractStructure) and len(fn.elements) == 1 and isinstance(fn.elements[0], data.AbstractAtom) and isinstance(fn.elements[0].tracks.interface, type):
+                # Got abstract type, return interface
+                return fn.elements[0]
+
             else:
                 raise TypeError("Unknown function", fn)
 
