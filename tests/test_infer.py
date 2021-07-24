@@ -52,7 +52,6 @@ from myia.testing.master_placeholders import (
 from myia.testing.common import (
     Tuple,
     List,
-    AN,
     B,
     Bot,
     D,
@@ -66,7 +65,7 @@ from myia.testing.common import (
     Thing_f,
     Thing_ftup,
     Ty,
-    U,
+    Un as U,
     af16_of,
     af32_of,
     af64_of,
@@ -1640,7 +1639,7 @@ def test_array_cast(x, t):
     infer_scalar((i64,), result=InferenceError),
 )
 def test_scalar_to_array(x):
-    return scalar_to_array(x, AN)
+    return scalar_to_array(x)
 
 
 @mt(

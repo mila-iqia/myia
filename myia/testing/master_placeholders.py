@@ -1,11 +1,13 @@
+import operator
 import numpy as np
 from myia.infer.inferrers import X, signature
 from myia.infer.infnode import inferrers
-from myia.testing.common import Number, Float
+from myia.testing.common import Number, Float, Array, Ty
 
 
 inferrers.update({
     np.log: signature(Number, ret=Float),
+    np.array: signature(Number, ret=Array.of(Number, ())),
 })
 
 def array_cast(arr, typ): raise NotImplementedError()
@@ -42,7 +44,7 @@ def scalar_add(a, b): raise NotImplementedError()
 def scalar_cast(x, typ): raise NotImplementedError()
 def scalar_lt(): raise NotImplementedError()
 def scalar_mul(x, y): raise NotImplementedError()
-def scalar_to_array(x, typ): raise NotImplementedError()
+def scalar_to_array(x): return np.array(x)
 def scalar_usub(): raise NotImplementedError()
 def shape(arr): raise NotImplementedError()
 def switch(c, t, f): raise NotImplementedError()

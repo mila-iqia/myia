@@ -178,6 +178,8 @@ u16 = A(np.uint16)
 u32 = A(np.uint32)
 u64 = A(np.uint64)
 
+Float = Un(f16, f32, f64)
+Number = Un(i8, i16, i32, i64, u8, u16, u32, u64, f16, f32, f64)
 Int = {
     8: i8,
     16: i16,
@@ -188,8 +190,10 @@ Tuple = _TupleFactory()
 List = _ListFactory()
 Array = _ArrayFactory()
 External = _ExternalFactory()
-
-U = Un
+String = A(str)
+EmptyTuple = A(tuple)
+EnvType = A(dict)
+newenv = {}
 
 
 def to_abstract_test(x):
@@ -238,30 +242,20 @@ class Thing:
         return self.contents * 2
 
 
-class _Nothing:
-    """Temporar placeholder."""
-    def __init__(self, name):
-        self.name = name
-
-    def __str__(self):
-        return f"{type(self).__name__}({self.name})"
-
-    __repr__ = __str__
-
-    def __getitem__(self, item):
-        raise TypeError(f"Cannot get {self}[{item}]")
-
-    def __call__(self, *args, **kwargs):
-        raise TypeError(f"Cannot call {self}")
+Thing_f = Thing(1.0)
+Thing_ftup = Thing((1.0, 2.0))
 
 
-newenv = _Nothing("newenv")
-AN = _Nothing("AN")
-EmptyTuple = _Nothing("EmptyTuple")
-Thing_f = _Nothing("Thing_f")
-Thing_ftup = _Nothing("Thing_ftop")
-mysum = _Nothing("mysum")
-EnvType = _Nothing("EnvType")
-Number = Un(i8, i16, i32, i64, u8, u16, u32, u64, f16, f32, f64)
-Float = Un(f16, f32, f64)
-String = _Nothing("String")
+@ovld
+def mysum(x):
+    return x
+
+
+@ovld
+def mysum(x, y):
+    return x + y
+
+
+@ovld
+def mysum(x, y, z):
+    return x + y + z
