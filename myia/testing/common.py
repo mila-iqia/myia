@@ -5,7 +5,7 @@ from ovld import ovld
 from myia import basics
 
 from myia.abstract import data
-from myia.abstract.to_abstract import precise_abstract, type_to_abstract
+from myia.abstract.to_abstract import precise_abstract
 from myia.ir.node import Constant, Graph
 
 

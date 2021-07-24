@@ -118,7 +118,8 @@ type_signature_arith_bin = [
     infer_scalar(i64, i64, result=i64),
     infer_scalar(f64, f64, result=f64),
     infer_scalar(i64, f64, result=InferenceError),
-    infer_scalar(B, B, result=InferenceError),
+    # Bool type supports arithmetic operations
+    infer_scalar(B, B, result=B),
 ]
 
 
