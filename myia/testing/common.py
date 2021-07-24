@@ -62,6 +62,17 @@ def _to_abstract(self, x: (data.GenericBase, data.AbstractValue)):  # noqa: F811
     return x
 
 
+@ovld
+def _to_abstract(self, x: list):
+    if not x:
+        items = []
+    else:
+        assert len(x) == 1, x
+        item, = x
+        items = [item if isinstance(item, data.AbstractValue) else _to_abstract(item)]
+    return data.AbstractStructure(items, {"interface": list})
+
+
 def A(*args):
     """Convert given arguments to an abstract value for testing."""
     if len(args) == 1:

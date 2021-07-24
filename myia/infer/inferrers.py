@@ -5,6 +5,7 @@ import types
 
 from .. import basics
 from ..abstract import data
+from ..abstract.map import MapError
 from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
@@ -67,6 +68,33 @@ def getattr_inferrer(node, args, unif):
     return res
 
 
+def getitem_inferrer(node, args, unif):
+    obj_node, key_node = args
+    assert key_node.is_constant(int)
+    obj = yield Require(obj_node)
+    key = key_node.value
+    if not (isinstance(obj, data.AbstractStructure) and obj.tracks.interface in (tuple, list)):
+        raise AssertionError(f"getitem can currently only be used for lists and tuples, got {obj}[{key}]")
+    return obj.elements[key]
+
+
+def make_tuple_inferrer(node, args, unif):
+    tuple_types = []
+    for arg_node in args:
+        tuple_types.append((yield Require(arg_node)))
+    return data.AbstractStructure(tuple_types, {"interface": tuple})
+
+
+def make_list_inferrer(node, args, unif):
+    tuple_types = []
+    for arg_node in args:
+        tuple_types.append((yield Require(arg_node)))
+    for typ in tuple_types[1:]:
+        if typ is not tuple_types[0]:
+            raise MapError(tuple_types[0], typ, "list elements don't have same type")
+    return data.AbstractStructure([tuple_types[0]] if tuple_types else [], {"interface": list})
+
+
 X = data.Generic("x")
 
 
@@ -74,19 +102,27 @@ def add_standard_inferrers(inferrers):
     """Register all the inferrers in this file."""
     inferrers.update(
         {
-            operator.mul: signature(X, X, ret=X),
             operator.add: signature(X, X, ret=X),
-            operator.sub: signature(X, X, ret=X),
-            operator.neg: signature(X, ret=X),
-            operator.le: signature(X, X, ret=bool),
+            operator.and_: signature(X, X, ret=X),
+            operator.eq: signature(X, X, ret=bool),
             operator.gt: signature(X, X, ret=bool),
+            operator.invert: signature(X, ret=X),
+            operator.le: signature(X, X, ret=bool),
+            operator.lshift: signature(X, X, ret=X),
+            operator.mul: signature(X, X, ret=X),
+            operator.neg: signature(X, ret=X),
+            operator.or_: signature(X, X, ret=X),
+            operator.rshift: signature(X, X, ret=X),
+            operator.sub: signature(X, X, ret=X),
             operator.truth: signature(X, ret=bool),
+            operator.xor: signature(X, X, ret=X),
             basics.return_: signature(X, ret=X),
             basics.resolve: inference_function(resolve),
             basics.user_switch: inference_function(user_switch),
             int.__add__: signature(int, int, ret=int),
             float.__add__: signature(float, float, ret=float),
             getattr: inference_function(getattr_inferrer),
+            operator.getitem: inference_function(getitem_inferrer),
             type: signature(
                 X,
                 ret=data.AbstractStructure([X], tracks={"interface": type}),
@@ -100,5 +136,7 @@ def add_standard_inferrers(inferrers):
                 ret=X,
             ),
             basics.partial: inference_function(partial_inferrer),
+            basics.make_tuple: inference_function(make_tuple_inferrer),
+            basics.make_list: inference_function(make_list_inferrer),
         }
     )
