@@ -156,6 +156,8 @@ class InterfaceTrack(Track):
 
 Tracks.register_track("value", ValueTrack)
 Tracks.register_track("interface", InterfaceTrack)
+Tracks.register_track("ndim", ValueTrack)
+Tracks.register_track("shape", ValueTrack)
 
 
 #################

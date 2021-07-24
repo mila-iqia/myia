@@ -1,7 +1,6 @@
 import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import List, Tuple
 from ovld import ovld
 
 import numpy as np
@@ -18,7 +17,6 @@ from myia.testing.master_placeholders import (
     bool_and,
     bool_or,
     broadcast_shape,
-    casttag,
     conv2d_grad_input,
     dict_values,
     distribute,
@@ -28,7 +26,6 @@ from myia.testing.master_placeholders import (
     env_setitem,
     gadd,
     grad,
-    hastag,
     hastype,
     identity,
     nil_eq,
@@ -52,9 +49,9 @@ from myia.testing.master_placeholders import (
     zeros_like,
 )
 from myia.testing.common import (
+    Tuple,
+    List,
     AN,
-    JT,
-    TU,
     B,
     Bot,
     D,
@@ -103,9 +100,6 @@ af64 = Array[f64]
 ########################
 # Temporary primitives #
 ########################
-
-
-abstract_inferrer_cons_test = {}
 
 
 def _tern(x: Number, y: Number, z: Number) -> Number:
@@ -1120,20 +1114,6 @@ def test_union_nested_2(x):
         return x[0]
 
 
-@mt(
-    infer_standard(TU(_1=i64, _2=f64, _37=(i64, i64)), result=i64),
-    infer_standard(TU(_2=f64, _3=(i64, i64)), result=InferenceError),
-    infer_standard(TU(_1=i64, _2=f64, _77=(i64, i64)), result=InferenceError),
-)
-def test_hastag_casttag(x):
-    if hastag(x, 1):
-        return casttag(x, 1)
-    elif hastag(x, 2):
-        return 1234
-    else:
-        return casttag(x, 37)[0]
-
-
 def _square(x):
     return x * x
 
@@ -1990,30 +1970,6 @@ def test_tagged_more(c, x, y, z):
 @infer_scalar(i64, result=InferenceError)
 def test_tagged_too_many_arguments(x):
     return tagged(x, 1, 2)
-
-
-@mt(
-    infer_scalar(i32, result=(JT(i32), Env, i32)),
-    infer_scalar(f64, result=(JT(f64), Env, f64)),
-)
-def test_J(x):
-    def f(x):
-        return x * x
-
-    jf = J(f)
-    jx = J(x)
-    jy, bprop = jf(jx)
-    df, dx = bprop(1.0)
-    return jy, df, dx
-
-
-@mt(
-    infer_scalar(JT(i32), result=i32),
-    infer_scalar(JT([i32]), result=[i32]),
-    infer_scalar(i32, result=InferenceError),
-)
-def test_Jinv(x):
-    return Jinv(x)
 
 
 @mt(
