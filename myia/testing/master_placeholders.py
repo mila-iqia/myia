@@ -43,7 +43,7 @@ def reshape(arr, shp): raise NotImplementedError()
 def scalar_add(a, b): raise NotImplementedError()
 def scalar_cast(x, typ): raise NotImplementedError()
 def scalar_lt(): raise NotImplementedError()
-def scalar_mul(x, y): raise NotImplementedError()
+def scalar_mul(x, y): return x * y
 def scalar_to_array(x): return np.array(x)
 def scalar_usub(): raise NotImplementedError()
 def shape(arr): raise NotImplementedError()

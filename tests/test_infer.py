@@ -280,17 +280,17 @@ def test_merge_point(x, y):
     return m(x, x), m(y, y)
 
 
-@infer_scalar(i64, result=InferenceError)
+@infer_scalar(i64, result=AssertionError)
 def test_not_enough_args_prim(x):
     return scalar_mul(x)
 
 
-@infer_scalar(i64, i64, i64, result=InferenceError)
+@infer_scalar(i64, i64, i64, result=AssertionError)
 def test_too_many_args_prim(x, y, z):
     return scalar_mul(x, y, z)
 
 
-@infer_scalar(i64, result=InferenceError)
+@infer_scalar(i64, result=AssertionError)
 def test_not_enough_args(x):
     def g(x, y):
         return x * y
@@ -298,7 +298,7 @@ def test_not_enough_args(x):
     return g(x)
 
 
-@infer_scalar(i64, i64, result=InferenceError)
+@infer_scalar(i64, i64, result=AssertionError)
 def test_too_many_args(x, y):
     def g(x):
         return x * x
