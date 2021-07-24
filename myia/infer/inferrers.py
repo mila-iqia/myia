@@ -79,6 +79,7 @@ def add_standard_inferrers(inferrers):
             operator.sub: signature(X, X, ret=X),
             operator.neg: signature(X, ret=X),
             operator.le: signature(X, X, ret=bool),
+            operator.gt: signature(X, X, ret=bool),
             operator.truth: signature(X, ret=bool),
             basics.return_: signature(X, ret=X),
             basics.resolve: inference_function(resolve),
