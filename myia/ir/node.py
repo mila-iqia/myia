@@ -107,6 +107,7 @@ class Graph:
 
     def specialize(self, sig):
         """Return a Graph specialized for a type signature."""
+        assert len(self.parameters) == len(sig)
         if sig not in self.specializations:
             cl = self.clone()
             for param, typ in zip(cl.parameters, sig):

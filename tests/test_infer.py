@@ -1,3 +1,4 @@
+import pytest
 import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -164,10 +165,9 @@ def test_prim_mul(x, y):
     # Three different inconsistent patterns below
     infer_scalar(f64, f64, i64, result=InferenceError),
     infer_scalar(i64, f64, f64, result=InferenceError),
-    infer_scalar(f64, f64, i64, result=InferenceError),
     # Test too few/too many arguments below
-    infer_scalar(i64, result=InferenceError),
-    infer_scalar(i64, i64, i64, i64, result=InferenceError),
+    infer_scalar(i64, result=AssertionError),
+    infer_scalar(i64, i64, i64, i64, result=AssertionError),
 )
 def test_prim_tern(x, y, z):
     return _tern(x, y, z)
