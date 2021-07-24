@@ -5,6 +5,7 @@ import pytest
 
 from myia.abstract.data import AbstractValue
 from myia.infer.infnode import infer_graph
+from myia.abstract import utils as autils
 from myia.parser import parse
 from myia.testing.common import A
 from myia.utils.info import enable_debug
@@ -80,9 +81,7 @@ def infer(*args, result=None):
                 if isinstance(result, AbstractValue):
                     ret_graph = infer_graph(graph, args)
                     ret_type = ret_graph.return_.abstract
-                    assert (
-                        ret_type is result
-                    ), f"Expected {result}, got {ret_type}"
+                    autils.unify(ret_type, result)
                 else:
                     with pytest.raises(exc_type, match=exc_match):
                         infer_graph(graph, args)

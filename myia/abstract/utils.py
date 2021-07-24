@@ -167,6 +167,22 @@ def _unify(self, x: object, y: object, *, U):  # noqa: F811
         raise MapError(x, y, reason="Cannot merge objects")
 
 
+@ovld
+def _unify(self, x: data.AbstractUnion, y: (data.AbstractAtom, data.AbstractStructure), *, U):  # noqa: F811
+    if y in x.options:
+        return y
+    else:
+        raise MapError(x, y, reason="Cannot merge objects")
+
+
+@ovld
+def _unify(self, x: (data.AbstractAtom, data.AbstractStructure), y: data.AbstractUnion, *, U):  # noqa: F811
+    if x in y.options:
+        return x
+    else:
+        raise MapError(x, y, reason="Cannot merge objects")
+
+
 def unify(x, y, U=None):
     """Unify x with y using Unificator U."""
     U = U or Unificator()

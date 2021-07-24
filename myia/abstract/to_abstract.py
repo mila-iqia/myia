@@ -1,5 +1,6 @@
 """Functions to convert data to an abstract data type."""
 from typing import Union
+from types import ModuleType
 
 from ovld import ovld
 
@@ -18,6 +19,15 @@ def to_abstract(self, xs: tuple):
     return data.AbstractStructure(
         [self(x) for x in xs], {"interface": type(xs)}
     )
+
+
+@ovld
+def to_abstract(self, x: ModuleType):  # noqa: F811
+    """Convert module to an AbstractValue.
+
+    Keep module as interface so that getattr(interface, name) is valid.
+    """
+    return data.AbstractAtom({"interface": x})
 
 
 @ovld

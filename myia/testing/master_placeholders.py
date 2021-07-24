@@ -1,3 +1,13 @@
+import numpy as np
+from myia.infer.inferrers import X, signature
+from myia.infer.infnode import inferrers
+from myia.testing.common import Number, Float
+
+
+inferrers.update({
+    np.log: signature(Number, ret=Float),
+})
+
 def array_cast(arr, typ): raise NotImplementedError()
 def array_map(fn, arr, *arrays): raise NotImplementedError()
 def array_reduce(fn, arr, shap): raise NotImplementedError()
