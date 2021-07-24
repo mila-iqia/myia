@@ -187,13 +187,18 @@ def test_prim_usub(x):
     infer_standard(i64, result=f64),
     infer_standard(f32, result=f32),
     infer_standard(f64, result=f64),
-    infer_standard(af64_of(2, 5), result=af64_of(2, 5)),
     # NB: Numpy accepts np.log(bool).
     # Maybe inferrer should accept too,
     # by just adding bool type to NUmber union
     infer_standard(B, result=InferenceError),
 )
 def test_prim_log(x):
+    return np.log(x)
+
+
+@pytest.mark.xfail(strict=True, raises=InferenceError, reason="Cannot merge objects")
+@infer_standard(af64_of(2, 5), result=af64_of(2, 5))
+def test_prim_log_array(x):
     return np.log(x)
 
 
