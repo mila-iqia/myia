@@ -16,12 +16,11 @@ typeof = type
     infer((i64, f64), result=H((i64, f64))),
 )
 def test_make_handle(x):
-    return make_handle(typeof(x))[1]
+    return make_handle(typeof(x))
 
 
 @mt(
     infer(H(i64), result=i64),
-    infer(H(i64), result=InferenceError),
     infer(i64, result=InferenceError),
 )
 def test_universe_getitem(h):
@@ -31,7 +30,6 @@ def test_universe_getitem(h):
 @mt(
     infer(H(i64), i64, result=None),
     infer(H(i64), f64, result=InferenceError),
-    infer(H(i64), i64, result=InferenceError),
     infer(i64, i64, result=InferenceError),
 )
 def test_universe_setitem(h, v):

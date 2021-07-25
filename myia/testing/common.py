@@ -100,7 +100,7 @@ def Ty(element_type):
 
 def H(*opts):
     return data.AbstractStructure(
-        [precise_abstract(opt) for opt in opts],
+        [_to_abstract(opt) for opt in opts],
         {"interface": basics.Handle}
     )
 

@@ -140,6 +140,11 @@ class Track:
     def __hash__(self):
         return hash(self.value)
 
+    def __str__(self):
+        return f"{type(self).__name__}({self.value})"
+
+    __repr__ = __str__
+
 
 class ValueTrack(Track):
     """Represents the actual value of an abstract object."""

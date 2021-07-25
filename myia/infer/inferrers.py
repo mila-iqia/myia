@@ -97,6 +97,7 @@ def make_list_inferrer(node, args, unif):
 
 X = data.Generic("x")
 
+AbstractNone = data.AbstractAtom({"interface": type(None)})
 
 def add_standard_inferrers(inferrers):
     """Register all the inferrers in this file."""
@@ -134,6 +135,11 @@ def add_standard_inferrers(inferrers):
             basics.global_universe_getitem: signature(
                 data.AbstractStructure([X], tracks={"interface": Handle}),
                 ret=X,
+            ),
+            basics.global_universe_setitem: signature(
+                data.AbstractStructure([X], tracks={"interface": Handle}),
+                X,
+                ret=AbstractNone
             ),
             basics.partial: inference_function(partial_inferrer),
             basics.make_tuple: inference_function(make_tuple_inferrer),

@@ -10,6 +10,7 @@ from ..ir.graph_utils import dfs, succ_deeper
 from ..parser import parse
 from ..utils.info import enable_debug
 from .algo import Inferrer, Require, RequireAll, Unify
+from myia.ir.node import SEQ
 
 inferrers = {}
 
@@ -139,6 +140,15 @@ class InferenceEngine:
 
         else:
             fn = yield Require(node.fn)
+
+            # Graph may contain nodes that are not involved in return node.
+            # e.g:
+            # def f(h, v):
+            #     global_universe_setitem(h, v)  # <-- unused in return value
+            #     return v
+            # Make sure to infer types for such nodes by visiting SEQ nodes.
+            if SEQ in node.edges:
+                yield Require(node.edges[SEQ].node)
 
             # if isinstance(fn, data.AbstractFunction):
             #     inp_types = []
