@@ -1,5 +1,3 @@
-import numpy as np
-
 from myia.testing.common import (
     Ty,
     af16_of,
@@ -13,6 +11,11 @@ from myia.testing.common import (
 )
 from myia.testing.multitest import infer, mt
 from myia.abstract.map import MapError as MyiaTypeError
+from myia.testing import numpy_subset as np
+from myia.testing.master_placeholders import add_testing_inferrers
+
+
+add_testing_inferrers()
 
 
 def Shp(*values):
@@ -111,7 +114,7 @@ def test_infer_full(shape, value, dtype):
 
 @mt(
     # we could not cast to a Nil,
-    infer(Ty(Nil), i64, result=MyiaTypeError),
+    infer(Ty(Nil), i64, result=Exception("wrong number of arguments")),
     # We could cast to a Bool,
     infer(Ty(Bool), i64, result=Bool),
     # we could create an int8 from any floating.

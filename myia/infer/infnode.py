@@ -80,7 +80,10 @@ def signature(*arg_types, ret):
         inp_types = []
         for inp in args:
             inp_types.append((yield Require(inp)))
-        assert len(inp_types) == len(arg_types)
+        assert len(inp_types) == len(arg_types), (
+            f"wrong number of arguments, "
+            f"expected {len(arg_types)}, got {len(inp_types)}"
+        )
         for inp_type, expected_type in zip(inp_types, arg_types):
             autils.unify(expected_type, inp_type, U=unif)
         return autils.reify(return_type, unif=unif.canon)
@@ -100,6 +103,28 @@ class InferenceEngine:
 
     def __init__(self, inferrers):
         self.inferrers = inferrers
+
+    def _is_abstract_type(self, fn: data.AbstractValue):
+        return (
+            isinstance(fn, data.AbstractStructure)
+            and fn.tracks.interface is type
+            and len(fn.elements) == 1
+            and isinstance(fn.elements[0], data.AbstractAtom)
+        )
+
+    def _get_inference_function(self, fn: data.AbstractValue):
+        if isinstance(fn.tracks.interface, InferenceFunction):
+            return fn.tracks.interface.fn
+        elif (
+            self._is_abstract_type(fn)
+            and (typ := fn.elements[0].tracks.interface) in self.inferrers
+        ):
+            # Got abstract type. If an inference function is set
+            # for given type, return it.
+            # e.g.: specific inference for None type to check that
+            # None constructor does not receive any input.
+            return self.inferrers[typ].tracks.interface.fn
+        return None
 
     def __call__(self, node, unif):
         """Infer the type of a node."""
@@ -159,9 +184,13 @@ class InferenceEngine:
 
             #     return autils.reify(fn.out, unif=unif.canon)
 
-            if isinstance(fn.tracks.interface, InferenceFunction):
+            # fn type inference not go through inferer if node.fn.abstract was
+            # already defined, but there may be inference function associated
+            # to this already-existing abstract. So, we use a specific
+            # function to do all work about getting associated inferer.
+            inf = self._get_inference_function(fn)
+            if inf:
                 partial_types = fn.elements
-                inf = fn.tracks.interface.fn
                 if isinstance(inf, SpecializedGraph):
                     arg_types = yield RequireAll(*node.inputs)
                     inf.commit((*partial_types, *arg_types))
@@ -198,7 +227,7 @@ class InferenceEngine:
                 ]
                 return (yield Unify(*optnodes))
 
-            elif isinstance(fn, data.AbstractStructure) and len(fn.elements) == 1 and isinstance(fn.elements[0], data.AbstractAtom) and isinstance(fn.elements[0].tracks.interface, type):
+            elif self._is_abstract_type(fn):
                 # Got abstract type, return interface
                 return fn.elements[0]
 

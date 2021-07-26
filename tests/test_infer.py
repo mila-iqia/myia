@@ -50,8 +50,8 @@ from myia.testing.master_placeholders import (
     zeros_like,
 )
 from myia.testing.common import (
-    Tuple,
-    List,
+    tuple_of,
+    list_of,
     B,
     Bot,
     D,
@@ -74,7 +74,7 @@ from myia.testing.common import (
     ai64_of,
     mysum,
     to_abstract_test,
-    Array,
+    array_of,
     EnvType as Env,
     External,
     Int,
@@ -93,8 +93,8 @@ from myia.testing.common import (
 from myia.testing.multitest import infer as mt_infer, mt
 from myia.abstract.map import MapError as InferenceError
 from myia.abstract.map import MapError as MyiaTypeError
-ai64 = Array[i64]
-af64 = Array[f64]
+ai64 = array_of(i64)
+af64 = array_of(f64)
 
 
 ########################
@@ -943,12 +943,12 @@ def test_hastype_simple(x):
     infer_scalar(i64, Ty(i64), result=True),
     infer_scalar(f64, Ty(i64), result=False),
     infer_scalar((i64, i64), Ty(tuple), result=True),
-    infer_scalar((i64, i64), Ty(Tuple), result=True),
-    infer_scalar((i64, i64), Ty(Tuple[Number, Number]), result=True),
-    infer_scalar((i64, i64), Ty(Tuple[i64, i64]), result=True),
-    infer_scalar((i64, i64), Ty(Tuple[float, float]), result=False),
+    infer_scalar((i64, i64), Ty(tuple_of()), result=True),
+    infer_scalar((i64, i64), Ty(tuple_of(Number, Number)), result=True),
+    infer_scalar((i64, i64), Ty(tuple_of(i64, i64)), result=True),
+    infer_scalar((i64, i64), Ty(tuple_of(float, float)), result=False),
     infer_scalar((i64, i64), Ty(ANYTHING), result=InferenceError),
-    infer_scalar([i64], Ty(List), result=True),
+    infer_scalar([i64], Ty(list_of()), result=True),
     infer_scalar(None, Ty(Nil), result=True),
     infer_scalar(U(i32, i64), Ty(i64), result=B),
     infer_scalar(i32, Ty(U(i16, i32)), result=True),
@@ -966,7 +966,7 @@ def test_typeof(x):
     return typeof(x)
 
 
-Tf4 = Tuple[f64, f64, f64, f64]
+Tf4 = tuple_of(f64, f64, f64, f64)
 
 
 @mt(
@@ -1003,9 +1003,9 @@ def test_hastype_2(x):
             return 0
         elif hastype(x, Tf4):
             return x
-        elif hastype(x, Tuple):
+        elif hastype(x, tuple_of()):
             return f(x[0]) + f(x[1:])
-        elif hastype(x, List):
+        elif hastype(x, list_of()):
             return 1.0
         elif hastype(x, Thing_ftup):
             return x.contents

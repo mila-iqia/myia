@@ -1,14 +1,9 @@
-import operator
 import numpy as np
 from myia.infer.inferrers import X, signature
 from myia.infer.infnode import inferrers
-from myia.testing.common import Number, Float, Array, Ty
+from myia.testing.common import Number, Float, array_of, Ty, tuple_of, Nil
+from myia.testing import numpy_subset
 
-
-inferrers.update({
-    np.log: signature(Number, ret=Float),
-    np.array: signature(Number, ret=Array.of(Number, ())),
-})
 
 def array_cast(arr, typ): raise NotImplementedError()
 def array_map(fn, arr, *arrays): raise NotImplementedError()
@@ -55,3 +50,15 @@ def typeof(obj): raise NotImplementedError()
 def unsafe_static_cast(x, typ): raise NotImplementedError()
 def user_switch(c, t, f): raise NotImplementedError()
 def zeros_like(x): raise NotImplementedError()
+
+
+def add_testing_inferrers():
+    inferrers.update({
+        np.log: signature(Number, ret=Float),
+        np.array: signature(Number, ret=array_of(Number, ())),
+        numpy_subset.prod: signature(array_of(Number), ret=array_of(Number, ())),
+        numpy_subset.full: signature(
+            tuple_of(), Number, Ty(Number), ret=array_of(Number)
+        ),
+        type(None): signature(ret=Nil),
+    })

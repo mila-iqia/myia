@@ -351,6 +351,19 @@ def abstract_map2(self, x: data.Tracks, y: data.Tracks, **kwargs):  # noqa: F811
 
 
 @ovld
+def abstract_map2(self, x: data.ValueTrack, y: data.ValueTrack, **kwargs):  # noqa: F811
+    if type(x) is not type(y):
+        raise MapError(x, y, "cannot merge objects")
+    if x.value is data.ANYTHING:
+        return y.value
+    if y.value is data.ANYTHING:
+        return x.value
+    if x.value != y.value:
+        raise MapError(x, y, "cannot merge objects")
+    return x
+
+
+@ovld
 def abstract_map2(  # noqa: F811
     self, x: data.AbstractAtom, y: data.AbstractAtom, **kwargs
 ):

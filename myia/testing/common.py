@@ -9,41 +9,6 @@ from myia.abstract.to_abstract import precise_abstract
 from myia.ir.node import Constant, Graph
 
 
-class _TupleFactory(data.AbstractStructure):
-    __type__ = tuple
-
-    def __init__(self, *items):
-        super().__init__([item if isinstance(item, data.AbstractValue) else A(item) for item in items], {"interface": self.__type__})
-
-    def __getitem__(self, *items):
-        return type(self)(*items)
-
-
-class _ListFactory(_TupleFactory):
-    __type__ = list
-
-
-class _ArrayFactory(_TupleFactory):
-    __type__ = np.ndarray
-
-    def __iter__(self, *items: data.AbstractAtom):
-        assert len(items) < 2
-        super().__init__(*items)
-
-    def __getitem__(self, item: data.AbstractAtom):
-        return super().__getitem__(item)
-
-    def of(self, scalar_type: data.AbstractAtom, shape, value=None):
-        tracks = {
-            "interface": np.ndarray,
-            "ndim":len(shape),
-            "shape": tuple(shape),
-        }
-        if value is not None:
-            tracks["value"] = value
-        return data.AbstractStructure([scalar_type], tracks)
-
-
 class _ExternalFactory(data.AbstractAtom):
     def __init__(self):
         super().__init__({"interface": object})
@@ -166,13 +131,48 @@ def build_graph(descr, params=[]):
     return g, nodeset
 
 
-def af16_of(*shape, value=None): return Array.of(f16, shape, value)
-def af32_of(*shape, value=None):return Array.of(f32, shape, value)
-def af64_of(*shape, value=None):return Array.of(f64, shape, value)
-def ai16_of(*shape, value=None):return Array.of(i16, shape, value)
-def ai32_of(*shape, value=None):return Array.of(i32, shape, value)
-def ai64_of(*shape, value=None):return Array.of(i64, shape, value)
-def au64_of(*shape, value=None):return Array.of(u64, shape, value)
+
+def _abstract_sequence(seq_type, *items):
+    return data.AbstractStructure([item if isinstance(item, data.AbstractValue) else A(item) for item in items], {"interface": seq_type})
+
+
+def _abstract_sequence_getitem(seq_type):
+    def getitem(self, *items):
+        return _abstract_sequence(seq_type, *items)
+
+    return getitem
+
+
+def tuple_of(*items):
+    return _abstract_sequence(tuple, *items)
+
+
+def list_of(*items):
+    return _abstract_sequence(list, *items)
+
+
+def array_of(dtype: data.AbstractAtom =None, shape=None, value=None):
+    items = [dtype] if dtype else []
+    tracks = {
+        "interface": np.ndarray,
+    }
+    if shape is not None:
+        tracks["shape"] = shape
+    if isinstance(shape, tuple):
+        tracks["ndim"] = len(shape)
+    if value is not None:
+        tracks["value"] = value
+    return data.AbstractStructure(items, tracks)
+
+
+
+def af16_of(*shape, value=None): return array_of(f16, shape, value)
+def af32_of(*shape, value=None):return array_of(f32, shape, value)
+def af64_of(*shape, value=None):return array_of(f64, shape, value)
+def ai16_of(*shape, value=None):return array_of(i16, shape, value)
+def ai32_of(*shape, value=None):return array_of(i32, shape, value)
+def ai64_of(*shape, value=None):return array_of(i64, shape, value)
+def au64_of(*shape, value=None):return array_of(u64, shape, value)
 
 
 B = Bool = A(bool)
@@ -197,9 +197,6 @@ Int = {
     32: i32,
     64: i64,
 }
-Tuple = _TupleFactory()
-List = _ListFactory()
-Array = _ArrayFactory()
 External = _ExternalFactory()
 String = A(str)
 EmptyTuple = A(tuple)
