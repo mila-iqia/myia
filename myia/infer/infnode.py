@@ -104,7 +104,8 @@ class InferenceEngine:
     def __init__(self, inferrers):
         self.inferrers = inferrers
 
-    def _is_abstract_type(self, fn: data.AbstractValue):
+    @classmethod
+    def is_abstract_type(cls, fn: data.AbstractValue):
         return (
             isinstance(fn, data.AbstractStructure)
             and fn.tracks.interface is type
@@ -116,7 +117,7 @@ class InferenceEngine:
         if isinstance(fn.tracks.interface, InferenceFunction):
             return fn.tracks.interface.fn
         elif (
-            self._is_abstract_type(fn)
+            self.is_abstract_type(fn)
             and (typ := fn.elements[0].tracks.interface) in self.inferrers
         ):
             # Got abstract type. If an inference function is set
@@ -227,7 +228,7 @@ class InferenceEngine:
                 ]
                 return (yield Unify(*optnodes))
 
-            elif self._is_abstract_type(fn):
+            elif self.is_abstract_type(fn):
                 # Got abstract type, return interface
                 return fn.elements[0]
 

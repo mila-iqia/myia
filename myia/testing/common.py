@@ -23,6 +23,11 @@ def _to_abstract(self, x: type):
 
 
 @ovld
+def _to_abstract(self, x: str):
+    return data.AbstractAtom({"interface": str, "value": x})
+
+
+@ovld
 def _to_abstract(self, x: (data.GenericBase, data.AbstractValue)):  # noqa: F811
     return x
 
@@ -163,7 +168,6 @@ def array_of(dtype: data.AbstractAtom =None, shape=None, value=None):
     if value is not None:
         tracks["value"] = value
     return data.AbstractStructure(items, tracks)
-
 
 
 def af16_of(*shape, value=None): return array_of(f16, shape, value)

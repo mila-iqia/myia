@@ -88,9 +88,9 @@ def test_prod(arr):
 
 @mt(
     # An error should be raised if wrong values are given as types.
-    infer(Shp(2, 3), i32, "bad string", result=MyiaTypeError),
-    infer(Shp(2, 3), i32, 10, result=MyiaTypeError),
-    infer(Shp(2, 3), i32, (), result=MyiaTypeError),
+    infer(Shp(2, 3), i32, "bad string", result=Exception("Cannot parse numpy dtype")),
+    infer(Shp(2, 3), i32, 10, result=TypeError("Expected an abstract type")),
+    infer(Shp(2, 3), i32, (), result=TypeError("Expected an abstract type")),
     # If d-type is not specified, output type should be type of fill value.
     infer(Shp(2, 3), i16, None, result=ai16_of(2, 3)),
     infer(Shp(2, 3), i64, None, result=ai64_of(2, 3)),

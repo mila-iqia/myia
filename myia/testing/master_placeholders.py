@@ -1,8 +1,11 @@
 import numpy as np
-from myia.infer.inferrers import X, signature
-from myia.infer.infnode import inferrers
+from myia.infer.inferrers import X, signature, getattr_inferrer, AbstractNone
+from myia.infer.infnode import inferrers, inference_function, InferenceEngine
 from myia.testing.common import Number, Float, array_of, Ty, tuple_of, Nil
+from myia.infer.algo import Require
+from myia.abstract import data
 from myia.testing import numpy_subset
+from myia.abstract.map import MapError
 
 
 def array_cast(arr, typ): raise NotImplementedError()
@@ -52,13 +55,34 @@ def user_switch(c, t, f): raise NotImplementedError()
 def zeros_like(x): raise NotImplementedError()
 
 
+def np_full_inferrer(node, args, unif):
+    shape_node, value_node, dtype_node = args
+    shape_type = yield Require(shape_node)
+    value_type = yield Require(value_node)
+    dtype = yield Require(dtype_node)
+    if dtype is Nil:
+        dtype = value_type
+    elif isinstance(dtype, data.AbstractAtom) and dtype.tracks.interface is str:
+        type_name = dtype.tracks.value
+        try:
+            dtype = data.AbstractAtom({"interface": np.dtype(type_name).type})
+        except TypeError:
+            raise TypeError(f"Cannot parse numpy dtype {type_name}")
+    elif InferenceEngine.is_abstract_type(dtype):
+        dtype = dtype.elements[0]
+    else:
+        raise TypeError(f"Expected an abstract type, got {dtype}")
+    return data.AbstractStructure([dtype], {"interface": np.ndarray})
+
+
 def add_testing_inferrers():
     inferrers.update({
         np.log: signature(Number, ret=Float),
         np.array: signature(Number, ret=array_of(Number, ())),
         numpy_subset.prod: signature(array_of(Number), ret=array_of(Number, ())),
-        numpy_subset.full: signature(
-            tuple_of(), Number, Ty(Number), ret=array_of(Number)
-        ),
+        # numpy_subset.full: signature(
+        #     tuple_of(), Number, Ty(Number), ret=array_of(Number)
+        # ),
+        numpy_subset.full: inference_function(np_full_inferrer),
         type(None): signature(ret=Nil),
     })
