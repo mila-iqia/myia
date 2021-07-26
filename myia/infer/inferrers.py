@@ -68,16 +68,23 @@ def getattr_inferrer(node, args, unif):
 
 
 def getitem_inferrer(node, args, unif):
+    """Inferrer for the getitem function."""
     obj_node, key_node = args
     assert key_node.is_constant(int)
     obj = yield Require(obj_node)
     key = key_node.value
-    if not (isinstance(obj, data.AbstractStructure) and obj.tracks.interface in (tuple, list)):
-        raise AssertionError(f"getitem can currently only be used for lists and tuples, got {obj}[{key}]")
+    if not (
+        isinstance(obj, data.AbstractStructure)
+        and obj.tracks.interface in (tuple, list)
+    ):
+        raise AssertionError(
+            f"getitem can currently only be used for lists and tuples, got {obj}[{key}]"
+        )
     return obj.elements[key]
 
 
 def make_tuple_inferrer(node, args, unif):
+    """Inferrer for the make_tuple function."""
     tuple_types = []
     for arg_node in args:
         tuple_types.append((yield Require(arg_node)))
@@ -85,12 +92,14 @@ def make_tuple_inferrer(node, args, unif):
 
 
 def make_list_inferrer(node, args, unif):
+    """Inferrer for the make_list function."""
     tuple_types = []
     for arg_node in args:
         tuple_types.append((yield Require(arg_node)))
     elements = []
     if tuple_types:
         from myia.abstract import utils as autils
+
         base_type = tuple_types[0]
         for typ in tuple_types[1:]:
             base_type = autils.merge(base_type, typ, U=unif)[0]
@@ -99,22 +108,30 @@ def make_list_inferrer(node, args, unif):
 
 
 X = data.Generic("x")
+Y = data.Generic("Y")
 
 AbstractNone = data.AbstractAtom({"interface": type(None)})
+AbstractString = data.AbstractAtom({"interface": str})
+
 
 def add_standard_inferrers(inferrers):
     """Register all the inferrers in this file."""
     inferrers.update(
         {
+            hasattr: signature(X, AbstractString, ret=bool),
             operator.add: signature(X, X, ret=X),
             operator.and_: signature(X, X, ret=X),
             operator.eq: signature(X, X, ret=bool),
             operator.gt: signature(X, X, ret=bool),
             operator.invert: signature(X, ret=X),
+            operator.is_: signature(X, Y, ret=bool),
+            operator.is_not: signature(X, Y, ret=bool),
             operator.le: signature(X, X, ret=bool),
             operator.lshift: signature(X, X, ret=X),
+            operator.lt: signature(X, X, ret=bool),
             operator.mul: signature(X, X, ret=X),
             operator.neg: signature(X, ret=X),
+            operator.not_: signature(X, ret=bool),
             operator.or_: signature(X, X, ret=X),
             operator.rshift: signature(X, X, ret=X),
             operator.sub: signature(X, X, ret=X),
@@ -139,12 +156,12 @@ def add_standard_inferrers(inferrers):
                 data.AbstractStructure([X], tracks={"interface": Handle}),
                 ret=X,
             ),
+            basics.partial: inference_function(partial_inferrer),
             basics.global_universe_setitem: signature(
                 data.AbstractStructure([X], tracks={"interface": Handle}),
                 X,
-                ret=AbstractNone
+                ret=AbstractNone,
             ),
-            basics.partial: inference_function(partial_inferrer),
             basics.make_tuple: inference_function(make_tuple_inferrer),
             basics.make_list: inference_function(make_list_inferrer),
         }

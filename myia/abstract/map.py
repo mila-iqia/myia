@@ -351,7 +351,10 @@ def abstract_map2(self, x: data.Tracks, y: data.Tracks, **kwargs):  # noqa: F811
 
 
 @ovld
-def abstract_map2(self, x: data.ValueTrack, y: data.ValueTrack, **kwargs):  # noqa: F811
+def abstract_map2(  # noqa: F811
+    self, x: data.ValueTrack, y: data.ValueTrack, **kwargs
+):
+    """Return other value if one is ANYTHING."""
     if type(x) is not type(y):
         raise MapError(x, y, "cannot merge objects")
     if x.value is data.ANYTHING:
@@ -368,7 +371,7 @@ def abstract_map2(  # noqa: F811
     self, x: data.AbstractAtom, y: data.AbstractAtom, **kwargs
 ):
     assert type(x) is type(y)
-    # Merge value track manually when we have both abstract atoms.
+    # Merge value track manually.
     x_val = x.tracks.value
     y_val = y.tracks.value
     if x_val is data.ANYTHING:
@@ -381,10 +384,15 @@ def abstract_map2(  # noqa: F811
     # Merge tracks, and add value track only if it's not ANYTHING
     track_set = (set(x.tracks._tracks) | set(y.tracks._tracks)) - {"value"}
     track_kwargs = {} if val is data.ANYTHING else {"value": val}
-    return type(x)(tracks=data.Tracks({
-        k: self(x.tracks.get_track(k), y.tracks.get_track(k), **kwargs)
-        for k in track_set
-    }, **track_kwargs))
+    return type(x)(
+        tracks=data.Tracks(
+            {
+                k: self(x.tracks.get_track(k), y.tracks.get_track(k), **kwargs)
+                for k in track_set
+            },
+            **track_kwargs
+        )
+    )
 
 
 @ovld

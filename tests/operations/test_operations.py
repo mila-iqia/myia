@@ -1,4 +1,7 @@
+from myia.testing import numpy_subset as np
 from myia.testing.common import (
+    Bool,
+    Nil,
     Ty,
     af16_of,
     af32_of,
@@ -7,13 +10,18 @@ from myia.testing.common import (
     ai32_of,
     ai64_of,
     au64_of,
-    Bool, Nil, f16, f32, f64, i8, i16, i32, i64, u32, u64
+    f16,
+    f32,
+    f64,
+    i8,
+    i16,
+    i32,
+    i64,
+    u32,
+    u64,
 )
 from myia.testing.multitest import infer, mt
-from myia.abstract.map import MapError as MyiaTypeError
-from myia.testing import numpy_subset as np
-from myia.testing.master_placeholders import add_testing_inferrers
-
+from myia.testing.testing_inferrers import add_testing_inferrers
 
 add_testing_inferrers()
 
@@ -88,7 +96,12 @@ def test_prod(arr):
 
 @mt(
     # An error should be raised if wrong values are given as types.
-    infer(Shp(2, 3), i32, "bad string", result=Exception("Cannot parse numpy dtype")),
+    infer(
+        Shp(2, 3),
+        i32,
+        "bad string",
+        result=Exception("Cannot parse numpy dtype"),
+    ),
     infer(Shp(2, 3), i32, 10, result=TypeError("Expected an abstract type")),
     infer(Shp(2, 3), i32, (), result=TypeError("Expected an abstract type")),
     # If d-type is not specified, output type should be type of fill value.

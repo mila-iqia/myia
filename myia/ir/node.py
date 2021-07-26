@@ -107,7 +107,10 @@ class Graph:
 
     def specialize(self, sig):
         """Return a Graph specialized for a type signature."""
-        assert len(self.parameters) == len(sig), f"{self}: bad signature length, expected {len(self.parameters)}, got {len(sig)}"
+        if not self.varargs and len(self.parameters) != len(sig):
+            raise AssertionError(
+                f"{self}: bad signature length, expected {len(self.parameters)}, got {len(sig)}"
+            )
         if sig not in self.specializations:
             cl = self.clone()
             for param, typ in zip(cl.parameters, sig):

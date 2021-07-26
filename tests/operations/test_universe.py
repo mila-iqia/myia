@@ -1,12 +1,11 @@
+from myia.abstract.map import MapError as InferenceError
 from myia.basics import (
-    make_handle,
     global_universe_getitem as universe_getitem,
     global_universe_setitem as universe_setitem,
+    make_handle,
 )
-from myia.abstract.map import MapError as InferenceError
 from myia.testing.common import H, f64, i64
 from myia.testing.multitest import infer, mt
-
 
 typeof = type
 

@@ -1,20 +1,13 @@
 """Common testing utilities."""
 from dataclasses import dataclass
-import numpy as np
-from ovld import ovld
-from myia import basics
 
+from ovld import ovld
+
+from myia import basics
 from myia.abstract import data
 from myia.abstract.to_abstract import precise_abstract
 from myia.ir.node import Constant, Graph
-
-
-class _ExternalFactory(data.AbstractAtom):
-    def __init__(self):
-        super().__init__({"interface": object})
-
-    def __getitem__(self, item):
-        return A(item)
+from myia.testing import numpy_subset as np
 
 
 @precise_abstract.variant
@@ -23,7 +16,8 @@ def _to_abstract(self, x: type):
 
 
 @ovld
-def _to_abstract(self, x: str):
+def _to_abstract(self, x: str):  # noqa: F811
+    """Keep value for string."""
     return data.AbstractAtom({"interface": str, "value": x})
 
 
@@ -33,13 +27,16 @@ def _to_abstract(self, x: (data.GenericBase, data.AbstractValue)):  # noqa: F811
 
 
 @ovld
-def _to_abstract(self, x: list):
+def _to_abstract(self, x: list):  # noqa: F811
+    # Let's expect list to have same type for all list values.
     if not x:
         items = []
     else:
         assert len(x) == 1, x
-        item, = x
-        items = [item if isinstance(item, data.AbstractValue) else _to_abstract(item)]
+        (item,) = x
+        items = [
+            item if isinstance(item, data.AbstractValue) else _to_abstract(item)
+        ]
     return data.AbstractStructure(items, {"interface": list})
 
 
@@ -58,6 +55,7 @@ def Un(*opts):
 
 
 def Ty(element_type):
+    """Convert given argument to an abstract type."""
     if element_type is data.ANYTHING:
         return data.AbstractStructure([A(object)], {"interface": type})
     if isinstance(element_type, data.AbstractValue):
@@ -69,20 +67,23 @@ def Ty(element_type):
 
 
 def H(*opts):
+    """Create an abstract handle."""
     return data.AbstractStructure(
-        [_to_abstract(opt) for opt in opts],
-        {"interface": basics.Handle}
+        [_to_abstract(opt) for opt in opts], {"interface": basics.Handle}
     )
 
 
 def D(**kwargs):
-    """Abstract dictionary."""
+    """Create an abstract dictionary."""
     # Warning: does not yet handle types for keys and values.
     return precise_abstract(kwargs)
 
 
 def Ex(value, t=None):
-    """Abstract external from master branch"""
+    """Abstract external from master branch.
+
+    Just create an abstract value.
+    """
     if value is data.ANYTHING:
         return A(object)
     value_type = _to_abstract(value)
@@ -92,6 +93,7 @@ def Ex(value, t=None):
 
 
 def S(x=data.ANYTHING, t=object):
+    """Create an abstract scalar."""
     if isinstance(t, data.AbstractAtom):
         t = t.tracks.interface
     assert isinstance(t, type)
@@ -99,7 +101,10 @@ def S(x=data.ANYTHING, t=object):
 
 
 def Shp(*dims):
-    return data.AbstractStructure([A(dim) for dim in dims], {"interface": tuple})
+    """Create an abstract tuple representing a shape."""
+    return data.AbstractStructure(
+        [A(dim) for dim in dims], {"interface": tuple}
+    )
 
 
 def build_node(g, descr, nodeset=set()):
@@ -136,9 +141,14 @@ def build_graph(descr, params=[]):
     return g, nodeset
 
 
-
 def _abstract_sequence(seq_type, *items):
-    return data.AbstractStructure([item if isinstance(item, data.AbstractValue) else A(item) for item in items], {"interface": seq_type})
+    return data.AbstractStructure(
+        [
+            item if isinstance(item, data.AbstractValue) else A(item)
+            for item in items
+        ],
+        {"interface": seq_type},
+    )
 
 
 def _abstract_sequence_getitem(seq_type):
@@ -149,14 +159,17 @@ def _abstract_sequence_getitem(seq_type):
 
 
 def tuple_of(*items):
+    """Create an abstract tuple."""
     return _abstract_sequence(tuple, *items)
 
 
 def list_of(*items):
+    """Create an abstract list."""
     return _abstract_sequence(list, *items)
 
 
-def array_of(dtype: data.AbstractAtom =None, shape=None, value=None):
+def array_of(dtype: data.AbstractAtom = None, shape=None, value=None):
+    """Create an abstract array."""
     items = [dtype] if dtype else []
     tracks = {
         "interface": np.ndarray,
@@ -170,15 +183,42 @@ def array_of(dtype: data.AbstractAtom =None, shape=None, value=None):
     return data.AbstractStructure(items, tracks)
 
 
-def af16_of(*shape, value=None): return array_of(f16, shape, value)
-def af32_of(*shape, value=None):return array_of(f32, shape, value)
-def af64_of(*shape, value=None):return array_of(f64, shape, value)
-def ai16_of(*shape, value=None):return array_of(i16, shape, value)
-def ai32_of(*shape, value=None):return array_of(i32, shape, value)
-def ai64_of(*shape, value=None):return array_of(i64, shape, value)
-def au64_of(*shape, value=None):return array_of(u64, shape, value)
+def af16_of(*shape, value=None):
+    """Create an abstract array of f16."""
+    return array_of(f16, shape, value)
 
 
+def af32_of(*shape, value=None):
+    """Create an abstract array of f32."""
+    return array_of(f32, shape, value)
+
+
+def af64_of(*shape, value=None):
+    """Create an abstract array of f64."""
+    return array_of(f64, shape, value)
+
+
+def ai16_of(*shape, value=None):
+    """Create an abstract array of i16."""
+    return array_of(i16, shape, value)
+
+
+def ai32_of(*shape, value=None):
+    """Create an abstract array of i32."""
+    return array_of(i32, shape, value)
+
+
+def ai64_of(*shape, value=None):
+    """Create an abstract array of i64."""
+    return array_of(i64, shape, value)
+
+
+def au64_of(*shape, value=None):
+    """Create an abstract array of u64."""
+    return array_of(u64, shape, value)
+
+
+Object = A(object)
 B = Bool = A(bool)
 Bot = Nil = A(None)
 f16 = A(np.float16)
@@ -194,6 +234,7 @@ u32 = A(np.uint32)
 u64 = A(np.uint64)
 
 Float = Un(f16, f32, f64)
+Integer = Un(i8, i16, i32, i64, u8, u16, u32, u64)
 Number = Un(i8, i16, i32, i64, u8, u16, u32, u64, f16, f32, f64)
 Int = {
     8: i8,
@@ -201,7 +242,7 @@ Int = {
     32: i32,
     64: i64,
 }
-External = _ExternalFactory()
+External = Ex
 String = A(str)
 EmptyTuple = A(tuple)
 EnvType = A(dict)
@@ -209,6 +250,10 @@ newenv = {}
 
 
 def to_abstract_test(x):
+    """`to_abstract_test`, from master branch.
+
+    Just make sure given value is an abstract value.
+    """
     assert isinstance(x, data.AbstractValue)
     return x
 
@@ -259,15 +304,15 @@ Thing_ftup = Thing((1.0, 2.0))
 
 
 @ovld
-def mysum(x):
+def mysum(x):  # noqa: F811
     return x
 
 
 @ovld
-def mysum(x, y):
+def mysum(x, y):  # noqa: F811
     return x + y
 
 
 @ovld
-def mysum(x, y, z):
+def mysum(x, y, z):  # noqa: F811
     return x + y + z

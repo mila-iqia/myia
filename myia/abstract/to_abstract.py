@@ -1,6 +1,6 @@
 """Functions to convert data to an abstract data type."""
-from typing import Union
 from types import ModuleType
+from typing import Union
 
 from ovld import ovld
 

@@ -1,13 +1,62 @@
-import pytest
 import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
+
+import pytest
 from ovld import ovld
 
-from myia.testing import numpy_subset as np
-
 from myia.abstract.data import ANYTHING
-from myia.testing import master_placeholders as P
+from myia.abstract.map import (
+    MapError as InferenceError,
+    MapError as MyiaTypeError,
+)
+from myia.basics import (
+    partial as myia_partial,
+    user_switch,
+    user_switch as switch,
+)
+from myia.testing import master_placeholders as P, numpy_subset as np
+from myia.testing.common import (
+    B,
+    Bot,
+    D,
+    EmptyTuple,
+    EnvType as Env,
+    Ex,
+    External,
+    Int,
+    Nil,
+    Number,
+    Point,
+    Point3D,
+    S,
+    Shp,
+    String,
+    Thing,
+    Thing_f,
+    Thing_ftup,
+    Ty,
+    Un as U,
+    af16_of,
+    af32_of,
+    af64_of,
+    ai16_of,
+    ai32_of,
+    ai64_of,
+    array_of,
+    f16,
+    f32,
+    f64,
+    i16,
+    i32,
+    i64,
+    list_of,
+    mysum,
+    newenv,
+    to_abstract_test,
+    tuple_of,
+    u64,
+)
 from myia.testing.master_placeholders import (
     J,
     Jinv,
@@ -15,8 +64,6 @@ from myia.testing.master_placeholders import (
     array_map,
     array_reduce,
     array_to_scalar,
-    bool_and,
-    bool_or,
     broadcast_shape,
     conv2d_grad_input,
     dict_values,
@@ -29,9 +76,6 @@ from myia.testing.master_placeholders import (
     grad,
     hastype,
     identity,
-    nil_eq,
-    nil_ne,
-    partial as myia_partial,
     reshape,
     scalar_add,
     scalar_cast,
@@ -40,70 +84,20 @@ from myia.testing.master_placeholders import (
     scalar_to_array,
     scalar_usub,
     shape,
-    switch,
     tagged,
     transpose,
     tuple_setitem,
-    typeof,
     unsafe_static_cast,
-    user_switch,
     zeros_like,
-    add_testing_inferrers
-)
-from myia.testing.common import (
-    tuple_of,
-    list_of,
-    B,
-    Bot,
-    D,
-    EmptyTuple,
-    Ex,
-    Point,
-    Point3D,
-    S,
-    Shp,
-    Thing,
-    Thing_f,
-    Thing_ftup,
-    Ty,
-    Un as U,
-    af16_of,
-    af32_of,
-    af64_of,
-    ai16_of,
-    ai32_of,
-    ai64_of,
-    mysum,
-    to_abstract_test,
-    array_of,
-    EnvType as Env,
-    External,
-    Int,
-    Nil,
-    Number,
-    String,
-    f16,
-    f32,
-    f64,
-    i16,
-    i32,
-    i64,
-    u64,
-    newenv,
 )
 from myia.testing.multitest import infer as mt_infer, mt
-from myia.abstract.map import MapError as InferenceError
-from myia.abstract.map import MapError as MyiaTypeError
+from myia.testing.testing_inferrers import add_testing_inferrers
+
 ai64 = array_of(i64)
 af64 = array_of(f64)
 
 
 add_testing_inferrers()
-
-
-########################
-# Temporary primitives #
-########################
 
 
 def _tern(x: Number, y: Number, z: Number) -> Number:
@@ -200,7 +194,9 @@ def test_prim_log(x):
     return np.log(x)
 
 
-@pytest.mark.xfail(strict=True, raises=InferenceError, reason="Cannot merge objects")
+@pytest.mark.xfail(
+    strict=True, raises=InferenceError, reason="Cannot merge objects"
+)
 @infer_standard(af64_of(2, 5), result=af64_of(2, 5))
 def test_prim_log_array(x):
     return np.log(x)
@@ -401,7 +397,7 @@ def test_tuple_getitem_negative(x, y):
     return (x, y)[-1]
 
 
-@infer_scalar(i64, f64, result=InferenceError)
+@infer_scalar(i64, f64, result=IndexError)
 def test_tuple_outofbound(x, y):
     return (x, y)[2]
 
@@ -931,7 +927,8 @@ def test_closure_passing(x, y):
     return a1(x) + a2(y)
 
 
-@mt(infer_scalar(B, result=B), infer_scalar(i64, result=InferenceError))
+# Should work even if x is not a bool.
+@mt(infer_scalar(B, result=B), infer_scalar(i64, result=B))
 def test_not(x):
     return not x
 
@@ -966,7 +963,7 @@ def test_hastype(x, y):
     infer_scalar(f64, result=Ty(to_abstract_test(f64))),
 )
 def test_typeof(x):
-    return typeof(x)
+    return type(x)
 
 
 Tf4 = tuple_of(f64, f64, f64, f64)
@@ -1131,7 +1128,7 @@ def _square(x):
     return x * x
 
 
-@infer_scalar(result=InferenceError)
+@infer_scalar(result=NameError)
 def test_nonexistent_variable():
     return xxxx + yz  # noqa
 
@@ -1217,13 +1214,13 @@ _getattr = getattr
     infer_scalar("add", i64, result=i64),
     infer_scalar("bad", i64, result=InferenceError),
     infer_scalar(1234, i64, result=InferenceError),
-    infer_scalar(External[str], i64, result=InferenceError),
+    infer_scalar(External(str), i64, result=InferenceError),
 )
 def test_getattr_flex(name, x):
     return _getattr(helpers, name)(x, x)
 
 
-@infer_scalar(External[SimpleNamespace], Ex("surprise"), result=InferenceError)
+@infer_scalar(External(SimpleNamespace), Ex("surprise"), result=InferenceError)
 def test_unknown_data(data, field):
     return _getattr(data, field)
 
@@ -1495,7 +1492,7 @@ def test_identity_function(x):
     infer_scalar(B, i64, result=InferenceError),
 )
 def test_bool_and(x, y):
-    return bool_and(x, y)
+    return x and y
 
 
 @mt(
@@ -1504,17 +1501,17 @@ def test_bool_and(x, y):
     infer_scalar(B, i64, result=InferenceError),
 )
 def test_bool_or(x, y):
-    return bool_or(x, y)
+    return x or y
 
 
 @mt(infer_standard(B, result=False), infer_standard(None, result=True))
 def test_nil_eq(x):
-    return nil_eq(None, x)
+    return x is None
 
 
 @mt(infer_standard(B, result=True), infer_standard(None, result=False))
 def test_nil_ne(x):
-    return nil_ne(None, x)
+    return x is not None
 
 
 @infer_standard(i64, result=0)
@@ -1540,10 +1537,12 @@ def test_and_none(x, y):
 
 @mt(
     infer_scalar(B, i64, i64, result=i64),
-    infer_scalar(i64, i64, i64, result=InferenceError),
+    # Should pass, as switch condition accepts non-bool values
+    infer_scalar(i64, i64, i64, result=i64),
     infer_scalar(B, i64, f64, result=InferenceError),
-    infer_scalar(True, i64, f64, result=i64),
-    infer_scalar(False, i64, f64, result=f64),
+    # Both branches are parsed, so this should fail
+    infer_scalar(True, i64, f64, result=InferenceError),
+    infer_scalar(False, i64, f64, result=InferenceError),
     infer_scalar(True, 1, 2, result=1),
     infer_scalar(False, 1, 2, result=2),
     infer_scalar(B, 1, 2, result=i64),
@@ -1709,12 +1708,12 @@ def test_multitype(x, y, z):
 
 
 @ovld
-def mystery(x: ai64, y: ai64):
+def mystery(x: ai64, y: ai64):  # noqa: F811
     return x @ y
 
 
 @ovld
-def mystery(x: af64, y: af64):
+def mystery(x: af64, y: af64):  # noqa: F811
     return array_map(scalar_add, x, y)
 
 
@@ -1933,7 +1932,7 @@ def test_env_onfn():
     return env_getitem(e, embed(f), newenv)
 
 
-_i64 = to_abstract_test(i64)
+_i64 = np.int64
 
 
 @mt(

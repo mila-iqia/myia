@@ -3,6 +3,8 @@
 import types
 from dataclasses import dataclass
 
+from myia.ir.node import SEQ
+
 from ..abstract import data, utils as autils
 from ..abstract.to_abstract import to_abstract, type_to_abstract
 from ..ir import Constant, Graph, Node
@@ -10,7 +12,6 @@ from ..ir.graph_utils import dfs, succ_deeper
 from ..parser import parse
 from ..utils.info import enable_debug
 from .algo import Inferrer, Require, RequireAll, Unify
-from myia.ir.node import SEQ
 
 inferrers = {}
 
@@ -104,29 +105,6 @@ class InferenceEngine:
     def __init__(self, inferrers):
         self.inferrers = inferrers
 
-    @classmethod
-    def is_abstract_type(cls, fn: data.AbstractValue):
-        return (
-            isinstance(fn, data.AbstractStructure)
-            and fn.tracks.interface is type
-            and len(fn.elements) == 1
-            and isinstance(fn.elements[0], data.AbstractAtom)
-        )
-
-    def _get_inference_function(self, fn: data.AbstractValue):
-        if isinstance(fn.tracks.interface, InferenceFunction):
-            return fn.tracks.interface.fn
-        elif (
-            self.is_abstract_type(fn)
-            and (typ := fn.elements[0].tracks.interface) in self.inferrers
-        ):
-            # Got abstract type. If an inference function is set
-            # for given type, return it.
-            # e.g.: specific inference for None type to check that
-            # None constructor does not receive any input.
-            return self.inferrers[typ].tracks.interface.fn
-        return None
-
     def __call__(self, node, unif):
         """Infer the type of a node."""
         assert node is not None
@@ -185,10 +163,11 @@ class InferenceEngine:
 
             #     return autils.reify(fn.out, unif=unif.canon)
 
-            # fn type inference not go through inferer if node.fn.abstract was
-            # already defined, but there may be inference function associated
-            # to this already-existing abstract. So, we use a specific
-            # function to do all work about getting associated inferer.
+            # fn type inference don't go through inferer logic if
+            # node.fn.abstract was already defined, but there may be
+            # inference function associated to this already-existing abstract.
+            # So, we use a specific function to do all work about getting
+            # associated infererrer.
             inf = self._get_inference_function(fn)
             if inf:
                 partial_types = fn.elements
@@ -234,6 +213,31 @@ class InferenceEngine:
 
             else:
                 raise TypeError("Unknown function", fn)
+
+    @classmethod
+    def is_abstract_type(cls, fn: data.AbstractValue):
+        """Return True if given abstract is an abstract type."""
+        return (
+            isinstance(fn, data.AbstractStructure)
+            and fn.tracks.interface is type
+            and len(fn.elements) == 1
+            and isinstance(fn.elements[0], data.AbstractAtom)
+        )
+
+    def _get_inference_function(self, fn: data.AbstractValue):
+        """Get inference function associated to given abstract."""
+        if isinstance(fn.tracks.interface, InferenceFunction):
+            return fn.tracks.interface.fn
+        elif (
+            self.is_abstract_type(fn)
+            and (typ := fn.elements[0].tracks.interface) in self.inferrers
+        ):
+            # Got abstract type.
+            # If an inference function is set for given type, return it.
+            # e.g.: specific inference for None type to check that
+            # None constructor does not receive any input.
+            return self.inferrers[typ].tracks.interface.fn
+        return None
 
 
 def infer_graph(graph, input_types):

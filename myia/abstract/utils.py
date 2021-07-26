@@ -168,7 +168,14 @@ def _unify(self, x: object, y: object, *, U):  # noqa: F811
 
 
 @ovld
-def _unify(self, x: data.AbstractUnion, y: (data.AbstractAtom, data.AbstractStructure), *, U):  # noqa: F811
+def _unify(  # noqa: F811
+    self,
+    x: data.AbstractUnion,
+    y: (data.AbstractAtom, data.AbstractStructure),
+    *,
+    U
+):
+    """Check if abstract value is in abstrct union."""
     if y in x.options:
         return y
     else:
@@ -176,7 +183,14 @@ def _unify(self, x: data.AbstractUnion, y: (data.AbstractAtom, data.AbstractStru
 
 
 @ovld
-def _unify(self, x: (data.AbstractAtom, data.AbstractStructure), y: data.AbstractUnion, *, U):  # noqa: F811
+def _unify(  # noqa: F811
+    self,
+    x: (data.AbstractAtom, data.AbstractStructure),
+    y: data.AbstractUnion,
+    *,
+    U
+):
+    """Check if abstract value is in abstrct union."""
     if x in y.options:
         return x
     else:
@@ -204,7 +218,8 @@ def _merge(self, x: data.AbstractUnion, y: data.AbstractUnion, *, U):
 
 
 @ovld
-def _merge(self, x: data.ValueTrack, y: data.ValueTrack, *, U):
+def _merge(self, x: data.ValueTrack, y: data.ValueTrack, *, U):  # noqa: F811
+    """Return ANYTHING if values are different."""
     return x if x.value == y.value else data.ValueTrack(data.ANYTHING)
 
 

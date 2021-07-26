@@ -3,9 +3,9 @@ from collections import Counter
 
 import pytest
 
+from myia.abstract import utils as autils
 from myia.abstract.data import AbstractValue
 from myia.infer.infnode import infer_graph
-from myia.abstract import utils as autils
 from myia.parser import parse
 from myia.testing.common import A
 from myia.utils.info import enable_debug
