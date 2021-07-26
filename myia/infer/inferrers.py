@@ -5,7 +5,6 @@ import types
 
 from .. import basics
 from ..abstract import data
-from ..abstract.map import MapError
 from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
@@ -89,10 +88,14 @@ def make_list_inferrer(node, args, unif):
     tuple_types = []
     for arg_node in args:
         tuple_types.append((yield Require(arg_node)))
-    for typ in tuple_types[1:]:
-        if typ is not tuple_types[0]:
-            raise MapError(tuple_types[0], typ, "list elements don't have same type")
-    return data.AbstractStructure([tuple_types[0]] if tuple_types else [], {"interface": list})
+    elements = []
+    if tuple_types:
+        from myia.abstract import utils as autils
+        base_type = tuple_types[0]
+        for typ in tuple_types[1:]:
+            base_type = autils.merge(base_type, typ, U=unif)[0]
+        elements.append(base_type)
+    return data.AbstractStructure(elements, {"interface": list})
 
 
 X = data.Generic("x")

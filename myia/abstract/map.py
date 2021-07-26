@@ -355,9 +355,9 @@ def abstract_map2(self, x: data.ValueTrack, y: data.ValueTrack, **kwargs):  # no
     if type(x) is not type(y):
         raise MapError(x, y, "cannot merge objects")
     if x.value is data.ANYTHING:
-        return y.value
+        return y
     if y.value is data.ANYTHING:
-        return x.value
+        return x
     if x.value != y.value:
         raise MapError(x, y, "cannot merge objects")
     return x

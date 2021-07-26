@@ -203,6 +203,11 @@ def _merge(self, x: data.AbstractUnion, y: data.AbstractUnion, *, U):
     )
 
 
+@ovld
+def _merge(self, x: data.ValueTrack, y: data.ValueTrack, *, U):
+    return x if x.value == y.value else data.ValueTrack(data.ANYTHING)
+
+
 def merge(x, y, U=None):
     """Merge x with y using Unificator U.
 
