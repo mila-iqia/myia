@@ -379,7 +379,8 @@ class Apply(Node):
             return objmap[self]
         if self.graph not in objmap:
             return self
-        res = Apply(objmap[self.graph])
+        with about(self, "clone"):
+            res = Apply(objmap[self.graph])
         objmap[self] = res
         res.edges = _edgemap(
             (e.clone(objmap) for e in self.edges.values()), res

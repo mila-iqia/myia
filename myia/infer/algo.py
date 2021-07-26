@@ -15,17 +15,20 @@ class InferenceTask:
     Arguments:
         node: The node being inferred.
         engine: The inference engine to use.
+        origin: The task that caused the request for this task.
 
     Attributes:
         node: The node being inferred.
+        origin: The task that caused the request for this task.
         inferrer: The (already started) generator handling this node.
         remap: A map from Generic/Placeholder instances to CanonGeneric
             instances.
         unif: The Unificator for this task.
     """
 
-    def __init__(self, node, engine):
+    def __init__(self, node, engine, origin):
         self.node = node
+        self.origin = origin
         self.node.abstract = data.Placeholder()
 
         self.unif = autils.Unificator()
@@ -198,7 +201,7 @@ class Inferrer:
         self.unif = autils.Unificator()
         self.scheduler = Scheduler()
 
-    def bootstrap(self, node):
+    def bootstrap(self, node, origin=None):
         """Start inference of the node.
 
         If the node was not already inferred, set the inference result to a
@@ -207,7 +210,9 @@ class Inferrer:
         existing = node.abstract
         if existing is None:
             self.step(
-                task=InferenceTask(node=node, engine=self.engine),
+                task=InferenceTask(
+                    node=node, engine=self.engine, origin=origin
+                ),
                 value=None,
             )
         else:
@@ -220,6 +225,13 @@ class Inferrer:
             task: The InferenceTask.
             value: The value to give to the inferrer to continue.
         """
+        try:
+            return self._step(task, value)
+        except Exception as exc:
+            exc.myia_trace = task
+            raise
+
+    def _step(self, task, value):
         node = task.node
         inferrer = task.inferrer
 
@@ -251,7 +263,7 @@ class Inferrer:
 
             # All requested nodes are scheduled
             for rnode in request.nodes:
-                self.bootstrap(rnode)
+                self.bootstrap(rnode, origin=task)
 
             # Schedule the rest of the inferrer, which will be triggered when all
             # nodes in the request are resolved.

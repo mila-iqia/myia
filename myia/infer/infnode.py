@@ -120,6 +120,9 @@ class InferenceEngine:
             node.replace(ct)
             return inference_function(spc)
 
+        elif node.is_constant(SpecializedGraph):
+            return inference_function(node.value)
+
         elif node.is_constant(
             (
                 types.BuiltinFunctionType,
@@ -203,7 +206,15 @@ def infer_graph(graph, input_types):
     eng = InferenceEngine(inferrers)
     g = graph.specialize(input_types)
     inf = Inferrer(eng)
-    inf.run(g.return_)
+
+    try:
+        inf.run(g.return_)
+    except Exception as exc:
+        tr = getattr(exc, "myia_trace", None)
+        while tr:
+            tr.node.abstract = None
+            tr = tr.origin
+        raise
 
     for node in dfs(g.return_, succ=succ_deeper):
         if node.is_constant(SpecializedGraph):
