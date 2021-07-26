@@ -690,7 +690,8 @@ class Parser:
         method_name = f"_process_{node.__class__.__name__}"
         method = getattr(self, method_name, None)
         if method:
-            return method(block, node)
+            with debug_inherit(location=self.make_location(node)):
+                return method(block, node)
         else:
             raise MyiaSyntaxError(
                 f"{node.__class__.__name__} not supported",
