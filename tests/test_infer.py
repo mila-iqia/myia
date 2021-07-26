@@ -205,12 +205,11 @@ def test_prim_log_array(x):
 @mt(
     infer_scalar(B, f64, f64, result=f64),
     infer_scalar(B, f64, i64, result=InferenceError),
-    infer_scalar(True, f64, i64, result=f64),
-    infer_scalar(False, f64, i64, result=i64),
-    # Note: scalar_pipeline will not convert i64 to bool,
-    # so the following is an InferenceError even though it
-    # will work with the standard_pipeline
-    infer_scalar(i64, f64, f64, result=InferenceError),
+    # Both if-branches are computed,
+    # so this should raise an error in myia zero code
+    infer_scalar(True, f64, i64, result=InferenceError),
+    infer_scalar(False, f64, i64, result=InferenceError),
+    infer_scalar(i64, f64, f64, result=f64),
     infer_scalar(True, 7, 4, result=i64),
     infer_scalar(False, 7, 4, result=i64),
     infer_scalar(B, 7, 4, result=i64),

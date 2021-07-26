@@ -368,7 +368,23 @@ def abstract_map2(  # noqa: F811
     self, x: data.AbstractAtom, y: data.AbstractAtom, **kwargs
 ):
     assert type(x) is type(y)
-    return type(x)(tracks=self(x.tracks, y.tracks, **kwargs))
+    # Merge value track manually when we have both abstract atoms.
+    x_val = x.tracks.value
+    y_val = y.tracks.value
+    if x_val is data.ANYTHING:
+        val = y_val
+    elif y_val is data.ANYTHING:
+        val = x_val
+    else:
+        assert type(x_val) is type(y_val), (type(x_val), type(y_val))
+        val = x_val if x_val == y_val else data.ANYTHING
+    # Merge tracks, and add value track only if it's not ANYTHING
+    track_set = (set(x.tracks._tracks) | set(y.tracks._tracks)) - {"value"}
+    track_kwargs = {} if val is data.ANYTHING else {"value": val}
+    return type(x)(tracks=data.Tracks({
+        k: self(x.tracks.get_track(k), y.tracks.get_track(k), **kwargs)
+        for k in track_set
+    }, **track_kwargs))
 
 
 @ovld
