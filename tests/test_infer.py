@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from ovld import ovld
 
-import numpy as np
+from myia.testing import numpy_subset as np
 
 from myia.abstract.data import ANYTHING
 from myia.testing import master_placeholders as P
@@ -48,6 +48,7 @@ from myia.testing.master_placeholders import (
     unsafe_static_cast,
     user_switch,
     zeros_like,
+    add_testing_inferrers
 )
 from myia.testing.common import (
     tuple_of,
@@ -95,6 +96,9 @@ from myia.abstract.map import MapError as InferenceError
 from myia.abstract.map import MapError as MyiaTypeError
 ai64 = array_of(i64)
 af64 = array_of(f64)
+
+
+add_testing_inferrers()
 
 
 ########################

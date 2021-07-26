@@ -7,6 +7,8 @@ int32 = np.int32
 int64 = np.int64
 uint64 = np.uint64
 float16 = np.float16
+float32 = np.float32
+dtype = np.dtype
 
 
 def prod(arr):
@@ -15,3 +17,11 @@ def prod(arr):
 
 def full(shape, value, dtype):
     return np.full(shape, value, dtype)
+
+
+def log(x):
+    return np.log(x)
+
+
+def ones(shape):
+    return np.ones(shape)

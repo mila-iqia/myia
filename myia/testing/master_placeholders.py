@@ -77,7 +77,7 @@ def np_full_inferrer(node, args, unif):
 
 def add_testing_inferrers():
     inferrers.update({
-        np.log: signature(Number, ret=Float),
+        numpy_subset.log: signature(Number, ret=Float),
         np.array: signature(Number, ret=array_of(Number, ())),
         numpy_subset.prod: signature(array_of(Number), ret=array_of(Number, ())),
         # numpy_subset.full: signature(
