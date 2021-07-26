@@ -214,9 +214,9 @@ def test_prim_log_array(x):
     infer_scalar(True, f64, i64, result=InferenceError),
     infer_scalar(False, f64, i64, result=InferenceError),
     infer_scalar(i64, f64, f64, result=f64),
-    infer_scalar(True, 7, 4, result=i64),
-    infer_scalar(False, 7, 4, result=i64),
-    infer_scalar(B, 7, 4, result=i64),
+    infer_scalar(True, 7, 4, result=int),
+    infer_scalar(False, 7, 4, result=int),
+    infer_scalar(B, 7, 4, result=int),
 )
 def test_if(c, x, y):
     if c:
