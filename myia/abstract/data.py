@@ -239,12 +239,13 @@ class AbstractStructure(AbstractValue):
                 type=f"{type(self).__name__}"
             )
         else:
+            interface = self.tracks.interface
             return H.instance["myia-abstract-structure"](
                 *map(hrepr, self.elements),
                 *hrepr(
                     self.tracks, omit_tracks={"interface"}, bare_tracks=True
                 ).children,
-                type=f"*{self.tracks.interface.__name__}",
+                type=f"*{interface.__name__ if isinstance(interface, type) else type(interface).__name__}",
             )
 
 
