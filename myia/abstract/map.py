@@ -300,6 +300,9 @@ class MapError(Exception):
         self.y = y
         self.reason = reason
 
+    def __str__(self):
+        return f"{self.reason}\n{self.x}\n{self.y}"
+
 
 @ovld.dispatch(
     initial_state=lambda: {"cache": {}},
