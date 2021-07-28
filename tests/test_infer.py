@@ -1347,10 +1347,14 @@ def test_closure_in_data(c, x):
     infer_scalar(int, Ty(int), result=int),
     infer_scalar(float, Ty(int), result=int),
     infer_scalar(float, Ty(float), result=float),
-    infer_scalar(float, Ty(ANYTHING), result=InferenceError),
-    infer_scalar(float, Ty(Bot), result=InferenceError),
-    infer_scalar(float, Ty(B), result=InferenceError),
-    infer_scalar(B, Ty(float), result=InferenceError),
+    # Will currently try to cast float to an object,
+    # but object constructor does not take any argument
+    infer_scalar(float, Ty(ANYTHING), result=AssertionError("wrong number of arguments, expected 0")),
+    infer_scalar(float, Ty(Bot), result=AssertionError("wrong number of arguments, expected 0")),
+    # Python bool accepts float
+    infer_scalar(float, Ty(B), result=bool),
+    # Python float accepts bool
+    infer_scalar(B, Ty(float), result=float),
 )
 def test_scalar_cast(x, t):
     return scalar_cast(x, t)
