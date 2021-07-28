@@ -1085,9 +1085,11 @@ def test_ann_assign_empty2():
     def f():
         b: int
         a = b + 1
+
         def g():
             nonlocal b
             b = 10
+
         g()
         return a
 
