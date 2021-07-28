@@ -355,22 +355,6 @@ def abstract_map2(self, x: data.Tracks, y: data.Tracks, **kwargs):  # noqa: F811
 
 @ovld
 def abstract_map2(  # noqa: F811
-    self, x: data.ValueTrack, y: data.ValueTrack, **kwargs
-):
-    """Return other value if one is ANYTHING."""
-    if type(x) is not type(y):
-        raise MapError(x, y, "cannot merge objects")
-    if x.value is data.ANYTHING:
-        return y
-    if y.value is data.ANYTHING:
-        return x
-    if x.value != y.value:
-        raise MapError(x, y, "cannot merge objects")
-    return x
-
-
-@ovld
-def abstract_map2(  # noqa: F811
     self, x: data.AbstractAtom, y: data.AbstractAtom, **kwargs
 ):
     assert type(x) is type(y)

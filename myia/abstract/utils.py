@@ -197,6 +197,22 @@ def _unify(  # noqa: F811
         raise MapError(x, y, reason="Cannot merge objects")
 
 
+@ovld
+def _unify(  # noqa: F811
+    self, x: data.ValueTrack, y: data.ValueTrack, *, U
+):
+    """Return other value if one is ANYTHING."""
+    if type(x) is not type(y):
+        raise MapError(x, y, "cannot merge objects")
+    if x.value is data.ANYTHING:
+        return y
+    if y.value is data.ANYTHING:
+        return x
+    if x.value != y.value:
+        raise MapError(x, y, "cannot merge objects")
+    return x
+
+
 def unify(x, y, U=None):
     """Unify x with y using Unificator U."""
     U = U or Unificator()
