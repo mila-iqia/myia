@@ -2,9 +2,9 @@
 from collections import Counter
 
 import pytest
+from ovld import ovld
 
-from myia.abstract import utils as autils
-from myia.abstract.data import AbstractValue
+from myia.abstract import data
 from myia.infer.infnode import infer_graph
 from myia.parser import parse
 from myia.testing.common import A
@@ -42,6 +42,36 @@ def mt(*testers):
     return deco
 
 
+@ovld
+def _check_inference(x: object, y: object):  # noqa: F811
+    return x is y
+
+
+@ovld
+def _check_inference(  # noqa: F811
+    x: data.AbstractUnion, y: data.AbstractUnion
+):
+    return (
+        type(x) is type(y)
+        and len(x.options) == len(y.options)
+        and all(vx is vy for vx, vy in zip(x.options, y.options))
+    )
+
+
+@ovld
+def _check_inference(  # noqa: F811
+    x: data.AbstractUnion, y: (data.AbstractAtom, data.AbstractStructure)
+):
+    return y in x.options
+
+
+@ovld
+def _check_inference(  # noqa: F811
+    x: (data.AbstractAtom, data.AbstractStructure), y: data.AbstractUnion
+):
+    return x in y.options
+
+
 def infer(*args, result=None):
     """Inference tester.
 
@@ -59,12 +89,12 @@ def infer(*args, result=None):
             and must returns the final wrapped function to run.
     """
     args = tuple(
-        arg if isinstance(arg, AbstractValue) else A(arg) for arg in args
+        arg if isinstance(arg, data.AbstractValue) else A(arg) for arg in args
     )
 
     exc_type = None
     exc_match = None
-    if not isinstance(result, AbstractValue):
+    if not isinstance(result, data.AbstractValue):
         if isinstance(result, Exception):
             exc_type = type(result)
             exc_match = str(result)
@@ -78,10 +108,12 @@ def infer(*args, result=None):
             with enable_debug():
                 graph = parse(fn)
 
-                if isinstance(result, AbstractValue):
+                if isinstance(result, data.AbstractValue):
                     ret_graph = infer_graph(graph, args)
                     ret_type = ret_graph.return_.abstract
-                    autils.unify(ret_type, result)
+                    assert _check_inference(
+                        ret_type, result
+                    ), f"Expected {result}, got {ret_type}"
                 else:
                     with pytest.raises(exc_type, match=exc_match):
                         infer_graph(graph, args)

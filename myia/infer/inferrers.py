@@ -32,6 +32,10 @@ def user_switch(node, args, unif):
     _ = yield Require(cond)  # TODO: check bool
     ift_t = yield Require(ift)
     iff_t = yield Require(iff)
+    # If both branches return same type, then expect this type.
+    if ift_t is iff_t:
+        return ift_t
+    # Otherwise, expect an union of both types.
     return data.AbstractUnion([ift_t, iff_t], tracks={})
 
 
@@ -108,17 +112,14 @@ def make_list_inferrer(node, args, unif):
 
 
 X = data.Generic("x")
-Y = data.Generic("Y")
-
-AbstractNone = data.AbstractAtom({"interface": type(None)})
-AbstractString = data.AbstractAtom({"interface": str})
+Y = data.Generic("y")
 
 
 def add_standard_inferrers(inferrers):
     """Register all the inferrers in this file."""
     inferrers.update(
         {
-            hasattr: signature(X, AbstractString, ret=bool),
+            hasattr: signature(X, str, ret=bool),
             operator.add: signature(X, X, ret=X),
             operator.and_: signature(X, X, ret=X),
             operator.eq: signature(X, X, ret=bool),
@@ -160,7 +161,7 @@ def add_standard_inferrers(inferrers):
             basics.global_universe_setitem: signature(
                 data.AbstractStructure([X], tracks={"interface": Handle}),
                 X,
-                ret=AbstractNone,
+                ret=None,
             ),
             basics.make_tuple: inference_function(make_tuple_inferrer),
             basics.make_list: inference_function(make_list_inferrer),

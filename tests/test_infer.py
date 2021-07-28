@@ -1,8 +1,10 @@
+import math
 import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-import math
+import pytest
+
 from myia.abstract.data import ANYTHING
 from myia.abstract.map import (
     MapError as InferenceError,
@@ -24,7 +26,6 @@ from myia.testing.common import (
     External,
     Int,
     Nil,
-    Float,
     Number,
     Point,
     Point3D,
@@ -65,8 +66,11 @@ from myia.testing.master_placeholders import (
 from myia.testing.multitest import infer as mt_infer, mt
 from myia.testing.testing_inferrers import add_testing_inferrers
 
-
 add_testing_inferrers()
+
+
+def mark_fail(exc_type, reason=None):
+    return pytest.mark.xfail(strict=True, raises=exc_type, reason=reason)
 
 
 def _tern(x: Number, y: Number, z: Number) -> Number:
@@ -153,12 +157,10 @@ def test_prim_usub(x):
 @mt(
     infer_standard(int, result=float),
     infer_standard(float, result=float),
-    # NB: math.log accepts bool.
-    # Maybe inferrer should accept too,
-    # by just adding bool type to NUmber union
-    infer_standard(B, result=InferenceError),
+    # math.log accepts bool
+    infer_standard(B, result=float),
 )
-def test_prim_log(x):
+def test_math_log(x):
     return math.log(x)
 
 
@@ -341,12 +343,16 @@ def test_len(xs):
     return len(xs)
 
 
-@mt(infer_scalar(int, float, result=int), infer_scalar(float, int, result=float))
+@mt(
+    infer_scalar(int, float, result=int), infer_scalar(float, int, result=float)
+)
 def test_tuple_getitem(x, y):
     return (x, y)[0]
 
 
-@mt(infer_scalar(int, float, result=float), infer_scalar(float, int, result=int))
+@mt(
+    infer_scalar(int, float, result=float), infer_scalar(float, int, result=int)
+)
 def test_tuple_getitem_negative(x, y):
     return (x, y)[-1]
 
@@ -928,7 +934,9 @@ Tf4 = tuple_of(float, float, float, float)
     infer_standard(float, result=int),
     infer_standard((int, int), result=int),
     infer_standard((float, float, int, int), result=int),
-    infer_standard((float, float, float, float), result=(float, float, float, float)),
+    infer_standard(
+        (float, float, float, float), result=(float, float, float, float)
+    ),
     infer_standard((int, (float, int)), result=int),
     infer_standard([int], result=1.0),
     infer_standard((int, [int]), result=int),
@@ -1165,7 +1173,9 @@ def test_unknown_data(data, field):
     return _getattr(data, field)
 
 
-@mt(infer_scalar(int, int, result=int), infer_scalar(float, float, result=float))
+@mt(
+    infer_scalar(int, int, result=int), infer_scalar(float, float, result=float)
+)
 def test_method(x, y):
     return x.__add__(y)
 
@@ -1349,8 +1359,16 @@ def test_closure_in_data(c, x):
     infer_scalar(float, Ty(float), result=float),
     # Will currently try to cast float to an object,
     # but object constructor does not take any argument
-    infer_scalar(float, Ty(ANYTHING), result=AssertionError("wrong number of arguments, expected 0")),
-    infer_scalar(float, Ty(Bot), result=AssertionError("wrong number of arguments, expected 0")),
+    infer_scalar(
+        float,
+        Ty(ANYTHING),
+        result=AssertionError("wrong number of arguments, expected 0"),
+    ),
+    infer_scalar(
+        float,
+        Ty(Bot),
+        result=AssertionError("wrong number of arguments, expected 0"),
+    ),
     # Python bool accepts float
     infer_scalar(float, Ty(B), result=bool),
     # Python float accepts bool
@@ -1693,7 +1711,10 @@ def test_J_return_function(x):
     return Jinv(jy), dy
 
 
-@mt(infer_standard(float, float, result=float), infer_standard(int, int, result=int))
+@mt(
+    infer_standard(float, float, result=float),
+    infer_standard(int, int, result=int),
+)
 def test_grad(x, y):
     def f(x, y):
         return x * (y + x)

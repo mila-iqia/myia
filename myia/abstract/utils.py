@@ -168,39 +168,7 @@ def _unify(self, x: object, y: object, *, U):  # noqa: F811
 
 
 @ovld
-def _unify(  # noqa: F811
-    self,
-    x: data.AbstractUnion,
-    y: (data.AbstractAtom, data.AbstractStructure),
-    *,
-    U
-):
-    """Check if abstract value is in abstrct union."""
-    if y in x.options:
-        return y
-    else:
-        raise MapError(x, y, reason="Cannot merge objects")
-
-
-@ovld
-def _unify(  # noqa: F811
-    self,
-    x: (data.AbstractAtom, data.AbstractStructure),
-    y: data.AbstractUnion,
-    *,
-    U
-):
-    """Check if abstract value is in abstrct union."""
-    if x in y.options:
-        return x
-    else:
-        raise MapError(x, y, reason="Cannot merge objects")
-
-
-@ovld
-def _unify(  # noqa: F811
-    self, x: data.ValueTrack, y: data.ValueTrack, *, U
-):
+def _unify(self, x: data.ValueTrack, y: data.ValueTrack, *, U):  # noqa: F811
     """Return other value if one is ANYTHING."""
     if type(x) is not type(y):
         raise MapError(x, y, "cannot merge objects")

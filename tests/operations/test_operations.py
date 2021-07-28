@@ -1,8 +1,4 @@
-from myia.testing.common import (
-    Bool,
-    Nil,
-    Ty,
-)
+from myia.testing.common import Bool, Nil, Ty
 from myia.testing.multitest import infer, mt
 from myia.testing.testing_inferrers import add_testing_inferrers
 
