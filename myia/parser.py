@@ -297,7 +297,6 @@ class Parser:
         self.line_offset -= 1
         self.filename = inspect.getfile(function)
         self.global_namespace = ModuleNamespace(function.__module__)
-        self.finalizers = {}
 
     def _eval_ast_node(self, node):
         text = ast.get_source_segment(self.src, node)
@@ -456,7 +455,10 @@ class Parser:
             else:
                 ld.replace(st.edges[1].node)
         elif var in function.variables_local:
-            assert st is not None
+            if st is None:
+                raise UnboundLocalError(
+                    f"local variable '{var}' referenced before assignment"
+                )
             ld.graph.delete_seq(ld)
             ld.replace(st.edges[1].node)
         else:
@@ -877,6 +879,11 @@ class Parser:
         assert isinstance(node.ctx, ast.Load)
         return block.read(node.id)
 
+    def _process_NamedExpr(self, block, node: ast.NamedExpr):
+        val = self.process_node(block, node.value)
+        self._assign(block, node.target, None, val)
+        return block.read(node.target.id)
+
     def _process_Slice(self, block, node):
         if node.lower is None:
             lower = Constant(None)
@@ -948,9 +955,19 @@ class Parser:
             raise NotImplementedError(targ)
 
     def _process_AnnAssign(self, block, node):
-        val = self.process_node(block, node.value)
-        val.annotation = self._eval_ast_node(node.annotation)
-        self._assign(block, node.target, None, val)
+        # Can only annotate single names
+        if not isinstance(node.target, ast.Name):
+            raise SyntaxError(
+                "only single target (not tuple) can be annotated"
+            )  # pragma: no cover
+        if node.value is not None:
+            val = self.process_node(block, node.value)
+            val.annotation = self._eval_ast_node(node.annotation)
+            block.write(node.target.id, val)
+        else:
+            # XXX: this discards the type annotation
+            block.function.variables_local.add(node.target.id)
+
         return block
 
     def _process_Assert(self, block, node):
@@ -987,11 +1004,6 @@ class Parser:
             ),
         )
         return block
-
-    def _process_NamedExpr(self, block, node: ast.NamedExpr):
-        val = self.process_node(block, node.value)
-        self._assign(block, node.target, None, val)
-        return block.read(node.target.id)
 
     def _process_Break(self, block, node):
         if len(block.function.break_target) == 0:
