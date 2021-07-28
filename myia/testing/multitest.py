@@ -72,6 +72,20 @@ def _check_inference(  # noqa: F811
     return x in y.options
 
 
+@ovld
+def _check_inference(x: data.AbstractAtom, y: data.AbstractAtom):
+    # Compare all tracks.
+    # E.g., one may have value track set to ANYTHING,
+    # and other one may not have value track.
+    # Simply doing `x == y` will fail,
+    # because they don't have same tracks defined.
+    return (
+        type(x) is type(y)
+        and x.tracks.interface is y.tracks.interface
+        and x.tracks.value is y.tracks.value
+    )
+
+
 def infer(*args, result=None):
     """Inference tester.
 
