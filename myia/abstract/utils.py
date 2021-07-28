@@ -204,13 +204,8 @@ def _unify(  # noqa: F811
     """Return other value if one is ANYTHING."""
     if type(x) is not type(y):
         raise MapError(x, y, "cannot merge objects")
-    if x.value is data.ANYTHING:
-        return y
-    if y.value is data.ANYTHING:
-        return x
-    if x.value != y.value:
-        raise MapError(x, y, "cannot merge objects")
-    return x
+    # Return ANYTHING if values are different.
+    return x if x.value == y.value else data.ValueTrack(data.ANYTHING)
 
 
 def unify(x, y, U=None):
