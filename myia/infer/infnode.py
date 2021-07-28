@@ -211,7 +211,7 @@ class InferenceEngine:
             # inference function associated to this already-existing abstract.
             # So, we use a specific function to do all work about getting
             # associated infererrer.
-            inf = self._get_inference_function(fn)
+            inf = self._get_inference_function(node.fn, fn)
             if inf:
                 partial_types = fn.elements
                 if isinstance(inf, SpecializedGraph):
@@ -267,8 +267,10 @@ class InferenceEngine:
             and isinstance(fn.elements[0], data.AbstractAtom)
         )
 
-    def _get_inference_function(self, fn: data.AbstractValue):
-        """Get inference function associated to given abstract."""
+    def _get_inference_function(self, node, fn: data.AbstractValue):
+        """Get inference function associated to given node and abstract."""
+        if node.is_constant() and node.value in self.inferrers:
+            return self.inferrers[node.value].tracks.interface.fn
         if isinstance(fn.tracks.interface, InferenceFunction):
             return fn.tracks.interface.fn
         elif (
@@ -277,8 +279,10 @@ class InferenceEngine:
         ):
             # Got abstract type.
             # If an inference function is set for given type, return it.
-            # e.g.: specific inference for None type to check that
-            # None constructor does not receive any input.
+            # We may pass here for e.g. if node is a parameter
+            # and inferred parameter type is an abstract type:
+            # def f(param_type, value):
+            #     return param_type(value)
             return self.inferrers[typ].tracks.interface.fn
         return None
 
