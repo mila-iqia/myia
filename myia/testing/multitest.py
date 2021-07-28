@@ -74,15 +74,13 @@ def _check_inference(  # noqa: F811
 
 @ovld
 def _check_inference(x: data.AbstractAtom, y: data.AbstractAtom):
-    # Compare all tracks.
-    # E.g., one may have value track set to ANYTHING,
-    # and other one may not have value track.
-    # Simply doing `x == y` will fail,
-    # because they don't have same tracks defined.
+    # compare value track manually.
+    xval = x.tracks.value
+    yval = y.tracks.value
     return (
         type(x) is type(y)
         and x.tracks.interface is y.tracks.interface
-        and x.tracks.value is y.tracks.value
+        and (xval == data.ANYTHING or yval == data.ANYTHING or xval == yval)
     )
 
 

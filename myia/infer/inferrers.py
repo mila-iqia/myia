@@ -123,7 +123,7 @@ def add_standard_inferrers(inferrers):
             operator.add: signature(X, X, ret=X),
             operator.and_: signature(X, X, ret=X),
             operator.eq: signature(X, X, ret=bool),
-            operator.gt: signature(X, X, ret=bool),
+            operator.gt: signature(X, Y, ret=bool),
             operator.invert: signature(X, ret=X),
             operator.is_: signature(X, Y, ret=bool),
             operator.is_not: signature(X, Y, ret=bool),

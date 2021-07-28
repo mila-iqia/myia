@@ -1,11 +1,14 @@
 """Implementation of type inference on Myia graphs."""
 
 import types
+from typing import Dict, Tuple
 from dataclasses import dataclass
+from typing import Sequence
 
 from myia.ir.node import SEQ
 
 from ..abstract import data, utils as autils
+from ..abstract.data import AbstractValue
 from ..abstract.to_abstract import to_abstract, type_to_abstract
 from ..ir import Constant, Graph, Node
 from ..ir.graph_utils import dfs, succ_deeper
@@ -90,6 +93,46 @@ def signature(*arg_types, ret):
         return autils.reify(return_type, unif=unif.canon)
 
     return inference_function(_infer)
+
+
+class InferenceDefinition:
+    __slots__ = "arg_types", "ret_type"
+
+    def __init__(self, *arg_types, ret_type):
+        self.arg_types = tuple(type_to_abstract(arg_type) if not isinstance(arg_type, AbstractValue) else arg_type for arg_type in arg_types)
+        self.ret_type = type_to_abstract(ret_type) if not isinstance(ret_type, AbstractValue) else ret_type
+
+
+def dispatch_inferences(*signatures: Sequence):
+    """Create an inference function from many type signatures.
+
+    Arguments:
+        signatures: a sequence of type signatures.
+            Each signature is a sequence of types or abstract values.
+            First sequence values are the argument types.
+            Last sequence value is the return type.
+            Each sequence must contain at least one element (the return type).
+    """
+    def_map = {}  # type: Dict[int, Dict[Tuple, InferenceDefinition]]
+    for sig in signatures:
+        if not isinstance(sig, InferenceDefinition):
+            *arg_types, ret_type = sig
+            sig = InferenceDefinition(*arg_types, ret_type=ret_type)
+        def_map.setdefault(len(sig.arg_types), {})[sig.arg_types] = sig
+
+    def inference(node, args, unif):
+        inp_types = []
+        for inp in args:
+            inp_types.append((yield Require(inp)))
+        inp_types = tuple(inp_types)
+        inf_def = def_map.get(len(inp_types), {}).get(inp_types, None)
+        if not inf_def:
+            raise RuntimeError(f"No inference for node: {node}, signature: {inp_types}")
+        for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
+            autils.unify(inp_type, expected_type, U=unif)
+        return autils.reify(inf_def.ret_type, unif=unif.canon)
+
+    return inference_function(inference)
 
 
 class Replace:
