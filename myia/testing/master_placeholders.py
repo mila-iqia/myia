@@ -1,48 +1,8 @@
 """Placeholder for master branch operations."""
-from myia.testing import numpy_subset
-
-
-def array_cast(arr, typ):
-    """Placeholder for master operation `array_cast`."""
-    return arr.astype(typ)
-
-
-def array_map(fn, *arrays):
-    """Placeholder for master operation `array_map`."""
-    return numpy_subset.vectorize(fn)(*arrays)
-
-
-def array_reduce(fn, arr, shap):
-    """Placeholder for master operation `array_reduce`."""
-    raise NotImplementedError()
-
-
-def array_to_scalar(x):
-    """Placeholder for master operation `array_to_scalar`."""
-    return x.item()
 
 
 def broadcast_shape(shpx, shpy):
     """Placeholder for master operation `broadcast_shape`."""
-    raise NotImplementedError()
-
-
-def conv2d(inp, weights, stride, padding, dilation, groups):
-    """Placeholder for master operation `conv2d`."""
-    raise NotImplementedError()
-
-
-def conv2d_grad_input(
-    inp_size, weights, grad_output, stride, padding, dilation, groups
-):
-    """Placeholder for master operation `conv2d_grad_input`."""
-    raise NotImplementedError()
-
-
-def conv2d_weight_grad(
-    inp, weight_size, grad_output, stride, padding, dilation, groups
-):
-    """Placeholder for master operation `conv2d_weight_grad`."""
     raise NotImplementedError()
 
 
@@ -54,16 +14,6 @@ def dict_setitem(dct, k, v):
 def dict_values(dct):
     """Placeholder for master operation `dict_values`."""
     raise NotImplementedError()
-
-
-def distribute(arr, shp):
-    """Placeholder for master operation `distribute`."""
-    return numpy_subset.broadcast_to(arr, shp)
-
-
-def dot(a, b):
-    """Placeholder for master operation `dot`."""
-    return numpy_subset.dot(a, b)
 
 
 def embed(x):
@@ -121,11 +71,6 @@ def record_setitem(obj, k, v):
     raise NotImplementedError()
 
 
-def reshape(arr, shp):
-    """Placeholder for master operation `reshape`."""
-    return numpy_subset.reshape(arr, shp)
-
-
 def scalar_add(a, b):
     """Placeholder for master operation `scalar_add`."""
     raise a + b
@@ -146,29 +91,14 @@ def scalar_mul(x, y):
     return x * y
 
 
-def scalar_to_array(x):
-    """Placeholder for master operation `scalar_to_array`."""
-    return numpy_subset.array(x)
-
-
 def scalar_usub(x):
     """Placeholder for master operation `scalar_usub`."""
     return -x
 
 
-def shape(arr):
-    """Placeholder for master operation `shape`."""
-    return arr.shape
-
-
 def tagged(x, tag=None):
     """Placeholder for master operation `tagged`."""
     raise NotImplementedError()
-
-
-def transpose(arr, perm):
-    """Placeholder for master operation `transpose`."""
-    return numpy_subset.transpose(arr, perm)
 
 
 def tuple_setitem(t, idx, v):

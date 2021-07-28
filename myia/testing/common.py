@@ -7,7 +7,6 @@ from myia import basics
 from myia.abstract import data
 from myia.abstract.to_abstract import precise_abstract
 from myia.ir.node import Constant, Graph
-from myia.testing import numpy_subset as np
 
 
 @precise_abstract.variant
@@ -60,8 +59,6 @@ def Ty(element_type):
         return data.AbstractStructure([A(object)], {"interface": type})
     if isinstance(element_type, data.AbstractValue):
         return data.AbstractStructure([element_type], {"interface": type})
-    if isinstance(element_type, np.dtype):
-        element_type = element_type.type
     assert isinstance(element_type, type), (element_type, type(element_type))
     return precise_abstract(element_type)
 
@@ -90,14 +87,6 @@ def Ex(value, t=None):
     if t is not None:
         assert value_type is t, (value, t, value_type)
     return value_type
-
-
-def S(x=data.ANYTHING, t=object):
-    """Create an abstract scalar."""
-    if isinstance(t, data.AbstractAtom):
-        t = t.tracks.interface
-    assert isinstance(t, type)
-    return data.AbstractAtom({"interface": t, "value": x})
 
 
 def Shp(*dims):
@@ -168,80 +157,12 @@ def list_of(*items):
     return _abstract_sequence(list, *items)
 
 
-def array_of(dtype: data.AbstractAtom = None, shape=None, value=None):
-    """Create an abstract array."""
-    items = [dtype] if dtype else []
-    tracks = {
-        "interface": np.ndarray,
-    }
-    if shape is not None:
-        tracks["shape"] = shape
-    if isinstance(shape, tuple):
-        tracks["ndim"] = len(shape)
-    if value is not None:
-        tracks["value"] = value
-    return data.AbstractStructure(items, tracks)
-
-
-def af16_of(*shape, value=None):
-    """Create an abstract array of f16."""
-    return array_of(f16, shape, value)
-
-
-def af32_of(*shape, value=None):
-    """Create an abstract array of f32."""
-    return array_of(f32, shape, value)
-
-
-def af64_of(*shape, value=None):
-    """Create an abstract array of f64."""
-    return array_of(f64, shape, value)
-
-
-def ai16_of(*shape, value=None):
-    """Create an abstract array of i16."""
-    return array_of(i16, shape, value)
-
-
-def ai32_of(*shape, value=None):
-    """Create an abstract array of i32."""
-    return array_of(i32, shape, value)
-
-
-def ai64_of(*shape, value=None):
-    """Create an abstract array of i64."""
-    return array_of(i64, shape, value)
-
-
-def au64_of(*shape, value=None):
-    """Create an abstract array of u64."""
-    return array_of(u64, shape, value)
-
-
 Object = A(object)
 B = Bool = A(bool)
 Bot = Nil = A(None)
-f16 = A(np.float16)
-f32 = A(np.float32)
-f64 = A(np.float64)
-i8 = A(np.int8)
-i16 = A(np.int16)
-i32 = A(np.int32)
-i64 = A(np.int64)
-u8 = A(np.uint8)
-u16 = A(np.uint16)
-u32 = A(np.uint32)
-u64 = A(np.uint64)
-
-Float = Un(f16, f32, f64)
-Integer = Un(i8, i16, i32, i64, u8, u16, u32, u64)
-Number = Un(i8, i16, i32, i64, u8, u16, u32, u64, f16, f32, f64)
-Int = {
-    8: i8,
-    16: i16,
-    32: i32,
-    64: i64,
-}
+Float = A(float)
+Int = A(int)
+Number = Un(int, float)
 External = Ex
 String = A(str)
 EmptyTuple = A(tuple)
@@ -249,21 +170,12 @@ EnvType = A(dict)
 newenv = {}
 
 
-def to_abstract_test(x):
-    """`to_abstract_test`, from master branch.
-
-    Just make sure given value is an abstract value.
-    """
-    assert isinstance(x, data.AbstractValue)
-    return x
-
-
 @dataclass(frozen=True)
 class Point:
     """Common dataclass for a 2D point."""
 
-    x: i64
-    y: i64
+    x: int
+    y: int
 
     def abs(self):
         """Compute distance from this point to origin."""
