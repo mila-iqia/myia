@@ -543,9 +543,7 @@ def f():
   i = {}
   j = {'a': '1', True: 2}
   k = dict()
-  _3 = {'a': 1, 'b': 2}
-  _4 = ()
-  m = dict(*_4, **_3)
+  m = dict(a=1, b=2)
   n = operator.add
   p = math.sin
   return (3, b, c, True, 'a string', g, h, i, j, k, m, n, p)
