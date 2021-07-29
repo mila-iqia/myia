@@ -50,7 +50,8 @@ def remove_useless_universe_getitem(g: Graph):
             # - at least 1 universe_getitem to replace
             if nodes_getitem and len(nodes_setitem) == 1:
                 (n_setitem,) = nodes_setitem
-                n_value = n_setitem.inputs[1]
+                args, kwargs = n_setitem.args()
+                n_value = args[1]
                 # Replace universe_getitem nodes with associated value.
                 for n_getitem in nodes_getitem:
                     graph.delete_seq(n_getitem)
