@@ -627,10 +627,8 @@ def test_call2():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.make_dict('b', 2)
-  #2 = myia.basics.make_tuple(1)
-  #3 = myia.basics.apply(g, #2, #1)
-  return #3
+  #1 = g(1, b=2)
+  return #1
 }
 
 graph g(a, b) {
@@ -717,10 +715,8 @@ def test_call6():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.make_dict('b', 2, 'c', 3)
-  #2 = myia.basics.make_tuple(1)
-  #3 = myia.basics.apply(g, #2, #1)
-  return #3
+  #1 = g(1, b=2, c=3)
+  return #1
 }
 
 graph g(a, b) {
@@ -793,10 +789,8 @@ def test_call_order():
   #1 = _operator.add(a, b)
   #2 = _operator.add(c, d)
   #3 = _operator.add(e, f~2)
-  #4 = myia.basics.make_dict('c', 33, 'e', #3)
-  #5 = myia.basics.make_tuple(#1, #2)
-  #6 = myia.basics.apply(g, #5, #4)
-  return #6
+  #4 = g(#1, #2, c=33, e=#3)
+  return #4
 }
 
 graph g(a~2, b~2) {
