@@ -748,15 +748,23 @@ class Parser:
     def _process_Call(self, block, node):
         func = self.process_node(block, node.func)
 
+        # We process edges for edges and groups at the same time
+        # and then decide which to use at the end.
+
+        edges = {}
         groups = []
         current = []
-        for arg in node.args:
+        stars = False
+        for i, arg in enumerate(node.args):
             if isinstance(arg, ast.Starred):
                 groups.append(current)
                 groups.append(self.process_node(block, arg.value))
                 current = []
+                stars = True
             else:
-                current.append(self.process_node(block, arg))
+                val = self.process_node(block, arg)
+                edges[i] = val
+                current.append(val)
         if current or not groups:
             groups.append(current)
 
@@ -764,6 +772,7 @@ class Parser:
             for k in node.keywords:
                 if k.arg is None:
                     groups.append(self.process_node(block, k.value))
+                    stars = True
             keywords = [k for k in node.keywords if k.arg is not None]
             kwlist = list(
                 zip(
@@ -771,14 +780,20 @@ class Parser:
                     (self.process_node(block, k.value) for k in keywords),
                 )
             )
-            dlist = []
-            for kw in kwlist:
-                dlist.extend(kw)
-            groups.append(block.apply(basics.make_dict, *dlist))
+            if stars:
+                dlist = []
+                for kw in kwlist:
+                    dlist.extend(kw)
+                groups.append(block.apply(basics.make_dict, *dlist))
+            else:
+                for k, v in kwlist:
+                    edges[k] = v
 
-        if len(groups) == 1:
-            (args,) = groups
-            return block.apply(func, *args)
+        if not stars:
+            app = block.apply(func)
+            for k, v in edges.items():
+                app.add_edge(k, v)
+            return app
         else:
             args = []
             for group in groups:
