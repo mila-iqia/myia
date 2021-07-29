@@ -369,6 +369,17 @@ class Apply(Node):
             i += 1
         return tuple(res)
 
+    def args(self):
+        args = []
+        kwargs = dict()
+        for e in self.edges.values():
+            if isinstance(e.label, int):
+                args.append(e)
+            if isinstance(e.label, str):
+                kwargs[e.label] = e.node
+        args = [e.node for e in sorted(args, key=lambda e: e.label)]
+        return args, kwargs
+
     def clone(self, objmap):
         """Copy a node in the context of a graph clone.
 
