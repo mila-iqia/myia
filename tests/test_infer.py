@@ -15,13 +15,11 @@ from myia.basics import (
     user_switch,
     user_switch as switch,
 )
-from myia.testing import master_placeholders as P
 from myia.testing.common import (
     B,
     Bot,
     D,
     EmptyTuple,
-    EnvType as Env,
     Ex,
     External,
     Int,
@@ -29,7 +27,6 @@ from myia.testing.common import (
     Number,
     Point,
     Point3D,
-    Shp,
     String,
     Thing,
     Thing_f,
@@ -42,15 +39,8 @@ from myia.testing.common import (
     tuple_of,
 )
 from myia.testing.master_placeholders import (
-    J,
-    Jinv,
-    broadcast_shape,
+    dict_setitem,
     dict_values,
-    embed,
-    env_getitem,
-    env_setitem,
-    gadd,
-    grad,
     hastype,
     identity,
     scalar_add,
@@ -58,7 +48,6 @@ from myia.testing.master_placeholders import (
     scalar_lt,
     scalar_mul,
     scalar_usub,
-    tagged,
     tuple_setitem,
     unsafe_static_cast,
     zeros_like,
@@ -418,7 +407,7 @@ def test_dict_getitem_nonconst(d, i):
     infer_scalar(D(z=int), float, result=InferenceError),
 )
 def test_dict_setitem(d, x):
-    return P.dict_setitem(d, "x", x)
+    return dict_setitem(d, "x", x)
 
 
 @mt(
@@ -1390,21 +1379,6 @@ def test_scalar_cast_3(x):
     return scalar_cast(x, float)
 
 
-@mt(
-    infer_scalar((int,), (int,), result=(int,)),
-    infer_scalar((int, int), (int,), result=(int, int)),
-    infer_scalar((int,), (int, int), result=(int, int)),
-    infer_scalar(Shp(1, 3), Shp(2, 1), result=Shp(2, 3)),
-    infer_scalar(Shp(2, 3), Shp(2, 3), result=Shp(2, 3)),
-    infer_scalar(Shp(2, 4), Shp(2, 3), result=InferenceError),
-    infer_scalar((int, int), Shp(2, 3), result=Shp(2, 3)),
-    infer_scalar((int,), (int,), result=InferenceError),
-    infer_scalar(int, int, result=InferenceError),
-)
-def test_broadcast_shape(xs, ys):
-    return broadcast_shape(xs, ys)
-
-
 @infer_scalar(int, int, result=InferenceError)
 def test_call_nonfunc(x, y):
     return x(y)
@@ -1525,11 +1499,6 @@ def test_dataclass_bad_inst(x, y, z):
     return Point(x, y, z)
 
 
-@infer_scalar(Ty(ANYTHING), int, int, result=InferenceError)
-def test_dataclass_bad_inst2(cls, x, y):
-    return P.make_record(cls, x, y)
-
-
 @infer_scalar(Point(int, int), result=InferenceError)
 def test_dataclass_wrong_field(pt):
     return pt.z
@@ -1538,39 +1507,6 @@ def test_dataclass_wrong_field(pt):
 @infer_scalar(Thing(int), result=int)
 def test_dataclass_call(thing):
     return thing()
-
-
-@infer_scalar(Thing(int), float, result=Thing(float))
-def test_record_setitem(thing, x):
-    return P.record_setitem(thing, "contents", x)
-
-
-@mt(
-    infer_scalar(Point(int, int), int, result=Point(int, int)),
-    infer_scalar(Point(int, int), float, result=InferenceError),
-)
-def test_record_setitem_2(pt, x):
-    return P.record_setitem(pt, "x", x)
-
-
-@infer_scalar(Thing(int), float, result=InferenceError)
-def test_record_setitem_wrong_field(thing, x):
-    return P.record_setitem(thing, "shfifty_five", x)
-
-
-@mt(
-    infer_scalar(int, int, result=int),
-    infer_scalar(float, float, result=float),
-    infer_scalar([float], [float], result=[float]),
-    infer_scalar((int, float), (int, float), result=(int, float)),
-    infer_scalar(Point(int, int), Point(int, int), result=Point(int, int)),
-    infer_scalar(Env, Env, result=Env),
-    infer_scalar(
-        {"x": int, "y": int}, {"x": int, "y": int}, result={"x": int, "y": int}
-    ),
-)
-def test_gadd(x, y):
-    return gadd(x, y)
 
 
 @mt(
@@ -1593,27 +1529,6 @@ def test_zeros_like_fn(x):
         return x + y
 
     return zeros_like(f)
-
-
-@mt(
-    infer_scalar(int, int, int, result=int),
-    infer_scalar(int, float, int, result=InferenceError),
-    infer_scalar(int, int, float, result=InferenceError),
-)
-def test_env(x, y, z):
-    e = newenv
-    e = env_setitem(e, embed(x), y)
-    return env_getitem(e, embed(x), z)
-
-
-@infer_scalar(result=Env)
-def test_env_onfn():
-    def f(x):
-        return x * x
-
-    e = newenv
-    e = env_setitem(e, embed(f), newenv)
-    return env_getitem(e, embed(f), newenv)
 
 
 @mt(
@@ -1640,99 +1555,6 @@ def test_pass(x):
     else:
         pass
     return x
-
-
-@infer_scalar(int, int, int, result=U(int, int))
-def test_tagged(x, y, z):
-    if x > 0:
-        return tagged(y)
-    else:
-        return tagged(z)
-
-
-@infer_scalar(int, int, int, int, result=U(int, int, int))
-def test_tagged_more(c, x, y, z):
-    if c == 0:
-        return tagged(x)
-    elif c > 0:
-        return tagged(y)
-    else:
-        return tagged(z)
-
-
-@infer_scalar(int, result=InferenceError)
-def test_tagged_too_many_arguments(x):
-    return tagged(x, 1, 2)
-
-
-@mt(
-    infer_standard(int, result=int),
-    infer_standard(float, result=float),
-)
-def test_Jinv2(x):
-    def f(x):
-        return x * x
-
-    ff = Jinv(J(f))
-    return ff(x)
-
-
-@infer_scalar(int, result=InferenceError)
-def test_Jinv3(x):
-    def f(x):
-        return x * x
-
-    return Jinv(f)(x)
-
-
-@infer_scalar(int, result=InferenceError)
-def test_Jinv4(x):
-    return Jinv(scalar_add)(x)
-
-
-@infer_standard(float, result=InferenceError)
-def test_J_bprop_invalid(x):
-    def f(x):
-        return x * x
-
-    _, bprop = J(f)(J(x))
-    return bprop(1.0, 1.0)
-
-
-@infer_standard(float, result=(float, float))
-def test_J_return_function(x):
-    def f(y):
-        return y * y
-
-    def g():
-        return f
-
-    jg, _ = J(g)()
-    jy, bprop = jg(J(x))
-    _, dy = bprop(1.0)
-    return Jinv(jy), dy
-
-
-@mt(
-    infer_standard(float, float, result=float),
-    infer_standard(int, int, result=int),
-)
-def test_grad(x, y):
-    def f(x, y):
-        return x * (y + x)
-
-    return grad(f)(x, y)
-
-
-@mt(
-    infer_standard(int, result=int),
-    infer_standard(float, result=float),
-)
-def test_grad_scalar_cast(x):
-    def f(x):
-        return scalar_cast(x, float)
-
-    return grad(f)(x)
 
 
 @mt(
