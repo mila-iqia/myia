@@ -226,9 +226,7 @@ class CodeGenerator:
 
         if fn.is_constant():
             if fn.value in self.simple_map:
-                return self._default_formatter(
-                    self.simple_map[fn.value], args
-                )
+                return self._default_formatter(self.simple_map[fn.value], args)
             elif fn.value in self.complex_map:
                 return self.complex_map[fn.value](*args)
             elif fn.value is basics.resolve:
