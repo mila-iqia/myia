@@ -1,14 +1,12 @@
 """Implementation of type inference on Myia graphs."""
 
 import types
-from typing import Dict, Tuple
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Dict, Sequence, Tuple
 
 from myia.ir.node import SEQ
 
 from ..abstract import data, utils as autils
-from ..abstract.data import AbstractValue
 from ..abstract.to_abstract import to_abstract, type_to_abstract
 from ..ir import Constant, Graph, Node
 from ..ir.graph_utils import dfs, succ_deeper
@@ -96,11 +94,28 @@ def signature(*arg_types, ret):
 
 
 class InferenceDefinition:
+    """Helper class to represent a signature."""
+
     __slots__ = "arg_types", "ret_type"
 
     def __init__(self, *arg_types, ret_type):
-        self.arg_types = tuple(type_to_abstract(arg_type) if not isinstance(arg_type, AbstractValue) else arg_type for arg_type in arg_types)
-        self.ret_type = type_to_abstract(ret_type) if not isinstance(ret_type, AbstractValue) else ret_type
+        self.arg_types = tuple(
+            self._type_to_abstract(arg_type) for arg_type in arg_types
+        )
+        self.ret_type = self._type_to_abstract(ret_type)
+
+    def __str__(self):
+        return f"{list(self.arg_types)} -> {self.ret_type}"
+
+    def _type_to_abstract(self, el):
+        if isinstance(el, (data.AbstractValue, data.Generic)):
+            return el
+        if isinstance(el, (tuple, list)):
+            return data.AbstractStructure(
+                [self._type_to_abstract(typ) for typ in el],
+                {"interface": type(el)},
+            )
+        return type_to_abstract(el)
 
 
 def dispatch_inferences(*signatures: Sequence):
@@ -127,7 +142,17 @@ def dispatch_inferences(*signatures: Sequence):
         inp_types = tuple(inp_types)
         inf_def = def_map.get(len(inp_types), {}).get(inp_types, None)
         if not inf_def:
-            raise RuntimeError(f"No inference for node: {node}, signature: {inp_types}")
+            raise RuntimeError(
+                f"No inference for node: {node}, signature: {list(inp_types)}\n"
+                f"Available signatures:\n"
+                + (
+                    "\n".join(
+                        str(dfn)
+                        for dct in def_map.values()
+                        for dfn in dct.values()
+                    )
+                )
+            )
         for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
             autils.unify(inp_type, expected_type, U=unif)
         return autils.reify(inf_def.ret_type, unif=unif.canon)

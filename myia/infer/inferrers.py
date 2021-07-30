@@ -5,6 +5,7 @@ import types
 
 from .. import basics
 from ..abstract import data
+from ..abstract.to_abstract import precise_abstract
 from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
@@ -29,13 +30,18 @@ def resolve(node, args, unif):
 def user_switch(node, args, unif):
     """Inferrer for the user_switch basic function."""
     cond, ift, iff = args
-    _ = yield Require(cond)  # TODO: check bool
+    cond_type = yield Require(cond)  # TODO: check bool
     ift_t = yield Require(ift)
     iff_t = yield Require(iff)
-    # If both branches return same type, then expect this type.
+    # If both branches return same type, then return this type.
     if ift_t is iff_t:
         return ift_t
-    # Otherwise, expect an union of both types.
+    # If cond_type has a value, check it.
+    if cond_type is precise_abstract(True):
+        return ift_t
+    if cond_type is precise_abstract(False):
+        return iff_t
+    # Otherwise, return an union of both types.
     return data.AbstractUnion([ift_t, iff_t], tracks={})
 
 
@@ -111,6 +117,65 @@ def make_list_inferrer(node, args, unif):
     return data.AbstractStructure(elements, {"interface": list})
 
 
+def myia_iter_inferrer(node, args, unif):
+    """Inferrer for the myia_iter function."""
+    (iterable_node,) = args
+    iterable_type = yield Require(iterable_node)
+    if iterable_type.tracks.interface in (tuple, list, range):
+        return iterable_type
+    raise TypeError(f"myia_iter: unexpected input type: {iterable_type}")
+
+
+def myia_hasnext_inferrer(node, args, unif):
+    """Inferrer for the myia_hasnext function."""
+    (iterable_node,) = args
+    iterable_type = yield Require(iterable_node)
+    if iterable_type.tracks.interface in (range, list):
+        return data.AbstractAtom({"interface": bool})
+    if iterable_type.tracks.interface is tuple:
+        assert isinstance(iterable_type, data.AbstractStructure)
+        return precise_abstract(bool(iterable_type.elements))
+    raise TypeError(f"myia_hasnext: unexpected input type: {iterable_type}")
+
+
+def myia_next_inferrer(node, args, unif):
+    """Inferrer for the myia_next function."""
+    (iterable_node,) = args
+    iterable_type = yield Require(iterable_node)
+    if iterable_type.tracks.interface is range:
+        return data.AbstractStructure(
+            [
+                data.AbstractAtom({"interface": int}),
+                data.AbstractAtom({"interface": range}),
+            ],
+            {"interface": tuple},
+        )
+    if iterable_type.tracks.interface is tuple:
+        assert isinstance(iterable_type, data.AbstractStructure)
+        type_next_el = iterable_type.elements[0]
+        type_next_seq = iterable_type.elements[1:]
+        return data.AbstractStructure(
+            [
+                type_next_el,
+                data.AbstractStructure(type_next_seq, {"interface": tuple}),
+            ],
+            {"interface": tuple},
+        )
+    if iterable_type.tracks.interface is list:
+        assert isinstance(iterable_type, data.AbstractStructure)
+        (type_el,) = iterable_type.elements
+        return data.AbstractStructure(
+            [
+                type_el,
+                data.AbstractStructure(
+                    [type_el], {"interface": iterable_type.tracks.interface}
+                ),
+            ],
+            {"interface": tuple},
+        )
+    raise TypeError(f"myia_next: unexpected input type: {iterable_type}")
+
+
 X = data.Generic("x")
 Y = data.Generic("y")
 
@@ -165,5 +230,8 @@ def add_standard_inferrers(inferrers):
             ),
             basics.make_tuple: inference_function(make_tuple_inferrer),
             basics.make_list: inference_function(make_list_inferrer),
+            basics.myia_iter: inference_function(myia_iter_inferrer),
+            basics.myia_hasnext: inference_function(myia_hasnext_inferrer),
+            basics.myia_next: inference_function(myia_next_inferrer),
         }
     )

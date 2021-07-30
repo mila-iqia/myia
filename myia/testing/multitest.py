@@ -73,7 +73,7 @@ def _check_inference(  # noqa: F811
 
 
 @ovld
-def _check_inference(x: data.AbstractAtom, y: data.AbstractAtom):
+def _check_inference(x: data.AbstractAtom, y: data.AbstractAtom):  # noqa: F811
     # compare value track manually.
     xval = x.tracks.value
     yval = y.tracks.value

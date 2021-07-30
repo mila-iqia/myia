@@ -5,6 +5,7 @@ Inferrers might be moved to standar inferrers later if correctly tested.
 """
 
 import math
+
 from myia import inferrers
 from myia.infer.inferrers import X
 from myia.infer.infnode import dispatch_inferences, signature

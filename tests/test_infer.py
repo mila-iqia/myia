@@ -208,7 +208,9 @@ def test_while(x, y):
 @mt(
     infer_standard([int], int, result=int),
     infer_standard([int], float, result=InferenceError),
-    infer_standard(int, int, result=InferenceError),
+    infer_standard(
+        int, int, result=TypeError("myia_iter: unexpected input type")
+    ),
     infer_standard((int, int, int), int, result=int),
     infer_standard((int, float, int), int, result=InferenceError),
 )
