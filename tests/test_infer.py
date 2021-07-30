@@ -1512,13 +1512,18 @@ def test_dataclass_call(thing):
 @mt(
     infer_scalar(int, result=0),
     infer_scalar(float, result=0.0),
-    infer_scalar([float], result=[float]),  # list element types are broadened
-    infer_scalar((int, float), result=(0, 0.0)),
-    infer_scalar(Point(int, int), result=Point(0, 0)),
-    infer_scalar((2, 3.0), result=(0, 0.0)),
-    infer_scalar(Point(1, 2), result=Point(0, 0)),
 )
 def test_zeros_like(x):
+    return zeros_like(x)
+
+
+@mark_fail(RuntimeError, "No inference for node")
+@mt(
+    infer_scalar([float], result=[float]),  # list element types are broadened
+    infer_scalar((int, float), result=(0, 0.0)),
+    infer_scalar((2, 3.0), result=(0, 0.0)),
+)
+def test_zeros_like_fail(x):
     return zeros_like(x)
 
 

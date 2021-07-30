@@ -110,6 +110,8 @@ class InferenceDefinition:
     def _type_to_abstract(self, el):
         if isinstance(el, (data.AbstractValue, data.Generic)):
             return el
+        if not isinstance(el, type):
+            el = type(el)
         if isinstance(el, (tuple, list)):
             return data.AbstractStructure(
                 [self._type_to_abstract(typ) for typ in el],

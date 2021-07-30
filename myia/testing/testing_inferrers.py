@@ -10,7 +10,7 @@ from myia import inferrers
 from myia.infer.inferrers import X
 from myia.infer.infnode import dispatch_inferences, signature
 from myia.testing.common import Float, Int, Nil, Object, tuple_of
-from myia.testing.master_placeholders import tuple_setitem
+from myia.testing.master_placeholders import tuple_setitem, zeros_like
 
 
 def add_testing_inferrers():
@@ -19,6 +19,7 @@ def add_testing_inferrers():
         {
             # master operation inferrers
             tuple_setitem: signature(tuple_of(), Int, X, ret=tuple_of()),
+            zeros_like: dispatch_inferences((int, 0), (float, 0.0)),
             math.log: dispatch_inferences(
                 (bool, Float), (Int, Float), (Float, float)
             ),

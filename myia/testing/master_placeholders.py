@@ -1,4 +1,5 @@
 """Placeholder for master branch operations."""
+from ovld import ovld
 
 
 def dict_setitem(dct, k, v):
@@ -58,6 +59,22 @@ def unsafe_static_cast(x, typ):
     return typ(x)
 
 
-def zeros_like(x):
+@ovld
+def zeros_like(self, x: int):  # noqa: F811
     """Placeholder for master operation `zeros_like`."""
-    raise NotImplementedError()
+    return 0
+
+
+@ovld
+def zeros_like(self, x: float):  # noqa: F811
+    return 0.0
+
+
+@ovld
+def zeros_like(self, x: list):  # noqa: F811
+    return [self(v) for v in x]
+
+
+@ovld
+def zeros_like(self, x: tuple):  # noqa: F811
+    return tuple(self(v) for v in x)
