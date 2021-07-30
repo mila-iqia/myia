@@ -370,6 +370,19 @@ class Apply(Node):
         return tuple(res)
 
     def args(self):
+        """Fetch the arguments for the node.
+
+        Returns a tuple of `(args, kwargs)`.
+
+        `args` is defined as a list of all the edge nodes that have an
+        integer label, sorted by the value of that integer
+        (ascending).
+
+        `kwargs` is defined as a dict of string -> edge node for all
+        the edges that have a string label.
+
+        All other edges are ignored.  One or both of the results can be empty.
+        """
         args = []
         kwargs = dict()
         for e in self.edges.values():
