@@ -73,7 +73,7 @@ def H(*opts):
 def D(**kwargs):
     """Create an abstract dictionary."""
     # Warning: does not yet handle types for keys and values.
-    return precise_abstract(kwargs)
+    return A(kwargs)
 
 
 def Ex(value, t=None):

@@ -36,6 +36,17 @@ def to_abstract(self, x: object):  # noqa: F811
 
 
 @ovld
+def to_abstract(self, x: str):  # noqa: F811
+    """Keep value for string."""
+    return data.AbstractAtom({"interface": type(x), "value": x})
+
+
+@ovld
+def to_abstract(self, x: dict):  # noqa: F811
+    return data.AbstractDict([self(el) for item in x.items() for el in item])
+
+
+@ovld
 def to_abstract(self, t: type):  # noqa: F811
     return data.AbstractStructure([type_to_abstract(t)], {"interface": type})
 

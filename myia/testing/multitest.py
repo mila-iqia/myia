@@ -43,13 +43,13 @@ def mt(*testers):
 
 
 @ovld
-def _check_inference(x: object, y: object):  # noqa: F811
+def _check_inference(self, x: object, y: object):  # noqa: F811
     return x is y
 
 
 @ovld
 def _check_inference(  # noqa: F811
-    x: data.AbstractUnion, y: data.AbstractUnion
+    self, x: data.AbstractUnion, y: data.AbstractUnion
 ):
     return (
         type(x) is type(y)
@@ -60,20 +60,22 @@ def _check_inference(  # noqa: F811
 
 @ovld
 def _check_inference(  # noqa: F811
-    x: data.AbstractUnion, y: (data.AbstractAtom, data.AbstractStructure)
+    self, x: data.AbstractUnion, y: (data.AbstractAtom, data.AbstractStructure)
 ):
     return y in x.options
 
 
 @ovld
 def _check_inference(  # noqa: F811
-    x: (data.AbstractAtom, data.AbstractStructure), y: data.AbstractUnion
+    self, x: (data.AbstractAtom, data.AbstractStructure), y: data.AbstractUnion
 ):
     return x in y.options
 
 
 @ovld
-def _check_inference(x: data.AbstractAtom, y: data.AbstractAtom):  # noqa: F811
+def _check_inference(  # noqa: F811
+    self, x: data.AbstractAtom, y: data.AbstractAtom
+):
     # compare value track manually.
     xval = x.tracks.value
     yval = y.tracks.value
@@ -81,6 +83,17 @@ def _check_inference(x: data.AbstractAtom, y: data.AbstractAtom):  # noqa: F811
         type(x) is type(y)
         and x.tracks.interface is y.tracks.interface
         and (xval == data.ANYTHING or yval == data.ANYTHING or xval == yval)
+    )
+
+
+@ovld
+def _check_inference(  # noqa: F811
+    self, x: data.AbstractDict, y: data.AbstractDict
+):
+    return (
+        len(x.elements) == len(y.elements)
+        and all(kx is ky for kx, ky in zip(x.keys, y.keys))
+        and all(self(vx, vy) for vx, vy in zip(x.values, y.values))
     )
 
 

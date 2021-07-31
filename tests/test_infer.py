@@ -300,6 +300,7 @@ def test_dict2(x, y):
     return {"x": x, "y": y}
 
 
+# fail
 @infer_scalar(int, int, float, result=D(x=int, y=float))
 def test_dict_merge(c, x, y):
     if c == 0:
@@ -387,15 +388,17 @@ def test_tuple_outofbound_negative(x, y):
 
 @mt(
     infer_standard(D(x=int), result=int),
-    infer_standard(D(y=float), result=InferenceError),
+    infer_standard(D(y=float), result=ValueError("not in list")),
 )
 def test_dict_getitem(d):
     return d["x"]
 
 
 @mt(
-    infer_standard(D(x=int), Ex(ANYTHING, t=str), result=InferenceError),
-    infer_standard(D(x=int), 2, result=InferenceError),
+    infer_standard(
+        D(x=int), Ex(ANYTHING, t=str), result=ValueError("not in list")
+    ),
+    infer_standard(D(x=int), 2, result=ValueError("not in list")),
 )
 def test_dict_getitem_nonconst(d, i):
     return d[i]
@@ -404,7 +407,7 @@ def test_dict_getitem_nonconst(d, i):
 @mt(
     infer_scalar(D(x=int), float, result=D(x=float)),
     infer_scalar(D(x=int, y=float), float, result=D(x=float, y=float)),
-    infer_scalar(D(z=int), float, result=InferenceError),
+    infer_scalar(D(z=int), float, result=ValueError("not in list")),
 )
 def test_dict_setitem(d, x):
     return dict_setitem(d, "x", x)

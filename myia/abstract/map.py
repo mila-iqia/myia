@@ -275,6 +275,11 @@ def abstract_map(self, x: data.AbstractStructure, **kwargs):  # noqa: F811
 
 
 @ovld
+def abstract_map(self, x: data.AbstractDict, **kwargs):  # noqa: F811
+    return (yield type(x))([self(elem, **kwargs) for elem in x.elements])
+
+
+@ovld
 def abstract_map(self, x: data.AbstractUnion, **kwargs):  # noqa: F811
     return (yield type(x))(
         [self(opt, **kwargs) for opt in x.options], self(x.tracks, **kwargs)
@@ -372,6 +377,24 @@ def abstract_map2(  # noqa: F811
     return (yield type(x))(
         [self(xe, ye, **kwargs) for xe, ye in zip(x.elements, y.elements)],
         tracks=self(x.tracks, y.tracks, **kwargs),
+    )
+
+
+@ovld
+def abstract_map2(  # noqa: F811
+    self, x: data.AbstractDict, y: data.AbstractDict, **kwargs
+):
+    assert type(x) is type(y)
+    if len(x.elements) != len(y.elements):
+        raise MapError(x, y, reason="Structures have different lengths")
+
+    # Require key types to be identical.
+    for kx, ky in zip(x.keys, y.keys):
+        if kx is not ky:
+            raise MapError(kx, ky, "Different dict keys")
+
+    return (yield type(x))(
+        [self(xe, ye, **kwargs) for xe, ye in zip(x.elements, y.elements)]
     )
 
 

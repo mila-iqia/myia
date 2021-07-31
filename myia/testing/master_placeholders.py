@@ -4,12 +4,13 @@ from ovld import ovld
 
 def dict_setitem(dct, k, v):
     """Placeholder for master operation `dict_setitem`."""
-    raise NotImplementedError()
+    dct[k] = v
+    return dct
 
 
 def dict_values(dct):
     """Placeholder for master operation `dict_values`."""
-    raise NotImplementedError()
+    return tuple(dct.values())
 
 
 def hastype(obj, typ):

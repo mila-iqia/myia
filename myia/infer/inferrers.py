@@ -80,17 +80,23 @@ def getattr_inferrer(node, args, unif):
 def getitem_inferrer(node, args, unif):
     """Inferrer for the getitem function."""
     obj_node, key_node = args
-    assert key_node.is_constant(int)
     obj = yield Require(obj_node)
-    key = key_node.value
-    if not (
-        isinstance(obj, data.AbstractStructure)
-        and obj.tracks.interface in (tuple, list)
-    ):
-        raise AssertionError(
-            f"getitem can currently only be used for lists and tuples, got {obj}[{key}]"
-        )
-    return obj.elements[key]
+    if isinstance(obj, data.AbstractDict):
+        key = yield Require(key_node)
+        key_pos = obj.keys.index(key)
+        return obj.values[key_pos]
+    else:
+        assert key_node.is_constant(int)
+        key = key_node.value
+        if not (
+            isinstance(obj, data.AbstractStructure)
+            and obj.tracks.interface in (tuple, list)
+        ):
+            raise AssertionError(
+                f"getitem can currently only be used for "
+                f"dicts, lists and tuples, got {obj}[{key}]"
+            )
+        return obj.elements[key]
 
 
 def make_tuple_inferrer(node, args, unif):
@@ -115,6 +121,15 @@ def make_list_inferrer(node, args, unif):
             base_type = autils.merge(base_type, typ, U=unif)[0]
         elements.append(base_type)
     return data.AbstractStructure(elements, {"interface": list})
+
+
+def make_dict_inferrer(node, args, unif):
+    """Inferrer for the make_dict function."""
+    assert (
+        not len(args) % 2
+    ), f"make_dict: expected even number of arguments, got {len(args)}"
+    arg_types = yield RequireAll(*args)
+    return data.AbstractDict(arg_types)
 
 
 def myia_iter_inferrer(node, args, unif):
@@ -233,5 +248,6 @@ def add_standard_inferrers(inferrers):
             basics.myia_iter: inference_function(myia_iter_inferrer),
             basics.myia_hasnext: inference_function(myia_hasnext_inferrer),
             basics.myia_next: inference_function(myia_next_inferrer),
+            basics.make_dict: inference_function(make_dict_inferrer),
         }
     )
