@@ -72,11 +72,10 @@ class SpecializedGraph:
 def signature(*arg_types, ret):
     """Create an inference function from a type signature."""
     arg_types = [
-        type_to_abstract(argt) if isinstance(argt, type) else argt
-        for argt in arg_types
+        InferenceDefinition.type_to_abstract(argt) for argt in arg_types
     ]
 
-    return_type = type_to_abstract(ret) if isinstance(ret, type) else ret
+    return_type = InferenceDefinition.type_to_abstract(ret)
 
     def _infer(node, args, unif):
         inp_types = []
@@ -100,21 +99,23 @@ class InferenceDefinition:
 
     def __init__(self, *arg_types, ret_type):
         self.arg_types = tuple(
-            self._type_to_abstract(arg_type) for arg_type in arg_types
+            self.type_to_abstract(arg_type) for arg_type in arg_types
         )
-        self.ret_type = self._type_to_abstract(ret_type)
+        self.ret_type = self.type_to_abstract(ret_type)
 
     def __str__(self):
         return f"{list(self.arg_types)} -> {self.ret_type}"
 
-    def _type_to_abstract(self, el):
+    @classmethod
+    def type_to_abstract(cls, el):
+        """Convert given object to an abstract type."""
         if isinstance(el, (data.AbstractValue, data.Generic)):
             return el
         if not isinstance(el, type):
             el = type(el)
         if isinstance(el, (tuple, list)):
             return data.AbstractStructure(
-                [self._type_to_abstract(typ) for typ in el],
+                [cls.type_to_abstract(typ) for typ in el],
                 {"interface": type(el)},
             )
         return type_to_abstract(el)
