@@ -1333,6 +1333,7 @@ def test_user_switch_hastype(x, y):
     return user_switch(hastype(x, int), y + 1, y + 2)
 
 
+@mark_fail(AttributeError, "``type object 'Thing' has no attribute 'contents' (dataclasses not yet supported)")
 @infer_standard(B, int, result=int)
 def test_closure_in_data(c, x):
     def f(x):
@@ -1410,6 +1411,7 @@ def test_max_std(x, y):
         return y
 
 
+@mark_fail(AttributeError, "`type object 'Point' has no attribute 'x'` (dataclasses not yet supported)")
 @mt(
     infer_scalar(Point(int, int), result=int),
     infer_scalar(Point(float, float), result=float),
@@ -1418,6 +1420,7 @@ def test_class(pt):
     return pt.x + pt.y
 
 
+@mark_fail(AssertionError, "`getattr can currently only be used for methods` (dataclasses not yet supported)")
 @mt(
     infer_scalar(Point(int, int), result=int),
     infer_scalar(Point(float, float), result=float),
@@ -1426,6 +1429,7 @@ def test_dataclass_method(pt):
     return pt.abs()
 
 
+@mark_fail(AssertionError, "`getattr can currently only be used for methods` (dataclasses not yet supported)")
 @mt(
     infer_scalar(Point(int, int), result=int),
     infer_scalar(Point(float, float), result=float),
@@ -1434,26 +1438,31 @@ def test_dataclass_property(pt):
     return pt.absprop
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_add(pt1, pt2):
     return pt1 + pt2
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_add_ct(pt):
     return pt + 10
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_sub(pt1, pt2):
     return pt1 - pt2
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_mul(pt1, pt2):
     return pt1 * pt2
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(
     Point3D(float, float, float),
     result=Point3D(float, float, float),
@@ -1462,31 +1471,37 @@ def test_arithmetic_data_truediv(pt1, pt2):
     return pt1 / pt2
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_floordiv(pt1, pt2):
     return pt1 // pt2
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_mod(pt1, pt2):
     return pt1 % pt2
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_pow(pt1, pt2):
     return pt1 ** pt2
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_pos(pt):
     return +pt
 
 
+# TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_neg(pt):
     return -pt
 
 
+@mark_fail(AttributeError, "`type object 'Point' has no attribute 'x'` (dataclasses not yet supported)")
 @mt(
     infer_scalar(int, int, int, int, result=Point(int, int)),
     infer_scalar(float, float, float, float, result=InferenceError),
@@ -1497,16 +1512,19 @@ def test_dataclass_inst(x1, y1, x2, y2):
     return Point(pt1.x + pt2.x, pt1.y + pt2.y)
 
 
+@pytest.mark.xfail(strict=True, reason="Wont' raise (dataclasses not yet supported)")
 @infer_scalar(int, int, int, result=InferenceError)
 def test_dataclass_bad_inst(x, y, z):
     return Point(x, y, z)
 
 
+@mark_fail(AttributeError, "`type object 'Point' has no attribute 'z'` (dataclasses not yet supported)")
 @infer_scalar(Point(int, int), result=InferenceError)
 def test_dataclass_wrong_field(pt):
     return pt.z
 
 
+@mark_fail(TypeError, "`Unknown function Thing` (dataclasses not yet supported)")
 @infer_scalar(Thing(int), result=int)
 def test_dataclass_call(thing):
     return thing()
