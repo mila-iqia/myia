@@ -5,11 +5,6 @@ from myia.testing.testing_inferrers import add_testing_inferrers
 add_testing_inferrers()
 
 
-def Shp(*values):
-    """Convert values to a tuple of integers."""
-    return tuple(int(value) for value in values)
-
-
 @mt(
     infer(int, int, result=int),
 )

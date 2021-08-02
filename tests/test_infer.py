@@ -1465,6 +1465,7 @@ def test_arithmetic_data_mul(pt1, pt2):
 # TODO ArithmeticData class not implemented in zero branch. This should fail.
 @infer_standard(
     Point3D(float, float, float),
+    Point3D(float, float, float),
     result=Point3D(float, float, float),
 )
 def test_arithmetic_data_truediv(pt1, pt2):
