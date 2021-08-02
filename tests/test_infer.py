@@ -416,9 +416,9 @@ def test_dict_setitem(d, x):
 @mt(
     infer_scalar((int, int), 1, float, result=(int, float)),
     infer_scalar((int, int, float), 1, float, result=(int, float, float)),
-    infer_scalar((int,), 1, float, result=InferenceError),
-    infer_scalar((int,), 0.0, float, result=InferenceError),
-    infer_scalar((int,), int, float, result=InferenceError),
+    infer_scalar((int,), 1, float, result=IndexError),
+    infer_scalar((int,), 0.0, float, result=AssertionError("Expected int index")),
+    infer_scalar((int,), int, float, result=AssertionError("Expected int value")),
 )
 def test_tuple_setitem(xs, idx, x):
     return tuple_setitem(xs, idx, x)

@@ -46,6 +46,24 @@ def dict_values_inferrer(node, args, unif):
     return data.AbstractStructure(dct_type.values, {"interface": tuple})
 
 
+def tuple_setitem_inferrer(node, args, unif):
+    t_node, idx_node, v_node = args
+    t_type = yield Require(t_node)
+    idx_type = yield Require(idx_node)
+    v_type = yield Require(v_node)
+    # Check tuple type
+    assert isinstance(t_type, data.AbstractStructure)
+    assert t_type.tracks.interface is tuple
+    # Check idx type
+    assert isinstance(idx_type, data.AbstractAtom)
+    assert idx_type.tracks.interface is int, f"Expected int index, got {idx_type.tracks.interface}"
+    assert isinstance(idx_type.tracks.value, int), f"Expected int value, got {idx_type.tracks.value}"
+    idx = idx_type.tracks.value
+    output_elements = list(t_type.elements)
+    output_elements[idx] = v_type
+    return data.AbstractStructure(output_elements, {"interface": tuple})
+
+
 def add_testing_inferrers():
     """Add supplementary inferrers for testing."""
     inferrers.update(
@@ -53,7 +71,7 @@ def add_testing_inferrers():
             # master operation inferrers
             dict_setitem: inference_function(dict_setitem_inferrer),
             dict_values: inference_function(dict_values_inferrer),
-            tuple_setitem: signature(tuple_of(), Int, X, ret=tuple_of()),
+            tuple_setitem: inference_function(tuple_setitem_inferrer),
             zeros_like: dispatch_inferences((int, 0), (float, 0.0)),
             math.log: dispatch_inferences(
                 (bool, Float), (Int, Float), (Float, float)
