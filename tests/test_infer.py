@@ -893,7 +893,7 @@ def test_hastype_simple(x):
 
 
 @mt(
-    infer_scalar(int, int, result=InferenceError),
+    infer_scalar(int, int, result=AssertionError("Expected abstract value")),
     infer_scalar(int, Ty(int), result=True),
     infer_scalar(float, Ty(int), result=False),
     infer_scalar((int, int), Ty(tuple), result=True),

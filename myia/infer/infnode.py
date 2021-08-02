@@ -292,7 +292,7 @@ class InferenceEngine:
             isinstance(fn, data.AbstractStructure)
             and fn.tracks.interface is type
             and len(fn.elements) == 1
-            and isinstance(fn.elements[0], data.AbstractAtom)
+            # and isinstance(fn.elements[0], data.AbstractAtom)
         )
 
     def _get_inference_function(self, node, fn: data.AbstractValue):

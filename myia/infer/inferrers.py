@@ -10,7 +10,7 @@ from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
 from .algo import Require, RequireAll
-from .infnode import Replace, inference_function, signature
+from .infnode import Replace, inference_function, signature, InferenceEngine
 
 
 def resolve(node, args, unif):
@@ -141,6 +141,29 @@ def len_inferrer(node, args, unif):
     return data.AbstractAtom({"interface": int})
 
 
+def isinstance_inferrer(node, args, unif):
+    obj_node, cls_node = args
+    obj_type = yield Require(obj_node)
+    cls_type = yield Require(cls_node)
+
+    obj_cls = obj_type.tracks.interface
+    assert isinstance(obj_cls, type), obj_cls
+
+    if cls_type.tracks.interface is tuple:
+        assert isinstance(cls_type, data.AbstractStructure)
+        expected_classes = []
+        for el in cls_type.elements:
+            assert InferenceEngine.is_abstract_type(el)
+            expected_classes.append(el.elements[0].tracks.interface)
+    else:
+        assert InferenceEngine.is_abstract_type(cls_type), f"Expected abstract value, got {cls_type}"
+        expected_classes = [cls_type.elements[0].tracks.interface]
+
+    assert all(isinstance(cls, type) for cls in expected_classes), expected_classes
+    # print("testing", obj_cls, expected_classes)
+    return precise_abstract(issubclass(obj_cls, tuple(expected_classes)))
+
+
 def myia_iter_inferrer(node, args, unif):
     """Inferrer for the myia_iter function."""
     (iterable_node,) = args
@@ -210,6 +233,8 @@ def add_standard_inferrers(inferrers):
         {
             len: inference_function(len_inferrer),
             hasattr: signature(X, str, ret=bool),
+            isinstance: inference_function(isinstance_inferrer),
+            operator.pos: signature(X, ret=X),
             operator.add: signature(X, X, ret=X),
             operator.and_: signature(X, X, ret=X),
             operator.eq: signature(X, X, ret=bool),
