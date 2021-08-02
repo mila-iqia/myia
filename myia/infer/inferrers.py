@@ -86,7 +86,7 @@ def getitem_inferrer(node, args, unif):
         key_pos = obj.keys.index(key)
         return obj.values[key_pos]
     else:
-        assert key_node.is_constant(int)
+        assert key_node.is_constant(int), key_node
         key = key_node.value
         if not (
             isinstance(obj, data.AbstractStructure)
