@@ -1530,15 +1530,6 @@ def test_zeros_like_fail(x):
     return zeros_like(x)
 
 
-# TODO: fix test
-@infer_scalar(int, result=newenv)
-def test_zeros_like_fn(x):
-    def f(y):
-        return x + y
-
-    return zeros_like(f)
-
-
 @mt(
     infer_scalar(int, result=int),
     infer_scalar(float, result=int),
