@@ -329,7 +329,7 @@ def test_dict_incompatible(c, x, y):
     infer_scalar((1,), result=1),
     infer_scalar((int, float), result=2),
     infer_scalar([float], result=int),
-    infer_scalar(int, result=InferenceError),
+    infer_scalar(int, result=AttributeError("Interface has no attribute __len__")),
 )
 def test_len(xs):
     return len(xs)

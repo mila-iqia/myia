@@ -132,6 +132,15 @@ def make_dict_inferrer(node, args, unif):
     return data.AbstractDict(arg_types)
 
 
+def len_inferrer(node, args, unif):
+    obj_node, = args
+    obj_type = yield Require(obj_node)
+    interface = obj_type.tracks.interface
+    if not hasattr(interface, "__len__"):
+        raise AttributeError(f"Interface has no attribute __len__: {interface}")
+    return data.AbstractAtom({"interface": int})
+
+
 def myia_iter_inferrer(node, args, unif):
     """Inferrer for the myia_iter function."""
     (iterable_node,) = args
@@ -199,6 +208,7 @@ def add_standard_inferrers(inferrers):
     """Register all the inferrers in this file."""
     inferrers.update(
         {
+            len: inference_function(len_inferrer),
             hasattr: signature(X, str, ret=bool),
             operator.add: signature(X, X, ret=X),
             operator.and_: signature(X, X, ret=X),
