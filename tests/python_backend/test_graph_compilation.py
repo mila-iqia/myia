@@ -285,3 +285,13 @@ def test_pointer():
 
     assert f(-1) == 6
     assert f(1) == 15
+
+
+def test_stardict_call():
+    @parse_and_compile
+    def f(d):
+        def g(a, b):
+            return a + b
+        return g(**d)
+
+    assert f(dict(a=1, b=2)) == 3
