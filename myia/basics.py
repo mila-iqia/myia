@@ -142,3 +142,11 @@ def return_(x):
 def resolve(ns, key):
     """Resolve the name in the given namespace."""
     return ns[key]
+
+
+def concat(*args):
+    """Contatenate the arguments in a tuple.
+
+    This is the same functionally as make_tuple, but used for macros.
+    """
+    return args

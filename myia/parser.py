@@ -752,42 +752,40 @@ class Parser:
         # and then decide which to use at the end.
 
         edges = {}
-        groups = []
+        args = []
+        kwargs = []
         current = []
         stars = False
         for i, arg in enumerate(node.args):
             if isinstance(arg, ast.Starred):
-                groups.append(current)
-                groups.append(self.process_node(block, arg.value))
+                if current:
+                    args.append(block.apply(basics.make_tuple, *current))
+                args.append(self.process_node(block, arg.value))
                 current = []
                 stars = True
             else:
                 val = self.process_node(block, arg)
                 edges[i] = val
                 current.append(val)
-        if current or not groups:
-            groups.append(current)
+        if stars and current:
+            args.append(block.apply(basics.make_tuple, *current))
 
+        kwlist = []
         if node.keywords:
             for k in node.keywords:
                 if k.arg is None:
-                    groups.append(self.process_node(block, k.value))
+                    if kwlist:
+                        kwargs.append(block.apply(basics.make_dict, *kwlist))
+                    kwlist = []
+                    kwargs.append(self.process_node(block, k.value))
                     stars = True
-            keywords = [k for k in node.keywords if k.arg is not None]
-            kwlist = list(
-                zip(
-                    (k.arg for k in keywords),
-                    (self.process_node(block, k.value) for k in keywords),
-                )
-            )
-            if stars:
-                dlist = []
-                for kw in kwlist:
-                    dlist.extend(kw)
-                groups.append(block.apply(basics.make_dict, *dlist))
-            else:
-                for k, v in kwlist:
-                    edges[k] = v
+                else:
+                    v = self.process_node(block, k.value)
+                    kwlist.append(k.arg)
+                    kwlist.append(v)
+                    edges[k.arg] = v
+            if stars and kwlist:
+                kwargs.append(block.apply(basics.make_dict, *kwlist))
 
         if not stars:
             app = block.apply(func)
@@ -795,13 +793,7 @@ class Parser:
                 app.add_edge(k, v)
             return app
         else:
-            args = []
-            for group in groups:
-                if isinstance(group, list):
-                    args.append(block.apply(basics.make_tuple, *group))
-                else:
-                    args.append(group)
-            return block.apply(basics.apply, func, *args)
+            return block.apply(basics.apply, func, block.apply(basics.concat, *args), block.apply(basics.concat, *kwargs))
 
     def _process_Compare(self, block, node):
         if len(node.ops) == 1:

@@ -738,9 +738,10 @@ def test_call7():
             str_graph(parse(f))
             == """graph f() {
   #1 = myia.basics.make_tuple(1, 2)
-  #2 = myia.basics.make_tuple()
-  #3 = myia.basics.apply(g, #2, #1)
-  return #3
+  #2 = myia.basics.concat(#1)
+  #3 = myia.basics.concat()
+  #4 = myia.basics.apply(g, #2, #3)
+  return #4
 }
 
 graph g(a, b) {
@@ -752,23 +753,24 @@ graph g(a, b) {
 
 def test_call8():
     def f():  # pragma: no cover
-        def g(*, a, b):
+        def g(*, a, b, c):
             return a
 
-        return g(**{"a": 1, "b": 2})
+        return g(c=3, **{"a": 1, "b": 2})
 
     with enable_debug():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.make_dict('a', 1, 'b', 2)
-  #2 = myia.basics.make_dict()
-  #3 = myia.basics.make_tuple()
-  #4 = myia.basics.apply(g, #3, #1, #2)
-  return #4
+  #1 = myia.basics.make_dict('c', 3)
+  #2 = myia.basics.make_dict('a', 1, 'b', 2)
+  #3 = myia.basics.concat()
+  #4 = myia.basics.concat(#1, #2)
+  #5 = myia.basics.apply(g, #3, #4)
+  return #5
 }
 
-graph g(a, b) {
+graph g(a, b, c) {
   return a
 }
 """
