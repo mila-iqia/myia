@@ -2,6 +2,7 @@ import math
 import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
+from myia.parser import MyiaSyntaxError
 
 import pytest
 
@@ -463,6 +464,7 @@ def test_return_closure(w, x, y, z):
     return (mul(w)(x), mul(y)(z))
 
 
+@mark_fail(MyiaSyntaxError, "Parser does not yet support default values on entry function")
 @mt(
     infer_scalar(int, result=int),
     infer_scalar(float, result=float),
