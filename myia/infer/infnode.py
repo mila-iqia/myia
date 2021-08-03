@@ -249,7 +249,12 @@ class InferenceEngine:
                     return res
                 else:
                     partial_args = [Virtual(a) for a in partial_types]
-                    res = inf(node, [*partial_args, *node.inputs], unif, self.inferrers)
+                    res = inf(
+                        node,
+                        [*partial_args, *node.inputs],
+                        unif,
+                        self.inferrers,
+                    )
                     # TODO: Return res if not generator, if we create
                     # inferrers that are not generators
                     assert isinstance(res, types.GeneratorType)

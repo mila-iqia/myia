@@ -327,7 +327,9 @@ def test_dict_incompatible(c, x, y):
     infer_scalar((1,), result=1),
     infer_scalar((int, float), result=2),
     infer_scalar([float], result=int),
-    infer_scalar(int, result=AttributeError("Interface has no attribute __len__")),
+    infer_scalar(
+        int, result=AttributeError("Interface has no attribute __len__")
+    ),
 )
 def test_len(xs):
     return len(xs)
@@ -373,7 +375,9 @@ def test_tuple_getslice_2(tup):
 
 @mt(
     infer_standard((int, int), (int,), result=(int, int, int)),
-    infer_standard((int, int), int, result=AssertionError("Expected abstract tuple")),
+    infer_standard(
+        (int, int), int, result=AssertionError("Expected abstract tuple")
+    ),
 )
 def test_concat_tuple(x, y):
     return x + y
@@ -415,8 +419,12 @@ def test_dict_setitem(d, x):
     infer_scalar((int, int), 1, float, result=(int, float)),
     infer_scalar((int, int, float), 1, float, result=(int, float, float)),
     infer_scalar((int,), 1, float, result=IndexError),
-    infer_scalar((int,), 0.0, float, result=AssertionError("Expected int index")),
-    infer_scalar((int,), int, float, result=AssertionError("Expected int value")),
+    infer_scalar(
+        (int,), 0.0, float, result=AssertionError("Expected int index")
+    ),
+    infer_scalar(
+        (int,), int, float, result=AssertionError("Expected int value")
+    ),
 )
 def test_tuple_setitem(xs, idx, x):
     return tuple_setitem(xs, idx, x)
@@ -828,7 +836,9 @@ def test_func_arg(x, y):
     return g(h, x, y)
 
 
-@infer_scalar(int, result=TypeError(r"No __add__ inference for .* \+ <class 'int'>"))
+@infer_scalar(
+    int, result=TypeError(r"No __add__ inference for .* \+ <class 'int'>")
+)
 def test_func_arg3(x):
     def g(func, x):
         z = func + x
@@ -899,7 +909,13 @@ def test_hastype_simple(x):
     infer_scalar((int, int), Ty(tuple_of(Number, Number)), result=True),
     infer_scalar((int, int), Ty(tuple_of(int, int)), result=True),
     infer_scalar((int, int), Ty(tuple_of(float, float)), result=False),
-    infer_scalar((int, int), Ty(ANYTHING), result=AssertionError("Too broad type `object` expected for isinstance")),
+    infer_scalar(
+        (int, int),
+        Ty(ANYTHING),
+        result=AssertionError(
+            "Too broad type `object` expected for isinstance"
+        ),
+    ),
     infer_scalar([int], Ty(list_of()), result=True),
     infer_scalar(None, Ty(Nil), result=True),
     infer_scalar(U(int, int), Ty(int), result=B),
@@ -1142,7 +1158,10 @@ class C2:
         return x * self.value
 
 
-@mark_fail(AttributeError, "`AttributeError: 'Named' object has no attribute 'f'` (dataclasses not yet supported)")
+@mark_fail(
+    AttributeError,
+    "`AttributeError: 'Named' object has no attribute 'f'` (dataclasses not yet supported)",
+)
 @infer_scalar(U(C1(2), C2(5)), int, result=int)
 def test_getattr_union(c, x):
     return c.f(x)
@@ -1173,7 +1192,11 @@ def test_method(x, y):
     return x.__add__(y)
 
 
-@infer_scalar(int, int, result=AttributeError("type object 'int' has no attribute 'unknown'"))
+@infer_scalar(
+    int,
+    int,
+    result=AttributeError("type object 'int' has no attribute 'unknown'"),
+)
 def test_unknown_method(x, y):
     return x.unknown(y)
 
@@ -1332,7 +1355,10 @@ def test_user_switch_hastype(x, y):
     return user_switch(hastype(x, int), y + 1, y + 2)
 
 
-@mark_fail(AttributeError, "``type object 'Thing' has no attribute 'contents' (dataclasses not yet supported)")
+@mark_fail(
+    AttributeError,
+    "``type object 'Thing' has no attribute 'contents' (dataclasses not yet supported)",
+)
 @infer_standard(B, int, result=int)
 def test_closure_in_data(c, x):
     def f(x):
@@ -1410,7 +1436,10 @@ def test_max_std(x, y):
         return y
 
 
-@mark_fail(AttributeError, "`type object 'Point' has no attribute 'x'` (dataclasses not yet supported)")
+@mark_fail(
+    AttributeError,
+    "`type object 'Point' has no attribute 'x'` (dataclasses not yet supported)",
+)
 @mt(
     infer_scalar(Point(int, int), result=int),
     infer_scalar(Point(float, float), result=float),
@@ -1419,7 +1448,10 @@ def test_class(pt):
     return pt.x + pt.y
 
 
-@mark_fail(AssertionError, "`getattr can currently only be used for methods` (dataclasses not yet supported)")
+@mark_fail(
+    AssertionError,
+    "`getattr can currently only be used for methods` (dataclasses not yet supported)",
+)
 @mt(
     infer_scalar(Point(int, int), result=int),
     infer_scalar(Point(float, float), result=float),
@@ -1428,7 +1460,10 @@ def test_dataclass_method(pt):
     return pt.abs()
 
 
-@mark_fail(AssertionError, "`getattr can currently only be used for methods` (dataclasses not yet supported)")
+@mark_fail(
+    AssertionError,
+    "`getattr can currently only be used for methods` (dataclasses not yet supported)",
+)
 @mt(
     infer_scalar(Point(int, int), result=int),
     infer_scalar(Point(float, float), result=float),
@@ -1437,31 +1472,46 @@ def test_dataclass_property(pt):
     return pt.absprop
 
 
-@mark_fail(TypeError, "`No __add__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __add__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_add(pt1, pt2):
     return pt1 + pt2
 
 
-@mark_fail(TypeError, "`No __add__ inference for <class 'myia.testing.common.Point'> + <class 'int'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __add__ inference for <class 'myia.testing.common.Point'> + <class 'int'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_add_ct(pt):
     return pt + 10
 
 
-@mark_fail(TypeError, "`No __sub__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __sub__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_sub(pt1, pt2):
     return pt1 - pt2
 
 
-@mark_fail(TypeError, "`No __mul__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __mul__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_mul(pt1, pt2):
     return pt1 * pt2
 
 
-@mark_fail(TypeError, "`No __truediv__ method for type <class 'myia.testing.common.Point3D'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __truediv__ method for type <class 'myia.testing.common.Point3D'>` (dataclasses not yet supported)",
+)
 @infer_standard(
     Point3D(float, float, float),
     Point3D(float, float, float),
@@ -1471,37 +1521,55 @@ def test_arithmetic_data_truediv(pt1, pt2):
     return pt1 / pt2
 
 
-@mark_fail(TypeError, "`No __floordiv__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __floordiv__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_floordiv(pt1, pt2):
     return pt1 // pt2
 
 
-@mark_fail(TypeError, "`No __mod__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __mod__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_mod(pt1, pt2):
     return pt1 % pt2
 
 
-@mark_fail(TypeError, "`No __pow__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __pow__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_pow(pt1, pt2):
     return pt1 ** pt2
 
 
-@mark_fail(TypeError, "`No __pos__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __pos__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_pos(pt):
     return +pt
 
 
-@mark_fail(TypeError, "`No __neg__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError,
+    "`No __neg__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)",
+)
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_neg(pt):
     return -pt
 
 
-@mark_fail(AttributeError, "`type object 'Point' has no attribute 'x'` (dataclasses not yet supported)")
+@mark_fail(
+    AttributeError,
+    "`type object 'Point' has no attribute 'x'` (dataclasses not yet supported)",
+)
 @mt(
     infer_scalar(int, int, int, int, result=Point(int, int)),
     infer_scalar(float, float, float, float, result=InferenceError),
@@ -1512,19 +1580,26 @@ def test_dataclass_inst(x1, y1, x2, y2):
     return Point(pt1.x + pt2.x, pt1.y + pt2.y)
 
 
-@pytest.mark.xfail(strict=True, reason="Wont' raise (dataclasses not yet supported)")
+@pytest.mark.xfail(
+    strict=True, reason="Wont' raise (dataclasses not yet supported)"
+)
 @infer_scalar(int, int, int, result=InferenceError)
 def test_dataclass_bad_inst(x, y, z):
     return Point(x, y, z)
 
 
-@mark_fail(AttributeError, "`type object 'Point' has no attribute 'z'` (dataclasses not yet supported)")
+@mark_fail(
+    AttributeError,
+    "`type object 'Point' has no attribute 'z'` (dataclasses not yet supported)",
+)
 @infer_scalar(Point(int, int), result=InferenceError)
 def test_dataclass_wrong_field(pt):
     return pt.z
 
 
-@mark_fail(TypeError, "`Unknown function Thing` (dataclasses not yet supported)")
+@mark_fail(
+    TypeError, "`Unknown function Thing` (dataclasses not yet supported)"
+)
 @infer_scalar(Thing(int), result=int)
 def test_dataclass_call(thing):
     return thing()

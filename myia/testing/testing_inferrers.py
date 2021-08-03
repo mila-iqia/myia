@@ -9,13 +9,12 @@ import math
 from myia import inferrers
 from myia.abstract import data
 from myia.infer.algo import Require
-from myia.infer.inferrers import X
 from myia.infer.infnode import (
     dispatch_inferences,
     inference_function,
     signature,
 )
-from myia.testing.common import Float, Int, Nil, Object, tuple_of
+from myia.testing.common import Float, Int, Nil, Object
 from myia.testing.master_placeholders import (
     dict_setitem,
     dict_values,
@@ -47,6 +46,7 @@ def dict_values_inferrer(node, args, unif, inferrers):
 
 
 def tuple_setitem_inferrer(node, args, unif, inferrers):
+    """Inferrer for the tuple_setitem function."""
     t_node, idx_node, v_node = args
     t_type = yield Require(t_node)
     idx_type = yield Require(idx_node)
@@ -56,8 +56,12 @@ def tuple_setitem_inferrer(node, args, unif, inferrers):
     assert t_type.tracks.interface is tuple
     # Check idx type
     assert isinstance(idx_type, data.AbstractAtom)
-    assert idx_type.tracks.interface is int, f"Expected int index, got {idx_type.tracks.interface}"
-    assert isinstance(idx_type.tracks.value, int), f"Expected int value, got {idx_type.tracks.value}"
+    assert (
+        idx_type.tracks.interface is int
+    ), f"Expected int index, got {idx_type.tracks.interface}"
+    assert isinstance(
+        idx_type.tracks.value, int
+    ), f"Expected int value, got {idx_type.tracks.value}"
     idx = idx_type.tracks.value
     output_elements = list(t_type.elements)
     output_elements[idx] = v_type

@@ -10,7 +10,7 @@ from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
 from .algo import Require, RequireAll
-from .infnode import Replace, inference_function, signature, InferenceEngine
+from .infnode import InferenceEngine, Replace, inference_function, signature
 
 
 def resolve(node, args, unif, inferrers):
@@ -74,7 +74,9 @@ def getattr_inferrer(node, args, unif, inferrers):
         # TODO callable(result) too broad
         new_node = Constant(result)
     else:
-        raise AssertionError(f"getattr can currently only be used for methods, got {interface}.{result} (type {type(result)})")
+        raise AssertionError(
+            f"getattr can currently only be used for methods, got {interface}.{result} (type {type(result)})"
+        )
         # new_node = Constant(result)
     yield Replace(new_node)
     res = yield Require(new_node)
@@ -137,7 +139,8 @@ def make_dict_inferrer(node, args, unif, inferrers):
 
 
 def len_inferrer(node, args, unif, inferrers):
-    obj_node, = args
+    """Inferrer for the len function."""
+    (obj_node,) = args
     obj_type = yield Require(obj_node)
     interface = obj_type.tracks.interface
     if not hasattr(interface, "__len__"):
@@ -146,6 +149,7 @@ def len_inferrer(node, args, unif, inferrers):
 
 
 def isinstance_inferrer(node, args, unif, inferrers):
+    """Inferrer for the isinstance function."""
     obj_node, cls_node = args
     obj_type = yield Require(obj_node)
     cls_type = yield Require(cls_node)
@@ -165,12 +169,16 @@ def isinstance_inferrer(node, args, unif, inferrers):
         assert isinstance(cls_type, data.AbstractStructure)
         out_types = []
         for el in cls_type.elements:
-            assert InferenceEngine.is_abstract_type(el), f"Expected abstract type, got {el}"
+            assert InferenceEngine.is_abstract_type(
+                el
+            ), f"Expected abstract type, got {el}"
             el_interface = el.elements[0].tracks.interface
             assert isinstance(el_interface, type), el_interface
             out_types.append(el_interface)
     else:
-        assert InferenceEngine.is_abstract_type(cls_type), f"Expected abstract type, got {cls_type}"
+        assert InferenceEngine.is_abstract_type(
+            cls_type
+        ), f"Expected abstract type, got {cls_type}"
         expected_type = cls_type.elements[0]
         if isinstance(expected_type, data.AbstractUnion):
             out_types = []
@@ -182,7 +190,9 @@ def isinstance_inferrer(node, args, unif, inferrers):
             expected_cls = expected_type.tracks.interface
             assert isinstance(expected_cls, type), expected_cls
             out_types = [expected_cls]
-    assert object not in out_types, "Too broad type `object` expected for isinstance"
+    assert (
+        object not in out_types
+    ), "Too broad type `object` expected for isinstance"
 
     expected = tuple(out_types)
     return precise_abstract(any(issubclass(el, expected) for el in inp_types))
@@ -263,14 +273,23 @@ def _bin_op_inferrer(bin_op, node, args, unif, inferrers):
         if not hasattr(a_interface, bin_op):
             raise TypeError(f"No {bin_op} method for type {a_interface}")
         elif getattr(a_interface, bin_op) in inferrers:
-            res = inferrers[getattr(a_interface, bin_op)].tracks.interface.fn(node, args, unif, inferrers)
+            res = inferrers[getattr(a_interface, bin_op)].tracks.interface.fn(
+                node, args, unif, inferrers
+            )
         else:
             # Assume binary op on same type return same type
             return data.AbstractAtom({"interface": a_interface})
-    elif hasattr(a_interface, bin_op) and getattr(a_interface, bin_op) in inferrers:
-        res = inferrers[getattr(a_interface, bin_op)].tracks.interface.fn(node, args, unif, inferrers)
+    elif (
+        hasattr(a_interface, bin_op)
+        and getattr(a_interface, bin_op) in inferrers
+    ):
+        res = inferrers[getattr(a_interface, bin_op)].tracks.interface.fn(
+            node, args, unif, inferrers
+        )
     else:
-        raise TypeError(f"No {bin_op} inference for {a_interface} + {b_interface}")
+        raise TypeError(
+            f"No {bin_op} inference for {a_interface} + {b_interface}"
+        )
     if isinstance(res, types.GeneratorType):
         assert isinstance(res, types.GeneratorType)
         curr = None
@@ -289,7 +308,7 @@ def _bin_op_inferrer(bin_op, node, args, unif, inferrers):
 
 
 def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
-    a_node, = args
+    (a_node,) = args
     a_type = yield Require(a_node)
     if isinstance(a_type, data.AbstractValue):
         a_interface = a_type.tracks.interface
@@ -302,7 +321,9 @@ def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
         # Assume unary op return same type
         return data.AbstractAtom({"interface": a_interface})
     else:
-        res = inferrers[getattr(a_interface, unary_op)].tracks.interface.fn(node, args, unif, inferrers)
+        res = inferrers[getattr(a_interface, unary_op)].tracks.interface.fn(
+            node, args, unif, inferrers
+        )
         if isinstance(res, types.GeneratorType):
             assert isinstance(res, types.GeneratorType)
             curr = None
@@ -321,42 +342,52 @@ def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
 
 
 def operator_add_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.add function."""
     return _bin_op_inferrer("__add__", node, args, unif, inferrers)
 
 
 def operator_floordiv_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.floordiv function."""
     return _bin_op_inferrer("__floordiv__", node, args, unif, inferrers)
 
 
 def operator_mod_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.mod function."""
     return _bin_op_inferrer("__mod__", node, args, unif, inferrers)
 
 
 def operator_sub_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.sub function."""
     return _bin_op_inferrer("__sub__", node, args, unif, inferrers)
 
 
 def operator_truediv_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.truediv function."""
     return _bin_op_inferrer("__truediv__", node, args, unif, inferrers)
 
 
 def operator_mul_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.mul function."""
     return _bin_op_inferrer("__mul__", node, args, unif, inferrers)
 
 
 def operator_neg_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.neg function."""
     return _unary_op_inferrer("__neg__", node, args, unif, inferrers)
 
 
 def operator_pos_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.pos function."""
     return _unary_op_inferrer("__pos__", node, args, unif, inferrers)
 
 
 def operator_pow_inferrer(node, args, unif, inferrers):
+    """Inferrer for the operator.pow function."""
     return _bin_op_inferrer("__pow__", node, args, unif, inferrers)
 
 
 def float_mul_inferrer(node, args, unif, inferrers):
+    """Inferrer for the float.__mul__ function."""
     a_node, b_node = args
     a_interface = yield Require(a_node)
     b_interface = yield Require(b_node)
@@ -376,6 +407,7 @@ def float_mul_inferrer(node, args, unif, inferrers):
 
 
 def float_sub_inferrer(node, args, unif, inferrers):
+    """Inferrer for the float.__sub__ function."""
     a_node, b_node = args
     a_interface = yield Require(a_node)
     b_interface = yield Require(b_node)
@@ -395,20 +427,28 @@ def float_sub_inferrer(node, args, unif, inferrers):
 
 
 def tuple_add_inferrer(node, args, unif, inferrers):
+    """Inferrer for the tuple.__add__ function."""
     t1_node, t2_node = args
     t1_type = yield Require(t1_node)
     t2_type = yield Require(t2_node)
-    assert isinstance(t1_type, data.AbstractStructure), f"Expected abstract tuple, got {t1_type}"
-    assert isinstance(t2_type, data.AbstractStructure), f"Expected abstract tuple, got {t2_type}"
+    assert isinstance(
+        t1_type, data.AbstractStructure
+    ), f"Expected abstract tuple, got {t1_type}"
+    assert isinstance(
+        t2_type, data.AbstractStructure
+    ), f"Expected abstract tuple, got {t2_type}"
     assert t1_type.tracks.interface is tuple
     assert t2_type.tracks.interface is tuple
-    return data.AbstractStructure(t1_type.elements + t2_type.elements, {"interface": tuple})
+    return data.AbstractStructure(
+        t1_type.elements + t2_type.elements, {"interface": tuple}
+    )
 
 
 def int_neg_inferrer(node, args, unif, inferrers):
+    """Inferrer for the int.__neg__ function."""
     # NB: bool.__neg__ is int.__neg__ and return an int.
     # So, we must expect input type to be either int or bool.
-    value_node, = args
+    (value_node,) = args
     if value_node.is_constant((int, bool)):
         ct = Constant(-value_node.value)
         yield Replace(ct)
