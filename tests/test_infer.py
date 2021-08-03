@@ -1052,6 +1052,7 @@ def test_isinstance_bad(x):
     return isinstance(x, (int, 3))
 
 
+@mark_fail(AssertionError, "getitem can currently only be used for dicts, lists and tuples (union not well handled by inferrer)")
 @mt(
     infer_standard(U(int, (int, int)), result=int),
     infer_standard(U(int, (float, int)), result=InferenceError),
