@@ -517,6 +517,7 @@ def test_closure_manager_bug():
     return rval
 
 
+@pytest.mark.xfail(strict=True, reason="Errors handling varargs")
 @mt(
     infer_standard(result=0),
     infer_standard(int, int, result=int),
