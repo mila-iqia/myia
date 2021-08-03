@@ -884,6 +884,7 @@ def test_func_arg3(x):
     return g(h, x)
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @mt(infer_scalar(int, result=int), infer_scalar(float, result=float))
 def test_func_arg4(x):
     def h(x):
