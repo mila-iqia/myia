@@ -1382,7 +1382,7 @@ def test_scalar_cast_3(x):
     return scalar_cast(x, float)
 
 
-@infer_scalar(int, int, result=InferenceError)
+@infer_scalar(int, int, result=TypeError("Unknown function"))
 def test_call_nonfunc(x, y):
     return x(y)
 
