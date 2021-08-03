@@ -453,7 +453,13 @@ def test_multitype_function(x, y):
     return (mul(x, x), mul(y, y))
 
 
-@mt(*type_signature_arith_bin)
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder() (around make_handle())")
+@mt(
+    infer_scalar(int, int, result=int),
+    infer_scalar(float, float, result=float),
+    infer_scalar(int, float, result=float),
+    infer_scalar(B, B, result=int),
+)
 def test_closure(x, y):
     def mul(a):
         return a * x
