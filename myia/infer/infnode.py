@@ -3,6 +3,7 @@
 import types
 from dataclasses import dataclass
 from typing import Dict, Sequence, Tuple
+from ovld import OvldMC
 
 from myia.ir.node import SEQ
 
@@ -92,7 +93,7 @@ def signature(*arg_types, ret):
     return inference_function(_infer)
 
 
-class InferenceDefinition:
+class InferenceDefinition(metaclass=OvldMC):
     """Helper class to represent a signature."""
 
     __slots__ = "arg_types", "ret_type"
@@ -120,8 +121,16 @@ class InferenceDefinition:
             )
         return type_to_abstract(el)
 
+    @classmethod
+    def without_value(cls, abstract: data.AbstractAtom):
+        """Get pure type from given abstract, without associated value.
 
-def dispatch_inferences(*signatures: Sequence):
+        Useful to lookup node abstract in registered signatures.
+        """
+        return data.AbstractAtom({"interface": abstract.tracks.interface})
+
+
+def dispatch_inferences(*signatures: Sequence, default=None):
     """Create an inference function from many type signatures.
 
     Arguments:
@@ -130,6 +139,8 @@ def dispatch_inferences(*signatures: Sequence):
             First sequence values are the argument types.
             Last sequence value is the return type.
             Each sequence must contain at least one element (the return type).
+        default: optional default inferrer function to call if
+            input nodes don't match any signature given above.
     """
     def_map = {}  # type: Dict[int, Dict[Tuple, InferenceDefinition]]
     for sig in signatures:
@@ -141,10 +152,17 @@ def dispatch_inferences(*signatures: Sequence):
     def inference(node, args, unif, inferrers):
         inp_types = []
         for inp in args:
-            inp_types.append((yield Require(inp)))
+            inp_type = yield Require(inp)
+            inp_types.append(InferenceDefinition.without_value(inp_type))
         inp_types = tuple(inp_types)
         inf_def = def_map.get(len(inp_types), {}).get(inp_types, None)
-        if not inf_def:
+        if inf_def:
+            for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
+                autils.unify(inp_type, expected_type, U=unif)
+            return autils.reify(inf_def.ret_type, unif=unif.canon)
+        elif default:
+            return (yield from default(node, args, unif, inferrers))
+        else:
             raise RuntimeError(
                 f"No inference for node: {node}, signature: {list(inp_types)}\n"
                 f"Available signatures:\n"
@@ -156,9 +174,6 @@ def dispatch_inferences(*signatures: Sequence):
                     )
                 )
             )
-        for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
-            autils.unify(inp_type, expected_type, U=unif)
-        return autils.reify(inf_def.ret_type, unif=unif.canon)
 
     return inference_function(inference)
 

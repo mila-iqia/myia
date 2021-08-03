@@ -82,7 +82,6 @@ type_signature_arith_bin = [
     infer_scalar(B, B, result=B),
 ]
 
-
 @mt(infer_scalar(int, result=int), infer_scalar(89, result=89))
 def test_identity(x):
     return x
@@ -113,7 +112,14 @@ def test_constants_floatxint2():
     return (8 * 7) + 4.0
 
 
-@mt(*type_signature_arith_bin)
+@mt(
+    infer_scalar(int, int, result=int),
+    infer_scalar(float, float, result=float),
+    # float.__rmul__ support (float, int) args
+    infer_scalar(int, float, result=float),
+    # Bool type supports arithmetic operations
+    infer_scalar(B, B, result=int),
+)
 def test_prim_mul(x, y):
     return x * y
 
@@ -839,7 +845,7 @@ def test_func_arg(x, y):
 
 
 @infer_scalar(
-    int, result=TypeError(r"No __add__ inference for .* \+ <class 'int'>")
+    int, result=TypeError(r"No inferrer for <slot wrapper '__radd__' of 'int' objects>")
 )
 def test_func_arg3(x):
     def g(func, x):
