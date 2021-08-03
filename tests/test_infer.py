@@ -719,6 +719,7 @@ def test_choose_incompatible(i, x, y):
     return choose(i)(x, y)
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @mt(infer_scalar(int, int, result=int), infer_scalar(int, float, result=float))
 def test_choose_indirect(i, x):
     def double(x):
