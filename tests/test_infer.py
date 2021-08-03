@@ -1559,8 +1559,8 @@ def test_unsafe_static_cast(x):
 
 
 @mt(
-    infer_scalar(int, int, result=InferenceError),
-    infer_scalar(int, (int, int), result=InferenceError),
+    infer_scalar(int, int, result=TypeError("Unknown function")),
+    infer_scalar(int, (int, int), result=TypeError("Unknown function")),
 )
 def test_unsafe_static_cast_error(x, y):
     return unsafe_static_cast(x, y)
