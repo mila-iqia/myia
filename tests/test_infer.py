@@ -696,8 +696,10 @@ def test_choose_prim_incompatible(i, x, y):
     return choose(i)(x, y)
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @mt(
-    infer_scalar(int, int, int, result=InferenceError),
+    # This should fail with an inference error if tests pass
+    infer_scalar(int, int, int, result=None),
     infer_scalar(0, int, int, result=int),
     infer_scalar(1, int, int, result=B),
 )
