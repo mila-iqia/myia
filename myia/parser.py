@@ -793,7 +793,12 @@ class Parser:
                 app.add_edge(k, v)
             return app
         else:
-            return block.apply(basics.apply, func, block.apply(basics.concat, *args), block.apply(basics.concat, *kwargs))
+            return block.apply(
+                basics.apply,
+                func,
+                block.apply(basics.concat, *args),
+                block.apply(basics.concat, *kwargs),
+            )
 
     def _process_Compare(self, block, node):
         if len(node.ops) == 1:

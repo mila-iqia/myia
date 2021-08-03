@@ -292,6 +292,7 @@ def test_stardict_call():
     def f(d):
         def g(a, b):
             return a + b
+
         return g(**d)
 
     assert f(dict(a=1, b=2)) == 3
