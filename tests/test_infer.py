@@ -892,7 +892,7 @@ def test_hastype_simple(x):
 
 
 @mt(
-    infer_scalar(int, int, result=AssertionError("Expected abstract value")),
+    infer_scalar(int, int, result=AssertionError("Expected abstract type")),
     infer_scalar(int, Ty(int), result=True),
     infer_scalar(float, Ty(int), result=False),
     infer_scalar((int, int), Ty(tuple), result=True),
@@ -900,7 +900,7 @@ def test_hastype_simple(x):
     infer_scalar((int, int), Ty(tuple_of(Number, Number)), result=True),
     infer_scalar((int, int), Ty(tuple_of(int, int)), result=True),
     infer_scalar((int, int), Ty(tuple_of(float, float)), result=False),
-    infer_scalar((int, int), Ty(ANYTHING), result=InferenceError),
+    infer_scalar((int, int), Ty(ANYTHING), result=AssertionError("Too broad type `object` expected for isinstance")),
     infer_scalar([int], Ty(list_of()), result=True),
     infer_scalar(None, Ty(Nil), result=True),
     infer_scalar(U(int, int), Ty(int), result=B),

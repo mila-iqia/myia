@@ -146,22 +146,33 @@ def isinstance_inferrer(node, args, unif, inferrers):
     obj_type = yield Require(obj_node)
     cls_type = yield Require(cls_node)
 
-    obj_cls = obj_type.tracks.interface
-    assert isinstance(obj_cls, type), obj_cls
-
-    if cls_type.tracks.interface is tuple:
-        assert isinstance(cls_type, data.AbstractStructure)
-        expected_classes = []
-        for el in cls_type.elements:
-            assert InferenceEngine.is_abstract_type(el)
-            expected_classes.append(el.elements[0].tracks.interface)
+    if isinstance(obj_type, data.AbstractUnion):
+        inp_types = []
+        for el in obj_type.options:
+            el_interface = el.tracks.interface
+            assert isinstance(el_interface, type), el_interface
+            inp_types.append(el_interface)
     else:
-        assert InferenceEngine.is_abstract_type(cls_type), f"Expected abstract value, got {cls_type}"
-        expected_classes = [cls_type.elements[0].tracks.interface]
+        obj_cls = obj_type.tracks.interface
+        assert isinstance(obj_cls, type), obj_cls
+        inp_types = [obj_cls]
 
-    assert all(isinstance(cls, type) for cls in expected_classes), expected_classes
-    # print("testing", obj_cls, expected_classes)
-    return precise_abstract(issubclass(obj_cls, tuple(expected_classes)))
+    assert InferenceEngine.is_abstract_type(cls_type), f"Expected abstract type, got {cls_type}"
+    expected_type = cls_type.elements[0]
+    if isinstance(expected_type, data.AbstractUnion):
+        out_types = []
+        for el in expected_type.options:
+            el_interface = el.tracks.interface
+            assert isinstance(el_interface, type), el_interface
+            out_types.append(el_interface)
+    else:
+        expected_cls = expected_type.tracks.interface
+        assert isinstance(expected_cls, type), expected_cls
+        out_types = [expected_cls]
+    assert object not in out_types, "Too broad type `object` expected for isinstance"
+
+    expected = tuple(out_types)
+    return precise_abstract(any(issubclass(el, expected) for el in inp_types))
 
 
 def myia_iter_inferrer(node, args, unif, inferrers):
@@ -388,7 +399,7 @@ def add_standard_inferrers(inferrers):
             # operator functions
             operator.add: inference_function(operator_add_inferrer),
             operator.and_: signature(X, X, ret=X),
-            operator.eq: signature(X, X, ret=bool),
+            operator.eq: signature(X, Y, ret=bool),
             operator.floordiv: inference_function(operator_floordiv_inferrer),
             operator.getitem: inference_function(getitem_inferrer),
             operator.gt: signature(X, Y, ret=bool),
