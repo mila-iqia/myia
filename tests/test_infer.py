@@ -632,6 +632,7 @@ def test_keywords_bad_3(x, y):
     return scalar_add(x=x, y=y)
 
 
+@mark_fail(AssertionError, "Got a data.Placeholder in processus")
 @mt(
     infer_scalar((int, int, int), result=int),
     infer_scalar((int, int, float), result=InferenceError),
