@@ -1173,7 +1173,7 @@ def test_method(x, y):
     return x.__add__(y)
 
 
-@infer_scalar(int, int, result=InferenceError)
+@infer_scalar(int, int, result=AttributeError("type object 'int' has no attribute 'unknown'"))
 def test_unknown_method(x, y):
     return x.unknown(y)
 
