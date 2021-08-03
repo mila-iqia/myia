@@ -72,7 +72,7 @@ def global_universe_setitem(h, value):
 ########
 
 
-def apply(fn, *groups):
+def apply(fn, args_, kwargs_):
     """Apply fn to the given arguments.
 
     Each group must be either a tuple of arguments or a dictionary of
@@ -80,11 +80,10 @@ def apply(fn, *groups):
     """
     args = []
     kwargs = {}
-    for g in groups:
-        if isinstance(g, tuple):
-            args.extend(g)
-        else:
-            kwargs.update(g)
+    for a in args_:
+        args.extend(a)
+    for k in kwargs_:
+        kwargs.update(k)
     return fn(*args, **kwargs)
 
 
