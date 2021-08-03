@@ -362,6 +362,21 @@ def tuple_add_inferrer(node, args, unif, inferrers):
     return data.AbstractStructure(t1_type.elements + t2_type.elements, {"interface": tuple})
 
 
+def int_neg_inferrer(node, args, unif, inferrers):
+    # NB: bool.__neg__ is int.__neg__ and return an int.
+    # So, we must expect input type to be either int or bool.
+    value_node, = args
+    if value_node.is_constant((int, bool)):
+        ct = Constant(-value_node.value)
+        yield Replace(ct)
+        res = yield Require(ct)
+        return res
+    else:
+        value_type = yield Require(value_node)
+        assert value_type.tracks.interface in (int, bool), value_type
+        return data.AbstractAtom({"interface": int})
+
+
 X = data.Generic("x")
 Y = data.Generic("y")
 
@@ -404,6 +419,7 @@ def add_standard_inferrers(inferrers):
             hasattr: signature(X, str, ret=bool),
             isinstance: inference_function(isinstance_inferrer),
             int.__add__: signature(int, int, ret=int),
+            int.__neg__: inference_function(int_neg_inferrer),
             float.__add__: signature(float, float, ret=float),
             float.__sub__: inference_function(float_sub_inferrer),
             tuple.__add__: inference_function(tuple_add_inferrer),

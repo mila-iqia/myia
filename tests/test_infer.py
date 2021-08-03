@@ -136,8 +136,7 @@ def test_prim_tern(x, y, z):
     infer_scalar(int, result=int),
     infer_scalar(float, result=float),
     # NB: In Python, -True == -1, -False == 0. So, -bool returns an int.
-    # But inference expects result to be same type as input for -x.
-    infer_scalar(B, result=B),
+    infer_scalar(B, result=int),
 )
 def test_prim_usub(x):
     return -x
