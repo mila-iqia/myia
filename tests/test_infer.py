@@ -374,7 +374,7 @@ def test_tuple_outofbound(x, y):
     infer_standard((float, int), result=(int,)),
     infer_standard((float, (int, float)), result=((int, float),)),
     infer_standard((), result=()),
-    infer_standard(float, result=InferenceError),
+    infer_standard(float, result=AssertionError(r"getitem can currently only be used for dicts, lists and tuples, got \*float\(\)")),
 )
 def test_tuple_getslice(tup):
     return tup[1:]

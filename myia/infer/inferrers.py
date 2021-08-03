@@ -87,22 +87,37 @@ def getitem_inferrer(node, args, unif, inferrers):
     """Inferrer for the getitem function."""
     obj_node, key_node = args
     obj = yield Require(obj_node)
+
     if isinstance(obj, data.AbstractDict):
         key = yield Require(key_node)
         key_pos = obj.keys.index(key)
         return obj.values[key_pos]
+
+    if not (
+        isinstance(obj, data.AbstractStructure)
+        and obj.tracks.interface in (tuple, list)
+    ):
+        raise AssertionError(
+            f"getitem can currently only be used for "
+            f"dicts, lists and tuples, got {obj}"
+        )
+
+    if key_node.is_apply(slice):
+        if obj.tracks.interface is list:
+            return data.AbstractStructure([obj.elements[0]], {"interface": list})
+        elif all(inp.is_constant() for inp in key_node.inputs):
+            idx = slice(*(inp.value for inp in key_node.inputs))
+            selection = obj.elements[idx]
+            return data.AbstractStructure(selection, {"interface": tuple})
+        else:
+            raise AssertionError("getitem inferrer does not yet support non-constants slice for tuples")
     else:
         assert key_node.is_constant(int), key_node
-        key = key_node.value
-        if not (
-            isinstance(obj, data.AbstractStructure)
-            and obj.tracks.interface in (tuple, list)
-        ):
-            raise AssertionError(
-                f"getitem can currently only be used for "
-                f"dicts, lists and tuples, got {obj}[{key}]"
-            )
-        return obj.elements[key]
+        if obj.tracks.interface is list:
+            return obj.elements[0]
+        else:
+            key = key_node.value
+            return obj.elements[key]
 
 
 def make_tuple_inferrer(node, args, unif, inferrers):
