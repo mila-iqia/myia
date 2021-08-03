@@ -728,23 +728,25 @@ graph g(a, b) {
 
 def test_call7():
     def f():  # pragma: no cover
-        def g(a, b):
+        def g(a, b, c, d):
             return a
 
-        return g(*(1, 2))
+        return g(3, *(1, 2), 4)
 
     with enable_debug():
         assert (
             str_graph(parse(f))
             == """graph f() {
-  #1 = myia.basics.make_tuple(1, 2)
-  #2 = myia.basics.concat(#1)
-  #3 = myia.basics.concat()
-  #4 = myia.basics.apply(g, #2, #3)
-  return #4
+  #1 = myia.basics.make_tuple(3)
+  #2 = myia.basics.make_tuple(1, 2)
+  #3 = myia.basics.make_tuple(4)
+  #4 = myia.basics.concat(#1, #2, #3)
+  #5 = myia.basics.concat()
+  #6 = myia.basics.apply(g, #4, #5)
+  return #6
 }
 
-graph g(a, b) {
+graph g(a, b, c, d) {
   return a
 }
 """
@@ -753,10 +755,10 @@ graph g(a, b) {
 
 def test_call8():
     def f():  # pragma: no cover
-        def g(*, a, b, c):
+        def g(*, a, b, c, d):
             return a
 
-        return g(c=3, **{"a": 1, "b": 2})
+        return g(c=3, **{"a": 1, "b": 2}, d=4)
 
     with enable_debug():
         assert (
@@ -764,13 +766,14 @@ def test_call8():
             == """graph f() {
   #1 = myia.basics.make_dict('c', 3)
   #2 = myia.basics.make_dict('a', 1, 'b', 2)
-  #3 = myia.basics.concat()
-  #4 = myia.basics.concat(#1, #2)
-  #5 = myia.basics.apply(g, #3, #4)
-  return #5
+  #3 = myia.basics.make_dict('d', 4)
+  #4 = myia.basics.concat()
+  #5 = myia.basics.concat(#1, #2, #3)
+  #6 = myia.basics.apply(g, #4, #5)
+  return #6
 }
 
-graph g(a, b, c) {
+graph g(a, b, c, d) {
   return a
 }
 """
