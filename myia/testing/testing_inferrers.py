@@ -24,7 +24,7 @@ from myia.testing.master_placeholders import (
 )
 
 
-def dict_setitem_inferrer(node, args, unif):
+def dict_setitem_inferrer(node, args, unif, inferrers):
     """Inferrer for the dict_setitem function."""
     dct_node, key_node, value_node = args
     dct_type = yield Require(dct_node)
@@ -38,7 +38,7 @@ def dict_setitem_inferrer(node, args, unif):
     return data.AbstractDict([el for item in zip(keys, values) for el in item])
 
 
-def dict_values_inferrer(node, args, unif):
+def dict_values_inferrer(node, args, unif, inferrers):
     """Inferrer for the dict_values function."""
     (dct_node,) = args
     dct_type = yield Require(dct_node)
@@ -46,7 +46,7 @@ def dict_values_inferrer(node, args, unif):
     return data.AbstractStructure(dct_type.values, {"interface": tuple})
 
 
-def tuple_setitem_inferrer(node, args, unif):
+def tuple_setitem_inferrer(node, args, unif, inferrers):
     t_node, idx_node, v_node = args
     t_type = yield Require(t_node)
     idx_type = yield Require(idx_node)

@@ -77,7 +77,7 @@ def signature(*arg_types, ret):
 
     return_type = InferenceDefinition.type_to_abstract(ret)
 
-    def _infer(node, args, unif):
+    def _infer(node, args, unif, inferrers):
         inp_types = []
         for inp in args:
             inp_types.append((yield Require(inp)))
@@ -138,7 +138,7 @@ def dispatch_inferences(*signatures: Sequence):
             sig = InferenceDefinition(*arg_types, ret_type=ret_type)
         def_map.setdefault(len(sig.arg_types), {})[sig.arg_types] = sig
 
-    def inference(node, args, unif):
+    def inference(node, args, unif, inferrers):
         inp_types = []
         for inp in args:
             inp_types.append((yield Require(inp)))
@@ -249,7 +249,7 @@ class InferenceEngine:
                     return res
                 else:
                     partial_args = [Virtual(a) for a in partial_types]
-                    res = inf(node, [*partial_args, *node.inputs], unif)
+                    res = inf(node, [*partial_args, *node.inputs], unif, self.inferrers)
                     # TODO: Return res if not generator, if we create
                     # inferrers that are not generators
                     assert isinstance(res, types.GeneratorType)

@@ -375,7 +375,7 @@ def test_tuple_getslice_2(tup):
 
 @mt(
     infer_standard((int, int), (int,), result=(int, int, int)),
-    infer_standard((int, int), int, result=InferenceError),
+    infer_standard((int, int), int, result=AssertionError("Expected abstract tuple")),
 )
 def test_concat_tuple(x, y):
     return x + y
@@ -830,7 +830,7 @@ def test_func_arg(x, y):
     return g(h, x, y)
 
 
-@infer_scalar(int, result=InferenceError)
+@infer_scalar(int, result=TypeError(r"No __add__ inference for .* \+ <class 'int'>"))
 def test_func_arg3(x):
     def g(func, x):
         z = func + x
@@ -1438,31 +1438,31 @@ def test_dataclass_property(pt):
     return pt.absprop
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __add__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_add(pt1, pt2):
     return pt1 + pt2
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __add__ inference for <class 'myia.testing.common.Point'> + <class 'int'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_add_ct(pt):
     return pt + 10
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __sub__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_sub(pt1, pt2):
     return pt1 - pt2
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __mul__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_mul(pt1, pt2):
     return pt1 * pt2
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __truediv__ method for type <class 'myia.testing.common.Point3D'>` (dataclasses not yet supported)")
 @infer_standard(
     Point3D(float, float, float),
     Point3D(float, float, float),
@@ -1472,31 +1472,31 @@ def test_arithmetic_data_truediv(pt1, pt2):
     return pt1 / pt2
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __floordiv__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_floordiv(pt1, pt2):
     return pt1 // pt2
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __mod__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_mod(pt1, pt2):
     return pt1 % pt2
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __pow__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), Point(int, int), result=Point(int, int))
 def test_arithmetic_data_pow(pt1, pt2):
     return pt1 ** pt2
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __pos__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_pos(pt):
     return +pt
 
 
-# TODO ArithmeticData class not implemented in zero branch. This should fail.
+@mark_fail(TypeError, "`No __neg__ method for type <class 'myia.testing.common.Point'>` (dataclasses not yet supported)")
 @infer_standard(Point(int, int), result=Point(int, int))
 def test_arithmetic_data_neg(pt):
     return -pt
