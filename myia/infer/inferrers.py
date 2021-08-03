@@ -157,18 +157,27 @@ def isinstance_inferrer(node, args, unif, inferrers):
         assert isinstance(obj_cls, type), obj_cls
         inp_types = [obj_cls]
 
-    assert InferenceEngine.is_abstract_type(cls_type), f"Expected abstract type, got {cls_type}"
-    expected_type = cls_type.elements[0]
-    if isinstance(expected_type, data.AbstractUnion):
+    if cls_type.tracks.interface is tuple:
+        assert isinstance(cls_type, data.AbstractStructure)
         out_types = []
-        for el in expected_type.options:
-            el_interface = el.tracks.interface
+        for el in cls_type.elements:
+            assert InferenceEngine.is_abstract_type(el), f"Expected abstract type, got {el}"
+            el_interface = el.elements[0].tracks.interface
             assert isinstance(el_interface, type), el_interface
             out_types.append(el_interface)
     else:
-        expected_cls = expected_type.tracks.interface
-        assert isinstance(expected_cls, type), expected_cls
-        out_types = [expected_cls]
+        assert InferenceEngine.is_abstract_type(cls_type), f"Expected abstract type, got {cls_type}"
+        expected_type = cls_type.elements[0]
+        if isinstance(expected_type, data.AbstractUnion):
+            out_types = []
+            for el in expected_type.options:
+                el_interface = el.tracks.interface
+                assert isinstance(el_interface, type), el_interface
+                out_types.append(el_interface)
+        else:
+            expected_cls = expected_type.tracks.interface
+            assert isinstance(expected_cls, type), expected_cls
+            out_types = [expected_cls]
     assert object not in out_types, "Too broad type `object` expected for isinstance"
 
     expected = tuple(out_types)

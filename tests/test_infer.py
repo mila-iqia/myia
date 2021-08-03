@@ -995,7 +995,7 @@ def test_isinstance(x):
     return f(x)
 
 
-@infer_standard(int, result=InferenceError)
+@infer_standard(int, result=AssertionError("Expected abstract type"))
 def test_isinstance_bad(x):
     return isinstance(x, (int, 3))
 
