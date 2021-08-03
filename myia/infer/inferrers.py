@@ -261,14 +261,8 @@ def _bin_op_inferrer(bin_op, node, args, unif, inferrers):
     a_node, b_node = args
     a_type = yield Require(a_node)
     b_type = yield Require(b_node)
-    if isinstance(a_type, data.AbstractValue):
-        a_interface = a_type.tracks.interface
-    else:
-        a_interface = a_type
-    if isinstance(b_type, data.AbstractValue):
-        b_interface = b_type.tracks.interface
-    else:
-        b_interface = b_type
+    a_interface = a_type.tracks.interface
+    b_interface = b_type.tracks.interface
     if a_interface is b_interface:
         if not hasattr(a_interface, bin_op):
             raise TypeError(f"No {bin_op} method for type {a_interface}")
@@ -280,8 +274,8 @@ def _bin_op_inferrer(bin_op, node, args, unif, inferrers):
             # Assume binary op on same type return same type
             return data.AbstractAtom({"interface": a_interface})
     elif (
-        hasattr(a_interface, bin_op)
-        and getattr(a_interface, bin_op) in inferrers
+            hasattr(a_interface, bin_op)
+            and getattr(a_interface, bin_op) in inferrers
     ):
         res = inferrers[getattr(a_interface, bin_op)].tracks.interface.fn(
             node, args, unif, inferrers
@@ -310,11 +304,7 @@ def _bin_op_inferrer(bin_op, node, args, unif, inferrers):
 def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
     (a_node,) = args
     a_type = yield Require(a_node)
-    if isinstance(a_type, data.AbstractValue):
-        a_interface = a_type.tracks.interface
-    else:
-        a_interface = a_type
-
+    a_interface = a_type.tracks.interface
     if not hasattr(a_interface, unary_op):
         raise TypeError(f"No {unary_op} method for type {a_interface}")
     elif getattr(a_interface, unary_op) not in inferrers:
