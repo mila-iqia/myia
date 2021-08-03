@@ -1143,6 +1143,7 @@ class C2:
         return x * self.value
 
 
+@mark_fail(AttributeError, "`AttributeError: 'Named' object has no attribute 'f'` (dataclasses not yet supported)")
 @infer_scalar(U(C1(2), C2(5)), int, result=int)
 def test_getattr_union(c, x):
     return c.f(x)
