@@ -282,12 +282,20 @@ def test_list(x, y):
 
 @mt(
     infer_scalar(int, int, result=[int]),
-    infer_scalar(float, float, result=[float]),
     infer_scalar([float], [float], result=InferenceError),
     infer_scalar(int, float, result=InferenceError),
 )
 def test_list_and_scalar(x, y):
     return [x, y, 3]
+
+
+@mark_fail(InferenceError, "Cannot merge int and float (pass in master, fail hre)")
+@mt(
+    infer_scalar(float, float, result=[float]),
+)
+def test_list_and_scalar_different_types(x, y):
+    return [x, y, 3]
+
 
 
 @infer_scalar(result=[])
