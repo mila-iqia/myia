@@ -1065,6 +1065,7 @@ def test_union(x):
         return x[0]
 
 
+@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
 @mt(
     infer_standard(U(int, (int, int)), result=int),
 )
