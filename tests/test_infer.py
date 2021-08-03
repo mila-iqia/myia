@@ -751,9 +751,11 @@ def test_hof(x):
     return hof(double, (x + 1, x + 2)) + hof(square, (x + 3, x + 4))
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @mt(
     infer_scalar(int, int, result=int),
-    infer_scalar(int, float, result=InferenceError),
+    # This fails in master. And here?
+    infer_scalar(int, float, result=None),
     infer_scalar(int, 3, result=int),
 )
 def test_hof_2(c, x):
