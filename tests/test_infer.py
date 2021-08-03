@@ -380,7 +380,7 @@ def test_concat_tuple(x, y):
     return x + y
 
 
-@infer_scalar(int, float, result=InferenceError)
+@infer_scalar(int, float, result=IndexError)
 def test_tuple_outofbound_negative(x, y):
     return (x, y)[-3]
 
