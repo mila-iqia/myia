@@ -61,16 +61,20 @@ def getattr_inferrer(node, args, unif, inferrers):
     obj_node, key_node = args
     assert key_node.is_constant(str)
     obj = yield Require(obj_node)
+    if InferenceEngine.is_abstract_type(obj):
+        obj = obj.elements[0]
     key = key_node.value
     interface = obj.tracks.interface
+    print(node, interface, key, obj)
     result = getattr(interface, key)
     if isinstance(result, (types.MethodType, types.WrapperDescriptorType)):
         ct = Constant(result)
         new_node = node.graph.apply(basics.partial, ct, obj_node)
     elif isinstance(interface, types.ModuleType) and callable(result):
+        # TODO callable(result) too broad
         new_node = Constant(result)
     else:
-        raise AssertionError("getattr can currently only be used for methods")
+        raise AssertionError(f"getattr can currently only be used for methods, got {interface}.{result} (type {type(result)})")
         # new_node = Constant(result)
     yield Replace(new_node)
     res = yield Require(new_node)

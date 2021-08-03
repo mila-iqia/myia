@@ -283,7 +283,7 @@ class InferenceEngine:
                 return fn.elements[0]
 
             else:
-                raise TypeError("Unknown function", fn)
+                raise TypeError("Unknown function", fn, node)
 
     @classmethod
     def is_abstract_type(cls, fn: data.AbstractValue):

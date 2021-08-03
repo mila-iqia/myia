@@ -166,7 +166,6 @@ Number = Un(int, float)
 External = Ex
 String = A(str)
 EmptyTuple = A(tuple)
-newenv = {}
 
 
 @dataclass(frozen=True)

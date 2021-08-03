@@ -35,7 +35,6 @@ from myia.testing.common import (
     Un as U,
     list_of,
     mysum,
-    newenv,
     tuple_of,
 )
 from myia.testing.master_placeholders import (
