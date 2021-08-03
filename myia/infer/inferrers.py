@@ -352,6 +352,25 @@ def operator_pow_inferrer(node, args, unif, inferrers):
     return _bin_op_inferrer("__pow__", node, args, unif, inferrers)
 
 
+def float_mul_inferrer(node, args, unif, inferrers):
+    a_node, b_node = args
+    a_interface = yield Require(a_node)
+    b_interface = yield Require(b_node)
+    if isinstance(a_interface, data.AbstractValue):
+        a_interface = a_interface.tracks.interface
+    if isinstance(b_interface, data.AbstractValue):
+        b_interface = b_interface.tracks.interface
+    assert a_interface is float, f"expected float type, got {a_interface}"
+    if b_interface is float:
+        return data.AbstractAtom({"interface": float})
+    else:
+        b_casted = node.graph.apply(float, b_node)
+        new_node = node.graph.apply(float.__mul__, a_node, b_casted)
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
+
+
 def float_sub_inferrer(node, args, unif, inferrers):
     a_node, b_node = args
     a_interface = yield Require(a_node)
@@ -441,6 +460,7 @@ def add_standard_inferrers(inferrers):
             int.__add__: signature(int, int, ret=int),
             int.__neg__: inference_function(int_neg_inferrer),
             float.__add__: signature(float, float, ret=float),
+            float.__mul__: inference_function(float_mul_inferrer),
             float.__sub__: inference_function(float_sub_inferrer),
             tuple.__add__: inference_function(tuple_add_inferrer),
             getattr: inference_function(getattr_inferrer),
