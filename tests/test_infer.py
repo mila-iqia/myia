@@ -457,6 +457,7 @@ def test_multitype_function(x, y):
 @mt(
     infer_scalar(int, int, result=int),
     infer_scalar(float, float, result=float),
+    # fails in master, should pass here because we support float.__rmul__
     infer_scalar(int, float, result=float),
     infer_scalar(B, B, result=int),
 )
@@ -467,12 +468,15 @@ def test_closure(x, y):
     return mul(x) + mul(y)
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @mt(
     infer_scalar(int, int, int, int, result=(int, int)),
     infer_scalar(float, float, float, float, result=(float, float)),
     infer_scalar(int, int, float, float, result=(int, float)),
-    infer_scalar(int, float, float, float, result=InferenceError),
-    infer_scalar(int, int, int, float, result=InferenceError),
+    # fails in master, should pass here
+    infer_scalar(int, float, float, float, result=(float, float)),
+    # fails in master, should pass here
+    infer_scalar(int, int, int, float, result=(int, float)),
 )
 def test_return_closure(w, x, y, z):
     def mul(a):
