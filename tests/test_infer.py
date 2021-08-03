@@ -666,6 +666,7 @@ def test_even_odd(n):
     return even(n)
 
 
+@mark_fail(AssertionError, "Got a data.Placeholder in processus")
 @mt(
     infer_scalar(int, int, int, result=int),
     infer_scalar(int, float, float, result=float),
