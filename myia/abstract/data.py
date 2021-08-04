@@ -110,7 +110,7 @@ class Tracks:
         return H.instance(
             *[
                 H.pair(k, hrepr(v.value), delimiter=" ↦ ")
-                for k, v in self._tracks.items()
+                for k, v in sorted(self._tracks.items())
                 if k not in omit
             ],
             vertical=True,
