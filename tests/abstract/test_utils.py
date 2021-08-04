@@ -133,13 +133,17 @@ def test_unify():
     # Variables remain
     assert _utest(cg0, cg1)
 
+    # Transferred from old `test_cannot_unify`
+    # Value tracks are now unified with ANYTHING if values are different.
+    # So, these tests pass now.
+    assert _utest(A(1), A(2))
+    assert _utest(A(cg0, 3), A(7, cg0))
+    assert _utest(A(cg0, cg1, cg2, 9), A(7, cg0, cg1, cg2))
+    assert _utest(Un(1), Un(2))
+
 
 @one_test_per_assert
 def test_cannot_unify():
-    assert not _utest(A(1), A(2))
-    assert not _utest(A(cg0, 3), A(7, cg0))
-    assert not _utest(A(cg0, cg1, cg2, 9), A(7, cg0, cg1, cg2))
-    assert not _utest(Un(1), Un(2))
     assert not _utest(Un(1), Un(1, 2))
 
 
