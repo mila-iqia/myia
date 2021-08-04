@@ -26,7 +26,7 @@ def _print_node(node, buf, nodecache, offset=0):
     print(
         ", ".join(args),
         end="",
-        file=buf,
+        file=buf
     )
     print(")", file=buf, end="")
     if node.abstract is not None:
