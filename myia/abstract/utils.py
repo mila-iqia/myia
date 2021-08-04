@@ -169,10 +169,9 @@ def _unify(self, x: object, y: object, *, U):  # noqa: F811
 
 @ovld
 def _unify(self, x: data.ValueTrack, y: data.ValueTrack, *, U):  # noqa: F811
-    """Return other value if one is ANYTHING."""
+    """Return ANYTHING if values are different."""
     if type(x) is not type(y):
         raise MapError(x, y, "cannot merge objects")
-    # Return ANYTHING if values are different.
     return x if x.value == y.value else data.ValueTrack(data.ANYTHING)
 
 
@@ -194,12 +193,6 @@ def _merge(self, x: data.AbstractUnion, y: data.AbstractUnion, *, U):
     return (yield type(x))(
         [*x.options, *y.options], tracks=self(x.tracks, y.tracks, U=U)
     )
-
-
-@ovld
-def _merge(self, x: data.ValueTrack, y: data.ValueTrack, *, U):  # noqa: F811
-    """Return ANYTHING if values are different."""
-    return x if x.value == y.value else data.ValueTrack(data.ANYTHING)
 
 
 def merge(x, y, U=None):
