@@ -62,10 +62,6 @@ def mark_fail(exc_type, reason=None):
     return pytest.mark.xfail(strict=True, raises=exc_type, reason=reason)
 
 
-def _tern(x: Number, y: Number, z: Number) -> Number:
-    return x + y + z
-
-
 def _to_i64(x: Number) -> Int:
     return int(x)
 
@@ -129,13 +125,14 @@ def test_prim_mul(x, y):
     infer_scalar(float, float, float, result=float),
     # Three different inconsistent patterns below
     infer_scalar(float, float, int, result=InferenceError),
-    infer_scalar(int, float, float, result=InferenceError),
+    # int.__add__ -> float.__radd__ supported
+    infer_scalar(int, float, float, result=float),
     # Test too few/too many arguments below
     infer_scalar(int, result=AssertionError),
     infer_scalar(int, int, int, int, result=AssertionError),
 )
 def test_prim_tern(x, y, z):
-    return _tern(x, y, z)
+    return x + y + z
 
 
 @mt(
