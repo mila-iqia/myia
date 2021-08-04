@@ -1221,9 +1221,9 @@ def test_getattr_flex(name, x):
     return _getattr(helpers, name)(x, x)
 
 
-@infer_scalar(External(SimpleNamespace), Ex("surprise"), result=InferenceError)
-def test_unknown_data(data, field):
-    return _getattr(data, field)
+@infer_scalar(External(SimpleNamespace), result=AttributeError("type object 'types.SimpleNamespace' has no attribute 'surprise'"))
+def test_unknown_data(data):
+    return _getattr(data, "surprise")
 
 
 @mt(

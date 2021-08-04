@@ -59,13 +59,12 @@ def partial_inferrer(node, args, unif, inferrers):
 def getattr_inferrer(node, args, unif, inferrers):
     """Inferrer for the getattr function."""
     obj_node, key_node = args
-    assert key_node.is_constant(str)
+    assert key_node.is_constant(str), f"getattr: expected a constant string key, got {key_node}"
     obj = yield Require(obj_node)
     if InferenceEngine.is_abstract_type(obj):
         obj = obj.elements[0]
     key = key_node.value
     interface = obj.tracks.interface
-    print(node, interface, key, obj)
     result = getattr(interface, key)
     if isinstance(result, (types.MethodType, types.WrapperDescriptorType)):
         ct = Constant(result)
