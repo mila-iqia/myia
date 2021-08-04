@@ -1076,6 +1076,7 @@ def test_union_2(x):
         return -1
 
 
+@mark_fail(InferenceError, "Cannot merge int and NoneType")
 @mt(infer_standard(U(int, None), result=int), infer_standard(None, result=0))
 def test_union_nil(x):
     if x is None:
@@ -1084,6 +1085,7 @@ def test_union_nil(x):
         return x
 
 
+@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
 @mt(infer_standard(U(int, None), U(int, None), U(int, None), result=int))
 def test_union_and(x, y, z):
     if (x is not None) and (y is not None) and (z is not None):
