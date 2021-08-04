@@ -10,7 +10,13 @@ from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
 from .algo import Require, RequireAll
-from .infnode import InferenceEngine, Replace, inference_function, signature, dispatch_inferences
+from .infnode import (
+    InferenceEngine,
+    Replace,
+    dispatch_inferences,
+    inference_function,
+    signature,
+)
 
 
 def resolve(node, args, unif, inferrers):
@@ -59,7 +65,9 @@ def partial_inferrer(node, args, unif, inferrers):
 def getattr_inferrer(node, args, unif, inferrers):
     """Inferrer for the getattr function."""
     obj_node, key_node = args
-    assert key_node.is_constant(str), f"getattr: expected a constant string key, got {key_node}"
+    assert key_node.is_constant(
+        str
+    ), f"getattr: expected a constant string key, got {key_node}"
     obj = yield Require(obj_node)
     if InferenceEngine.is_abstract_type(obj):
         obj = obj.elements[0]
@@ -103,13 +111,17 @@ def getitem_inferrer(node, args, unif, inferrers):
 
     if key_node.is_apply(slice):
         if obj.tracks.interface is list:
-            return data.AbstractStructure([obj.elements[0]], {"interface": list})
+            return data.AbstractStructure(
+                [obj.elements[0]], {"interface": list}
+            )
         elif all(inp.is_constant() for inp in key_node.inputs):
             idx = slice(*(inp.value for inp in key_node.inputs))
             selection = obj.elements[idx]
             return data.AbstractStructure(selection, {"interface": tuple})
         else:
-            raise AssertionError("getitem inferrer does not yet support non-constants slice for tuples")
+            raise AssertionError(
+                "getitem inferrer does not yet support non-constants slice for tuples"
+            )
     else:
         assert key_node.is_constant(int), key_node
         if obj.tracks.interface is list:
@@ -278,11 +290,17 @@ def _bin_op_inferrer(bin_op, bin_rop, node, args, unif, inferrers):
     a_interface = a_type.tracks.interface
     b_interface = b_type.tracks.interface
     if hasattr(a_interface, bin_op):
-        new_node = node.graph.apply(getattr(a_interface, bin_op), a_node, b_node)
+        new_node = node.graph.apply(
+            getattr(a_interface, bin_op), a_node, b_node
+        )
     elif hasattr(b_interface, bin_rop):
-        new_node = node.graph.apply(getattr(b_interface, bin_rop), b_node, a_node)
+        new_node = node.graph.apply(
+            getattr(b_interface, bin_rop), b_node, a_node
+        )
     else:
-        raise TypeError(f"No {bin_op} method for {a_interface} and no {bin_rop} method for {b_interface}")
+        raise TypeError(
+            f"No {bin_op} method for {a_interface} and no {bin_rop} method for {b_interface}"
+        )
     yield Replace(new_node)
     res = yield Require(new_node)
     return res
@@ -296,9 +314,13 @@ def _bin_rop_inference(bin_rop):
         a_interface = a_type.tracks.interface
         b_interface = b_type.tracks.interface
         if a_interface is b_interface:
-            raise TypeError(f"Looking for {bin_rop} for same type {a_interface}, nodes: {a_type}, {b_type}")
+            raise TypeError(
+                f"Looking for {bin_rop} for same type {a_interface}, nodes: {a_type}, {b_type}"
+            )
         if hasattr(b_interface, bin_rop):
-            new_node = node.graph.apply(getattr(b_interface, bin_rop), b_node, a_node)
+            new_node = node.graph.apply(
+                getattr(b_interface, bin_rop), b_node, a_node
+            )
             yield Replace(new_node)
             res = yield Require(new_node)
             return res
@@ -349,7 +371,9 @@ def operator_add_inferrer(node, args, unif, inferrers):
 
 def operator_floordiv_inferrer(node, args, unif, inferrers):
     """Inferrer for the operator.floordiv function."""
-    return _bin_op_inferrer("__floordiv__", "__rfloordiv__", node, args, unif, inferrers)
+    return _bin_op_inferrer(
+        "__floordiv__", "__rfloordiv__", node, args, unif, inferrers
+    )
 
 
 def operator_mod_inferrer(node, args, unif, inferrers):
@@ -359,12 +383,14 @@ def operator_mod_inferrer(node, args, unif, inferrers):
 
 def operator_sub_inferrer(node, args, unif, inferrers):
     """Inferrer for the operator.sub function."""
-    return _bin_op_inferrer("__sub__" , "__rsub__", node, args, unif, inferrers)
+    return _bin_op_inferrer("__sub__", "__rsub__", node, args, unif, inferrers)
 
 
 def operator_truediv_inferrer(node, args, unif, inferrers):
     """Inferrer for the operator.truediv function."""
-    return _bin_op_inferrer("__truediv__", "__rtruediv__", node, args, unif, inferrers)
+    return _bin_op_inferrer(
+        "__truediv__", "__rtruediv__", node, args, unif, inferrers
+    )
 
 
 def operator_mul_inferrer(node, args, unif, inferrers):
@@ -522,10 +548,7 @@ def add_standard_inferrers(inferrers):
             len: inference_function(len_inferrer),
             hasattr: signature(X, str, ret=bool),
             isinstance: inference_function(isinstance_inferrer),
-            int.__add__: _bin_op_dispatcher(
-                "__radd__",
-                (int, int, int)
-            ),
+            int.__add__: _bin_op_dispatcher("__radd__", (int, int, int)),
             int.__mul__: _bin_op_dispatcher(
                 "__rmul__",
                 (int, int, int),
@@ -537,8 +560,7 @@ def add_standard_inferrers(inferrers):
             float.__mul__: inference_function(float_mul_inferrer),
             float.__radd__: inference_function(float_radd_inferrer),
             float.__rmul__: dispatch_inferences(
-                (float, float, float),
-                (float, int, float)
+                (float, float, float), (float, int, float)
             ),
             float.__sub__: inference_function(float_sub_inferrer),
             tuple.__add__: inference_function(tuple_add_inferrer),

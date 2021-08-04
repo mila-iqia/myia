@@ -38,6 +38,8 @@ def to_abstract(self, x: object):  # noqa: F811
 @ovld
 def to_abstract(self, x: str):  # noqa: F811
     """Keep value for string."""
+    # Override `to_abstract` instead of `precise_abstract` so that
+    # dict string keys are abstracted will string values in any case.
     return data.AbstractAtom({"interface": type(x), "value": x})
 
 

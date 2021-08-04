@@ -2,7 +2,6 @@ import math
 import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
-from myia.parser import MyiaSyntaxError
 
 import pytest
 
@@ -16,6 +15,7 @@ from myia.basics import (
     user_switch,
     user_switch as switch,
 )
+from myia.parser import MyiaSyntaxError
 from myia.testing.common import (
     B,
     Bot,
@@ -77,6 +77,7 @@ type_signature_arith_bin = [
     # Bool type supports arithmetic operations
     infer_scalar(B, B, result=B),
 ]
+
 
 @mt(infer_scalar(int, result=int), infer_scalar(89, result=89))
 def test_identity(x):
@@ -288,13 +289,14 @@ def test_list_and_scalar(x, y):
     return [x, y, 3]
 
 
-@mark_fail(InferenceError, "Cannot merge int and float (pass in master, fail hre)")
+@mark_fail(
+    InferenceError, "Cannot merge int and float (pass in master, fail hre)"
+)
 @mt(
     infer_scalar(float, float, result=[float]),
 )
 def test_list_and_scalar_different_types(x, y):
     return [x, y, 3]
-
 
 
 @infer_scalar(result=[])
@@ -373,7 +375,12 @@ def test_tuple_outofbound(x, y):
     infer_standard((float, int), result=(int,)),
     infer_standard((float, (int, float)), result=((int, float),)),
     infer_standard((), result=()),
-    infer_standard(float, result=AssertionError(r"getitem can currently only be used for dicts, lists and tuples, got \*float\(\)")),
+    infer_standard(
+        float,
+        result=AssertionError(
+            r"getitem can currently only be used for dicts, lists and tuples, got \*float\(\)"
+        ),
+    ),
 )
 def test_tuple_getslice(tup):
     return tup[1:]
@@ -453,7 +460,10 @@ def test_multitype_function(x, y):
     return (mul(x, x), mul(y, y))
 
 
-@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder() (around make_handle())")
+@mark_fail(
+    InferenceError,
+    "Cannot merge *type(?x) and *Placeholder() (around make_handle())",
+)
 @mt(
     infer_scalar(int, int, result=int),
     infer_scalar(float, float, result=float),
@@ -488,7 +498,10 @@ def test_return_closure(w, x, y, z):
     return (mul(w)(x), mul(y)(z))
 
 
-@mark_fail(MyiaSyntaxError, "Parser does not yet support default values on entry function")
+@mark_fail(
+    MyiaSyntaxError,
+    "Parser does not yet support default values on entry function",
+)
 @mt(
     infer_scalar(int, result=int),
     infer_scalar(float, result=float),
@@ -558,7 +571,9 @@ def test_keywords_bad(x, y):
     return fn(albert=x, charles=y)
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @infer_scalar(int, int, result=int)
 def test_keywords_different_order(x, y):
     def fn1(x, albert, beatrice):
@@ -840,7 +855,9 @@ def test_hof_4(x, y):
     return f(double, (y + 3, y + 4))
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(
     infer_scalar(B, B, int, int, result=int),
     # this raises an InferenceError in master branch
@@ -890,7 +907,10 @@ def test_func_arg(x, y):
 
 
 @infer_scalar(
-    int, result=TypeError(r"No inferrer for <slot wrapper '__radd__' of 'int' objects>")
+    int,
+    result=TypeError(
+        r"No inferrer for <slot wrapper '__radd__' of 'int' objects>"
+    ),
 )
 def test_func_arg3(x):
     def g(func, x):
@@ -984,10 +1004,10 @@ def test_hastype(x, y):
 # Current hastype() does not recursively check expected type.
 # It's just a call to isinstance.
 # Do we need "hastype" in zero branch ?
-@mark_fail(AssertionError, "Expected *bool(value ↦ False), got *bool(value ↦ True)")
-@mt(
-    infer_scalar((int, int), Ty(tuple_of(float, float)), result=False)
+@mark_fail(
+    AssertionError, "Expected *bool(value ↦ False), got *bool(value ↦ True)"
 )
+@mt(infer_scalar((int, int), Ty(tuple_of(float, float)), result=False))
 def test_hastype_fail(x, y):
     return hastype(x, y)
 
@@ -1047,7 +1067,10 @@ def test_hastype_2(x):
     return f(x)
 
 
-@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder() (around make_handle())")
+@mark_fail(
+    InferenceError,
+    "Cannot merge *type(?x) and *Placeholder() (around make_handle())",
+)
 @mt(
     infer_standard(int, result=int),
     infer_standard(float, result=float),
@@ -1084,7 +1107,10 @@ def test_isinstance_bad(x):
     return isinstance(x, (int, 3))
 
 
-@mark_fail(AssertionError, "getitem can currently only be used for dicts, lists and tuples (union not well handled by inferrer)")
+@mark_fail(
+    AssertionError,
+    "getitem can currently only be used for dicts, lists and tuples (union not well handled by inferrer)",
+)
 @mt(
     infer_standard(U(int, (int, int)), result=int),
     infer_standard(U(int, (float, int)), result=InferenceError),
@@ -1097,7 +1123,9 @@ def test_union(x):
         return x[0]
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(
     infer_standard(U(int, (int, int)), result=int),
 )
@@ -1117,7 +1145,9 @@ def test_union_nil(x):
         return x
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(infer_standard(U(int, None), U(int, None), U(int, None), result=int))
 def test_union_and(x, y, z):
     if (x is not None) and (y is not None) and (z is not None):
@@ -1126,7 +1156,10 @@ def test_union_and(x, y, z):
         return 0
 
 
-@mark_fail(TypeError, "No __add__ method for ABSENT and no __radd__ method for ABSENT (unions not well supported)")
+@mark_fail(
+    TypeError,
+    "No __add__ method for ABSENT and no __radd__ method for ABSENT (unions not well supported)",
+)
 @infer_standard(U(int, None), U(int, None), result=int)
 def test_union_binand(x, y):
     if (x is not None) & (y is not None):
@@ -1135,7 +1168,10 @@ def test_union_binand(x, y):
         return 0
 
 
-@mark_fail(AssertionError, "getitem can currently only be used for dicts, lists and tuples")
+@mark_fail(
+    AssertionError,
+    "getitem can currently only be used for dicts, lists and tuples",
+)
 @mt(
     infer_standard(U(int, float, (int, int)), int, result=int),
     infer_standard(U(int, float, (int, int)), float, result=InferenceError),
@@ -1151,7 +1187,10 @@ def test_union_nested(x, y):
         return x[0]
 
 
-@mark_fail(AssertionError, "getitem can currently only be used for dicts, lists and tuples")
+@mark_fail(
+    AssertionError,
+    "getitem can currently only be used for dicts, lists and tuples",
+)
 @mt(
     infer_standard(U(int, float, (int, int)), result=int),
     infer_standard(U(int, (int, int)), result=int),
@@ -1260,7 +1299,12 @@ def test_getattr_flex(name, x):
     return _getattr(helpers, name)(x, x)
 
 
-@infer_scalar(External(SimpleNamespace), result=AttributeError("type object 'types.SimpleNamespace' has no attribute 'surprise'"))
+@infer_scalar(
+    External(SimpleNamespace),
+    result=AttributeError(
+        "type object 'types.SimpleNamespace' has no attribute 'surprise'"
+    ),
+)
 def test_unknown_data(data):
     return _getattr(data, "surprise")
 
@@ -1316,7 +1360,10 @@ def test_infinite_mutual_recursion(x):
 
 # myia_repr_failure prints a too long structure here. Need to deactivate it
 # to print readable error trace.
-@mark_fail(RecursionError, "maximum recursion depth exceeded while calling a Python object (in `is_concrete[AbstractStructure]`)")
+@mark_fail(
+    RecursionError,
+    "maximum recursion depth exceeded while calling a Python object (in `is_concrete[AbstractStructure]`)",
+)
 @infer_scalar([int], result=InferenceError)
 def test_recursive_build(xs):
     rval = ()
@@ -1358,7 +1405,9 @@ def test_identity_function(x):
     return identity(x)
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(
     infer_scalar(B, B, result=B),
     # this raises an InferenceError in master branch
@@ -1370,7 +1419,9 @@ def test_bool_and(x, y):
     return x and y
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(
     infer_scalar(B, B, result=B),
     # this raises an InferenceError in master branch
@@ -1400,17 +1451,21 @@ def test_bool_ne(x):
         return 0
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(
     infer_scalar(B, B, result=B),
     # expected to raise in master
-    infer_scalar(int, int, result=None)
+    infer_scalar(int, int, result=None),
 )
 def test_and(x, y):
     return x and y
 
 
-@mark_fail(InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(infer_scalar(int, None, result=int), infer_scalar(int, int, result=int))
 def test_and_none(x, y):
     if x > 0 and y is not None:

@@ -3,6 +3,7 @@
 import types
 from dataclasses import dataclass
 from typing import Dict, Sequence, Tuple
+
 from ovld import OvldMC
 
 from myia.ir.node import SEQ
