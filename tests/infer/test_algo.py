@@ -203,9 +203,10 @@ def test_merge():
     node = Combine(L("a", 5), L("b", 5))
     assert infer(engine=eng, node=node) is A(5)
 
-    with pytest.raises(MapError):
-        node = Combine(L("a", 5), L("b", 6))
-        infer(engine=eng, node=node)
+    node = Combine(L("a", 5), L("b", 6))
+    assert infer(engine=eng, node=node) is data.AbstractAtom(
+        {"interface": int, "value": data.ANYTHING}
+    )
 
     node = Combine(U("a", 5), U("b", 6))
     assert infer(engine=eng, node=node) is Un(5, 6)
