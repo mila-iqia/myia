@@ -407,6 +407,26 @@ def float_mul_inferrer(node, args, unif, inferrers):
         return res
 
 
+def float_radd_inferrer(node, args, unif, inferrers):
+    """Inferrer for the float.__radd__ function."""
+    a_node, b_node = args
+    a_interface = yield Require(a_node)
+    b_interface = yield Require(b_node)
+    if isinstance(a_interface, data.AbstractValue):
+        a_interface = a_interface.tracks.interface
+    if isinstance(b_interface, data.AbstractValue):
+        b_interface = b_interface.tracks.interface
+    assert a_interface is float, f"expected float type, got {a_interface}"
+    if b_interface is float:
+        return data.AbstractAtom({"interface": float})
+    else:
+        b_casted = node.graph.apply(float, b_node)
+        new_node = node.graph.apply(float.__radd__, a_node, b_casted)
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
+
+
 def float_sub_inferrer(node, args, unif, inferrers):
     """Inferrer for the float.__sub__ function."""
     a_node, b_node = args
@@ -502,7 +522,10 @@ def add_standard_inferrers(inferrers):
             len: inference_function(len_inferrer),
             hasattr: signature(X, str, ret=bool),
             isinstance: inference_function(isinstance_inferrer),
-            int.__add__: signature(int, int, ret=int),
+            int.__add__: _bin_op_dispatcher(
+                "__radd__",
+                (int, int, int)
+            ),
             int.__mul__: _bin_op_dispatcher(
                 "__rmul__",
                 (int, int, int),
@@ -512,6 +535,7 @@ def add_standard_inferrers(inferrers):
             int.__neg__: inference_function(int_neg_inferrer),
             float.__add__: signature(float, float, ret=float),
             float.__mul__: inference_function(float_mul_inferrer),
+            float.__radd__: inference_function(float_radd_inferrer),
             float.__rmul__: dispatch_inferences(
                 (float, float, float),
                 (float, int, float)
