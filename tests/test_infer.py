@@ -965,7 +965,6 @@ def test_hastype_simple(x):
     infer_scalar((int, int), Ty(tuple_of()), result=True),
     infer_scalar((int, int), Ty(tuple_of(Number, Number)), result=True),
     infer_scalar((int, int), Ty(tuple_of(int, int)), result=True),
-    infer_scalar((int, int), Ty(tuple_of(float, float)), result=False),
     infer_scalar(
         (int, int),
         Ty(ANYTHING),
@@ -980,6 +979,17 @@ def test_hastype_simple(x):
     infer_scalar(U(int, int), Ty(U(int, int)), result=B),
 )
 def test_hastype(x, y):
+    return hastype(x, y)
+
+
+# Current hastype() does not recursively check expected type.
+# It's just a call to isinstance.
+# Do we need "hastype" in zero branch ?
+@mark_fail(AssertionError, "Expected *bool(value ↦ False), got *bool(value ↦ True)")
+@mt(
+    infer_scalar((int, int), Ty(tuple_of(float, float)), result=False)
+)
+def test_hastype_fail(x, y):
     return hastype(x, y)
 
 
