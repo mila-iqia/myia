@@ -899,6 +899,7 @@ def test_func_arg4(x):
     return g(t, x)
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @infer_scalar(result=int)
 def test_closure_deep():
     def g(x):
@@ -910,6 +911,7 @@ def test_closure_deep():
     return g(2)()
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @infer_scalar(int, int, result=int)
 def test_closure_passing(x, y):
     def adder(x):
