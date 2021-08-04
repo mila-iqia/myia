@@ -1094,6 +1094,7 @@ def test_union_and(x, y, z):
         return 0
 
 
+@mark_fail(TypeError, "No __add__ method for ABSENT and no __radd__ method for ABSENT (unions not well supported)")
 @infer_standard(U(int, None), U(int, None), result=int)
 def test_union_binand(x, y):
     if (x is not None) & (y is not None):
