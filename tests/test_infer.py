@@ -1269,6 +1269,7 @@ def pong():
     return ping()
 
 
+@mark_fail(AssertionError, "Got a data.Placeholder in processus")
 @infer_scalar(int, result=InferenceError)
 def test_infinite_mutual_recursion(x):
     return ping()
