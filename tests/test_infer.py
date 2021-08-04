@@ -1291,6 +1291,7 @@ def test_partial_1(x):
     return f2(x)
 
 
+@mark_fail(InferenceError, "Cannot merge *type(?x) and *Placeholder()")
 @infer_scalar(int, result=int)
 def test_partial_2(x):
     def f(a, b):
