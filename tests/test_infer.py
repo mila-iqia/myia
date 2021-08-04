@@ -1391,7 +1391,8 @@ def test_switch_switch(x, y):
     return switch(f(y), 1, 2)
 
 
-@infer_standard(int, int, result=InferenceError)
+# This test raises InferenceError in master branch. I don't know why.
+@infer_standard(int, int, result=int)
 def test_user_switch_hastype(x, y):
     return user_switch(hastype(x, int), y + 1, y + 2)
 
