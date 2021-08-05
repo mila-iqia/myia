@@ -8,6 +8,7 @@ from ..abstract import data
 from ..abstract.to_abstract import precise_abstract
 from ..basics import Handle
 from ..ir import Constant
+from ..abstract import utils as autils
 from ..utils.misc import ModuleNamespace
 from .algo import Require, RequireAll
 from .infnode import (
@@ -133,21 +134,15 @@ def getitem_inferrer(node, args, unif, inferrers):
 
 def make_tuple_inferrer(node, args, unif, inferrers):
     """Inferrer for the make_tuple function."""
-    tuple_types = []
-    for arg_node in args:
-        tuple_types.append((yield Require(arg_node)))
+    tuple_types = yield RequireAll(*args)
     return data.AbstractStructure(tuple_types, {"interface": tuple})
 
 
 def make_list_inferrer(node, args, unif, inferrers):
     """Inferrer for the make_list function."""
-    tuple_types = []
-    for arg_node in args:
-        tuple_types.append((yield Require(arg_node)))
     elements = []
-    if tuple_types:
-        from myia.abstract import utils as autils
-
+    if args:
+        tuple_types = yield RequireAll(*args)
         base_type = tuple_types[0]
         for typ in tuple_types[1:]:
             base_type = autils.merge(base_type, typ, U=unif)[0]
@@ -283,7 +278,21 @@ def myia_next_inferrer(node, args, unif, inferrers):
     raise TypeError(f"myia_next: unexpected input type: {iterable_type}")
 
 
+def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
+    """Generic inferrer for builtin unary operator functions."""
+    (a_node,) = args
+    a_type = yield Require(a_node)
+    a_interface = a_type.tracks.interface
+    if not hasattr(a_interface, unary_op):
+        raise TypeError(f"No {unary_op} method for type {a_interface}")
+    new_node = node.graph.apply(getattr(a_interface, unary_op), a_node)
+    yield Replace(new_node)
+    res = yield Require(new_node)
+    return res
+
+
 def _bin_op_inferrer(bin_op, bin_rop, node, args, unif, inferrers):
+    """Generic inferrer for builtin binary operator functions."""
     a_node, b_node = args
     a_type = yield Require(a_node)
     b_type = yield Require(b_node)
@@ -306,62 +315,62 @@ def _bin_op_inferrer(bin_op, bin_rop, node, args, unif, inferrers):
     return res
 
 
-def _bin_rop_inference(bin_rop):
-    def inf(node, args, unif, inferrers):
-        a_node, b_node = args
-        a_type = yield Require(a_node)
-        b_type = yield Require(b_node)
-        a_interface = a_type.tracks.interface
-        b_interface = b_type.tracks.interface
-        if a_interface is b_interface:
-            raise TypeError(
-                f"Looking for {bin_rop} for same type {a_interface}, nodes: {a_type}, {b_type}"
-            )
-        if hasattr(b_interface, bin_rop):
-            new_node = node.graph.apply(
-                getattr(b_interface, bin_rop), b_node, a_node
-            )
-            yield Replace(new_node)
-            res = yield Require(new_node)
-            return res
-        else:
-            raise TypeError(f"No {bin_rop} method for {b_interface}")
+def _bin_rop_inferrer(bin_rop, node, args, unif, inferrers):
+    """Generic inferrer for binary rop methods.
 
-    return inf
+    Replace node with a call to rop method if available in right operand type.
+    """
+    a_node, b_node = args
+    a_type = yield Require(a_node)
+    b_type = yield Require(b_node)
+    a_interface = a_type.tracks.interface
+    b_interface = b_type.tracks.interface
+    if a_interface is b_interface:
+        raise TypeError(
+            f"Looking for {bin_rop} for same type {a_interface}, nodes: {a_type}, {b_type}"
+        )
+    if hasattr(b_interface, bin_rop):
+        new_node = node.graph.apply(
+            getattr(b_interface, bin_rop), b_node, a_node
+        )
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
+    else:
+        raise TypeError(f"No {bin_rop} method for {b_interface}")
 
 
 def _bin_op_dispatcher(bin_rop, *signatures):
-    return dispatch_inferences(*signatures, default=_bin_rop_inference(bin_rop))
+    """Dispatcher for binary op methods.
+
+    Create an inference function using given signatures and a
+    fallback binary rop inference function.
+    """
+    def inf(node, args, unif, inferrers):
+        return _bin_rop_inferrer(bin_rop, node, args, unif, inferrers)
+
+    return dispatch_inferences(*signatures, default=inf)
 
 
-def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
-    (a_node,) = args
+def _bin_op_cast_right(cls, bin_op, node, args, unif, inferrers):
+    """Inferrer for binary op/rop methods (e.g. float.__mul__).
+
+    Cast right operand to left operand type if necessary.
+    """
+    a_node, b_node = args
     a_type = yield Require(a_node)
+    b_type = yield Require(b_node)
     a_interface = a_type.tracks.interface
-    if not hasattr(a_interface, unary_op):
-        raise TypeError(f"No {unary_op} method for type {a_interface}")
-    elif getattr(a_interface, unary_op) not in inferrers:
-        # Assume unary op return same type
-        return data.AbstractAtom({"interface": a_interface})
+    b_interface = b_type.tracks.interface
+    assert a_interface is cls, f"expected {cls}, got {a_interface}"
+    if b_interface is cls:
+        return data.AbstractAtom({"interface": cls})
     else:
-        res = inferrers[getattr(a_interface, unary_op)].tracks.interface.fn(
-            node, args, unif, inferrers
-        )
-        if isinstance(res, types.GeneratorType):
-            assert isinstance(res, types.GeneratorType)
-            curr = None
-            try:
-                while True:
-                    instruction = res.send(curr)
-                    if isinstance(instruction, Replace):
-                        node.replace(instruction.new_node)
-                        curr = None
-                    else:
-                        curr = yield instruction
-            except StopIteration as stop:
-                return stop.value
-        else:
-            return res
+        b_casted = node.graph.apply(cls, b_node)
+        new_node = node.graph.apply(getattr(cls, bin_op), a_node, b_casted)
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
 
 
 def operator_add_inferrer(node, args, unif, inferrers):
@@ -415,62 +424,38 @@ def operator_pow_inferrer(node, args, unif, inferrers):
 
 def float_mul_inferrer(node, args, unif, inferrers):
     """Inferrer for the float.__mul__ function."""
-    a_node, b_node = args
-    a_interface = yield Require(a_node)
-    b_interface = yield Require(b_node)
-    if isinstance(a_interface, data.AbstractValue):
-        a_interface = a_interface.tracks.interface
-    if isinstance(b_interface, data.AbstractValue):
-        b_interface = b_interface.tracks.interface
-    assert a_interface is float, f"expected float type, got {a_interface}"
-    if b_interface is float:
-        return data.AbstractAtom({"interface": float})
-    else:
-        b_casted = node.graph.apply(float, b_node)
-        new_node = node.graph.apply(float.__mul__, a_node, b_casted)
-        yield Replace(new_node)
-        res = yield Require(new_node)
-        return res
+    return _bin_op_cast_right(float, "__mul__", node, args, unif, inferrers)
+
+
+def float_rmul_inferrer(node, args, unif, inferrers):
+    """Inferrer for the float.__mul__ function."""
+    return _bin_op_cast_right(float, "__rmul__", node, args, unif, inferrers)
 
 
 def float_radd_inferrer(node, args, unif, inferrers):
     """Inferrer for the float.__radd__ function."""
-    a_node, b_node = args
-    a_interface = yield Require(a_node)
-    b_interface = yield Require(b_node)
-    if isinstance(a_interface, data.AbstractValue):
-        a_interface = a_interface.tracks.interface
-    if isinstance(b_interface, data.AbstractValue):
-        b_interface = b_interface.tracks.interface
-    assert a_interface is float, f"expected float type, got {a_interface}"
-    if b_interface is float:
-        return data.AbstractAtom({"interface": float})
-    else:
-        b_casted = node.graph.apply(float, b_node)
-        new_node = node.graph.apply(float.__radd__, a_node, b_casted)
-        yield Replace(new_node)
-        res = yield Require(new_node)
-        return res
+    return _bin_op_cast_right(float, "__radd__", node, args, unif, inferrers)
 
 
 def float_sub_inferrer(node, args, unif, inferrers):
     """Inferrer for the float.__sub__ function."""
-    a_node, b_node = args
-    a_interface = yield Require(a_node)
-    b_interface = yield Require(b_node)
-    if isinstance(a_interface, data.AbstractValue):
-        a_interface = a_interface.tracks.interface
-    if isinstance(b_interface, data.AbstractValue):
-        b_interface = b_interface.tracks.interface
-    assert a_interface is float, f"expected float type, got {a_interface}"
-    if b_interface is float:
-        return data.AbstractAtom({"interface": float})
-    else:
-        b_casted = node.graph.apply(float, b_node)
-        new_node = node.graph.apply(float.__sub__, a_node, b_casted)
-        yield Replace(new_node)
-        res = yield Require(new_node)
+    return _bin_op_cast_right(float, "__sub__", node, args, unif, inferrers)
+
+
+def int_neg_inferrer(node, args, unif, inferrers):
+    """Inferrer for the int.__neg__ function."""
+    # NB: bool.__neg__ is int.__neg__ and return an int.
+    # So, we must expect input type to be either int or bool.
+    (value_node,) = args
+    if value_node.is_constant((int, bool)):
+        ct = Constant(-value_node.value)
+        yield Replace(ct)
+        res = yield Require(ct)
         return res
+    else:
+        value_type = yield Require(value_node)
+        assert value_type.tracks.interface in (int, bool), value_type
+        return data.AbstractAtom({"interface": int})
 
 
 def tuple_add_inferrer(node, args, unif, inferrers):
@@ -489,22 +474,6 @@ def tuple_add_inferrer(node, args, unif, inferrers):
     return data.AbstractStructure(
         t1_type.elements + t2_type.elements, {"interface": tuple}
     )
-
-
-def int_neg_inferrer(node, args, unif, inferrers):
-    """Inferrer for the int.__neg__ function."""
-    # NB: bool.__neg__ is int.__neg__ and return an int.
-    # So, we must expect input type to be either int or bool.
-    (value_node,) = args
-    if value_node.is_constant((int, bool)):
-        ct = Constant(-value_node.value)
-        yield Replace(ct)
-        res = yield Require(ct)
-        return res
-    else:
-        value_type = yield Require(value_node)
-        assert value_type.tracks.interface in (int, bool), value_type
-        return data.AbstractAtom({"interface": int})
 
 
 X = data.Generic("x")
@@ -557,12 +526,11 @@ def add_standard_inferrers(inferrers):
             int.__sub__: signature(int, int, ret=int),
             int.__neg__: inference_function(int_neg_inferrer),
             float.__add__: signature(float, float, ret=float),
+            float.__neg__: signature(X, ret=X),
             float.__mul__: inference_function(float_mul_inferrer),
-            float.__radd__: inference_function(float_radd_inferrer),
-            float.__rmul__: dispatch_inferences(
-                (float, float, float), (float, int, float)
-            ),
             float.__sub__: inference_function(float_sub_inferrer),
+            float.__radd__: inference_function(float_radd_inferrer),
+            float.__rmul__: inference_function(float_rmul_inferrer),
             tuple.__add__: inference_function(tuple_add_inferrer),
             getattr: inference_function(getattr_inferrer),
             type: signature(
