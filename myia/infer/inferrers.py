@@ -20,7 +20,7 @@ from .infnode import (
 )
 
 
-def resolve(node, args, unif, inferrers):
+def resolve(node, args, unif):
     """Inferrer for the resolve basic function."""
     ns, name = args
     assert ns.is_constant(ModuleNamespace)
@@ -34,7 +34,7 @@ def resolve(node, args, unif, inferrers):
     return res
 
 
-def user_switch(node, args, unif, inferrers):
+def user_switch(node, args, unif):
     """Inferrer for the user_switch basic function."""
     cond, ift, iff = args
     cond_type = yield Require(cond)  # TODO: check bool
@@ -52,7 +52,7 @@ def user_switch(node, args, unif, inferrers):
     return data.AbstractUnion([ift_t, iff_t], tracks={})
 
 
-def partial_inferrer(node, args, unif, inferrers):
+def partial_inferrer(node, args, unif):
     """Inferrer for the a partial application."""
     fn, *args = args
     fn_type = yield Require(fn)
@@ -63,7 +63,7 @@ def partial_inferrer(node, args, unif, inferrers):
     )
 
 
-def getattr_inferrer(node, args, unif, inferrers):
+def getattr_inferrer(node, args, unif):
     """Inferrer for the getattr function."""
     obj_node, key_node = args
     assert key_node.is_constant(
@@ -91,7 +91,7 @@ def getattr_inferrer(node, args, unif, inferrers):
     return res
 
 
-def getitem_inferrer(node, args, unif, inferrers):
+def getitem_inferrer(node, args, unif):
     """Inferrer for the getitem function."""
     obj_node, key_node = args
     obj = yield Require(obj_node)
@@ -132,13 +132,13 @@ def getitem_inferrer(node, args, unif, inferrers):
             return obj.elements[key]
 
 
-def make_tuple_inferrer(node, args, unif, inferrers):
+def make_tuple_inferrer(node, args, unif):
     """Inferrer for the make_tuple function."""
     tuple_types = yield RequireAll(*args)
     return data.AbstractStructure(tuple_types, {"interface": tuple})
 
 
-def make_list_inferrer(node, args, unif, inferrers):
+def make_list_inferrer(node, args, unif):
     """Inferrer for the make_list function."""
     elements = []
     if args:
@@ -150,7 +150,7 @@ def make_list_inferrer(node, args, unif, inferrers):
     return data.AbstractStructure(elements, {"interface": list})
 
 
-def make_dict_inferrer(node, args, unif, inferrers):
+def make_dict_inferrer(node, args, unif):
     """Inferrer for the make_dict function."""
     assert (
         not len(args) % 2
@@ -159,7 +159,7 @@ def make_dict_inferrer(node, args, unif, inferrers):
     return data.AbstractDict(arg_types)
 
 
-def len_inferrer(node, args, unif, inferrers):
+def len_inferrer(node, args, unif):
     """Inferrer for the len function."""
     (obj_node,) = args
     obj_type = yield Require(obj_node)
@@ -169,7 +169,7 @@ def len_inferrer(node, args, unif, inferrers):
     return data.AbstractAtom({"interface": int})
 
 
-def isinstance_inferrer(node, args, unif, inferrers):
+def isinstance_inferrer(node, args, unif):
     """Inferrer for the isinstance function."""
     obj_node, cls_node = args
     obj_type = yield Require(obj_node)
@@ -219,7 +219,7 @@ def isinstance_inferrer(node, args, unif, inferrers):
     return precise_abstract(any(issubclass(el, expected) for el in inp_types))
 
 
-def myia_iter_inferrer(node, args, unif, inferrers):
+def myia_iter_inferrer(node, args, unif):
     """Inferrer for the myia_iter function."""
     (iterable_node,) = args
     iterable_type = yield Require(iterable_node)
@@ -228,7 +228,7 @@ def myia_iter_inferrer(node, args, unif, inferrers):
     raise TypeError(f"myia_iter: unexpected input type: {iterable_type}")
 
 
-def myia_hasnext_inferrer(node, args, unif, inferrers):
+def myia_hasnext_inferrer(node, args, unif):
     """Inferrer for the myia_hasnext function."""
     (iterable_node,) = args
     iterable_type = yield Require(iterable_node)
@@ -240,7 +240,7 @@ def myia_hasnext_inferrer(node, args, unif, inferrers):
     raise TypeError(f"myia_hasnext: unexpected input type: {iterable_type}")
 
 
-def myia_next_inferrer(node, args, unif, inferrers):
+def myia_next_inferrer(node, args, unif):
     """Inferrer for the myia_next function."""
     (iterable_node,) = args
     iterable_type = yield Require(iterable_node)
@@ -278,7 +278,7 @@ def myia_next_inferrer(node, args, unif, inferrers):
     raise TypeError(f"myia_next: unexpected input type: {iterable_type}")
 
 
-def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
+def _unary_op_inferrer(unary_op, node, args, unif):
     """Generic inferrer for builtin unary operator functions."""
     (a_node,) = args
     a_type = yield Require(a_node)
@@ -291,7 +291,7 @@ def _unary_op_inferrer(unary_op, node, args, unif, inferrers):
     return res
 
 
-def _bin_op_inferrer(bin_op, bin_rop, node, args, unif, inferrers):
+def _bin_op_inferrer(bin_op, bin_rop, node, args, unif):
     """Generic inferrer for builtin binary operator functions."""
     a_node, b_node = args
     a_type = yield Require(a_node)
@@ -315,7 +315,7 @@ def _bin_op_inferrer(bin_op, bin_rop, node, args, unif, inferrers):
     return res
 
 
-def _bin_rop_inferrer(bin_rop, node, args, unif, inferrers):
+def _bin_rop_inferrer(bin_rop, node, args, unif):
     """Generic inferrer for binary rop methods.
 
     Replace node with a call to rop method if available in right operand type.
@@ -346,13 +346,13 @@ def _bin_op_dispatcher(bin_rop, *signatures):
     Create an inference function using given signatures and a
     fallback binary rop inference function.
     """
-    def inf(node, args, unif, inferrers):
-        return _bin_rop_inferrer(bin_rop, node, args, unif, inferrers)
+    def inf(node, args, unif):
+        return _bin_rop_inferrer(bin_rop, node, args, unif)
 
     return dispatch_inferences(*signatures, default=inf)
 
 
-def _bin_op_cast_right(cls, bin_op, node, args, unif, inferrers):
+def _bin_op_cast_right(cls, bin_op, node, args, unif):
     """Inferrer for binary op/rop methods (e.g. float.__mul__).
 
     Cast right operand to left operand type if necessary.
@@ -373,76 +373,72 @@ def _bin_op_cast_right(cls, bin_op, node, args, unif, inferrers):
         return res
 
 
-def operator_add_inferrer(node, args, unif, inferrers):
+def operator_add_inferrer(node, args, unif):
     """Inferrer for the operator.add function."""
-    return _bin_op_inferrer("__add__", "__radd__", node, args, unif, inferrers)
+    return _bin_op_inferrer("__add__", "__radd__", node, args, unif)
 
 
-def operator_floordiv_inferrer(node, args, unif, inferrers):
+def operator_floordiv_inferrer(node, args, unif):
     """Inferrer for the operator.floordiv function."""
-    return _bin_op_inferrer(
-        "__floordiv__", "__rfloordiv__", node, args, unif, inferrers
-    )
+    return _bin_op_inferrer("__floordiv__", "__rfloordiv__", node, args, unif)
 
 
-def operator_mod_inferrer(node, args, unif, inferrers):
+def operator_mod_inferrer(node, args, unif):
     """Inferrer for the operator.mod function."""
-    return _bin_op_inferrer("__mod__", "__rmod__", node, args, unif, inferrers)
+    return _bin_op_inferrer("__mod__", "__rmod__", node, args, unif)
 
 
-def operator_sub_inferrer(node, args, unif, inferrers):
+def operator_sub_inferrer(node, args, unif):
     """Inferrer for the operator.sub function."""
-    return _bin_op_inferrer("__sub__", "__rsub__", node, args, unif, inferrers)
+    return _bin_op_inferrer("__sub__", "__rsub__", node, args, unif)
 
 
-def operator_truediv_inferrer(node, args, unif, inferrers):
+def operator_truediv_inferrer(node, args, unif):
     """Inferrer for the operator.truediv function."""
-    return _bin_op_inferrer(
-        "__truediv__", "__rtruediv__", node, args, unif, inferrers
-    )
+    return _bin_op_inferrer("__truediv__", "__rtruediv__", node, args, unif)
 
 
-def operator_mul_inferrer(node, args, unif, inferrers):
+def operator_mul_inferrer(node, args, unif):
     """Inferrer for the operator.mul function."""
-    return _bin_op_inferrer("__mul__", "__rmul__", node, args, unif, inferrers)
+    return _bin_op_inferrer("__mul__", "__rmul__", node, args, unif)
 
 
-def operator_neg_inferrer(node, args, unif, inferrers):
+def operator_neg_inferrer(node, args, unif):
     """Inferrer for the operator.neg function."""
-    return _unary_op_inferrer("__neg__", node, args, unif, inferrers)
+    return _unary_op_inferrer("__neg__", node, args, unif)
 
 
-def operator_pos_inferrer(node, args, unif, inferrers):
+def operator_pos_inferrer(node, args, unif):
     """Inferrer for the operator.pos function."""
-    return _unary_op_inferrer("__pos__", node, args, unif, inferrers)
+    return _unary_op_inferrer("__pos__", node, args, unif)
 
 
-def operator_pow_inferrer(node, args, unif, inferrers):
+def operator_pow_inferrer(node, args, unif):
     """Inferrer for the operator.pow function."""
-    return _bin_op_inferrer("__pow__", "__rpow__", node, args, unif, inferrers)
+    return _bin_op_inferrer("__pow__", "__rpow__", node, args, unif)
 
 
-def float_mul_inferrer(node, args, unif, inferrers):
+def float_mul_inferrer(node, args, unif):
     """Inferrer for the float.__mul__ function."""
-    return _bin_op_cast_right(float, "__mul__", node, args, unif, inferrers)
+    return _bin_op_cast_right(float, "__mul__", node, args, unif)
 
 
-def float_rmul_inferrer(node, args, unif, inferrers):
+def float_rmul_inferrer(node, args, unif):
     """Inferrer for the float.__mul__ function."""
-    return _bin_op_cast_right(float, "__rmul__", node, args, unif, inferrers)
+    return _bin_op_cast_right(float, "__rmul__", node, args, unif)
 
 
-def float_radd_inferrer(node, args, unif, inferrers):
+def float_radd_inferrer(node, args, unif):
     """Inferrer for the float.__radd__ function."""
-    return _bin_op_cast_right(float, "__radd__", node, args, unif, inferrers)
+    return _bin_op_cast_right(float, "__radd__", node, args, unif)
 
 
-def float_sub_inferrer(node, args, unif, inferrers):
+def float_sub_inferrer(node, args, unif):
     """Inferrer for the float.__sub__ function."""
-    return _bin_op_cast_right(float, "__sub__", node, args, unif, inferrers)
+    return _bin_op_cast_right(float, "__sub__", node, args, unif)
 
 
-def int_neg_inferrer(node, args, unif, inferrers):
+def int_neg_inferrer(node, args, unif):
     """Inferrer for the int.__neg__ function."""
     # NB: bool.__neg__ is int.__neg__ and return an int.
     # So, we must expect input type to be either int or bool.
@@ -458,7 +454,7 @@ def int_neg_inferrer(node, args, unif, inferrers):
         return data.AbstractAtom({"interface": int})
 
 
-def tuple_add_inferrer(node, args, unif, inferrers):
+def tuple_add_inferrer(node, args, unif):
     """Inferrer for the tuple.__add__ function."""
     t1_node, t2_node = args
     t1_type = yield Require(t1_node)

@@ -79,7 +79,7 @@ def signature(*arg_types, ret):
 
     return_type = InferenceDefinition.type_to_abstract(ret)
 
-    def _infer(node, args, unif, inferrers):
+    def _infer(node, args, unif):
         inp_types = []
         for inp in args:
             inp_types.append((yield Require(inp)))
@@ -150,7 +150,7 @@ def dispatch_inferences(*signatures: Sequence, default=None):
             sig = InferenceDefinition(*arg_types, ret_type=ret_type)
         def_map.setdefault(len(sig.arg_types), {})[sig.arg_types] = sig
 
-    def inference(node, args, unif, inferrers):
+    def inference(node, args, unif):
         inp_types = []
         for inp in args:
             inp_type = yield Require(inp)
@@ -162,7 +162,7 @@ def dispatch_inferences(*signatures: Sequence, default=None):
                 autils.unify(inp_type, expected_type, U=unif)
             return autils.reify(inf_def.ret_type, unif=unif.canon)
         elif default:
-            return (yield from default(node, args, unif, inferrers))
+            return (yield from default(node, args, unif))
         else:
             raise RuntimeError(
                 f"No inference for node: {node}, signature: {list(inp_types)}\n"
@@ -265,12 +265,7 @@ class InferenceEngine:
                     return res
                 else:
                     partial_args = [Virtual(a) for a in partial_types]
-                    res = inf(
-                        node,
-                        [*partial_args, *node.inputs],
-                        unif,
-                        self.inferrers,
-                    )
+                    res = inf(node, [*partial_args, *node.inputs], unif)
                     # TODO: Return res if not generator, if we create
                     # inferrers that are not generators
                     assert isinstance(res, types.GeneratorType)
