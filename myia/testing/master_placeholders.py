@@ -28,11 +28,6 @@ def scalar_add(a, b):
     raise a + b
 
 
-def scalar_cast(x, typ):
-    """Placeholder for master operation `scalar_cast`."""
-    return typ(x)
-
-
 def scalar_lt(x, y):
     """Placeholder for master operation `scalar_lt`."""
     return x < y
@@ -53,11 +48,6 @@ def tuple_setitem(t, idx, v):
     o = list(t)
     o[idx] = v
     return tuple(o)
-
-
-def unsafe_static_cast(x, typ):
-    """Placeholder for master operation `unsafe_static_cast`."""
-    return typ(x)
 
 
 @ovld

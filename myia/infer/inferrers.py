@@ -237,7 +237,6 @@ def myia_hasnext_inferrer(node, args, unif):
     if iterable_type.tracks.interface is tuple:
         assert isinstance(iterable_type, data.AbstractStructure)
         return precise_abstract(bool(iterable_type.elements))
-    raise TypeError(f"myia_hasnext: unexpected input type: {iterable_type}")
 
 
 def myia_next_inferrer(node, args, unif):
@@ -275,7 +274,6 @@ def myia_next_inferrer(node, args, unif):
             ],
             {"interface": tuple},
         )
-    raise TypeError(f"myia_next: unexpected input type: {iterable_type}")
 
 
 def _unary_op_inferrer(unary_op, node, args, unif):
@@ -330,10 +328,6 @@ def _bin_rop_inferrer(bin_rop, node, args, unif):
     b_type = yield Require(b_node)
     a_interface = a_type.tracks.interface
     b_interface = b_type.tracks.interface
-    if a_interface is b_interface:
-        raise TypeError(
-            f"Looking for {bin_rop} for same type {a_interface}, nodes: {a_type}, {b_type}"
-        )
     if hasattr(b_interface, bin_rop):
         new_node = node.graph.apply(
             getattr(b_interface, bin_rop), b_node, a_node

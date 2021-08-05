@@ -60,13 +60,6 @@ def _check_inference(  # noqa: F811
 
 @ovld
 def _check_inference(  # noqa: F811
-    self, x: data.AbstractUnion, y: (data.AbstractAtom, data.AbstractStructure)
-):
-    return y in x.options
-
-
-@ovld
-def _check_inference(  # noqa: F811
     self, x: (data.AbstractAtom, data.AbstractStructure), y: data.AbstractUnion
 ):
     return x in y.options

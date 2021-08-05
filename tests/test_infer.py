@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import math
 import operator
 from dataclasses import dataclass
@@ -21,22 +22,16 @@ from myia.testing.common import (
     Bot,
     D,
     EmptyTuple,
-    Ex,
-    External,
+    A,
     Int,
     Nil,
     Number,
-    Point,
-    Point3D,
     String,
-    Thing,
-    Thing_f,
-    Thing_ftup,
     Ty,
     Un as U,
     list_of,
-    mysum,
     tuple_of,
+    Aconst,
 )
 from myia.testing.master_placeholders import (
     dict_setitem,
@@ -44,18 +39,62 @@ from myia.testing.master_placeholders import (
     hastype,
     identity,
     scalar_add,
-    scalar_cast,
     scalar_lt,
     scalar_mul,
     scalar_usub,
     tuple_setitem,
-    unsafe_static_cast,
     zeros_like,
 )
 from myia.testing.multitest import infer as mt_infer, mt
 from myia.testing.testing_inferrers import add_testing_inferrers
 
 add_testing_inferrers()
+
+
+
+@dataclass(frozen=True)
+class Point:
+    """Common dataclass for a 2D point."""
+
+    x: int
+    y: int
+
+    def abs(self):
+        """Compute distance from this point to origin."""
+        return (self.x ** 2 + self.y ** 2) ** 0.5
+
+    @property
+    def absprop(self):
+        """Return abs as a property."""
+        return self.abs()
+
+
+@dataclass(frozen=True)
+class Point3D:
+    """Common dataclass for a 3D point."""
+
+    x: object
+    y: object
+    z: object
+
+    def abs(self):
+        """Compute distance from origin to this point."""
+        return (self.x ** 2 + self.y ** 2 + self.z ** 2) ** 0.5
+
+
+@dataclass(frozen=True)
+class Thing:
+    """Common dataclass to use for tests."""
+
+    contents: object
+
+    def __call__(self):
+        """Overload of call."""
+        return self.contents * 2
+
+
+Thing_f = Thing(1.0)
+Thing_ftup = Thing((1.0, 2.0))
 
 
 def mark_fail(exc_type, reason=None):
@@ -198,6 +237,7 @@ def test_while(x, y):
 
 
 @mt(
+    infer_standard(range, int, result=int),
     infer_standard([int], int, result=int),
     infer_standard([int], float, result=InferenceError),
     infer_standard(
@@ -359,6 +399,20 @@ def test_tuple_getitem(x, y):
 
 
 @mt(
+    infer_scalar(int, int, result=int), infer_scalar(float, float, result=float)
+)
+def test_list_getitem(x, y):
+    return [x, y][0]
+
+
+@mt(
+    infer_scalar(int, int, int, result=[int]), infer_scalar(float, float, float, result=[float])
+)
+def test_list_getitem_slice(x, y, z):
+    return [x, y, z][1:]
+
+
+@mt(
     infer_scalar(int, float, result=float), infer_scalar(float, int, result=int)
 )
 def test_tuple_getitem_negative(x, y):
@@ -419,7 +473,7 @@ def test_dict_getitem(d):
 
 @mt(
     infer_standard(
-        D(x=int), Ex(ANYTHING, t=str), result=ValueError("not in list")
+        D(x=int), Aconst(str), result=ValueError("not in list")
     ),
     infer_standard(D(x=int), 2, result=ValueError("not in list")),
 )
@@ -1293,14 +1347,14 @@ _getattr = getattr
     infer_scalar("add", int, result=int),
     infer_scalar("bad", int, result=InferenceError),
     infer_scalar(1234, int, result=InferenceError),
-    infer_scalar(External(str), int, result=InferenceError),
+    infer_scalar(A(str), int, result=InferenceError),
 )
 def test_getattr_flex(name, x):
     return _getattr(helpers, name)(x, x)
 
 
 @infer_scalar(
-    External(SimpleNamespace),
+    A(SimpleNamespace),
     result=AttributeError(
         "type object 'types.SimpleNamespace' has no attribute 'surprise'"
     ),
@@ -1551,31 +1605,22 @@ def test_closure_in_data(c, x):
     infer_scalar(B, Ty(float), result=float),
 )
 def test_scalar_cast(x, t):
-    return scalar_cast(x, t)
+    return t(x)
 
 
 @infer_scalar(int, result=float)
 def test_scalar_cast_2(x):
-    return scalar_cast(x, float)
+    return float(x)
 
 
 @infer_scalar(int, result=float)
 def test_scalar_cast_3(x):
-    return scalar_cast(x, float)
+    return float(x)
 
 
 @infer_scalar(int, int, result=TypeError("Unknown function"))
 def test_call_nonfunc(x, y):
     return x(y)
-
-
-@mark_fail(TypeError, "Unknown function mysum")
-@mt(
-    infer_scalar(int, int, int, result=int),
-    infer_scalar(float, float, float, result=InferenceError),
-)
-def test_multitype(x, y, z):
-    return mysum(x) * mysum(x, y) * mysum(x, y, z)
 
 
 ###########################
@@ -1786,7 +1831,7 @@ def test_zeros_like_fail(x):
     infer_scalar((int, int), result=int),
 )
 def test_unsafe_static_cast(x):
-    return unsafe_static_cast(x, int)
+    return int(x)
 
 
 @mt(
@@ -1794,7 +1839,7 @@ def test_unsafe_static_cast(x):
     infer_scalar(int, (int, int), result=TypeError("Unknown function")),
 )
 def test_unsafe_static_cast_error(x, y):
-    return unsafe_static_cast(x, y)
+    return y(x)
 
 
 @infer_scalar(int, result=int)

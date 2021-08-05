@@ -115,11 +115,6 @@ class InferenceDefinition(metaclass=OvldMC):
             return el
         if not isinstance(el, type):
             el = type(el)
-        if isinstance(el, (tuple, list)):
-            return data.AbstractStructure(
-                [cls.type_to_abstract(typ) for typ in el],
-                {"interface": type(el)},
-            )
         return type_to_abstract(el)
 
     @classmethod

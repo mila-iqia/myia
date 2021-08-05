@@ -145,6 +145,7 @@ def test_unify():
 @one_test_per_assert
 def test_cannot_unify():
     assert not _utest(Un(1), Un(1, 2))
+    assert not _utest(A({"x": 1}), A({"x": 1, "y": 2}))
 
 
 def test_unify_recursive():

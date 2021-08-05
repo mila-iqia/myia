@@ -170,8 +170,6 @@ def _unify(self, x: object, y: object, *, U):  # noqa: F811
 @ovld
 def _unify(self, x: data.ValueTrack, y: data.ValueTrack, *, U):  # noqa: F811
     """Return ANYTHING if values are different."""
-    if type(x) is not type(y):
-        raise MapError(x, y, "cannot merge objects")
     return x if x.value == y.value else data.ValueTrack(data.ANYTHING)
 
 
