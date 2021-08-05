@@ -296,6 +296,11 @@ def _bin_op_inferrer(bin_op, bin_rop, node, args, unif):
     a_node, b_node = args
     a_type = yield Require(a_node)
     b_type = yield Require(b_node)
+
+    if isinstance(a_type, data.GenericBase) or isinstance(b_type, data.GenericBase):
+        # If there is any generic in operands, just unify them.
+        return autils.unify(a_type, b_type)[0]
+
     a_interface = a_type.tracks.interface
     b_interface = b_type.tracks.interface
     if hasattr(a_interface, bin_op):
