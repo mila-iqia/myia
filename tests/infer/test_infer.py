@@ -20,14 +20,18 @@ def g(z):
 def test_specialization():
     # TODO: This line seems to break str() on representations in other tests,
     # to reproduce, call signature with these arguments before all tests are run
+    previous_inferrer = inferrers[operator.truediv]
     inferrers[operator.truediv] = signature(int, float, ret=float)
 
-    with enable_debug():
-        graph = parse(f)
+    try:
+        with enable_debug():
+            graph = parse(f)
 
-    g = infer_graph(graph, (to_abstract(1), to_abstract(1.5)))
-    result = g.return_.abstract
-    assert result is type_to_abstract(float)
+        g = infer_graph(graph, (to_abstract(1), to_abstract(1.5)))
+        result = g.return_.abstract
+        assert result is type_to_abstract(float)
+    finally:
+        inferrers[operator.truediv] = previous_inferrer
 
     # TODO: verify that all of g's nodes have a type
 

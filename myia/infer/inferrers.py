@@ -4,11 +4,10 @@ import operator
 import types
 
 from .. import basics
-from ..abstract import data
+from ..abstract import data, utils as autils
 from ..abstract.to_abstract import precise_abstract
 from ..basics import Handle
 from ..ir import Constant
-from ..abstract import utils as autils
 from ..utils.misc import ModuleNamespace
 from .algo import Require, RequireAll
 from .infnode import (
@@ -295,7 +294,9 @@ def _bin_op_inferrer(bin_op, bin_rop, node, args, unif):
     a_type = yield Require(a_node)
     b_type = yield Require(b_node)
 
-    if isinstance(a_type, data.GenericBase) or isinstance(b_type, data.GenericBase):
+    if isinstance(a_type, data.GenericBase) or isinstance(
+        b_type, data.GenericBase
+    ):
         # If there is any generic in operands, just unify them.
         return autils.unify(a_type, b_type)[0]
 
@@ -324,9 +325,7 @@ def _bin_rop_inferrer(bin_rop, node, args, unif):
     Replace node with a call to rop method if available in right operand type.
     """
     a_node, b_node = args
-    a_type = yield Require(a_node)
     b_type = yield Require(b_node)
-    a_interface = a_type.tracks.interface
     b_interface = b_type.tracks.interface
     if hasattr(b_interface, bin_rop):
         new_node = node.graph.apply(
@@ -345,6 +344,7 @@ def _bin_op_dispatcher(bin_rop, *signatures):
     Create an inference function using given signatures and a
     fallback binary rop inference function.
     """
+
     def inf(node, args, unif):
         return _bin_rop_inferrer(bin_rop, node, args, unif)
 

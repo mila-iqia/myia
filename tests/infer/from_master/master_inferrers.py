@@ -3,7 +3,6 @@
 Help to test master operations.
 Inferrers might be moved to standar inferrers later if correctly tested.
 """
-
 import math
 
 from myia import inferrers
@@ -15,7 +14,8 @@ from myia.infer.infnode import (
     signature,
 )
 from myia.testing.common import Float, Int, Nil, Object
-from myia.testing.master_placeholders import (
+
+from .master_placeholders import (
     dict_setitem,
     dict_values,
     tuple_setitem,

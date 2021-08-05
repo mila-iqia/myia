@@ -105,7 +105,7 @@ def test_format_exc():
         assert (
             format_exc(exc.value, mode="caret")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a~2::*int(), b~2::*NoneType())
+In fun:clone(a~6::*int(), b::*NoneType())
 89     c = add(
            ^^^^
 90         a,
@@ -116,7 +116,7 @@ In fun:clone(a~2::*int(), b~2::*NoneType())
        ^
 
 File ./tests/test_parser.py, line 2025
-In add:clone(x~7::*int(), y~2::*NoneType())
+In add:clone(x~105::*int(), y~53::*NoneType())
 2025     return f"value is {x}"
          ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -128,14 +128,14 @@ TypeError: No __radd__ method for <class 'NoneType'>"""
         assert (
             format_exc(exc.value, mode="color")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a~2::*int(), b~2::*NoneType())
+In fun:clone(a~6::*int(), b::*NoneType())
 89     c = \x1b[33m\x1b[1madd(\x1b[0m
 90         \x1b[33m\x1b[1ma,\x1b[0m
 91         \x1b[33m\x1b[1mb,\x1b[0m
 92     \x1b[33m\x1b[1m)\x1b[0m
 
 File ./tests/test_parser.py, line 2025
-In add:clone(x~7::*int(), y~2::*NoneType())
+In add:clone(x~105::*int(), y~53::*NoneType())
 2025     \x1b[33m\x1b[1mreturn f"value is {x}"\x1b[0m
 
 TypeError: No __radd__ method for <class 'NoneType'>"""

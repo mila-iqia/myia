@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import math
 import operator
 from dataclasses import dataclass
@@ -18,11 +17,12 @@ from myia.basics import (
 )
 from myia.parser import MyiaSyntaxError
 from myia.testing.common import (
+    A,
+    Aconst,
     B,
     Bot,
     D,
     EmptyTuple,
-    A,
     Int,
     Nil,
     Number,
@@ -31,9 +31,11 @@ from myia.testing.common import (
     Un as U,
     list_of,
     tuple_of,
-    Aconst,
 )
-from myia.testing.master_placeholders import (
+from myia.testing.multitest import infer as mt_infer, mt
+
+from .master_inferrers import add_testing_inferrers
+from .master_placeholders import (
     dict_setitem,
     dict_values,
     hastype,
@@ -45,11 +47,8 @@ from myia.testing.master_placeholders import (
     tuple_setitem,
     zeros_like,
 )
-from myia.testing.multitest import infer as mt_infer, mt
-from myia.testing.testing_inferrers import add_testing_inferrers
 
 add_testing_inferrers()
-
 
 
 @dataclass(frozen=True)
@@ -406,7 +405,8 @@ def test_list_getitem(x, y):
 
 
 @mt(
-    infer_scalar(int, int, int, result=[int]), infer_scalar(float, float, float, result=[float])
+    infer_scalar(int, int, int, result=[int]),
+    infer_scalar(float, float, float, result=[float]),
 )
 def test_list_getitem_slice(x, y, z):
     return [x, y, z][1:]
@@ -472,9 +472,7 @@ def test_dict_getitem(d):
 
 
 @mt(
-    infer_standard(
-        D(x=int), Aconst(str), result=ValueError("not in list")
-    ),
+    infer_standard(D(x=int), Aconst(str), result=ValueError("not in list")),
     infer_standard(D(x=int), 2, result=ValueError("not in list")),
 )
 def test_dict_getitem_nonconst(d, i):
