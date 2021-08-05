@@ -63,6 +63,11 @@ def Ty(element_type):
     return precise_abstract(element_type)
 
 
+def Aconst(typ, value=data.ANYTHING):
+    """Create an abstract constant atom."""
+    return data.AbstractAtom({"interface": typ, "value": value})
+
+
 def H(*opts):
     """Create an abstract handle."""
     return data.AbstractStructure(

@@ -8,7 +8,7 @@ from myia.abstract import data, utils as autils
 from myia.abstract.data import ANYTHING, Placeholder
 from myia.abstract.map import MapError
 from myia.infer.algo import Merge, Require, RequireAll, Unify, infer
-from myia.testing.common import A, Un
+from myia.testing.common import A, Aconst, Un
 
 
 class HasAbstract:
@@ -204,9 +204,7 @@ def test_merge():
     assert infer(engine=eng, node=node) is A(5)
 
     node = Combine(L("a", 5), L("b", 6))
-    assert infer(engine=eng, node=node) is data.AbstractAtom(
-        {"interface": int, "value": data.ANYTHING}
-    )
+    assert infer(engine=eng, node=node) is Aconst(int)
 
     node = Combine(U("a", 5), U("b", 6))
     assert infer(engine=eng, node=node) is Un(5, 6)
@@ -216,13 +214,11 @@ def test_unify():
     node = CombineU(L("a", 5), L("b", 5))
     assert infer(engine=eng, node=node) is A(5)
 
-    with pytest.raises(MapError):
-        node = CombineU(L("a", 5), L("b", 6))
-        infer(engine=eng, node=node)
+    node = CombineU(L("a", 5), L("b", 6))
+    assert infer(engine=eng, node=node) is Aconst(int)
 
-    with pytest.raises(MapError):
-        node = CombineU(U("a", 5), U("b", 6))
-        infer(engine=eng, node=node)
+    node = CombineU(U("a", 5), U("b", 6))
+    assert infer(engine=eng, node=node) is Un(Aconst(int))
 
     node = CombineU(U("a", 5), U("b", 5))
     assert infer(engine=eng, node=node) is Un(5)
@@ -240,8 +236,7 @@ def test_generic():
         Combine(L("a", 13), L("b", ph)),
         Combine(L("c", ph), L("d", 31)),
     )
-    with pytest.raises(MapError):
-        print(infer(engine=eng, node=node))
+    assert infer(engine=eng, node=node) is A(Aconst(int, 13), Aconst(int))
 
 
 def test_call_unify():

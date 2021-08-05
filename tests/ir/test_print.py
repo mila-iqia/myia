@@ -101,11 +101,11 @@ def test_format_exc():
     with enable_debug():
         graph = parse(fun)
         with pytest.raises(Exception) as exc:
-            infer_graph(graph, (A(int), A(float)))
+            infer_graph(graph, (A(int), A(None)))
         assert (
             format_exc(exc.value, mode="caret")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a::*int(), b::*float())
+In fun:clone(a~2::*int(), b~2::*NoneType())
 89     c = add(
            ^^^^
 90         a,
@@ -115,30 +115,30 @@ In fun:clone(a::*int(), b::*float())
 92     )
        ^
 
-File ./tests/ir/test_print.py, line 85
-In add:clone(x::*int(), y::*float())
-85     return x + y
-              ^^^^^
+File ./tests/test_parser.py, line 2025
+In add:clone(x~9::*int(), y~2::*NoneType())
+2025     return f"value is {x}"
+         ^^^^^^^^^^^^^^^^^^^^^^
 
-MapError: Cannot merge objects"""
+TypeError: No __radd__ method for <class 'NoneType'>"""
         )
 
         with pytest.raises(Exception) as exc:
-            infer_graph(graph, (A(int), A(float)))
+            infer_graph(graph, (A(int), A(None)))
         assert (
             format_exc(exc.value, mode="color")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a::*int(), b::*float())
+In fun:clone(a~2::*int(), b~2::*NoneType())
 89     c = \x1b[33m\x1b[1madd(\x1b[0m
 90         \x1b[33m\x1b[1ma,\x1b[0m
 91         \x1b[33m\x1b[1mb,\x1b[0m
 92     \x1b[33m\x1b[1m)\x1b[0m
 
-File ./tests/ir/test_print.py, line 85
-In add:clone(x::*int(), y::*float())
-85     return \x1b[33m\x1b[1mx + y\x1b[0m
+File ./tests/test_parser.py, line 2025
+In add:clone(x~9::*int(), y~2::*NoneType())
+2025     \x1b[33m\x1b[1mreturn f"value is {x}"\x1b[0m
 
-MapError: Cannot merge objects"""
+TypeError: No __radd__ method for <class 'NoneType'>"""
         )
 
     assert format_exc(TypeError("abc")) is None
@@ -147,6 +147,6 @@ MapError: Cannot merge objects"""
 def test_format_exc_no_debug():
     graph = parse(add2)
     with pytest.raises(Exception) as exc:
-        infer_graph(graph, (A(int), A(float)))
+        infer_graph(graph, (A(int), A(None)))
     format_exc(exc.value, mode="caret")
     format_exc(exc.value, mode="color")

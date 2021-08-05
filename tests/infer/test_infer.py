@@ -35,7 +35,7 @@ def test_specialization():
 @mt(
     infer(int, int, result=int),
     infer(float, float, result=float),
-    infer(int, float, result=MapError),
+    infer(int, float, result=float),
     infer(float, int, result=Exception(".*Cannot merge.*")),
 )
 def test_sum(a, b):
@@ -51,7 +51,7 @@ def test_sum_2(a, b):
 @mt(
     infer(int, int, result=int),
     infer(float, float, result=float),
-    infer(int, float, result=MapError),
+    infer(int, float, result=float),
     # This is for coverage of missing builtin function, it could be
     # a different builtin when we add support for list
     infer(list, list, result=TypeError),
