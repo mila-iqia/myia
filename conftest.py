@@ -1,7 +1,6 @@
 def myia_repr_failure(self, excinfo):
     exc = excinfo.value
     trace = getattr(exc, "myia_trace", None)
-    # return self._repr_failure(excinfo)
     if trace is not None:
         from myia.ir.print import format_exc
 

@@ -71,29 +71,6 @@ class SpecializedGraph:
         assert self.graph is graph
 
 
-def signature(*arg_types, ret):
-    """Create an inference function from a type signature."""
-    arg_types = [
-        InferenceDefinition.type_to_abstract(argt) for argt in arg_types
-    ]
-
-    return_type = InferenceDefinition.type_to_abstract(ret)
-
-    def _infer(node, args, unif):
-        inp_types = []
-        for inp in args:
-            inp_types.append((yield Require(inp)))
-        assert len(inp_types) == len(arg_types), (
-            f"wrong number of arguments, "
-            f"expected {len(arg_types)}, got {len(inp_types)}"
-        )
-        for inp_type, expected_type in zip(inp_types, arg_types):
-            autils.unify(expected_type, inp_type, U=unif)
-        return autils.reify(return_type, unif=unif.canon)
-
-    return inference_function(_infer)
-
-
 class InferenceDefinition(metaclass=OvldMC):
     """Helper class to represent a signature."""
 
@@ -124,6 +101,29 @@ class InferenceDefinition(metaclass=OvldMC):
         Useful to lookup node abstract in registered signatures.
         """
         return data.AbstractAtom({"interface": abstract.tracks.interface})
+
+
+def signature(*arg_types, ret):
+    """Create an inference function from a type signature."""
+    arg_types = [
+        InferenceDefinition.type_to_abstract(argt) for argt in arg_types
+    ]
+
+    return_type = InferenceDefinition.type_to_abstract(ret)
+
+    def _infer(node, args, unif):
+        inp_types = []
+        for inp in args:
+            inp_types.append((yield Require(inp)))
+        assert len(inp_types) == len(arg_types), (
+            f"wrong number of arguments, "
+            f"expected {len(arg_types)}, got {len(inp_types)}"
+        )
+        for inp_type, expected_type in zip(inp_types, arg_types):
+            autils.unify(expected_type, inp_type, U=unif)
+        return autils.reify(return_type, unif=unif.canon)
+
+    return inference_function(_infer)
 
 
 def dispatch_inferences(*signatures: Sequence, default=None):
@@ -246,10 +246,11 @@ class InferenceEngine:
             #     return autils.reify(fn.out, unif=unif.canon)
 
             # fn type inference don't go through inferer logic if
-            # node.fn.abstract was already defined, but there may be
-            # inference function associated to this already-existing abstract.
-            # So, we use a specific function to do all work about getting
-            # associated infererrer.
+            # node.fn.abstract was already defined
+            # (e.g. if node.fn is a Parameter node).
+            # So, we use a dedicated function to check if
+            # abstract is either an inference function
+            # or an abstract type present in inferrers.
             inf = self._get_inference_function(node.fn, fn)
             if inf:
                 partial_types = fn.elements
@@ -290,7 +291,7 @@ class InferenceEngine:
                 return (yield Unify(*optnodes))
 
             elif self.is_abstract_type(fn):
-                # Got abstract type, return interface
+                # Got abstract type not in inferrers, return type
                 return fn.elements[0]
 
             else:
@@ -308,8 +309,6 @@ class InferenceEngine:
 
     def _get_inference_function(self, node, fn: data.AbstractValue):
         """Get inference function associated to given node and abstract."""
-        if node.is_constant() and node.value in self.inferrers:
-            return self.inferrers[node.value].tracks.interface.fn
         if isinstance(fn.tracks.interface, InferenceFunction):
             return fn.tracks.interface.fn
         elif (

@@ -13,12 +13,6 @@ def _to_abstract(self, x: type):
 
 
 @ovld
-def _to_abstract(self, x: str):  # noqa: F811
-    """Keep value for string."""
-    return data.AbstractAtom({"interface": str, "value": x})
-
-
-@ovld
 def _to_abstract(self, x: (data.GenericBase, data.AbstractValue)):  # noqa: F811
     return x
 

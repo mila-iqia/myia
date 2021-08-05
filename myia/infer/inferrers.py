@@ -77,8 +77,9 @@ def getattr_inferrer(node, args, unif):
     if isinstance(result, (types.MethodType, types.WrapperDescriptorType)):
         ct = Constant(result)
         new_node = node.graph.apply(basics.partial, ct, obj_node)
-    elif isinstance(interface, types.ModuleType) and callable(result):
-        # TODO callable(result) too broad
+    elif isinstance(interface, types.ModuleType) and isinstance(
+        result, (types.FunctionType, types.BuiltinFunctionType)
+    ):
         new_node = Constant(result)
     else:
         raise AssertionError(
@@ -151,9 +152,6 @@ def make_list_inferrer(node, args, unif):
 
 def make_dict_inferrer(node, args, unif):
     """Inferrer for the make_dict function."""
-    assert (
-        not len(args) % 2
-    ), f"make_dict: expected even number of arguments, got {len(args)}"
     arg_types = yield RequireAll(*args)
     return data.AbstractDict(arg_types)
 
@@ -265,12 +263,7 @@ def myia_next_inferrer(node, args, unif):
         assert isinstance(iterable_type, data.AbstractStructure)
         (type_el,) = iterable_type.elements
         return data.AbstractStructure(
-            [
-                type_el,
-                data.AbstractStructure(
-                    [type_el], {"interface": iterable_type.tracks.interface}
-                ),
-            ],
+            [type_el, data.AbstractStructure([type_el], {"interface": list})],
             {"interface": tuple},
         )
 

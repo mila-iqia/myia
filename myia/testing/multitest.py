@@ -49,17 +49,6 @@ def _check_inference(self, x: object, y: object):  # noqa: F811
 
 @ovld
 def _check_inference(  # noqa: F811
-    self, x: data.AbstractUnion, y: data.AbstractUnion
-):
-    return (
-        type(x) is type(y)
-        and len(x.options) == len(y.options)
-        and all(vx is vy for vx, vy in zip(x.options, y.options))
-    )
-
-
-@ovld
-def _check_inference(  # noqa: F811
     self, x: (data.AbstractAtom, data.AbstractStructure), y: data.AbstractUnion
 ):
     return x in y.options
@@ -76,17 +65,6 @@ def _check_inference(  # noqa: F811
         type(x) is type(y)
         and x.tracks.interface is y.tracks.interface
         and (xval == data.ANYTHING or yval == data.ANYTHING or xval == yval)
-    )
-
-
-@ovld
-def _check_inference(  # noqa: F811
-    self, x: data.AbstractDict, y: data.AbstractDict
-):
-    return (
-        len(x.elements) == len(y.elements)
-        and all(kx is ky for kx, ky in zip(x.keys, y.keys))
-        and all(self(vx, vy) for vx, vy in zip(x.values, y.values))
     )
 
 

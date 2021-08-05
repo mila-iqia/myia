@@ -286,8 +286,14 @@ class AbstractDict(AbstractStructure):
     """
 
     def __init__(self, items):
-        assert not len(items) % 2
+        assert (
+            not len(items) % 2
+        ), f"Expected even number of arguments, got {len(items)}"
         super().__init__(items, {"interface": dict})
+        key_set = set(self.keys)
+        assert len(self.keys) == len(
+            key_set
+        ), "Currently supports only unique abstract keys."
 
     @property
     def keys(self):
