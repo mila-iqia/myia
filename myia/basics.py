@@ -144,9 +144,11 @@ def resolve(ns, key):
     return ns[key]
 
 
-def concat(*args):
-    """Contatenate the arguments in a tuple.
+def args_concat(*args):
+    """Contatenate positional argument groups to a single tuple."""
+    return tuple(a for t in args for a in t)
 
-    This is the same functionally as make_tuple, but used for macros.
-    """
-    return args
+
+def kwargs_concat(*args):
+    """Concatenate keyword argument groups to a single dict."""
+    return dict(item for kw in args for item in kw.items())

@@ -740,8 +740,8 @@ def test_call7():
   #1 = myia.basics.make_tuple(3)
   #2 = myia.basics.make_tuple(1, 2)
   #3 = myia.basics.make_tuple(4)
-  #4 = myia.basics.concat(#1, #2, #3)
-  #5 = myia.basics.concat()
+  #4 = myia.basics.args_concat(#1, #2, #3)
+  #5 = myia.basics.kwargs_concat()
   #6 = myia.basics.apply(g, #4, #5)
   return #6
 }
@@ -767,8 +767,8 @@ def test_call8():
   #1 = myia.basics.make_dict('c', 3)
   #2 = myia.basics.make_dict('a', 1, 'b', 2)
   #3 = myia.basics.make_dict('d', 4)
-  #4 = myia.basics.concat()
-  #5 = myia.basics.concat(#1, #2, #3)
+  #4 = myia.basics.args_concat()
+  #5 = myia.basics.kwargs_concat(#1, #2, #3)
   #6 = myia.basics.apply(g, #4, #5)
   return #6
 }

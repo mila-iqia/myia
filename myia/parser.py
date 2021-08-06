@@ -796,8 +796,8 @@ class Parser:
             return block.apply(
                 basics.apply,
                 func,
-                block.apply(basics.concat, *args),
-                block.apply(basics.concat, *kwargs),
+                block.apply(basics.args_concat, *args),
+                block.apply(basics.kwargs_concat, *kwargs),
             )
 
     def _process_Compare(self, block, node):
