@@ -18,6 +18,8 @@ def resolve(node, args, unif):
     assert ns.is_constant(ModuleNamespace)
     assert name.is_constant(str)
     resolved = ns.value[name.value]
+    if hasattr(resolved, "__myia__"):
+        resolved = resolved.__myia__()
     ct = Constant(resolved)
     yield Replace(ct)
     res = yield Require(ct)
