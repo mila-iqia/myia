@@ -339,14 +339,7 @@ class CodeGenerator:
 
     def _str_apply(self, fn, args, kwargs):
         """Formatter for apply `apply`, which seems to represent a call with args and kwargs."""
-        params = []
-        l, _ = args.args()
-        for e in l:
-            params.append(f"*{self._rvalue(e)}")
-        l, _ = kwargs.args()
-        for e in l:
-            params.append(f"**{self._rvalue(e)}")
-        return f"{self._label(fn)}({', '.join(params)})"
+        return f"{self._label(fn)}(*{self._rvalue(args)}, **{self._rvalue(kwargs)})"
 
     def _str_getattr(self, *params):
         """Formatter for apply getattr."""
