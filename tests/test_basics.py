@@ -35,12 +35,11 @@ def test_apply():
     def f(x=0, y=0, z=0):
         return (x, y, z)
 
-    assert basics.apply(f, (), ()) == (0, 0, 0)
-    assert basics.apply(f, ((),), ()) == (0, 0, 0)
-    assert basics.apply(f, ((18,),), ()) == (18, 0, 0)
-    assert basics.apply(f, ((1, 2),), ()) == (1, 2, 0)
-    assert basics.apply(f, ((1, 2), (3,)), ()) == (1, 2, 3)
-    assert basics.apply(f, ((1,),), ({"y": 2}, {"z": 3})) == (1, 2, 3)
+    assert basics.apply(f, (), {}) == (0, 0, 0)
+    assert basics.apply(f, (18,), {}) == (18, 0, 0)
+    assert basics.apply(f, (1, 2), {}) == (1, 2, 0)
+    assert basics.apply(f, (1, 2, 3), {}) == (1, 2, 3)
+    assert basics.apply(f, (1,), {"y": 2, "z": 3}) == (1, 2, 3)
 
 
 def test_partial():

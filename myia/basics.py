@@ -72,18 +72,8 @@ def global_universe_setitem(h, value):
 ########
 
 
-def apply(fn, args_, kwargs_):
-    """Apply fn to the given arguments.
-
-    Each group must be either a tuple of arguments or a dictionary of
-    keyword arguments.
-    """
-    args = []
-    kwargs = {}
-    for a in args_:
-        args.extend(a)
-    for k in kwargs_:
-        kwargs.update(k)
+def apply(fn, args, kwargs):
+    """Apply fn to the given arguments."""
     return fn(*args, **kwargs)
 
 
