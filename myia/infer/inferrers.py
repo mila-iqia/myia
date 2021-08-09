@@ -185,7 +185,21 @@ def len_inferrer(node, args, unif):
     interface = obj_type.tracks.interface
     if not hasattr(interface, "__len__"):
         raise AttributeError(f"Interface has no attribute __len__: {interface}")
-    return data.AbstractAtom({"interface": int})
+    new_node = node.graph.apply(interface.__len__, obj_node)
+    yield Replace(new_node)
+    res = yield Require(new_node)
+    return res
+
+
+def tuple_len_inferrer(node, args, unif):
+    """Inferrer for the tuple.__len__ method."""
+    (tuple_node,) = args
+    tuple_type = yield Require(tuple_node)
+    interface = tuple_type.tracks.interface
+    assert (
+        isinstance(tuple_type, data.AbstractStructure) and interface is tuple
+    ), f"Expected tuple, got {interface}"
+    return precise_abstract(len(tuple_type.elements))
 
 
 def isinstance_inferrer(node, args, unif):
@@ -508,6 +522,10 @@ def add_standard_inferrers(inferrers):
             tuple.__getitem__: inference_function(tuple_getitem_inferrer),
             list.__getitem__: inference_function(list_getitem_inferrer),
             dict.__getitem__: inference_function(dict_getitem_inferrer),
+            tuple.__len__: inference_function(tuple_len_inferrer),
+            list.__len__: signature(
+                data.AbstractStructure([X], {"interface": list}), ret=int
+            ),
             getattr: inference_function(getattr_inferrer),
             type: signature(
                 X,
