@@ -217,17 +217,21 @@ class CodeGenerator:
         """Convert an already-replaced apply node to an expr."""
         # Replace node function and inputs if necessary.
         fn = self.replace.get(replaced_node.fn, replaced_node.fn)
-        inputs = [self.replace.get(inp, inp) for inp in replaced_node.inputs]
+        args, kwargs = replaced_node.args()
+
+        args = [self.replace.get(a, a) for a in args]
+        for k in list(kwargs.keys()):
+            v = kwargs[k]
+            kwargs[k] = self.replace.get(v, v)
+
         if fn.is_constant():
             if fn.value in self.simple_map:
-                return self._default_formatter(
-                    self.simple_map[fn.value], inputs
-                )
+                return self._default_formatter(self.simple_map[fn.value], args)
             elif fn.value in self.complex_map:
-                return self.complex_map[fn.value](*inputs)
+                return self.complex_map[fn.value](*args)
             elif fn.value is basics.resolve:
-                namespace = inputs[0].value
-                symbol_name = inputs[1].value
+                namespace = args[0].value
+                symbol_name = args[1].value
                 symbol = namespace[symbol_name]
                 # We register node as an inline node.
                 # Node usage will be directly replaced with resolved name.
@@ -247,8 +251,12 @@ class CodeGenerator:
                 ),
             ):
                 name = self._register_global(fn.value.__name__, fn.value)
-                return f"{name}({', '.join(map(self._rvalue, inputs))})"
-        return f"{self._label(fn)}({', '.join(map(self._rvalue, inputs))})"
+                args = [self._rvalue(a) for a in args]
+                args.extend(f"{k}={self._rvalue(a)}" for k, a in kwargs)
+                return f"{name}({', '.join(args)})"
+        args = [self._rvalue(a) for a in args]
+        args.extend(f"{k}={self._rvalue(a)}" for k, a in kwargs.items())
+        return f"{self._label(fn)}({', '.join(args)})"
 
     def _rvalue(self, replaced_node):
         """Inline constant strings or get name for given already-replaced node."""

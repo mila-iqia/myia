@@ -748,45 +748,57 @@ class Parser:
     def _process_Call(self, block, node):
         func = self.process_node(block, node.func)
 
-        groups = []
-        current = []
-        for arg in node.args:
-            if isinstance(arg, ast.Starred):
-                groups.append(current)
-                groups.append(self.process_node(block, arg.value))
-                current = []
-            else:
-                current.append(self.process_node(block, arg))
-        if current or not groups:
-            groups.append(current)
+        # We process edges for edges and groups at the same time
+        # and then decide which to use at the end.
 
+        edges = {}
+        args = []
+        kwargs = []
+        current = []
+        stars = False
+        for i, arg in enumerate(node.args):
+            if isinstance(arg, ast.Starred):
+                if current:
+                    args.append(block.apply(basics.make_tuple, *current))
+                args.append(self.process_node(block, arg.value))
+                current = []
+                stars = True
+            else:
+                val = self.process_node(block, arg)
+                edges[i] = val
+                current.append(val)
+        if stars and current:
+            args.append(block.apply(basics.make_tuple, *current))
+
+        kwlist = []
         if node.keywords:
             for k in node.keywords:
                 if k.arg is None:
-                    groups.append(self.process_node(block, k.value))
-            keywords = [k for k in node.keywords if k.arg is not None]
-            kwlist = list(
-                zip(
-                    (k.arg for k in keywords),
-                    (self.process_node(block, k.value) for k in keywords),
-                )
-            )
-            dlist = []
-            for kw in kwlist:
-                dlist.extend(kw)
-            groups.append(block.apply(basics.make_dict, *dlist))
-
-        if len(groups) == 1:
-            (args,) = groups
-            return block.apply(func, *args)
-        else:
-            args = []
-            for group in groups:
-                if isinstance(group, list):
-                    args.append(block.apply(basics.make_tuple, *group))
+                    if kwlist:
+                        kwargs.append(block.apply(basics.make_dict, *kwlist))
+                    kwlist = []
+                    kwargs.append(self.process_node(block, k.value))
+                    stars = True
                 else:
-                    args.append(group)
-            return block.apply(basics.apply, func, *args)
+                    v = self.process_node(block, k.value)
+                    kwlist.append(k.arg)
+                    kwlist.append(v)
+                    edges[k.arg] = v
+            if stars and kwlist:
+                kwargs.append(block.apply(basics.make_dict, *kwlist))
+
+        if not stars:
+            app = block.apply(func)
+            for k, v in edges.items():
+                app.add_edge(k, v)
+            return app
+        else:
+            return block.apply(
+                basics.apply,
+                func,
+                block.apply(basics.args_concat, *args),
+                block.apply(basics.kwargs_concat, *kwargs),
+            )
 
     def _process_Compare(self, block, node):
         if len(node.ops) == 1:

@@ -248,10 +248,10 @@ class GraphPrinter:
 
     def get_edge_class(self, edge_label):
         """Get CSS class for given edge label."""
-        assert edge_label in (SEQ, FN) or isinstance(edge_label, int)
+        assert edge_label in (SEQ, FN) or isinstance(edge_label, (int, str))
         if edge_label is SEQ:
             return "link-edge"
         if edge_label is FN:
             return "fn-edge"
-        if isinstance(edge_label, int):
+        if isinstance(edge_label, (int, str)):
             return "input-edge"

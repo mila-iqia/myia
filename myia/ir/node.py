@@ -369,6 +369,30 @@ class Apply(Node):
             i += 1
         return tuple(res)
 
+    def args(self):
+        """Fetch the arguments for the node.
+
+        Returns a tuple of `(args, kwargs)`.
+
+        `args` is defined as a list of all the edge nodes that have an
+        integer label, sorted by the value of that integer
+        (ascending).
+
+        `kwargs` is defined as a dict of string -> edge node for all
+        the edges that have a string label.
+
+        All other edges are ignored.  One or both of the results can be empty.
+        """
+        args = []
+        kwargs = dict()
+        for e in self.edges.values():
+            if isinstance(e.label, int):
+                args.append(e)
+            if isinstance(e.label, str):
+                kwargs[e.label] = e.node
+        args = [e.node for e in sorted(args, key=lambda e: e.label)]
+        return args, kwargs
+
     def clone(self, objmap):
         """Copy a node in the context of a graph clone.
 

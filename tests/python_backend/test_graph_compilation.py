@@ -285,3 +285,14 @@ def test_pointer():
 
     assert f(-1) == 6
     assert f(1) == 15
+
+
+def test_star_call():
+    @parse_and_compile
+    def f(d, e):
+        def g(a, b, c):
+            return a + b + c
+
+        return g(*e, **d)
+
+    assert f(dict(c=1, b=2), (3,)) == 6

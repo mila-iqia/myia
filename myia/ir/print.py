@@ -19,11 +19,11 @@ def _print_node(node, buf, nodecache, offset=0):
     assert node.is_apply()
     print(f"{o}{nodecache(node)} = ", end="", file=buf)
     print(f"{nodecache(node.fn)}(", end="", file=buf)
-    print(
-        ", ".join(nodecache(a) for a in node.inputs),
-        end="",
-        file=buf,
-    )
+    args, kwargs = node.args()
+    args = [nodecache(a) for a in args]
+    args.extend(f"{k}={nodecache(v)}" for k, v in kwargs.items())
+
+    print(", ".join(args), end="", file=buf)
     print(")", file=buf, end="")
     if node.abstract is not None:
         print(f" ; type={node.abstract}", file=buf, end="")

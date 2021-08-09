@@ -72,19 +72,8 @@ def global_universe_setitem(h, value):
 ########
 
 
-def apply(fn, *groups):
-    """Apply fn to the given arguments.
-
-    Each group must be either a tuple of arguments or a dictionary of
-    keyword arguments.
-    """
-    args = []
-    kwargs = {}
-    for g in groups:
-        if isinstance(g, tuple):
-            args.extend(g)
-        else:
-            kwargs.update(g)
+def apply(fn, args, kwargs):
+    """Apply fn to the given arguments."""
     return fn(*args, **kwargs)
 
 
@@ -143,3 +132,13 @@ def return_(x):
 def resolve(ns, key):
     """Resolve the name in the given namespace."""
     return ns[key]
+
+
+def args_concat(*args):
+    """Contatenate positional argument groups to a single tuple."""
+    return tuple(a for t in args for a in t)
+
+
+def kwargs_concat(*args):
+    """Concatenate keyword argument groups to a single dict."""
+    return dict(item for kw in args for item in kw.items())
