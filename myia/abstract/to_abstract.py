@@ -45,7 +45,9 @@ def to_abstract(self, x: str):  # noqa: F811
 
 @ovld
 def to_abstract(self, x: dict):  # noqa: F811
-    return data.AbstractDict([self(el) for item in x.items() for el in item])
+    return data.AbstractStructure(
+        [self(el) for item in x.items() for el in item], {"interface": dict}
+    )
 
 
 @ovld

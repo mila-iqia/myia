@@ -279,33 +279,6 @@ class AbstractUnion(AbstractValue):
             )
 
 
-class AbstractDict(AbstractStructure):
-    """Represents a dict type.
-
-    Store succession of key-value types in a flat list.
-    """
-
-    def __init__(self, items):
-        assert (
-            not len(items) % 2
-        ), f"Expected even number of arguments, got {len(items)}"
-        super().__init__(items, {"interface": dict})
-        key_set = set(self.keys)
-        assert len(self.keys) == len(
-            key_set
-        ), "Currently supports only unique abstract keys."
-
-    @property
-    def keys(self):
-        """Get list of key types."""
-        return self.elements[::2]
-
-    @property
-    def values(self):
-        """Get list of value types."""
-        return self.elements[1::2]
-
-
 ##################
 # Function types #
 ##################

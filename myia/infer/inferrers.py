@@ -147,11 +147,12 @@ def dict_getitem_inferrer(node, args, unif):
     dict_node, key_node = args
     dict_type = yield Require(dict_node)
     key = yield Require(key_node)
-    assert isinstance(
-        dict_type, data.AbstractDict
+    assert (
+        isinstance(dict_type, data.AbstractStructure)
+        and dict_type.tracks.interface is dict
     ), f"Expected dict, got {dict_type}"
-    key_pos = dict_type.keys.index(key)
-    return dict_type.values[key_pos]
+    key_pos = dict_type.elements[::2].index(key)
+    return dict_type.elements[1::2][key_pos]
 
 
 def make_tuple_inferrer(node, args, unif):
@@ -175,7 +176,14 @@ def make_list_inferrer(node, args, unif):
 def make_dict_inferrer(node, args, unif):
     """Inferrer for the make_dict function."""
     arg_types = yield RequireAll(*args)
-    return data.AbstractDict(arg_types)
+    assert (
+        not len(arg_types) % 2
+    ), f"Expected even number of arguments, got {len(arg_types)}"
+    keys = arg_types[::2]
+    assert len(keys) == len(
+        set(keys)
+    ), "make_dict currently supports only unique abstract keys."
+    return data.AbstractStructure(arg_types, {"interface": dict})
 
 
 def len_inferrer(node, args, unif):
