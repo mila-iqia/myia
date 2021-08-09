@@ -116,7 +116,7 @@ In fun:clone(a~6::*int(), b::*NoneType())
        ^
 
 File ./tests/test_parser.py, line 2025
-In add:clone(x~105::*int(), y~53::*NoneType())
+In add:clone(x~102::*int(), y~53::*NoneType())
 2025     return f"value is {x}"
          ^^^^^^^^^^^^^^^^^^^^^^
 
@@ -135,7 +135,7 @@ In fun:clone(a~6::*int(), b::*NoneType())
 92     \x1b[33m\x1b[1m)\x1b[0m
 
 File ./tests/test_parser.py, line 2025
-In add:clone(x~105::*int(), y~53::*NoneType())
+In add:clone(x~102::*int(), y~53::*NoneType())
 2025     \x1b[33m\x1b[1mreturn f"value is {x}"\x1b[0m
 
 TypeError: No __radd__ method for <class 'NoneType'>"""

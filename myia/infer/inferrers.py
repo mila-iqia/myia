@@ -501,6 +501,9 @@ def add_standard_inferrers(inferrers):
             basics.return_: signature(X, ret=X),
             basics.resolve: inference_function(resolve),
             basics.user_switch: inference_function(user_switch),
+            # builtin constructors
+            object: signature(ret=object),
+            type(None): signature(ret=None),
             # builtin functions
             len: inference_function(len_inferrer),
             hasattr: signature(X, str, ret=bool),

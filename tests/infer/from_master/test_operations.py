@@ -1,10 +1,6 @@
 from myia.testing.common import Bool, Nil, Ty
 from myia.testing.multitest import infer, mt
 
-from .master_inferrers import add_testing_inferrers
-
-add_testing_inferrers()
-
 
 @mt(
     infer(int, int, result=int),

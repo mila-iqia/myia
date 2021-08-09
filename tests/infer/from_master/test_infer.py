@@ -1,4 +1,3 @@
-import math
 import operator
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -34,21 +33,35 @@ from myia.testing.common import (
 )
 from myia.testing.multitest import infer as mt_infer, mt
 
-from .master_inferrers import add_testing_inferrers
-from .master_placeholders import (
-    dict_setitem,
-    dict_values,
-    hastype,
-    identity,
-    scalar_add,
-    scalar_lt,
-    scalar_mul,
-    scalar_usub,
-    tuple_setitem,
-    zeros_like,
-)
 
-add_testing_inferrers()
+def hastype(obj, typ):
+    """Placeholder for master operation `hastype`."""
+    return isinstance(obj, typ)
+
+
+def identity(x):
+    """Placeholder for master operation `identity`."""
+    return x
+
+
+def scalar_add(a, b):
+    """Placeholder for master operation `scalar_add`."""
+    raise a + b
+
+
+def scalar_lt(x, y):
+    """Placeholder for master operation `scalar_lt`."""
+    return x < y
+
+
+def scalar_mul(x, y):
+    """Placeholder for master operation `scalar_mul`."""
+    return x * y
+
+
+def scalar_usub(x):
+    """Placeholder for master operation `scalar_usub`."""
+    return -x
 
 
 @dataclass(frozen=True)
@@ -185,13 +198,13 @@ def test_prim_usub(x):
 
 
 @mt(
-    infer_standard(int, result=float),
+    infer_standard(int, result=int),
     infer_standard(float, result=float),
     # math.log accepts bool
-    infer_standard(B, result=float),
+    infer_standard(B, result=int),
 )
-def test_math_log(x):
-    return math.log(x)
+def test_module_function_call(x):
+    return operator.neg(x)
 
 
 @mt(
@@ -364,11 +377,6 @@ def test_dict_merge(c, x, y):
         return {"x": x, "y": y}
 
 
-@infer_scalar(int, float, result=(int, float))
-def test_dict_values(x, y):
-    return dict_values({"x": x, "y": y})
-
-
 @infer_scalar(B, int, float, result=MyiaTypeError)
 def test_dict_incompatible(c, x, y):
     if c:
@@ -477,30 +485,6 @@ def test_dict_getitem(d):
 )
 def test_dict_getitem_nonconst(d, i):
     return d[i]
-
-
-@mt(
-    infer_scalar(D(x=int), float, result=D(x=float)),
-    infer_scalar(D(x=int, y=float), float, result=D(x=float, y=float)),
-    infer_scalar(D(z=int), float, result=ValueError("not in list")),
-)
-def test_dict_setitem(d, x):
-    return dict_setitem(d, "x", x)
-
-
-@mt(
-    infer_scalar((int, int), 1, float, result=(int, float)),
-    infer_scalar((int, int, float), 1, float, result=(int, float, float)),
-    infer_scalar((int,), 1, float, result=IndexError),
-    infer_scalar(
-        (int,), 0.0, float, result=AssertionError("Expected int index")
-    ),
-    infer_scalar(
-        (int,), int, float, result=AssertionError("Expected int value")
-    ),
-)
-def test_tuple_setitem(xs, idx, x):
-    return tuple_setitem(xs, idx, x)
 
 
 @mark_fail(AssertionError, "expecting a graph in SpecializedGraph.commit()")
@@ -1803,24 +1787,6 @@ def test_dataclass_wrong_field(pt):
 @infer_scalar(Thing(int), result=int)
 def test_dataclass_call(thing):
     return thing()
-
-
-@mt(
-    infer_scalar(int, result=0),
-    infer_scalar(float, result=0.0),
-)
-def test_zeros_like(x):
-    return zeros_like(x)
-
-
-@mark_fail(RuntimeError, "No inference for node")
-@mt(
-    infer_scalar([float], result=[float]),  # list element types are broadened
-    infer_scalar((int, float), result=(0, 0.0)),
-    infer_scalar((2, 3.0), result=(0, 0.0)),
-)
-def test_zeros_like_fail(x):
-    return zeros_like(x)
 
 
 @mt(

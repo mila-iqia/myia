@@ -82,9 +82,6 @@ class InferenceDefinition(metaclass=OvldMC):
         )
         self.ret_type = self.type_to_abstract(ret_type)
 
-    def __str__(self):
-        return f"{list(self.arg_types)} -> {self.ret_type}"
-
     @classmethod
     def type_to_abstract(cls, el):
         """Convert given object to an abstract type."""
@@ -156,20 +153,12 @@ def dispatch_inferences(*signatures: Sequence, default=None):
             for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
                 autils.unify(inp_type, expected_type, U=unif)
             return autils.reify(inf_def.ret_type, unif=unif.canon)
-        elif default:
-            return (yield from default(node, args, unif))
         else:
-            raise RuntimeError(
-                f"No inference for node: {node}, signature: {list(inp_types)}\n"
-                f"Available signatures:\n"
-                + (
-                    "\n".join(
-                        str(dfn)
-                        for dct in def_map.values()
-                        for dfn in dct.values()
-                    )
-                )
+            assert default, (
+                f"No default inference for node: {node}, "
+                f"signature: {list(inp_types)}"
             )
+            return (yield from default(node, args, unif))
 
     return inference_function(inference)
 
