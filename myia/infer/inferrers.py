@@ -268,67 +268,84 @@ def myia_next_inferrer(node, args, unif):
         )
 
 
-def _unary_op_inferrer(unary_op, node, args, unif):
-    """Generic inferrer for builtin unary operator functions."""
-    (a_node,) = args
-    a_type = yield Require(a_node)
-    a_interface = a_type.tracks.interface
-    if not hasattr(a_interface, unary_op):
-        raise TypeError(f"No {unary_op} method for type {a_interface}")
-    new_node = node.graph.apply(getattr(a_interface, unary_op), a_node)
-    yield Replace(new_node)
-    res = yield Require(new_node)
-    return res
+def _unary_op_inference(unary_op):
+    """Create a generic inference for builtin unary operator functions."""
 
-
-def _bin_op_inferrer(bin_op, bin_rop, node, args, unif):
-    """Generic inferrer for builtin binary operator functions."""
-    a_node, b_node = args
-    a_type = yield Require(a_node)
-    b_type = yield Require(b_node)
-
-    if isinstance(a_type, data.GenericBase) or isinstance(
-        b_type, data.GenericBase
-    ):
-        # If there is any generic in operands, just unify them.
-        return autils.unify(a_type, b_type)[0]
-
-    a_interface = a_type.tracks.interface
-    b_interface = b_type.tracks.interface
-    if hasattr(a_interface, bin_op):
-        new_node = node.graph.apply(
-            getattr(a_interface, bin_op), a_node, b_node
-        )
-    elif hasattr(b_interface, bin_rop):
-        new_node = node.graph.apply(
-            getattr(b_interface, bin_rop), b_node, a_node
-        )
-    else:
-        raise TypeError(
-            f"No {bin_op} method for {a_interface} and no {bin_rop} method for {b_interface}"
-        )
-    yield Replace(new_node)
-    res = yield Require(new_node)
-    return res
-
-
-def _bin_rop_inferrer(bin_rop, node, args, unif):
-    """Generic inferrer for binary rop methods.
-
-    Replace node with a call to rop method if available in right operand type.
-    """
-    a_node, b_node = args
-    b_type = yield Require(b_node)
-    b_interface = b_type.tracks.interface
-    if hasattr(b_interface, bin_rop):
-        new_node = node.graph.apply(
-            getattr(b_interface, bin_rop), b_node, a_node
-        )
+    def inf(node, args, unif):
+        """Generic inferrer for builtin unary operator functions."""
+        (a_node,) = args
+        a_type = yield Require(a_node)
+        a_interface = a_type.tracks.interface
+        if not hasattr(a_interface, unary_op):
+            raise TypeError(f"No {unary_op} method for type {a_interface}")
+        new_node = node.graph.apply(getattr(a_interface, unary_op), a_node)
         yield Replace(new_node)
         res = yield Require(new_node)
         return res
-    else:
-        raise TypeError(f"No {bin_rop} method for {b_interface}")
+
+    return inference_function(inf)
+
+
+def _bin_op_inference(bin_op, bin_rop):
+    """Create a generic inference for builtin binary operator functions."""
+
+    def inf(node, args, unif):
+        """Generic inferrer for builtin binary operator functions."""
+        a_node, b_node = args
+        a_type = yield Require(a_node)
+        b_type = yield Require(b_node)
+
+        if isinstance(a_type, data.GenericBase) or isinstance(
+            b_type, data.GenericBase
+        ):
+            # If there is any generic in operands, just unify them.
+            return autils.unify(a_type, b_type)[0]
+
+        a_interface = a_type.tracks.interface
+        b_interface = b_type.tracks.interface
+        if hasattr(a_interface, bin_op):
+            new_node = node.graph.apply(
+                getattr(a_interface, bin_op), a_node, b_node
+            )
+        elif hasattr(b_interface, bin_rop):
+            new_node = node.graph.apply(
+                getattr(b_interface, bin_rop), b_node, a_node
+            )
+        else:
+            raise TypeError(
+                f"No {bin_op} method for {a_interface} "
+                f"and no {bin_rop} method for {b_interface}"
+            )
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
+
+    return inference_function(inf)
+
+
+def _bin_rop_inferrer(bin_rop):
+    """Create a generic inferrer for binary rop methods."""
+
+    def inf(node, args, unif):
+        """Generic inferrer for binary rop methods.
+
+        Replace node with a call to rop method
+        if available in right operand type.
+        """
+        a_node, b_node = args
+        b_type = yield Require(b_node)
+        b_interface = b_type.tracks.interface
+        if hasattr(b_interface, bin_rop):
+            new_node = node.graph.apply(
+                getattr(b_interface, bin_rop), b_node, a_node
+            )
+            yield Replace(new_node)
+            res = yield Require(new_node)
+            return res
+        else:
+            raise TypeError(f"No {bin_rop} method for {b_interface}")
+
+    return inf
 
 
 def _bin_op_dispatcher(bin_rop, *signatures):
@@ -338,96 +355,36 @@ def _bin_op_dispatcher(bin_rop, *signatures):
     fallback binary rop inference function.
     """
 
-    def inf(node, args, unif):
-        return _bin_rop_inferrer(bin_rop, node, args, unif)
-
-    return dispatch_inferences(*signatures, default=inf)
+    return dispatch_inferences(*signatures, default=_bin_rop_inferrer(bin_rop))
 
 
-def _bin_op_cast_right(cls, bin_op, node, args, unif):
-    """Inferrer for binary op/rop methods (e.g. float.__mul__).
+def _bin_op_right_cast_inference(cls, bin_op):
+    """Create a generic inference for binary op/rop methods.
 
-    Cast right operand to left operand type if necessary.
+    Replace right operand with a cast to left type if necessary.
     """
-    a_node, b_node = args
-    a_type = yield Require(a_node)
-    b_type = yield Require(b_node)
-    a_interface = a_type.tracks.interface
-    b_interface = b_type.tracks.interface
-    assert a_interface is cls, f"expected {cls}, got {a_interface}"
-    if b_interface is cls:
-        return data.AbstractAtom({"interface": cls})
-    else:
-        b_casted = node.graph.apply(cls, b_node)
-        new_node = node.graph.apply(getattr(cls, bin_op), a_node, b_casted)
-        yield Replace(new_node)
-        res = yield Require(new_node)
-        return res
 
+    def inf(node, args, unif):
+        """Inferrer for binary op/rop methods (e.g. float.__mul__).
 
-def operator_add_inferrer(node, args, unif):
-    """Inferrer for the operator.add function."""
-    return _bin_op_inferrer("__add__", "__radd__", node, args, unif)
+        Cast right operand to left operand type if necessary.
+        """
+        a_node, b_node = args
+        a_type = yield Require(a_node)
+        b_type = yield Require(b_node)
+        a_interface = a_type.tracks.interface
+        b_interface = b_type.tracks.interface
+        assert a_interface is cls, f"expected {cls}, got {a_interface}"
+        if b_interface is cls:
+            return data.AbstractAtom({"interface": cls})
+        else:
+            b_casted = node.graph.apply(cls, b_node)
+            new_node = node.graph.apply(getattr(cls, bin_op), a_node, b_casted)
+            yield Replace(new_node)
+            res = yield Require(new_node)
+            return res
 
-
-def operator_floordiv_inferrer(node, args, unif):
-    """Inferrer for the operator.floordiv function."""
-    return _bin_op_inferrer("__floordiv__", "__rfloordiv__", node, args, unif)
-
-
-def operator_mod_inferrer(node, args, unif):
-    """Inferrer for the operator.mod function."""
-    return _bin_op_inferrer("__mod__", "__rmod__", node, args, unif)
-
-
-def operator_sub_inferrer(node, args, unif):
-    """Inferrer for the operator.sub function."""
-    return _bin_op_inferrer("__sub__", "__rsub__", node, args, unif)
-
-
-def operator_truediv_inferrer(node, args, unif):
-    """Inferrer for the operator.truediv function."""
-    return _bin_op_inferrer("__truediv__", "__rtruediv__", node, args, unif)
-
-
-def operator_mul_inferrer(node, args, unif):
-    """Inferrer for the operator.mul function."""
-    return _bin_op_inferrer("__mul__", "__rmul__", node, args, unif)
-
-
-def operator_neg_inferrer(node, args, unif):
-    """Inferrer for the operator.neg function."""
-    return _unary_op_inferrer("__neg__", node, args, unif)
-
-
-def operator_pos_inferrer(node, args, unif):
-    """Inferrer for the operator.pos function."""
-    return _unary_op_inferrer("__pos__", node, args, unif)
-
-
-def operator_pow_inferrer(node, args, unif):
-    """Inferrer for the operator.pow function."""
-    return _bin_op_inferrer("__pow__", "__rpow__", node, args, unif)
-
-
-def float_mul_inferrer(node, args, unif):
-    """Inferrer for the float.__mul__ function."""
-    return _bin_op_cast_right(float, "__mul__", node, args, unif)
-
-
-def float_rmul_inferrer(node, args, unif):
-    """Inferrer for the float.__mul__ function."""
-    return _bin_op_cast_right(float, "__rmul__", node, args, unif)
-
-
-def float_radd_inferrer(node, args, unif):
-    """Inferrer for the float.__radd__ function."""
-    return _bin_op_cast_right(float, "__radd__", node, args, unif)
-
-
-def float_sub_inferrer(node, args, unif):
-    """Inferrer for the float.__sub__ function."""
-    return _bin_op_cast_right(float, "__sub__", node, args, unif)
+    return inference_function(inf)
 
 
 def int_neg_inferrer(node, args, unif):
@@ -436,6 +393,7 @@ def int_neg_inferrer(node, args, unif):
     # So, we must expect input type to be either int or bool.
     (value_node,) = args
     if value_node.is_constant((int, bool)):
+        # Inline apply node if value node is a constant.
         ct = Constant(-value_node.value)
         yield Replace(ct)
         res = yield Require(ct)
@@ -473,10 +431,12 @@ def add_standard_inferrers(inferrers):
     inferrers.update(
         {
             # operator functions
-            operator.add: inference_function(operator_add_inferrer),
+            operator.add: _bin_op_inference("__add__", "__radd__"),
             operator.and_: signature(X, X, ret=X),
             operator.eq: signature(X, Y, ret=bool),
-            operator.floordiv: inference_function(operator_floordiv_inferrer),
+            operator.floordiv: _bin_op_inference(
+                "__floordiv__", "__rfloordiv__"
+            ),
             operator.getitem: inference_function(getitem_inferrer),
             operator.gt: signature(X, Y, ret=bool),
             operator.invert: signature(X, ret=X),
@@ -485,17 +445,17 @@ def add_standard_inferrers(inferrers):
             operator.le: signature(X, X, ret=bool),
             operator.lshift: signature(X, X, ret=X),
             operator.lt: signature(X, X, ret=bool),
-            operator.mod: inference_function(operator_mod_inferrer),
-            operator.mul: inference_function(operator_mul_inferrer),
+            operator.mod: _bin_op_inference("__mod__", "__rmod__"),
+            operator.mul: _bin_op_inference("__mul__", "__rmul__"),
             operator.ne: signature(X, X, ret=X),
-            operator.neg: inference_function(operator_neg_inferrer),
+            operator.neg: _unary_op_inference("__neg__"),
             operator.not_: signature(X, ret=bool),
             operator.or_: signature(X, X, ret=X),
-            operator.pos: inference_function(operator_pos_inferrer),
-            operator.pow: inference_function(operator_pow_inferrer),
+            operator.pos: _unary_op_inference("__pos__"),
+            operator.pow: _bin_op_inference("__pow__", "__rpow__"),
             operator.rshift: signature(X, X, ret=X),
-            operator.sub: inference_function(operator_sub_inferrer),
-            operator.truediv: inference_function(operator_truediv_inferrer),
+            operator.sub: _bin_op_inference("__sub__", "__rsub__"),
+            operator.truediv: _bin_op_inference("__truediv__", "__rtruediv__"),
             operator.truth: signature(X, ret=bool),
             operator.xor: signature(X, X, ret=X),
             basics.return_: signature(X, ret=X),
@@ -518,10 +478,10 @@ def add_standard_inferrers(inferrers):
             int.__neg__: inference_function(int_neg_inferrer),
             float.__add__: signature(float, float, ret=float),
             float.__neg__: signature(X, ret=X),
-            float.__mul__: inference_function(float_mul_inferrer),
-            float.__sub__: inference_function(float_sub_inferrer),
-            float.__radd__: inference_function(float_radd_inferrer),
-            float.__rmul__: inference_function(float_rmul_inferrer),
+            float.__mul__: _bin_op_right_cast_inference(float, "__mul__"),
+            float.__sub__: _bin_op_right_cast_inference(float, "__sub__"),
+            float.__radd__: _bin_op_right_cast_inference(float, "__radd__"),
+            float.__rmul__: _bin_op_right_cast_inference(float, "__rmul__"),
             tuple.__add__: inference_function(tuple_add_inferrer),
             getattr: inference_function(getattr_inferrer),
             type: signature(
