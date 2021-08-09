@@ -589,7 +589,7 @@ def test_keywords(x, y):
     return fn(albert=x, beatrice=y) + fn(beatrice=3, albert=7)
 
 
-@mark_fail(AssertionError, "Got a data.Placeholder in processus")
+@mark_fail(MyiaSyntaxError, "GeneratorExp not supported")
 @infer_scalar(int, int, result=int)
 def test_keywords_expand(x, y):
     def fn(z, albert, beatrice):
@@ -644,7 +644,7 @@ def test_keywords_shadow(x, y):
     return fn(albert=x, beatrice=y)
 
 
-@mark_fail(AssertionError, "Got a data.Placeholder in processus")
+@mark_fail(MyiaSyntaxError, "GeneratorExp not supported")
 @infer_scalar(int, int, result=InferenceError)
 def test_redundant_kw(x, y):
     def fn(albert, beatrice):
@@ -694,7 +694,7 @@ def test_keywords_bad_3(x, y):
     return scalar_add(x=x, y=y)
 
 
-@mark_fail(AssertionError, "Got a data.Placeholder in processus")
+@mark_fail(MyiaSyntaxError, "GeneratorExp not supported")
 @mt(
     infer_scalar((int, int, int), result=int),
     infer_scalar((int, int, float), result=InferenceError),
