@@ -261,6 +261,9 @@ class Inferrer:
             request.unif = self.unif
             request.payload = task
 
+            if not request.nodes:
+                return self._step(task, request.combine([]))
+
             # All requested nodes are scheduled
             for rnode in request.nodes:
                 self.bootstrap(rnode, origin=task)

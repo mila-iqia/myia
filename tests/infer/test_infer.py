@@ -78,3 +78,19 @@ def test_fact(x):
 @infer(int, result=TypeError)
 def test_not_function(x):
     return x()
+
+
+@infer(result=int)
+def test_nullary_call():
+    def f():
+        return 1
+
+    return f()
+
+
+@infer(int, result=int)
+def test_constant_branch(x):
+    if x <= 0:
+        return 1
+    else:
+        return 2
