@@ -440,7 +440,7 @@ def test_tuple_outofbound(x, y):
     infer_standard(
         float,
         result=AssertionError(
-            r"getitem can currently only be used for dicts, lists and tuples, got \*float\(\)"
+            r"Interface has no attribute __getitem__\: <class 'float'>"
         ),
     ),
 )

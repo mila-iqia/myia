@@ -94,30 +94,28 @@ def getattr_inferrer(node, args, unif):
 def getitem_inferrer(node, args, unif):
     """Inferrer for the getitem function."""
     obj_node, key_node = args
-    obj = yield Require(obj_node)
-
-    if isinstance(obj, data.AbstractDict):
-        key = yield Require(key_node)
-        key_pos = obj.keys.index(key)
-        return obj.values[key_pos]
-
-    if not (
-        isinstance(obj, data.AbstractStructure)
-        and obj.tracks.interface in (tuple, list)
-    ):
+    obj_type = yield Require(obj_node)
+    interface = obj_type.tracks.interface
+    if not hasattr(interface, "__getitem__"):
         raise AssertionError(
-            f"getitem can currently only be used for "
-            f"dicts, lists and tuples, got {obj}"
+            f"Interface has no attribute __getitem__: {interface}"
         )
+    new_node = node.graph.apply(interface.__getitem__, obj_node, key_node)
+    yield Replace(new_node)
+    res = yield Require(new_node)
+    return res
 
+
+def tuple_getitem_inferrer(node, args, unif):
+    """Inferrer for the tuple.__getitem__ method."""
+    tuple_node, key_node = args
+    tuple_type = yield Require(tuple_node)
+    interface = tuple_type.tracks.interface
+    assert interface is tuple, f"Expected tuple, got {tuple_type}"
     if key_node.is_apply(slice):
-        if obj.tracks.interface is list:
-            return data.AbstractStructure(
-                [obj.elements[0]], {"interface": list}
-            )
-        elif all(inp.is_constant() for inp in key_node.inputs):
+        if all(inp.is_constant() for inp in key_node.inputs):
             idx = slice(*(inp.value for inp in key_node.inputs))
-            selection = obj.elements[idx]
+            selection = tuple_type.elements[idx]
             return data.AbstractStructure(selection, {"interface": tuple})
         else:
             raise AssertionError(
@@ -125,11 +123,35 @@ def getitem_inferrer(node, args, unif):
             )
     else:
         assert key_node.is_constant(int), key_node
-        if obj.tracks.interface is list:
-            return obj.elements[0]
-        else:
-            key = key_node.value
-            return obj.elements[key]
+        key = key_node.value
+        return tuple_type.elements[key]
+
+
+def list_getitem_inferrer(node, args, unif):
+    """Inferrer for the list.__getitem__ method."""
+    list_node, key_node = args
+    list_type = yield Require(list_node)
+    inferface = list_type.tracks.interface
+    assert inferface is list, f"Expected list, got {list_type}"
+    if key_node.is_apply(slice):
+        return data.AbstractStructure(
+            [list_type.elements[0]], {"interface": list}
+        )
+    else:
+        assert key_node.is_constant(int), key_node
+        return list_type.elements[0]
+
+
+def dict_getitem_inferrer(node, args, unif):
+    """Inferrer for the dict.__getitem__ method."""
+    dict_node, key_node = args
+    dict_type = yield Require(dict_node)
+    key = yield Require(key_node)
+    assert isinstance(
+        dict_type, data.AbstractDict
+    ), f"Expected dict, got {dict_type}"
+    key_pos = dict_type.keys.index(key)
+    return dict_type.values[key_pos]
 
 
 def make_tuple_inferrer(node, args, unif):
@@ -483,6 +505,9 @@ def add_standard_inferrers(inferrers):
             float.__radd__: _bin_op_right_cast_inference(float, "__radd__"),
             float.__rmul__: _bin_op_right_cast_inference(float, "__rmul__"),
             tuple.__add__: inference_function(tuple_add_inferrer),
+            tuple.__getitem__: inference_function(tuple_getitem_inferrer),
+            list.__getitem__: inference_function(list_getitem_inferrer),
+            dict.__getitem__: inference_function(dict_getitem_inferrer),
             getattr: inference_function(getattr_inferrer),
             type: signature(
                 X,
