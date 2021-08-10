@@ -95,6 +95,11 @@ def add_standard_inferrers(inferrers):
                 data.AbstractStructure([X], tracks={"interface": Handle}),
                 ret=X,
             ),
+            basics.global_universe_setitem: signature(
+                data.AbstractStructure([X], tracks={"interface": Handle}),
+                X,
+                ret=None,
+            ),
             basics.partial: inference_function(partial_inferrer),
         }
     )
