@@ -1,6 +1,7 @@
 """Common testing utilities."""
 from ovld import ovld
 
+from myia import basics
 from myia.abstract import data
 from myia.abstract.to_abstract import precise_abstract
 from myia.ir.node import Constant, Graph
@@ -28,6 +29,13 @@ def A(*args):
 def Un(*opts):
     """Convert given arguments to an abstract union for testing."""
     return data.AbstractUnion([A(opt) for opt in opts], tracks={})
+
+
+def H(*opts):
+    """Create an abstract handle."""
+    return data.AbstractStructure(
+        [_to_abstract(opt) for opt in opts], {"interface": basics.Handle}
+    )
 
 
 def build_node(g, descr, nodeset=set()):

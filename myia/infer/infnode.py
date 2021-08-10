@@ -3,6 +3,8 @@
 import types
 from dataclasses import dataclass
 
+from myia.ir.node import SEQ
+
 from ..abstract import data, utils as autils
 from ..abstract.to_abstract import to_abstract, type_to_abstract
 from ..ir import Constant, Graph, Node
@@ -66,14 +68,22 @@ class SpecializedGraph:
         assert self.graph is graph
 
 
+def _type_to_abstract(el):
+    """Convert given object to an abstract type."""
+    # Keep abstracts and generics.
+    if isinstance(el, (data.AbstractValue, data.Generic)):
+        return el
+    # Get type for objects (e.g. for None).
+    if not isinstance(el, type):
+        el = type(el)
+    return type_to_abstract(el)
+
+
 def signature(*arg_types, ret):
     """Create an inference function from a type signature."""
-    arg_types = [
-        type_to_abstract(argt) if isinstance(argt, type) else argt
-        for argt in arg_types
-    ]
+    arg_types = [_type_to_abstract(argt) for argt in arg_types]
 
-    return_type = type_to_abstract(ret) if isinstance(ret, type) else ret
+    return_type = _type_to_abstract(ret)
 
     def _infer(node, args, unif):
         inp_types = []
@@ -139,6 +149,15 @@ class InferenceEngine:
 
         else:
             fn = yield Require(node.fn)
+
+            # Graph may contain nodes that are not involved in return node.
+            # e.g:
+            # def f(h, v):
+            #     global_universe_setitem(h, v)  # <-- unused in return value
+            #     return v
+            # Make sure to infer types for such nodes by visiting SEQ nodes.
+            if SEQ in node.edges:
+                yield Require(node.edges[SEQ].node)
 
             # if isinstance(fn, data.AbstractFunction):
             #     inp_types = []
