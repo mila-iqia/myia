@@ -146,13 +146,15 @@ def dict_getitem_inferrer(node, args, unif):
     """Inferrer for the dict.__getitem__ method."""
     dict_node, key_node = args
     dict_type = yield Require(dict_node)
-    key = yield Require(key_node)
-    assert (
-        isinstance(dict_type, data.AbstractStructure)
-        and dict_type.tracks.interface is dict
+    assert isinstance(dict_type, data.AbstractStructure) and isinstance(
+        dict_type.tracks.interface, data.DictWithKeys
     ), f"Expected dict, got {dict_type}"
-    key_pos = dict_type.elements[::2].index(key)
-    return dict_type.elements[1::2][key_pos]
+    assert (
+        key_node.is_constant()
+    ), f"Abstract dict currently supports only constant keys, got {key_node}"
+    key = key_node.value
+    key_pos = dict_type.tracks.interface.keys.index(key)
+    return dict_type.elements[key_pos]
 
 
 def make_tuple_inferrer(node, args, unif):
@@ -175,15 +177,26 @@ def make_list_inferrer(node, args, unif):
 
 def make_dict_inferrer(node, args, unif):
     """Inferrer for the make_dict function."""
-    arg_types = yield RequireAll(*args)
     assert (
-        not len(arg_types) % 2
-    ), f"Expected even number of arguments, got {len(arg_types)}"
-    keys = arg_types[::2]
+        not len(args) % 2
+    ), f"Expected even number of arguments, got {len(args)}"
+
+    key_nodes = args[::2]
+    assert all(
+        key_node.is_constant() for key_node in key_nodes
+    ), "Abstract dict currently supports only constant keys."
+    keys = [key_node.value for key_node in key_nodes]
     assert len(keys) == len(
         set(keys)
     ), "make_dict currently supports only unique abstract keys."
-    return data.AbstractStructure(arg_types, {"interface": dict})
+
+    val_types = yield RequireAll(*args[1::2])
+    dct = {key: val_type for key, val_type in zip(keys, val_types)}
+    sorted_keys = sorted(keys)
+    return data.AbstractStructure(
+        [dct[key] for key in sorted_keys],
+        {"interface": data.DictWithKeys(sorted_keys)},
+    )
 
 
 def len_inferrer(node, args, unif):

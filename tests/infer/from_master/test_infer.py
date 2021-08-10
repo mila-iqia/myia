@@ -473,15 +473,27 @@ def test_tuple_outofbound_negative(x, y):
 
 @mt(
     infer_standard(D(x=int), result=int),
-    infer_standard(D(y=float), result=ValueError("not in list")),
+    infer_standard(D(y=float), result=ValueError("not in tuple")),
 )
 def test_dict_getitem(d):
     return d["x"]
 
 
 @mt(
-    infer_standard(D(x=int), Aconst(str), result=ValueError("not in list")),
-    infer_standard(D(x=int), 2, result=ValueError("not in list")),
+    infer_standard(
+        D(x=int),
+        Aconst(str),
+        result=AssertionError(
+            "Abstract dict currently supports only constant keys"
+        ),
+    ),
+    infer_standard(
+        D(x=int),
+        2,
+        result=AssertionError(
+            "Abstract dict currently supports only constant keys"
+        ),
+    ),
 )
 def test_dict_getitem_nonconst(d, i):
     return d[i]

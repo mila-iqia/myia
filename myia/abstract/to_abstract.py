@@ -39,14 +39,16 @@ def to_abstract(self, x: object):  # noqa: F811
 def to_abstract(self, x: str):  # noqa: F811
     """Keep value for string."""
     # Override `to_abstract` instead of `precise_abstract` so that
-    # dict string keys are abstracted will string values in any case.
+    # dict string keys are abstracted with string values in any case.
     return data.AbstractAtom({"interface": type(x), "value": x})
 
 
 @ovld
 def to_abstract(self, x: dict):  # noqa: F811
+    # Sort keys
+    keys = sorted(x.keys())
     return data.AbstractStructure(
-        [self(el) for item in x.items() for el in item], {"interface": dict}
+        [self(x[k]) for k in keys], {"interface": data.DictWithKeys(keys)}
     )
 
 

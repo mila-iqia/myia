@@ -298,6 +298,28 @@ class AbstractFunction(AbstractStructure):
         return self.elements[-1]
 
 
+##################
+# Dict utilities #
+##################
+
+
+class DictWithKeys:
+    """Represent keys for a dictionary. To be used as abstract interface."""
+
+    def __init__(self, keys):
+        # Keep keys order as it is passed, and save it in a tuple.
+        self.keys = tuple(keys)
+        # Add this so that inferrer can detect __getitem__ in interface.
+        self.__getitem__ = dict.__getitem__
+
+    def __hash__(self):
+        return hash(self.keys)
+
+    def __eq__(self, other):
+        # Compare keys tuples directly.
+        return isinstance(other, DictWithKeys) and self.keys == other.keys
+
+
 ####################
 # Incomplete types #
 ####################
