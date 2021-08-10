@@ -46,7 +46,7 @@ def identity(x):
 
 def scalar_add(a, b):
     """Placeholder for master operation `scalar_add`."""
-    raise a + b
+    return a + b
 
 
 def scalar_lt(x, y):
@@ -700,7 +700,9 @@ def test_kwarg_bad(x, y):
     return proxy(albert=x, beatrice=y, charles=x + y)
 
 
-@mark_fail(MyiaSyntaxError, "Raise not supported")
+@mark_fail(
+    AssertionError, "Graph(scalar_add): bad signature length, expected 2, got 0"
+)
 @infer_scalar(int, int, result=InferenceError)
 def test_keywords_bad_3(x, y):
     return scalar_add(x=x, y=y)
@@ -740,7 +742,9 @@ def test_even_odd(n):
     return even(n)
 
 
-@mark_fail(AssertionError, "Got a data.Placeholder in processus")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(
     infer_scalar(int, int, int, result=int),
     infer_scalar(int, float, float, result=float),
@@ -755,9 +759,11 @@ def test_choose_prim(i, x, y):
     return choose(i)(x, y)
 
 
-@mark_fail(AssertionError, "Got a data.Placeholder in processus")
+@mark_fail(
+    InferenceError, "Cannot merge InterfaceTrack containing InferenceFunction"
+)
 @mt(
-    infer_scalar(int, int, int, result=InferenceError),
+    infer_scalar(int, int, int, result=int),
     infer_scalar(0, int, int, result=int),
     infer_scalar(1, int, int, result=B),
 )

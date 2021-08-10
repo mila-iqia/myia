@@ -105,7 +105,7 @@ def test_format_exc():
         assert (
             format_exc(exc.value, mode="caret")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a~2::*int(), b~2::*NoneType())
+In fun:clone(a~6::*int(), b::*NoneType())
 89     c = add(
            ^^^^
 90         a,
@@ -116,7 +116,7 @@ In fun:clone(a~2::*int(), b~2::*NoneType())
        ^
 
 File ./myia/basics.py, line 144
-In add:clone(x~4::*int(), y~4::*NoneType())
+In add:clone(x~114::*int(), y~65::*NoneType())
 144     return dict(item for kw in args for item in kw.items())
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -128,14 +128,14 @@ TypeError: No __radd__ method for <class 'NoneType'>"""
         assert (
             format_exc(exc.value, mode="color")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a~2::*int(), b~2::*NoneType())
+In fun:clone(a~6::*int(), b::*NoneType())
 89     c = \x1b[33m\x1b[1madd(\x1b[0m
 90         \x1b[33m\x1b[1ma,\x1b[0m
 91         \x1b[33m\x1b[1mb,\x1b[0m
 92     \x1b[33m\x1b[1m)\x1b[0m
 
 File ./myia/basics.py, line 144
-In add:clone(x~4::*int(), y~4::*NoneType())
+In add:clone(x~114::*int(), y~65::*NoneType())
 144     return \x1b[33m\x1b[1mdict(item for kw in args for item in kw.items())\x1b[0m
 
 TypeError: No __radd__ method for <class 'NoneType'>"""
