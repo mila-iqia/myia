@@ -52,10 +52,15 @@ def getattr_inferrer(node, args, unif):
     assert key_node.is_constant(str)
     obj = yield Require(obj_node)
     key = key_node.value
-    result = getattr(obj.tracks.interface, key)
+    interface = obj.tracks.interface
+    result = getattr(interface, key)
     if isinstance(result, (types.MethodType, types.WrapperDescriptorType)):
         ct = Constant(result)
         new_node = node.graph.apply(basics.partial, ct, obj_node)
+    elif isinstance(interface, types.ModuleType) and isinstance(
+        result, (types.FunctionType, types.BuiltinFunctionType)
+    ):
+        new_node = Constant(result)
     else:
         raise AssertionError("getattr can currently only be used for methods")
         # new_node = Constant(result)

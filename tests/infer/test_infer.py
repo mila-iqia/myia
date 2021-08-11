@@ -94,3 +94,8 @@ def test_constant_branch(x):
         return 1
     else:
         return 2
+
+
+@infer(int, result=int)
+def test_module_function_call(x):
+    return operator.neg(x)
