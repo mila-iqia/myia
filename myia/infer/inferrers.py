@@ -9,7 +9,12 @@ from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
 from .algo import Require, RequireAll
-from .infnode import Replace, inference_function, signature
+from .infnode import (
+    Replace,
+    dispatch_inferences,
+    inference_function,
+    signature,
+)
 
 
 def resolve(node, args, unif):
@@ -85,6 +90,24 @@ def add_standard_inferrers(inferrers):
             basics.return_: signature(X, ret=X),
             basics.resolve: inference_function(resolve),
             basics.user_switch: inference_function(user_switch),
+            # builtin constructors
+            type(None): signature(ret=None),
+            bool: dispatch_inferences(
+                (bool, bool),
+                (int, bool),
+                (float, bool),
+            ),
+            int: dispatch_inferences(
+                (bool, int),
+                (int, int),
+                (float, int),
+            ),
+            float: dispatch_inferences(
+                (bool, float),
+                (int, float),
+                (float, float),
+            ),
+            # builtin functions
             int.__add__: signature(int, int, ret=int),
             float.__add__: signature(float, float, ret=float),
             getattr: inference_function(getattr_inferrer),
