@@ -45,3 +45,6 @@ exclude_lines = [
     "untested",
     "pragma: no cover",
 ]
+
+[tool.coverage.run]
+source = ["myia"]
