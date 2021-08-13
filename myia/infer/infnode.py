@@ -113,7 +113,7 @@ class InferenceDefinition:
         self.ret_type = _type_to_abstract(ret_type)
 
 
-def dispatch_inferences(*signatures: Sequence, default=None):
+def dispatch_inferences(*signatures: Sequence):
     """Create an inference function from many type signatures.
 
     Arguments:
@@ -122,15 +122,13 @@ def dispatch_inferences(*signatures: Sequence, default=None):
             First sequence values are the argument types.
             Last sequence value is the return type.
             Each sequence must contain at least one element (the return type).
-        default: optional default inferrer function to call if
-            input nodes don't match any signature given above.
     """
-    def_map = {}  # type: Dict[int, Dict[Tuple, InferenceDefinition]]
+    def_map = {}  # type: Dict[Tuple, InferenceDefinition]
     for sig in signatures:
         if not isinstance(sig, InferenceDefinition):
             *arg_types, ret_type = sig
             sig = InferenceDefinition(*arg_types, ret_type=ret_type)
-        def_map.setdefault(len(sig.arg_types), {})[sig.arg_types] = sig
+        def_map[sig.arg_types] = sig
 
     def inference(node, args, unif):
         inp_types = []
@@ -138,7 +136,7 @@ def dispatch_inferences(*signatures: Sequence, default=None):
             inp_type = yield Require(inp)
             inp_types.append(inp_type)
         inp_types = tuple(inp_types)
-        inf_def = def_map[len(inp_types)][inp_types]
+        inf_def = def_map[inp_types]
         for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
             autils.unify(inp_type, expected_type, U=unif)
         return autils.reify(inf_def.ret_type, unif=unif.canon)
