@@ -4,8 +4,6 @@ import types
 from dataclasses import dataclass
 from typing import Dict, Sequence, Tuple
 
-from ovld import OvldMC
-
 from myia.ir.node import SEQ
 
 from ..abstract import data, utils as autils
@@ -103,7 +101,7 @@ def signature(*arg_types, ret):
     return inference_function(_infer)
 
 
-class InferenceDefinition(metaclass=OvldMC):
+class InferenceDefinition:
     """Helper class to represent a signature."""
 
     __slots__ = "arg_types", "ret_type"
@@ -113,14 +111,6 @@ class InferenceDefinition(metaclass=OvldMC):
             _type_to_abstract(arg_type) for arg_type in arg_types
         )
         self.ret_type = _type_to_abstract(ret_type)
-
-    @classmethod
-    def without_value(cls, abstract: data.AbstractAtom):
-        """Get pure type from given abstract, without associated value.
-
-        Useful to lookup node abstract in registered signatures.
-        """
-        return data.AbstractAtom({"interface": abstract.tracks.interface})
 
 
 def dispatch_inferences(*signatures: Sequence, default=None):
@@ -146,7 +136,7 @@ def dispatch_inferences(*signatures: Sequence, default=None):
         inp_types = []
         for inp in args:
             inp_type = yield Require(inp)
-            inp_types.append(InferenceDefinition.without_value(inp_type))
+            inp_types.append(inp_type)
         inp_types = tuple(inp_types)
         inf_def = def_map[len(inp_types)][inp_types]
         for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
