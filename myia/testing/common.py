@@ -38,6 +38,14 @@ def H(*opts):
     )
 
 
+def Ty(element_type):
+    """Convert given argument to an abstract type."""
+    if isinstance(element_type, data.AbstractValue):
+        return data.AbstractStructure([element_type], {"interface": type})
+    assert isinstance(element_type, type), (element_type, type(element_type))
+    return precise_abstract(element_type)
+
+
 def build_node(g, descr, nodeset=set()):
     """Create a node recursively from a tuple of tuples.
 
@@ -70,3 +78,6 @@ def build_graph(descr, params=[]):
     nodeset.add(g.return_)
     nodeset.add(g.return_.fn)
     return g, nodeset
+
+
+Nil = A(None)

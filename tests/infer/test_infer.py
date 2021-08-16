@@ -4,6 +4,7 @@ from myia.abstract.map import MapError
 from myia.abstract.to_abstract import to_abstract, type_to_abstract
 from myia.infer.infnode import infer_graph, inferrers, signature
 from myia.parser import parse
+from myia.testing.common import Nil, Ty
 from myia.testing.multitest import infer, mt
 from myia.utils.info import enable_debug
 
@@ -99,3 +100,20 @@ def test_constant_branch(x):
 @infer(int, result=int)
 def test_module_function_call(x):
     return operator.neg(x)
+
+
+@mt(
+    # we could not cast to a Nil,
+    infer(Ty(Nil), int, result=Exception("wrong number of arguments")),
+    infer(Ty(bool), bool, result=bool),
+    infer(Ty(bool), int, result=bool),
+    infer(Ty(bool), float, result=bool),
+    infer(Ty(int), bool, result=int),
+    infer(Ty(int), int, result=int),
+    infer(Ty(int), float, result=int),
+    infer(Ty(float), bool, result=float),
+    infer(Ty(float), int, result=float),
+    infer(Ty(float), float, result=float),
+)
+def test_infer_scalar_cast(dtype, value):
+    return dtype(value)

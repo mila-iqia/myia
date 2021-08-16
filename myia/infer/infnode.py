@@ -2,6 +2,7 @@
 
 import types
 from dataclasses import dataclass
+from typing import Dict, Sequence, Tuple
 
 from myia.ir.node import SEQ
 
@@ -89,12 +90,58 @@ def signature(*arg_types, ret):
         inp_types = []
         for inp in args:
             inp_types.append((yield Require(inp)))
-        assert len(inp_types) == len(arg_types)
+        assert len(inp_types) == len(arg_types), (
+            f"wrong number of arguments, "
+            f"expected {len(arg_types)}, got {len(inp_types)}"
+        )
         for inp_type, expected_type in zip(inp_types, arg_types):
             autils.unify(expected_type, inp_type, U=unif)
         return autils.reify(return_type, unif=unif.canon)
 
     return inference_function(_infer)
+
+
+class InferenceDefinition:
+    """Helper class to represent a signature."""
+
+    __slots__ = "arg_types", "ret_type"
+
+    def __init__(self, *arg_types, ret_type):
+        self.arg_types = tuple(
+            _type_to_abstract(arg_type) for arg_type in arg_types
+        )
+        self.ret_type = _type_to_abstract(ret_type)
+
+
+def dispatch_inferences(*signatures: Sequence):
+    """Create an inference function from many type signatures.
+
+    Arguments:
+        signatures: a sequence of type signatures.
+            Each signature is a sequence of types or abstract values.
+            First sequence values are the argument types.
+            Last sequence value is the return type.
+            Each sequence must contain at least one element (the return type).
+    """
+    def_map = {}  # type: Dict[Tuple, InferenceDefinition]
+    for sig in signatures:
+        if not isinstance(sig, InferenceDefinition):
+            *arg_types, ret_type = sig
+            sig = InferenceDefinition(*arg_types, ret_type=ret_type)
+        def_map[sig.arg_types] = sig
+
+    def inference(node, args, unif):
+        inp_types = []
+        for inp in args:
+            inp_type = yield Require(inp)
+            inp_types.append(inp_type)
+        inp_types = tuple(inp_types)
+        inf_def = def_map[inp_types]
+        for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
+            autils.unify(inp_type, expected_type, U=unif)
+        return autils.reify(inf_def.ret_type, unif=unif.canon)
+
+    return inference_function(inference)
 
 
 class Replace:
@@ -168,9 +215,27 @@ class InferenceEngine:
 
             #     return autils.reify(fn.out, unif=unif.canon)
 
+            # fn type inference don't go through inferrer logic if
+            # node.fn.abstract was already defined
+            # (e.g. if node.fn is a Parameter node).
+            # So, we need additional checks to get inferrer from fn.
+            inf = None
+            partial_types = []
             if isinstance(fn.tracks.interface, InferenceFunction):
-                partial_types = fn.elements
                 inf = fn.tracks.interface.fn
+                partial_types = fn.elements
+            elif (
+                self.is_abstract_type(fn)
+                and (typ := fn.elements[0].tracks.interface) in self.inferrers
+            ):
+                # Got abstract type with type in inferrers.
+                # We may pass here for e.g. if node is a parameter
+                # and inferred parameter type is an abstract type:
+                # def f(param_type, value):
+                #     return param_type(value)
+                inf = self.inferrers[typ].tracks.interface.fn
+
+            if inf:
                 if isinstance(inf, SpecializedGraph):
                     arg_types = yield RequireAll(*node.inputs)
                     inf.commit((*partial_types, *arg_types))
@@ -208,7 +273,17 @@ class InferenceEngine:
                 return (yield Unify(*optnodes))
 
             else:
-                raise TypeError("Unknown function", fn)
+                raise TypeError("Unknown function", fn, node)
+
+    @classmethod
+    def is_abstract_type(cls, fn: data.AbstractValue):
+        """Return True if given abstract is an abstract type."""
+        return (
+            isinstance(fn, data.AbstractStructure)
+            and fn.tracks.interface is type
+            and len(fn.elements) == 1
+            # and isinstance(fn.elements[0], data.AbstractAtom)
+        )
 
 
 def infer_graph(graph, input_types):
