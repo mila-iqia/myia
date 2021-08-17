@@ -81,20 +81,20 @@ def test_print5():
     str_graph(g)
 
 
-def add(x, y):
-    return x + y
+def and_(x, y):
+    return x & y
 
 
 def fun(a, b):
-    c = add(
+    c = and_(
         a,
         b,
     )
     return c * b
 
 
-def add2(x, y):
-    return x + y
+def and_2(x, y):
+    return x & y
 
 
 def test_format_exc():
@@ -105,9 +105,9 @@ def test_format_exc():
         assert (
             format_exc(exc.value, mode="caret")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a::*int(), b::*float())
-89     c = add(
-           ^^^^
+In fun:clone(a~11::*int(), b~11::*float())
+89     c = and_(
+           ^^^^^
 90         a,
            ^^
 91         b,
@@ -115,12 +115,12 @@ In fun:clone(a::*int(), b::*float())
 92     )
        ^
 
-File ./tests/ir/test_print.py, line 85
-In add:clone(x::*int(), y::*float())
-85     return x + y
-              ^^^^^
+File ./tests/test_parser.py, line 2024
+In and_:clone(x::*int(), y::*float())
+2024     return f"value is {x}"
+         ^^^^^^^^^^^^^^^^^^^^^^
 
-MapError: Cannot merge objects"""
+AssertionError: No inference for node: Apply(#12 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
         )
 
         with pytest.raises(Exception) as exc:
@@ -128,24 +128,24 @@ MapError: Cannot merge objects"""
         assert (
             format_exc(exc.value, mode="color")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a::*int(), b::*float())
-89     c = \x1b[33m\x1b[1madd(\x1b[0m
+In fun:clone(a~11::*int(), b~11::*float())
+89     c = \x1b[33m\x1b[1mand_(\x1b[0m
 90         \x1b[33m\x1b[1ma,\x1b[0m
 91         \x1b[33m\x1b[1mb,\x1b[0m
 92     \x1b[33m\x1b[1m)\x1b[0m
 
-File ./tests/ir/test_print.py, line 85
-In add:clone(x::*int(), y::*float())
-85     return \x1b[33m\x1b[1mx + y\x1b[0m
+File ./tests/test_parser.py, line 2024
+In and_:clone(x::*int(), y::*float())
+2024     \x1b[33m\x1b[1mreturn f"value is {x}"\x1b[0m
 
-MapError: Cannot merge objects"""
+AssertionError: No inference for node: Apply(#12 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
         )
 
     assert format_exc(TypeError("abc")) is None
 
 
 def test_format_exc_no_debug():
-    graph = parse(add2)
+    graph = parse(and_2)
     with pytest.raises(Exception) as exc:
         infer_graph(graph, (A(int), A(float)))
     format_exc(exc.value, mode="caret")

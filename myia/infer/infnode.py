@@ -80,6 +80,18 @@ def _type_to_abstract(el):
     return type_to_abstract(el)
 
 
+def _without_value(abstract: data.AbstractAtom):
+    """Get pure type from given abstract, without associated value.
+
+    Useful to lookup node abstract in registered signatures.
+
+    NB: We must remove value track, not keeping it with ANYTHING value,
+    because abstract atom with only interface won't have same hash
+    as abstract atom with interface + ANYTHING value.
+    """
+    return data.AbstractAtom({"interface": abstract.tracks.interface})
+
+
 def signature(*arg_types, ret):
     """Create an inference function from a type signature."""
     arg_types = [_type_to_abstract(argt) for argt in arg_types]
@@ -113,7 +125,7 @@ class InferenceDefinition:
         self.ret_type = _type_to_abstract(ret_type)
 
 
-def dispatch_inferences(*signatures: Sequence):
+def dispatch_inferences(*signatures: Sequence, default=None):
     """Create an inference function from many type signatures.
 
     Arguments:
@@ -122,6 +134,8 @@ def dispatch_inferences(*signatures: Sequence):
             First sequence values are the argument types.
             Last sequence value is the return type.
             Each sequence must contain at least one element (the return type).
+        default: optional default inferrer function to call if
+            input nodes don't match any signature given above.
     """
     def_map = {}  # type: Dict[Tuple, InferenceDefinition]
     for sig in signatures:
@@ -134,12 +148,19 @@ def dispatch_inferences(*signatures: Sequence):
         inp_types = []
         for inp in args:
             inp_type = yield Require(inp)
-            inp_types.append(inp_type)
+            inp_types.append(_without_value(inp_type))
         inp_types = tuple(inp_types)
-        inf_def = def_map[inp_types]
-        for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
-            autils.unify(inp_type, expected_type, U=unif)
-        return autils.reify(inf_def.ret_type, unif=unif.canon)
+        inf_def = def_map.get(inp_types)
+        if inf_def:
+            for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
+                autils.unify(inp_type, expected_type, U=unif)
+            return autils.reify(inf_def.ret_type, unif=unif.canon)
+        else:
+            assert default, (
+                f"No inference for node: {node}, "
+                f"signature: {list(inp_types)}"
+            )
+            return (yield from default(node, args, unif))
 
     return inference_function(inference)
 

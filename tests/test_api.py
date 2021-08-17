@@ -1,6 +1,5 @@
 import pytest
 
-from myia.abstract.map import MapError
 from myia.api import checked
 
 
@@ -26,15 +25,6 @@ def test_good():
 
     # Should have been cached
     assert fact(5) == 120
-
-
-def test_bad():
-    with pytest.raises(MapError):
-        fact(5.0)
-
-    # Should have been cached
-    with pytest.raises(MapError):
-        fact(5.0)
 
 
 def test_method():

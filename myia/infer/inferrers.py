@@ -4,7 +4,7 @@ import operator
 import types
 
 from .. import basics
-from ..abstract import data
+from ..abstract import data, utils as autils
 from ..basics import Handle
 from ..ir import Constant
 from ..utils.misc import ModuleNamespace
@@ -82,22 +82,161 @@ def getattr_inferrer(node, args, unif):
     return res
 
 
+def _unary_op_inference(unary_op):
+    """Create a generic inference for builtin unary operator functions."""
+
+    def inf(node, args, unif):
+        """Generic inferrer for builtin unary operator functions."""
+        (a_node,) = args
+        a_type = yield Require(a_node)
+        a_interface = a_type.tracks.interface
+        if not hasattr(a_interface, unary_op):
+            raise TypeError(f"No {unary_op} method for type {a_interface}")
+        new_node = node.graph.apply(getattr(a_interface, unary_op), a_node)
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
+
+    return inference_function(inf)
+
+
+def _bin_op_inference(bin_op, bin_rop):
+    """Create a generic inference for builtin binary operator functions."""
+
+    def inf(node, args, unif):
+        """Generic inferrer for builtin binary operator functions."""
+        a_node, b_node = args
+        a_type = yield Require(a_node)
+        b_type = yield Require(b_node)
+
+        if isinstance(a_type, data.GenericBase) or isinstance(
+            b_type, data.GenericBase
+        ):
+            # If there is any generic in operands, just unify them.
+            return autils.unify(a_type, b_type)[0]
+
+        a_interface = a_type.tracks.interface
+        b_interface = b_type.tracks.interface
+        if hasattr(a_interface, bin_op):
+            new_node = node.graph.apply(
+                getattr(a_interface, bin_op), a_node, b_node
+            )
+        elif hasattr(b_interface, bin_rop):
+            new_node = node.graph.apply(
+                getattr(b_interface, bin_rop), b_node, a_node
+            )
+        else:
+            raise TypeError(
+                f"No {bin_op} method for {a_interface} "
+                f"and no {bin_rop} method for {b_interface}"
+            )
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
+
+    return inference_function(inf)
+
+
+def _bin_rop_inferrer(bin_rop):
+    """Create a generic inferrer for binary rop methods."""
+
+    def inf(node, args, unif):
+        """Generic inferrer for binary rop methods.
+
+        Replace node with a call to rop method
+        if available in right operand type.
+        """
+        a_node, b_node = args
+        b_type = yield Require(b_node)
+        b_interface = b_type.tracks.interface
+        assert hasattr(
+            b_interface, bin_rop
+        ), f"No {bin_rop} method for {b_interface}"
+        new_node = node.graph.apply(
+            getattr(b_interface, bin_rop), b_node, a_node
+        )
+        yield Replace(new_node)
+        res = yield Require(new_node)
+        return res
+
+    return inf
+
+
+def _bin_op_dispatcher(bin_rop, *signatures):
+    """Dispatcher for binary op methods.
+
+    Create an inference function using given signatures and a
+    fallback binary rop inference function.
+    """
+
+    return dispatch_inferences(*signatures, default=_bin_rop_inferrer(bin_rop))
+
+
+def _bin_op_right_cast_inference(cls, bin_op):
+    """Create a generic inference for binary op/rop methods.
+
+    Replace right operand with a cast to left type if necessary.
+    """
+
+    def inf(node, args, unif):
+        """Inferrer for binary op/rop methods (e.g. float.__mul__).
+
+        Cast right operand to left operand type if necessary.
+        """
+        a_node, b_node = args
+        a_type = yield Require(a_node)
+        b_type = yield Require(b_node)
+        a_interface = a_type.tracks.interface
+        b_interface = b_type.tracks.interface
+        assert a_interface is cls, f"expected {cls}, got {a_interface}"
+        if b_interface is cls:
+            return data.AbstractAtom({"interface": cls})
+        else:
+            b_casted = node.graph.apply(cls, b_node)
+            new_node = node.graph.apply(getattr(cls, bin_op), a_node, b_casted)
+            yield Replace(new_node)
+            res = yield Require(new_node)
+            return res
+
+    return inference_function(inf)
+
+
 X = data.Generic("x")
+Y = data.Generic("y")
 
 
 def add_standard_inferrers(inferrers):
     """Register all the inferrers in this file."""
     inferrers.update(
         {
-            operator.mul: signature(X, X, ret=X),
-            operator.add: signature(X, X, ret=X),
-            operator.sub: signature(X, X, ret=X),
+            # operator functions
+            operator.add: _bin_op_inference("__add__", "__radd__"),
+            operator.and_: _bin_op_inference("__and__", "__rand__"),
+            operator.eq: signature(X, Y, ret=bool),
+            operator.floordiv: _bin_op_inference(
+                "__floordiv__", "__rfloordiv__"
+            ),
+            operator.ge: signature(X, Y, ret=bool),
+            operator.gt: signature(X, Y, ret=bool),
+            operator.invert: _unary_op_inference("__invert__"),
+            operator.is_: signature(X, Y, ret=bool),
+            operator.is_not: signature(X, Y, ret=bool),
+            operator.le: signature(X, Y, ret=bool),
+            operator.lshift: _bin_op_inference("__lshift__", "__rlshift__"),
+            operator.lt: signature(X, Y, ret=bool),
+            operator.mod: _bin_op_inference("__mod__", "__rmod__"),
+            operator.mul: _bin_op_inference("__mul__", "__rmul__"),
+            operator.ne: signature(X, Y, ret=bool),
             operator.neg: signature(X, ret=X),
-            operator.le: signature(X, X, ret=bool),
+            operator.not_: signature(X, ret=bool),
+            operator.or_: _bin_op_inference("__or__", "__ror__"),
+            operator.pos: _unary_op_inference("__pos__"),
+            operator.pow: _bin_op_inference("__pow__", "__rpow__"),
+            operator.rshift: _bin_op_inference("__rshift__", "__rrshift__"),
+            operator.sub: _bin_op_inference("__sub__", "__rsub__"),
+            operator.truediv: _bin_op_inference("__truediv__", "__rtruediv__"),
             operator.truth: signature(X, ret=bool),
-            basics.return_: signature(X, ret=X),
-            basics.resolve: inference_function(resolve),
-            basics.user_switch: inference_function(user_switch),
+            operator.xor: _bin_op_inference("__xor__", "__rxor__"),
             # builtin constructors
             type(None): signature(ret=None),
             bool: dispatch_inferences(
@@ -116,17 +255,132 @@ def add_standard_inferrers(inferrers):
                 (float, float),
             ),
             # builtin functions
-            int.__add__: signature(int, int, ret=int),
-            float.__add__: signature(float, float, ret=float),
             getattr: inference_function(getattr_inferrer),
             type: signature(
                 X,
                 ret=data.AbstractStructure([X], tracks={"interface": type}),
             ),
-            basics.make_handle: signature(
-                data.AbstractStructure([X], tracks={"interface": type}),
-                ret=data.AbstractStructure([X], tracks={"interface": Handle}),
+            bool.__add__: _bin_op_dispatcher("__radd__", (bool, bool, bool)),
+            bool.__and__: dispatch_inferences(
+                (bool, bool, bool),
+                (bool, int, int),
             ),
+            bool.__or__: dispatch_inferences(
+                (bool, bool, bool),
+                (bool, int, int),
+            ),
+            bool.__xor__: dispatch_inferences(
+                (bool, bool, bool),
+                (bool, int, int),
+            ),
+            float.__add__: _bin_op_right_cast_inference(float, "__add__"),
+            float.__floordiv__: _bin_op_right_cast_inference(
+                float, "__floordiv__"
+            ),
+            float.__mod__: dispatch_inferences(
+                (float, bool, float),
+                (float, int, float),
+                (float, float, float),
+            ),
+            float.__mul__: _bin_op_right_cast_inference(float, "__mul__"),
+            float.__pos__: signature(float, ret=float),
+            float.__pow__: dispatch_inferences(
+                (float, bool, float),
+                (float, int, float),
+                (float, float, float),
+            ),
+            float.__radd__: _bin_op_right_cast_inference(float, "__radd__"),
+            float.__rfloordiv__: _bin_op_right_cast_inference(
+                float, "__rfloordiv__"
+            ),
+            float.__rmod__: _bin_op_right_cast_inference(float, "__rmod__"),
+            float.__rmul__: _bin_op_right_cast_inference(float, "__rmul__"),
+            float.__rpow__: _bin_op_right_cast_inference(float, "__rpow__"),
+            float.__rsub__: _bin_op_right_cast_inference(float, "__rsub__"),
+            float.__sub__: _bin_op_right_cast_inference(float, "__sub__"),
+            float.__truediv__: _bin_op_right_cast_inference(
+                float, "__truediv__"
+            ),
+            int.__add__: _bin_op_dispatcher(
+                "__radd__", (int, int, int), (bool, bool, int), (int, bool, int)
+            ),
+            int.__and__: dispatch_inferences(
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__floordiv__: _bin_op_dispatcher(
+                "__rfloordiv__",
+                (bool, bool, int),
+                (bool, int, int),
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__invert__: dispatch_inferences(
+                (int, int),
+                (bool, int),
+            ),
+            int.__lshift__: dispatch_inferences(
+                (bool, bool, int),
+                (bool, int, int),
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__mod__: _bin_op_dispatcher(
+                "__rmod__",
+                (bool, bool, int),
+                (bool, int, int),
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__mul__: _bin_op_dispatcher(
+                "__rmul__",
+                (bool, bool, int),
+                (bool, int, int),
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__or__: dispatch_inferences(
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__pos__: dispatch_inferences(
+                (int, int),
+                (bool, int),
+            ),
+            int.__pow__: _bin_op_dispatcher(
+                "__rpow__",
+                (bool, bool, int),
+                (bool, int, int),
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__radd__: dispatch_inferences((int, bool, int)),
+            int.__rshift__: dispatch_inferences(
+                (bool, bool, int),
+                (bool, int, int),
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__sub__: _bin_op_dispatcher(
+                "__rsub__",
+                (bool, bool, int),
+                (bool, int, int),
+                (int, bool, int),
+                (int, int, int),
+            ),
+            int.__truediv__: dispatch_inferences(
+                (bool, bool, float),
+                (bool, int, float),
+                (bool, float, float),
+                (int, bool, float),
+                (int, int, float),
+                (int, float, float),
+            ),
+            int.__xor__: dispatch_inferences(
+                (int, bool, int),
+                (int, int, int),
+            ),
+            # myia basics functions
             basics.global_universe_getitem: signature(
                 data.AbstractStructure([X], tracks={"interface": Handle}),
                 ret=X,
@@ -136,6 +390,13 @@ def add_standard_inferrers(inferrers):
                 X,
                 ret=None,
             ),
+            basics.make_handle: signature(
+                data.AbstractStructure([X], tracks={"interface": type}),
+                ret=data.AbstractStructure([X], tracks={"interface": Handle}),
+            ),
             basics.partial: inference_function(partial_inferrer),
+            basics.resolve: inference_function(resolve),
+            basics.return_: signature(X, ret=X),
+            basics.user_switch: inference_function(user_switch),
         }
     )
