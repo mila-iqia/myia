@@ -1,4 +1,5 @@
 from myia.abstract import data
+from myia.abstract.to_abstract import to_abstract
 from myia.abstract.utils import (
     MapError,
     canonical,
@@ -6,12 +7,13 @@ from myia.abstract.utils import (
     get_generics,
     is_concrete,
     merge,
+    recursivize,
     uncanonical,
     unify,
 )
 from myia.testing.common import A, Un
 
-from ..common import one_test_per_assert
+from ..common import Point, Trio, one_test_per_assert
 
 cg0 = data.CanonGeneric(0)
 cg1 = data.CanonGeneric(1)
@@ -182,3 +184,66 @@ def test_merge():
 def test_get_generics():
     assert get_generics(A(cg0, 1, cg1)) == {cg0, cg1}
     assert get_generics(A(int, float)) == set()
+
+
+def _make_tagger(*types):
+    def tagger(typ):
+        itf = typ.tracks.interface
+        if isinstance(itf, data.TypedObject) and itf.cls in types:
+            return itf.cls
+
+    return tagger
+
+
+def test_recursivize():
+    tg_p = _make_tagger(Point)
+
+    pt = Point(Point(1, 2), 3)
+    pt2 = Point(Point(Point(1, 2), 3), 4)
+
+    apt = to_abstract(pt)
+    apt2 = to_abstract(pt2)
+
+    rapt = recursivize(apt, parents={}, tagger=tg_p)
+    rapt2 = recursivize(apt2, parents={}, tagger=tg_p)
+    assert rapt is rapt2
+    rapt3 = recursivize(rapt, parents={}, tagger=tg_p)
+    assert rapt is rapt3
+
+    tri = Trio(Point(1, 2), Point(1.5, 2.5), Point(Point(1, 2), 3))
+    atri = to_abstract(tri)
+    ratri = recursivize(atri, parents={}, tagger=tg_p)
+
+    assert ratri is data.AbstractStructure(
+        [to_abstract(Point(1, 2)), to_abstract(Point(1.5, 2.5)), rapt],
+        {"interface": data.TypedObject(Trio, ["a", "b", "c"])},
+    )
+
+    tri2 = Trio(
+        1,
+        2,
+        Point(
+            Trio(Point(3, 4), 5, 6),
+            7,
+        ),
+    )
+    atri2 = to_abstract(tri2)
+    ratri2 = recursivize(atri2, parents={}, tagger=_make_tagger(Point, Trio))
+    assert (
+        str(ratri2)
+        == "#1=*Trio(#2=*U(*int(), *Point(*U(*int(), #1=*Trio()), *int())), *int(), #2=*U())"
+    )
+
+
+def test_recursivize_broaden():
+    tg_p = _make_tagger(Point)
+
+    pt = Point(Point(1, 2), 3)
+    pt2 = Point(Point(Point(4, 5), 6), 7)
+
+    apt = A(pt)
+    apt2 = A(pt2)
+
+    rapt = recursivize(apt, parents={}, tagger=tg_p)
+    rapt2 = recursivize(apt2, parents={}, tagger=tg_p)
+    assert rapt is rapt2

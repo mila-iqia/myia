@@ -58,14 +58,22 @@ def getattr_inferrer(node, args, unif):
     obj = yield Require(obj_node)
     key = key_node.value
     interface = obj.tracks.interface
+    if isinstance(interface, data.TypedObject):
+        if key in interface.indexed:
+            return obj.elements[interface.indexed[key]]
+        else:
+            interface = interface.cls
     result = getattr(interface, key)
-    if isinstance(result, (types.MethodType, types.WrapperDescriptorType)):
-        ct = Constant(result)
-        new_node = node.graph.apply(basics.partial, ct, obj_node)
-    elif isinstance(interface, types.ModuleType) and isinstance(
+    if isinstance(interface, types.ModuleType) and isinstance(
         result, (types.FunctionType, types.BuiltinFunctionType)
     ):
         new_node = Constant(result)
+    elif isinstance(
+        result,
+        (types.MethodType, types.WrapperDescriptorType, types.FunctionType),
+    ):
+        ct = Constant(result)
+        new_node = node.graph.apply(basics.partial, ct, obj_node)
     else:
         raise AssertionError("getattr can currently only be used for methods")
         # new_node = Constant(result)
