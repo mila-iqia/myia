@@ -104,7 +104,6 @@ def _utest(a, b, expected=True, mappings={}):
     if expected is not True:
         assert c == expected
     for entry, canon in mappings.items():
-        print(entry, canon, U.canon[entry])
         assert U.canon[entry] == canon
     return True
 
@@ -167,7 +166,6 @@ def _mtest(a, b, expected=True, mappings={}):
     if expected is not True:
         assert c == expected
     for entry, canon in mappings.items():
-        print(entry, canon, U.canon[entry])
         assert U.canon[entry] == canon
     return True
 
@@ -210,6 +208,8 @@ def test_recursivize():
     rapt3 = recursivize(rapt, parents={}, tagger=tg_p)
     assert rapt is rapt3
 
+    assert str(rapt) == "#1=*Point(*U(*int(), #1=*Point()), *int())"
+
     tri = Trio(Point(1, 2), Point(1.5, 2.5), Point(Point(1, 2), 3))
     atri = to_abstract(tri)
     ratri = recursivize(atri, parents={}, tagger=tg_p)
@@ -247,3 +247,7 @@ def test_recursivize_broaden():
     rapt = recursivize(apt, parents={}, tagger=tg_p)
     rapt2 = recursivize(apt2, parents={}, tagger=tg_p)
     assert rapt is rapt2
+    assert (
+        str(rapt)
+        == "#1=*Point(*U(#2=*int(value ↦ ANYTHING), #1=*Point()), #2=*int())"
+    )
