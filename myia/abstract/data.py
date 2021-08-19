@@ -352,3 +352,35 @@ class Placeholder(GenericBase):
 
     def __hrepr_short__(self, H, hrepr):
         return H.atom["myia-placeholder"](f"??{self.id}")
+
+
+###################
+# Other utilities #
+###################
+
+
+class TypedObject:
+    """Interface to a standard Python type, with a list of its fields.
+
+    It is used in the interface track of an AbstractStructure which must contain
+    the types of the fields in the order given.
+    """
+
+    def __init__(self, cls, field_names):
+        self.cls = cls
+        self.field_names = tuple(field_names)
+        self.indexed = dict(zip(self.field_names, range(len(self.field_names))))
+
+    @property
+    def __name__(self):
+        return self.cls.__name__
+
+    def __hash__(self):
+        return hash((self.cls, self.field_names))
+
+    def __eq__(self, other):
+        return (
+            type(other) is type(self)
+            and self.cls == other.cls
+            and self.field_names == other.field_names
+        )

@@ -1,5 +1,7 @@
 from myia.abstract import data
-from myia.abstract.to_abstract import from_value, type_to_abstract
+from myia.abstract.to_abstract import from_value, to_abstract, type_to_abstract
+
+from ..common import Point
 
 
 def test_from_value():
@@ -55,4 +57,24 @@ def test_type_to_abstract():
     assert type_to_abstract(int) is data.AbstractAtom({"interface": int})
     assert from_value(int) is data.AbstractStructure(
         [data.AbstractAtom({"interface": int})], {"interface": type}
+    )
+
+
+def test_obj():
+    pt = Point(1, 2)
+    assert to_abstract(pt) is data.AbstractStructure(
+        (type_to_abstract(int), type_to_abstract(int)),
+        {"interface": data.TypedObject(Point, ["x", "y"])},
+    )
+
+    pt = Point(Point(1, 2), 3)
+    assert to_abstract(pt) is data.AbstractStructure(
+        (
+            data.AbstractStructure(
+                (type_to_abstract(int), type_to_abstract(int)),
+                {"interface": data.TypedObject(Point, ["x", "y"])},
+            ),
+            type_to_abstract(int),
+        ),
+        {"interface": data.TypedObject(Point, ["x", "y"])},
     )

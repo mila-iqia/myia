@@ -223,9 +223,12 @@ def abstract_map(self, x, **kwargs):
             return result
         cls = result.send(None)
         assert cls is not None
-        inst = cls.empty()
-        constructor = _make_constructor(inst)
-        cache[x] = inst
+        if isinstance(cls, type):
+            inst = cls.empty()
+            constructor = _make_constructor(inst)
+            cache[x] = inst
+        else:
+            inst = constructor = cls
         try:
             result.send(constructor)
         except StopIteration as e:

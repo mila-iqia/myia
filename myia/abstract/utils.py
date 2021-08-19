@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from ovld import ovld
 
+from ..utils.orderedset import OrderedSet
 from . import data
 from .map import (
     MapError,
@@ -196,3 +197,74 @@ def merge(x, y, U=None):
     U = U or Unificator()
     res = _merge(x, y, U=U)
     return reify(res, unif=U.canon), U
+
+
+###############
+# Recursivize #
+###############
+
+
+@abstract_map.variant
+def recursivize(self, a: data.AbstractStructure, *, parents, tagger):
+    """Transform certain types so that they are recursively uniform.
+
+    For example:
+
+        Cons(int, Cons(int, int)) => #1=Cons(int, Union(int, #1))
+
+    Arguments:
+        self: A pointer to the recursivize function
+        a: An AbstractStructure or AbstractValue
+        parents: A map from a tag to a canonical AbstractStructure
+        tagger: A function from an AbstractStructure to a tag that
+            corresponds to it (usually its interface). If X is nested
+            in Y, and X has the same tag as Y, recursivize must produce
+            the same result for X and Y.
+    """
+    tag = tagger(a)
+    if not tag:
+        return (yield from self.super(a, parents=parents, tagger=tagger))
+
+    if tag in parents:
+        finalize_here = False
+        inst = parents[tag]
+    else:
+        finalize_here = True
+        inst = type(a).empty()
+        inst.__init__([OrderedSet() for _ in a.elements], self(a.tracks))
+        parents = {**parents, tag: inst}
+
+    yield inst
+
+    for u, elem in zip(inst.elements, a.elements):
+        if finalize_here:
+            # We don't call self() at the first level because we don't want to
+            # hit cached entries for subtypes in elem. For example,
+            # A(B(int, int), B(int, B(int, int))) should produce
+            # A(B(int, int), #1=B(int, Union(#1, int))), but the
+            # algorithm will not work if the cached value for the first B(int, int)
+            # is used for the second (instead of contributing to the union)
+            u.add(_recursivize_helper(elem, parents=parents, tagger=tagger))
+        else:
+            u.add(self(elem, parents=parents, tagger=tagger))
+
+    if finalize_here:
+        elems = []
+        for u in inst.elements:
+            if len(u) == 1:
+                (value,) = u
+            else:
+                value = data.AbstractUnion.empty()
+                value.__init__(list(u), {})
+                value._incomplete = False
+            elems.append(value)
+        inst.elements = elems
+        inst._incomplete = False
+
+    return inst
+
+
+# No postprocessing because some of the return value might still be incomplete
+@recursivize.variant(postprocess=lambda self, x: x)
+def _recursivize_helper(self, vt: data.ValueTrack, *, parents, tagger):
+    return data.ValueTrack(data.ANYTHING)

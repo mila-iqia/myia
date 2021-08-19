@@ -37,7 +37,6 @@ def test_bad():
         fact(5.0)
 
 
-@pytest.mark.xfail(reason="Objects are not represented properly yet")
 def test_method():
     b = Banana(7)
     assert b.bigger(4) is True

@@ -117,3 +117,19 @@ def test_module_function_call(x):
 )
 def test_infer_scalar_cast(dtype, value):
     return dtype(value)
+
+
+class Banana:
+    def __init__(self, size):
+        self.size = size
+
+    def bigger(self, obj):
+        return obj <= self.size
+
+
+@mt(
+    infer(Banana(3.5), float, result=bool),
+    infer(Banana("ohno"), float, result=MapError),
+)
+def test_method(b, x):
+    return b.bigger(x)

@@ -32,7 +32,18 @@ def to_abstract(self, x: ModuleType):  # noqa: F811
 
 @ovld
 def to_abstract(self, x: object):  # noqa: F811
-    return data.AbstractAtom({"interface": type(x)})
+    try:
+        members = vars(x)
+    except TypeError:
+        members = []
+    if not members:
+        return data.AbstractAtom({"interface": type(x)})
+    else:
+        field_types = tuple(self(x) for x in members.values())
+        return data.AbstractStructure(
+            field_types,
+            {"interface": data.TypedObject(type(x), members.keys())},
+        )
 
 
 @ovld
