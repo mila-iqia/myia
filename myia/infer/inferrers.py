@@ -172,11 +172,18 @@ def _bin_op_dispatcher(bin_rop, *signatures):
     return dispatch_inferences(*signatures, default=_bin_rop_inferrer(bin_rop))
 
 
-def _bin_op_right_cast_inference(cls, bin_op):
+def _bin_op_right_cast_inference(cls, bin_op, ret=None):
     """Create a generic inference for binary op/rop methods.
 
     Replace right operand with a cast to left type if necessary.
+
+    If both operands have same interface cls,
+    return abstract atom with either cls or ret (if not None) as interface.
     """
+    if ret is None:
+        ret = cls
+    else:
+        assert isinstance(ret, type)
 
     def inf(node, args, unif):
         """Inferrer for binary op/rop methods (e.g. float.__mul__).
@@ -190,7 +197,7 @@ def _bin_op_right_cast_inference(cls, bin_op):
         b_interface = b_type.tracks.interface
         assert a_interface is cls, f"expected {cls}, got {a_interface}"
         if b_interface is cls:
-            return data.AbstractAtom({"interface": cls})
+            return data.AbstractAtom({"interface": ret})
         else:
             b_casted = node.graph.apply(cls, b_node)
             new_node = node.graph.apply(getattr(cls, bin_op), a_node, b_casted)
@@ -212,21 +219,21 @@ def add_standard_inferrers(inferrers):
             # operator functions
             operator.add: _bin_op_inference("__add__", "__radd__"),
             operator.and_: _bin_op_inference("__and__", "__rand__"),
-            operator.eq: signature(X, Y, ret=bool),
+            operator.eq: _bin_op_inference("__eq__", "__eq__"),
             operator.floordiv: _bin_op_inference(
                 "__floordiv__", "__rfloordiv__"
             ),
-            operator.ge: signature(X, Y, ret=bool),
-            operator.gt: signature(X, Y, ret=bool),
+            operator.ge: _bin_op_inference("__ge__", "__le__"),
+            operator.gt: _bin_op_inference("__gt__", "__lt__"),
             operator.invert: _unary_op_inference("__invert__"),
             operator.is_: signature(X, Y, ret=bool),
             operator.is_not: signature(X, Y, ret=bool),
-            operator.le: signature(X, Y, ret=bool),
+            operator.le: _bin_op_inference("__le__", "__ge__"),
             operator.lshift: _bin_op_inference("__lshift__", "__rlshift__"),
-            operator.lt: signature(X, Y, ret=bool),
+            operator.lt: _bin_op_inference("__lt__", "__gt__"),
             operator.mod: _bin_op_inference("__mod__", "__rmod__"),
             operator.mul: _bin_op_inference("__mul__", "__rmul__"),
-            operator.ne: signature(X, Y, ret=bool),
+            operator.ne: _bin_op_inference("__ne__", "__ne__"),
             operator.neg: signature(X, ret=X),
             operator.not_: signature(X, ret=bool),
             operator.or_: _bin_op_inference("__or__", "__ror__"),
@@ -274,15 +281,21 @@ def add_standard_inferrers(inferrers):
                 (bool, int, int),
             ),
             float.__add__: _bin_op_right_cast_inference(float, "__add__"),
+            float.__eq__: _bin_op_right_cast_inference(float, "__eq__", bool),
             float.__floordiv__: _bin_op_right_cast_inference(
                 float, "__floordiv__"
             ),
+            float.__ge__: _bin_op_right_cast_inference(float, "__ge__", bool),
+            float.__gt__: _bin_op_right_cast_inference(float, "__gt__", bool),
+            float.__le__: _bin_op_right_cast_inference(float, "__le__", bool),
+            float.__lt__: _bin_op_right_cast_inference(float, "__lt__", bool),
             float.__mod__: dispatch_inferences(
                 (float, bool, float),
                 (float, int, float),
                 (float, float, float),
             ),
             float.__mul__: _bin_op_right_cast_inference(float, "__mul__"),
+            float.__ne__: _bin_op_right_cast_inference(float, "__ne__", bool),
             float.__pos__: signature(float, ret=float),
             float.__pow__: dispatch_inferences(
                 (float, bool, float),
@@ -308,6 +321,13 @@ def add_standard_inferrers(inferrers):
                 (int, bool, int),
                 (int, int, int),
             ),
+            int.__eq__: _bin_op_dispatcher(
+                "__eq__",
+                (bool, bool, bool),
+                (bool, int, bool),
+                (int, bool, bool),
+                (int, int, bool),
+            ),
             int.__floordiv__: _bin_op_dispatcher(
                 "__rfloordiv__",
                 (bool, bool, int),
@@ -315,15 +335,43 @@ def add_standard_inferrers(inferrers):
                 (int, bool, int),
                 (int, int, int),
             ),
+            int.__ge__: _bin_op_dispatcher(
+                "__le__",
+                (bool, bool, bool),
+                (bool, int, bool),
+                (int, bool, bool),
+                (int, int, bool),
+            ),
+            int.__gt__: _bin_op_dispatcher(
+                "__lt__",
+                (bool, bool, bool),
+                (bool, int, bool),
+                (int, bool, bool),
+                (int, int, bool),
+            ),
             int.__invert__: dispatch_inferences(
                 (int, int),
                 (bool, int),
+            ),
+            int.__le__: _bin_op_dispatcher(
+                "__ge__",
+                (bool, bool, bool),
+                (bool, int, bool),
+                (int, bool, bool),
+                (int, int, bool),
             ),
             int.__lshift__: dispatch_inferences(
                 (bool, bool, int),
                 (bool, int, int),
                 (int, bool, int),
                 (int, int, int),
+            ),
+            int.__lt__: _bin_op_dispatcher(
+                "__gt__",
+                (bool, bool, bool),
+                (bool, int, bool),
+                (int, bool, bool),
+                (int, int, bool),
             ),
             int.__mod__: _bin_op_dispatcher(
                 "__rmod__",
@@ -338,6 +386,13 @@ def add_standard_inferrers(inferrers):
                 (bool, int, int),
                 (int, bool, int),
                 (int, int, int),
+            ),
+            int.__ne__: _bin_op_dispatcher(
+                "__ne__",
+                (bool, bool, bool),
+                (bool, int, bool),
+                (int, bool, bool),
+                (int, int, bool),
             ),
             int.__or__: dispatch_inferences(
                 (int, bool, int),
@@ -379,6 +434,53 @@ def add_standard_inferrers(inferrers):
             int.__xor__: dispatch_inferences(
                 (int, bool, int),
                 (int, int, int),
+            ),
+            # NB: For str comparison methods,
+            # we declare str-vs-other-builtin signatures as not implemented
+            # so that inference stops here instead of looking for
+            # right operand method (which might call back
+            # str comparison method again, resulting in infinite loop).
+            str.__eq__: _bin_op_dispatcher(
+                "__eq__",
+                (str, bool, NotImplemented),
+                (str, int, NotImplemented),
+                (str, float, NotImplemented),
+                (str, str, bool),
+            ),
+            str.__ge__: _bin_op_dispatcher(
+                "__le__",
+                (str, bool, NotImplemented),
+                (str, int, NotImplemented),
+                (str, float, NotImplemented),
+                (str, str, bool),
+            ),
+            str.__gt__: _bin_op_dispatcher(
+                "__lt__",
+                (str, bool, NotImplemented),
+                (str, int, NotImplemented),
+                (str, float, NotImplemented),
+                (str, str, bool),
+            ),
+            str.__le__: _bin_op_dispatcher(
+                "__ge__",
+                (str, bool, NotImplemented),
+                (str, int, NotImplemented),
+                (str, float, NotImplemented),
+                (str, str, bool),
+            ),
+            str.__lt__: _bin_op_dispatcher(
+                "__gt__",
+                (str, bool, NotImplemented),
+                (str, int, NotImplemented),
+                (str, float, NotImplemented),
+                (str, str, bool),
+            ),
+            str.__ne__: _bin_op_dispatcher(
+                "__ne__",
+                (str, bool, NotImplemented),
+                (str, int, NotImplemented),
+                (str, float, NotImplemented),
+                (str, str, bool),
             ),
             # myia basics functions
             basics.global_universe_getitem: signature(

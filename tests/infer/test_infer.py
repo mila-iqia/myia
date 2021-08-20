@@ -119,7 +119,7 @@ class Banana:
 
 @mt(
     infer(Banana(3.5), float, result=bool),
-    infer(Banana("ohno"), float, result=MapError),
+    infer(Banana("ohno"), float, result=AssertionError(r"No inference for .* signature\: \[\*str\(\)\]")),
 )
 def test_method(b, x):
     return b.bigger(x)
@@ -235,7 +235,7 @@ def test_binary_truediv(a, b):
     return a / b
 
 
-@mt(
+binary_bool_tests = [
     infer(int, bool, result=bool),
     infer(int, int, result=bool),
     infer(int, float, result=bool),
@@ -245,112 +245,53 @@ def test_binary_truediv(a, b):
     infer(bool, bool, result=bool),
     infer(bool, int, result=bool),
     infer(bool, float, result=bool),
-)
+]
+
+
+binary_bool_tests_with_str = [
+    *binary_bool_tests,
+    infer(str, bool, result=AssertionError(r"No implementation for .* signature\: \[\*str\(\), \*bool\(\)\]")),
+    infer(str, int, result=AssertionError(r"No implementation for .* signature\: \[\*str\(\), \*int\(\)\]")),
+    infer(str, float, result=AssertionError(r"No implementation for .* signature\: \[\*str\(\), \*float\(\)\]")),
+]
+
+
+@mt(*binary_bool_tests_with_str)
 def test_binary_bool_eq(a, b):
     return a == b
 
 
-@mt(
-    infer(int, bool, result=bool),
-    infer(int, int, result=bool),
-    infer(int, float, result=bool),
-    infer(float, bool, result=bool),
-    infer(float, int, result=bool),
-    infer(float, float, result=bool),
-    infer(bool, bool, result=bool),
-    infer(bool, int, result=bool),
-    infer(bool, float, result=bool),
-)
+@mt(*binary_bool_tests_with_str)
 def test_binary_bool_ge(a, b):
     return a >= b
 
 
-@mt(
-    infer(int, bool, result=bool),
-    infer(int, int, result=bool),
-    infer(int, float, result=bool),
-    infer(float, bool, result=bool),
-    infer(float, int, result=bool),
-    infer(float, float, result=bool),
-    infer(bool, bool, result=bool),
-    infer(bool, int, result=bool),
-    infer(bool, float, result=bool),
-)
+@mt(*binary_bool_tests_with_str)
 def test_binary_bool_gt(a, b):
     return a > b
 
 
-@mt(
-    infer(int, bool, result=bool),
-    infer(int, int, result=bool),
-    infer(int, float, result=bool),
-    infer(float, bool, result=bool),
-    infer(float, int, result=bool),
-    infer(float, float, result=bool),
-    infer(bool, bool, result=bool),
-    infer(bool, int, result=bool),
-    infer(bool, float, result=bool),
-)
+@mt(*binary_bool_tests)
 def test_binary_bool_is(a, b):
     return a is b
 
 
-@mt(
-    infer(int, bool, result=bool),
-    infer(int, int, result=bool),
-    infer(int, float, result=bool),
-    infer(float, bool, result=bool),
-    infer(float, int, result=bool),
-    infer(float, float, result=bool),
-    infer(bool, bool, result=bool),
-    infer(bool, int, result=bool),
-    infer(bool, float, result=bool),
-)
+@mt(*binary_bool_tests)
 def test_binary_bool_is_not(a, b):
     return a is not b
 
 
-@mt(
-    infer(int, bool, result=bool),
-    infer(int, int, result=bool),
-    infer(int, float, result=bool),
-    infer(float, bool, result=bool),
-    infer(float, int, result=bool),
-    infer(float, float, result=bool),
-    infer(bool, bool, result=bool),
-    infer(bool, int, result=bool),
-    infer(bool, float, result=bool),
-)
+@mt(*binary_bool_tests_with_str)
 def test_binary_bool_le(a, b):
     return a <= b
 
 
-@mt(
-    infer(int, bool, result=bool),
-    infer(int, int, result=bool),
-    infer(int, float, result=bool),
-    infer(float, bool, result=bool),
-    infer(float, int, result=bool),
-    infer(float, float, result=bool),
-    infer(bool, bool, result=bool),
-    infer(bool, int, result=bool),
-    infer(bool, float, result=bool),
-)
+@mt(*binary_bool_tests_with_str)
 def test_binary_bool_lt(a, b):
     return a < b
 
 
-@mt(
-    infer(int, bool, result=bool),
-    infer(int, int, result=bool),
-    infer(int, float, result=bool),
-    infer(float, bool, result=bool),
-    infer(float, int, result=bool),
-    infer(float, float, result=bool),
-    infer(bool, bool, result=bool),
-    infer(bool, int, result=bool),
-    infer(bool, float, result=bool),
-)
+@mt(*binary_bool_tests_with_str)
 def test_binary_bool_ne(a, b):
     return a != b
 

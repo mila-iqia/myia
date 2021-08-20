@@ -105,7 +105,7 @@ def test_format_exc():
         assert (
             format_exc(exc.value, mode="caret")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a~11::*int(), b~11::*float())
+In fun:clone(a~29::*int(), b~29::*float())
 89     c = and_(
            ^^^^^
 90         a,
@@ -120,7 +120,7 @@ In and_:clone(x::*int(), y::*float())
 2024     return f"value is {x}"
          ^^^^^^^^^^^^^^^^^^^^^^
 
-AssertionError: No inference for node: Apply(#12 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
+AssertionError: No inference for node: Apply(#32 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
         )
 
         with pytest.raises(Exception) as exc:
@@ -128,7 +128,7 @@ AssertionError: No inference for node: Apply(#12 = <slot wrapper '__and__' of 'i
         assert (
             format_exc(exc.value, mode="color")
             == """File ./tests/ir/test_print.py, lines 89-92
-In fun:clone(a~11::*int(), b~11::*float())
+In fun:clone(a~29::*int(), b~29::*float())
 89     c = \x1b[33m\x1b[1mand_(\x1b[0m
 90         \x1b[33m\x1b[1ma,\x1b[0m
 91         \x1b[33m\x1b[1mb,\x1b[0m
@@ -138,7 +138,7 @@ File ./tests/test_parser.py, line 2024
 In and_:clone(x::*int(), y::*float())
 2024     \x1b[33m\x1b[1mreturn f"value is {x}"\x1b[0m
 
-AssertionError: No inference for node: Apply(#12 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
+AssertionError: No inference for node: Apply(#32 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
         )
 
     assert format_exc(TypeError("abc")) is None
