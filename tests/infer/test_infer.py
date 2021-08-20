@@ -1,6 +1,5 @@
 import operator
 
-from myia.abstract.map import MapError
 from myia.abstract.to_abstract import to_abstract, type_to_abstract
 from myia.infer.infnode import infer_graph, inferrers, signature
 from myia.parser import parse
@@ -119,7 +118,11 @@ class Banana:
 
 @mt(
     infer(Banana(3.5), float, result=bool),
-    infer(Banana("ohno"), float, result=AssertionError(r"No inference for .* signature\: \[\*str\(\)\]")),
+    infer(
+        Banana("ohno"),
+        float,
+        result=AssertionError(r"No inference for .* signature\: \[\*str\(\)\]"),
+    ),
 )
 def test_method(b, x):
     return b.bigger(x)
@@ -250,9 +253,27 @@ binary_bool_tests = [
 
 binary_bool_tests_with_str = [
     *binary_bool_tests,
-    infer(str, bool, result=AssertionError(r"No implementation for .* signature\: \[\*str\(\), \*bool\(\)\]")),
-    infer(str, int, result=AssertionError(r"No implementation for .* signature\: \[\*str\(\), \*int\(\)\]")),
-    infer(str, float, result=AssertionError(r"No implementation for .* signature\: \[\*str\(\), \*float\(\)\]")),
+    infer(
+        str,
+        bool,
+        result=AssertionError(
+            r"No implementation for .* signature\: \[\*str\(\), \*bool\(\)\]"
+        ),
+    ),
+    infer(
+        str,
+        int,
+        result=AssertionError(
+            r"No implementation for .* signature\: \[\*str\(\), \*int\(\)\]"
+        ),
+    ),
+    infer(
+        str,
+        float,
+        result=AssertionError(
+            r"No implementation for .* signature\: \[\*str\(\), \*float\(\)\]"
+        ),
+    ),
 ]
 
 

@@ -122,7 +122,11 @@ class InferenceDefinition:
         self.arg_types = tuple(
             _type_to_abstract(arg_type) for arg_type in arg_types
         )
-        self.ret_type = ret_type if ret_type is NotImplemented else _type_to_abstract(ret_type)
+        self.ret_type = (
+            ret_type
+            if ret_type is NotImplemented
+            else _type_to_abstract(ret_type)
+        )
 
 
 def dispatch_inferences(*signatures: Sequence, default=None):
@@ -158,7 +162,9 @@ def dispatch_inferences(*signatures: Sequence, default=None):
                     f"signature: {list(inp_types)}"
                 )
             else:
-                for inp_type, expected_type in zip(inp_types, inf_def.arg_types):
+                for inp_type, expected_type in zip(
+                    inp_types, inf_def.arg_types
+                ):
                     autils.unify(inp_type, expected_type, U=unif)
                 return autils.reify(inf_def.ret_type, unif=unif.canon)
         else:

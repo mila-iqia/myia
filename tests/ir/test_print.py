@@ -116,11 +116,11 @@ In fun:clone(a~29::*int(), b~29::*float())
        ^
 
 File ./tests/test_parser.py, line 2024
-In and_:clone(x::*int(), y::*float())
+In and_:clone(x~2::*int(), y::*float())
 2024     return f"value is {x}"
          ^^^^^^^^^^^^^^^^^^^^^^
 
-AssertionError: No inference for node: Apply(#32 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
+AssertionError: No inference for node: Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y)), signature: [*int(), *float()]"""
         )
 
         with pytest.raises(Exception) as exc:
@@ -135,10 +135,10 @@ In fun:clone(a~29::*int(), b~29::*float())
 92     \x1b[33m\x1b[1m)\x1b[0m
 
 File ./tests/test_parser.py, line 2024
-In and_:clone(x::*int(), y::*float())
+In and_:clone(x~2::*int(), y::*float())
 2024     \x1b[33m\x1b[1mreturn f"value is {x}"\x1b[0m
 
-AssertionError: No inference for node: Apply(#32 = <slot wrapper '__and__' of 'int' objects>(x, y)), signature: [*int(), *float()]"""
+AssertionError: No inference for node: Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y)), signature: [*int(), *float()]"""
         )
 
     assert format_exc(TypeError("abc")) is None
