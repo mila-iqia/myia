@@ -7,6 +7,7 @@ from typing import Dict, Sequence, Tuple
 from myia.ir.node import SEQ
 
 from ..abstract import data, utils as autils
+from ..abstract.map import abstract_map
 from ..abstract.to_abstract import to_abstract, type_to_abstract
 from ..ir import Constant, Graph, Node
 from ..ir.graph_utils import dfs, succ_deeper
@@ -80,7 +81,8 @@ def _type_to_abstract(el):
     return type_to_abstract(el)
 
 
-def _without_value(abstract: data.AbstractAtom):
+@abstract_map.variant
+def broaden(self, abstract: data.AbstractAtom, **kwargs):
     """Get pure type from given abstract, without associated value.
 
     Useful to lookup node abstract in registered signatures.
@@ -88,8 +90,15 @@ def _without_value(abstract: data.AbstractAtom):
     NB: We must remove value track, not keeping it with ANYTHING value,
     because abstract atom with only interface won't have same hash
     as abstract atom with interface + ANYTHING value.
+    TODO: Improve handling for this case (e.g. ignoring ANYTHING for hash?)
     """
-    return data.AbstractAtom({"interface": abstract.tracks.interface})
+    return data.AbstractAtom(
+        {
+            key: track.value
+            for key, track in abstract.tracks.items()
+            if key != "value"
+        }
+    )
 
 
 def signature(*arg_types, ret):
@@ -152,7 +161,7 @@ def dispatch_inferences(*signatures: Sequence, default=None):
         inp_types = []
         for inp in args:
             inp_type = yield Require(inp)
-            inp_types.append(_without_value(inp_type))
+            inp_types.append(broaden(inp_type))
         inp_types = tuple(inp_types)
         inf_def = def_map.get(inp_types)
         if inf_def:
@@ -172,7 +181,12 @@ def dispatch_inferences(*signatures: Sequence, default=None):
                 f"No inference for node: {node}, "
                 f"signature: {list(inp_types)}"
             )
-            return (yield from default(node, args, unif))
+            ret_type = yield from default(node, args, unif)
+            # Cache result in def_map.
+            def_map[inp_types] = InferenceDefinition(
+                *inp_types, ret_type=ret_type
+            )
+            return ret_type
 
     return inference_function(inference)
 

@@ -121,6 +121,8 @@ def _bin_op_inference(bin_op, bin_rop):
             new_node = node.graph.apply(
                 getattr(a_interface, bin_op), a_node, b_node
             )
+        # TODO: In order to support user-defined graphs for bin_op,
+        # the case where it returns NotImplemented will have to be handled.
         elif hasattr(b_interface, bin_rop):
             new_node = node.graph.apply(
                 getattr(b_interface, bin_rop), b_node, a_node
