@@ -93,6 +93,11 @@ def fun(a, b):
     return c * b
 
 
+def fun_compact(a, b):
+    c = and_(a, b)
+    return c * b
+
+
 def and_2(x, y):
     return x & y
 
@@ -132,6 +137,43 @@ In fun:clone(a~29::*int(), b~29::*float())
 90         \x1b[33m\x1b[1ma,\x1b[0m
 91         \x1b[33m\x1b[1mb,\x1b[0m
 92     \x1b[33m\x1b[1m)\x1b[0m
+
+File ???
+In and_:clone(x~2::*int(), y::*float())
+    Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y))
+
+AssertionError: No inference for node: Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y)), signature: [*int(), *float()]"""
+        )
+
+    assert format_exc(TypeError("abc")) is None
+
+
+def test_format_exc_compact():
+    with enable_debug():
+        graph = parse(fun_compact)
+        with pytest.raises(Exception) as exc:
+            infer_graph(graph, (A(int), A(float)))
+        assert (
+            format_exc(exc.value, mode="caret")
+            == """File ./tests/ir/test_print.py, line 97
+In fun_compact:clone(a~30::*int(), b~30::*float())
+97     c = and_(a, b)
+           ^^^^^^^^^^
+
+File ???
+In and_:clone(x~2::*int(), y::*float())
+    Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y))
+
+AssertionError: No inference for node: Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y)), signature: [*int(), *float()]"""
+        )
+
+        with pytest.raises(Exception) as exc:
+            infer_graph(graph, (A(int), A(float)))
+        assert (
+            format_exc(exc.value, mode="color")
+            == """File ./tests/ir/test_print.py, line 97
+In fun_compact:clone(a~30::*int(), b~30::*float())
+97     c = \x1b[33m\x1b[1mand_(a, b)\x1b[0m
 
 File ???
 In and_:clone(x~2::*int(), y::*float())
