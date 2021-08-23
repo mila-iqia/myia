@@ -31,6 +31,10 @@ class StackVar:
         """Return the top element of the stack."""
         return self.var.get()[0]
 
+    def clear(self):
+        """Clear stack."""
+        self.var.set((None, None))
+
 
 _stack = StackVar("_stack")
 _debug = ContextVar("debug", default=False)
@@ -40,6 +44,8 @@ _debug = ContextVar("debug", default=False)
 def enable_debug():
     """Enable debugging for a context."""
     tok = _debug.set(True)
+    # Clear stack each time we call enable_debug.
+    _stack.clear()
     try:
         yield
     finally:

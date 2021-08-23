@@ -115,10 +115,9 @@ In fun:clone(a~29::*int(), b~29::*float())
 92     )
        ^
 
-File ./tests/test_parser.py, line 2024
+File ???
 In and_:clone(x~2::*int(), y::*float())
-2024     return f"value is {x}"
-         ^^^^^^^^^^^^^^^^^^^^^^
+    Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y))
 
 AssertionError: No inference for node: Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y)), signature: [*int(), *float()]"""
         )
@@ -134,9 +133,9 @@ In fun:clone(a~29::*int(), b~29::*float())
 91         \x1b[33m\x1b[1mb,\x1b[0m
 92     \x1b[33m\x1b[1m)\x1b[0m
 
-File ./tests/test_parser.py, line 2024
+File ???
 In and_:clone(x~2::*int(), y::*float())
-2024     \x1b[33m\x1b[1mreturn f"value is {x}"\x1b[0m
+    Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y))
 
 AssertionError: No inference for node: Apply(#33 = <slot wrapper '__and__' of 'int' objects>(x~2, y)), signature: [*int(), *float()]"""
         )
